@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Local Stream Engine
+    orgId: 1
+    folder: Local Stream Engine
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards
