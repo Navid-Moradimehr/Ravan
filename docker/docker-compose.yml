@@ -91,6 +91,25 @@ services:
     ports:
       - "18083:8083"
 
+  ai-gateway:
+    build:
+      context: ..
+      dockerfile: services/ai_gateway/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      REDPANDA_BROKERS: redpanda:9092
+      PROCESSED_TOPIC: iot.processed
+      AI_ENRICHED_TOPIC: iot.ai_enriched
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://host.docker.internal:1234/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-lm-studio}
+      OPENAI_MODEL: ${OPENAI_MODEL:-openai/gpt-oss-20B}
+      LLM_BATCH_SECONDS: ${LLM_BATCH_SECONDS:-5}
+      LLM_MAX_BATCH_SIZE: ${LLM_MAX_BATCH_SIZE:-100}
+    ports:
+      - "8080:8080"
+
   jobmanager:
     image: flink:1.20.0-scala_2.12-java17
     command: jobmanager
