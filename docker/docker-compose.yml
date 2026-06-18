@@ -110,6 +110,17 @@ services:
     ports:
       - "8080:8080"
 
+  dashboard:
+    build:
+      context: ..
+      dockerfile: ui/Dockerfile
+    depends_on:
+      - ai-gateway
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+
   jobmanager:
     image: flink:1.20.0-scala_2.12-java17
     command: jobmanager

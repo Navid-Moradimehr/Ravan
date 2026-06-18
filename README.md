@@ -28,9 +28,19 @@ Prometheus scrapes services and exporters; Grafana and the web dashboard expose 
 3. Create topics: `pwsh scripts/create-topics.ps1`.
 4. Run the generator: `python services/ingestion/mock_generator.py`.
 5. Run the AI gateway locally or through Docker Compose.
+6. Open the dashboard: `http://localhost:3000`.
 
 ## Documentation
 
 - `Guide.md` contains the original product brief.
 - `ObsidianVault/` is the project knowledge base.
 - `docs/` contains implementation-facing references and operational notes.
+
+## Useful URLs
+
+- Dashboard: `http://localhost:3000`
+- Redpanda Console: `http://localhost:18080`
+- Flink UI: `http://localhost:18088`
+- AI Gateway: `http://localhost:8080/health`
+- Grafana: `http://localhost:13000`
+- Prometheus: `http://localhost:19090`
