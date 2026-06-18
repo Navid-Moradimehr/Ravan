@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Aptos", "Segoe UI", sans-serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", monospace;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #090b0d;
+  color: #e5e7eb;
+}
+
+:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+}
