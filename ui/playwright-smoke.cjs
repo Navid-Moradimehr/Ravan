@@ -15,6 +15,9 @@ const { chromium, expect } = require('@playwright/test');
   for (const text of ['Open Redpanda Console', 'Grafana', 'Prometheus', 'Flink UI', 'AI Health']) {
     await expect(page.getByRole('link', { name: text })).toBeVisible();
   }
+  await page.getByRole('button', { name: 'Switch to light mode' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.getByRole('button', { name: 'Switch to dark mode' })).toBeVisible();
   const content = await page.content();
   if (!content.includes('openai/gpt-oss-20B')) throw new Error('model not rendered');
   await page.screenshot({ path: 'docs/dashboard-smoke.png', fullPage: true });

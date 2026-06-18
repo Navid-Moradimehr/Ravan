@@ -2,10 +2,10 @@ import { cn } from "@/lib/utils";
 import type { PipelineNode } from "@/lib/api";
 
 const statusClassName: Record<PipelineNode["status"], string> = {
-  active: "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
-  starting: "border-sky-500/40 bg-sky-500/10 text-sky-200",
-  degraded: "border-amber-500/40 bg-amber-500/10 text-amber-200",
-  offline: "border-red-500/40 bg-red-500/10 text-red-200",
+  active: "border-success/40 bg-success/10 text-success",
+  starting: "border-info/40 bg-info/10 text-info",
+  degraded: "border-warning/40 bg-warning/10 text-warning",
+  offline: "border-error/40 bg-error/10 text-error",
 };
 
 export function StatusPill({ status }: { status: PipelineNode["status"] }) {
