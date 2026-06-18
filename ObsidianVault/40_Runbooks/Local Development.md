@@ -5,7 +5,7 @@
 ```powershell
 Copy-Item .env.example .env
 docker compose -f docker/docker-compose.yml up -d
-pwsh scripts/create-topics.ps1
+powershell -ExecutionPolicy Bypass -File scripts/create-topics.ps1
 ```
 
 ## Verify
@@ -19,6 +19,6 @@ pwsh scripts/create-topics.ps1
 ## CDC
 
 ```powershell
-pwsh scripts/register-debezium.ps1
-pwsh scripts/seed-orders.ps1
+powershell -ExecutionPolicy Bypass -File scripts/register-debezium.ps1
+powershell -ExecutionPolicy Bypass -File scripts/seed-orders.ps1
 ```

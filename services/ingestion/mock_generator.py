@@ -49,6 +49,7 @@ def main() -> None:
     topic = os.getenv("IOT_TOPIC", "iot.raw")
     rate_per_second = env_int("MOCK_RATE_PER_SECOND", 100)
     device_count = env_int("MOCK_DEVICE_COUNT", 50)
+    max_events = env_int("MOCK_MAX_EVENTS", 0)
     delay = 1 / max(rate_per_second, 1)
     running = True
 
@@ -73,6 +74,9 @@ def main() -> None:
         if produced % rate_per_second == 0:
             elapsed = max(time.time() - started_at, 0.001)
             print(f"produced={produced} rate={produced / elapsed:.1f}/sec topic={topic}")
+
+        if max_events and produced >= max_events:
+            running = False
 
         time.sleep(delay)
 

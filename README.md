@@ -25,10 +25,11 @@ Prometheus scrapes services and exporters; Grafana and the web dashboard expose 
 
 1. Copy `.env.example` to `.env` and adjust ports/model settings.
 2. Start infrastructure: `docker compose -f docker/docker-compose.yml up -d`.
-3. Create topics: `pwsh scripts/create-topics.ps1`.
+3. Create topics: `powershell -ExecutionPolicy Bypass -File scripts/create-topics.ps1`.
 4. Run the generator: `python services/ingestion/mock_generator.py`.
 5. Run the AI gateway locally or through Docker Compose.
-6. Open the dashboard: `http://localhost:3000`.
+6. Start the dashboard locally: `cd ui; npm run dev`.
+7. Open the dashboard: `http://localhost:3000`.
 
 ## Documentation
 

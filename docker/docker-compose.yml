@@ -54,7 +54,7 @@ services:
       - "18080:8080"
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     command: ["postgres", "-c", "wal_level=logical"]
     environment:
       POSTGRES_DB: stream_engine
@@ -72,7 +72,7 @@ services:
       retries: 10
 
   connect:
-    image: quay.io/debezium/connect:3.0
+    image: debezium/connect:3.0.0.Final
     depends_on:
       redpanda:
         condition: service_healthy
@@ -107,8 +107,22 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-openai/gpt-oss-20B}
       LLM_BATCH_SECONDS: ${LLM_BATCH_SECONDS:-5}
       LLM_MAX_BATCH_SIZE: ${LLM_MAX_BATCH_SIZE:-100}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-8}
+      LLM_ALLOW_FALLBACK: ${LLM_ALLOW_FALLBACK:-true}
     ports:
       - "8080:8080"
+
+  processor:
+    build:
+      context: ..
+      dockerfile: services/processor/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      REDPANDA_BROKERS: redpanda:9092
+      IOT_TOPIC: iot.raw
+      PROCESSED_TOPIC: iot.processed
 
   dashboard:
     build:
@@ -120,6 +134,8 @@ services:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
     ports:
       - "3000:3000"
+    profiles:
+      - ui
 
   jobmanager:
     image: flink:1.20.0-scala_2.12-java17

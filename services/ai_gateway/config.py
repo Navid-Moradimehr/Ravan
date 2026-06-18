@@ -14,3 +14,5 @@ class Settings(BaseSettings):
     openai_model: str = "openai/gpt-oss-20B"
     llm_batch_seconds: int = 5
     llm_max_batch_size: int = 100
+    llm_timeout_seconds: int = 8
+    llm_allow_fallback: bool = True

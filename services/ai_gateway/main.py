@@ -118,7 +118,7 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
 
     started = time.monotonic()
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
             response = await client.post(
                 f"{settings.openai_base_url.rstrip('/')}/chat/completions",
                 headers={"Authorization": f"Bearer {settings.openai_api_key}"},
@@ -134,24 +134,47 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
             response.raise_for_status()
             payload = response.json()
             content = payload["choices"][0]["message"]["content"]
-
-        enriched_payload = {
-            "source": "ai-gateway",
-            "model": settings.openai_model,
-            "batch_size": len(batch),
-            "summary": content,
-            "events": batch,
-            "latency_seconds": round(time.monotonic() - started, 3),
-        }
-        producer.produce(settings.ai_enriched_topic, value=json.dumps(enriched_payload).encode("utf-8"))
-        producer.poll(0)
-        enriched_events.inc()
-        last_success_epoch.set(time.time())
-        service_state["last_error"] = None
     except Exception as exc:
-        service_state["last_error"] = str(exc)
+        if not settings.llm_allow_fallback:
+            service_state["last_error"] = str(exc)
+            llm_latency.observe(time.monotonic() - started)
+            return
+        fallback_reason = f"{type(exc).__name__}: {exc}"
+        content = build_fallback_summary(batch, fallback_reason)
+        service_state["last_error"] = f"LLM fallback active: {fallback_reason}"
     finally:
         llm_latency.observe(time.monotonic() - started)
+
+    enriched_payload = {
+        "source": "ai-gateway",
+        "model": settings.openai_model,
+        "batch_size": len(batch),
+        "summary": content,
+        "events": batch,
+        "latency_seconds": round(time.monotonic() - started, 3),
+    }
+    producer.produce(settings.ai_enriched_topic, value=json.dumps(enriched_payload).encode("utf-8"))
+    producer.poll(0)
+    enriched_events.inc()
+    last_success_epoch.set(time.time())
+
+
+def build_fallback_summary(batch: list[dict[str, Any]], error: str) -> str:
+    critical = [event for event in batch if event.get("severity") == "critical"]
+    warning = [event for event in batch if event.get("severity") == "warning"]
+    devices = sorted({event.get("device_id", "unknown") for event in critical + warning})
+    return json.dumps(
+        {
+            "mode": "deterministic_fallback",
+            "reason": error,
+            "batch_size": len(batch),
+            "critical_count": len(critical),
+            "warning_count": len(warning),
+            "devices": devices[:10],
+            "operator_action": "Inspect critical devices first; verify temperature, vibration, and pressure thresholds.",
+        },
+        separators=(",", ":"),
+    )
 
 
 if __name__ == "__main__":

@@ -5,5 +5,5 @@ if (-not (Test-Path -LiteralPath ".env")) {
 }
 
 docker compose -f docker/docker-compose.yml up -d
-pwsh scripts/create-topics.ps1
+powershell -ExecutionPolicy Bypass -File scripts/create-topics.ps1
 Write-Host "Core services started. Run the generator with: python services/ingestion/mock_generator.py"

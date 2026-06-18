@@ -1,0 +1,12 @@
+.git
+.env
+.venv
+**/__pycache__
+**/*.pyc
+ui/node_modules
+ui/.next
+ui/.turbo
+docker/data
+docker/grafana/data
+docker/prometheus/data
+ObsidianVault/.obsidian/workspace*
