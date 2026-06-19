@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from services.edge_ingest.main import to_legacy_iot_event
-from services.edge_ingest.model import IndustrialEvent, validate_event, utc_now
+from services.edge_ingest.model import IndustrialEvent, to_json_bytes, validate_event, utc_now
 
 
 def test_valid_industrial_event_passes_validation() -> None:
@@ -64,3 +64,21 @@ def test_industrial_event_maps_to_legacy_processor_shape() -> None:
     assert legacy["temperature_c"] == 72.5
     assert legacy["vibration_mm_s"] == 3.0
     json.dumps(legacy)
+
+
+def test_model_serializes_to_compact_json_bytes() -> None:
+    event = IndustrialEvent(
+        source_protocol="mqtt",
+        source_id="factory/line-01/Pump-01/Temperature",
+        asset_id="Pump-01",
+        tag="Temperature",
+        value=51.2,
+        quality="good",
+        unit="c",
+        ts_source=utc_now(),
+    )
+
+    payload = to_json_bytes(event)
+
+    assert isinstance(payload, bytes)
+    assert b"Pump-01" in payload

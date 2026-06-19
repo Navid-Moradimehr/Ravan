@@ -152,7 +152,7 @@ services:
       dockerfile: services/edge_ingest/Dockerfile
     command: ["python", "-m", "services.edge_ingest.opcua_simulator"]
     ports:
-      - "4840:4840"
+      - "14840:4840"
     profiles:
       - edge
 
@@ -162,7 +162,7 @@ services:
       dockerfile: services/edge_ingest/Dockerfile
     command: ["python", "-m", "services.edge_ingest.modbus_simulator"]
     ports:
-      - "5020:5020"
+      - "15020:5020"
     profiles:
       - edge
 

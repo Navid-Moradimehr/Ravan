@@ -5,9 +5,17 @@
 ### Dashboard
 
 - Open `http://localhost:3000`.
-- Verify the title, KPI cards, signal map, AI gateway panel, and operator links render.
+- Verify the industrial command-center title, KPI cards, protocol source cards, AI gateway panel, and operator links render.
 - Click `Light mode` and confirm the theme flips to a pale surface palette.
 - Refresh the page and confirm the selected theme persists.
+
+### Industrial Edge Ingestion
+
+- Run `powershell -ExecutionPolicy Bypass -File scripts/start-industrial-sim.ps1`.
+- Open Redpanda Console and verify `industrial.raw`, `industrial.normalized`, `industrial.dlq`, and `iot.raw` exist.
+- Confirm `industrial.normalized` receives OPC UA, MQTT, and Modbus records with `source_protocol`, `asset_id`, `tag`, `value`, `quality`, `ts_source`, and `ts_ingest`.
+- Confirm `iot.raw` receives compatibility records that the existing processor can score.
+- Open `http://localhost:8090` and verify edge Prometheus metrics are exposed.
 
 ### AI Gateway
 
@@ -44,7 +52,7 @@
 
 - Open Grafana at `http://localhost:13000`.
 - Open Prometheus at `http://localhost:19090`.
-- Confirm metrics are visible for broker, AI gateway, and service health.
+- Confirm metrics are visible for broker, edge ingest, AI gateway, and service health.
 
 ## Performance Tests
 
@@ -53,24 +61,33 @@
 3. AI latency: compare LM Studio against fallback mode and note p95 response time.
 4. Restart recovery: stop one container at a time and verify offsets and topics recover cleanly.
 5. UI responsiveness: keep the dashboard open while the generator runs and confirm it stays interactive.
+6. Industrial soak: run `scripts/edge-soak.ps1 -Seconds 300 -MqttRatePerSecond 100` and verify normalized throughput, DLQ count, and service recovery.
 
 ## Industrial Readiness
 
-This app is not wired directly to PLCs or sensors. In real industrial systems, the typical pattern is:
+The app includes a hardware-free edge adapter and simulators for OPC UA, MQTT, and Modbus TCP. This validates the same data acquisition pattern used in real deployments without requiring physical PLCs or sensors.
+
+Real industrial systems typically use this shape:
 
 - PLCs and sensors expose data through an edge layer using OPC UA, Modbus, or MQTT.
 - A gateway or SCADA/IIoT runtime normalizes and forwards that data.
 - Streaming infrastructure ingests the normalized events.
 - Analytics, AI, dashboards, and historians consume the stream.
 
-So the current app is suitable for industrial-style pipelines, but it needs an edge adapter before it can talk to a real plant network.
+## Local Test Commands
 
-## Recommended Simulation Stack
+```powershell
+.venv\Scripts\python.exe -m pytest tests -q
+```
 
-- Use an OPC UA simulator or PLC simulator for tag-level testing.
-- Use an MQTT broker/client simulator for telemetry-style testing.
-- Keep the mock generator for load tests and failure injection.
-- Add an edge bridge that converts OPC UA or MQTT messages into Redpanda topics.
+```powershell
+npm --prefix ui run build
+```
+
+```powershell
+$env:PLAYWRIGHT_CHROMIUM_PATH = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+npm --prefix ui run test:smoke
+```
 
 ## LM Studio Checks
 
