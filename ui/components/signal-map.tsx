@@ -18,7 +18,7 @@ export function SignalMap({ nodes }: { nodes: PipelineNode[] }) {
         {nodes.map((node, index) => (
           <li key={node.name} className="relative rounded-xl border border-border-subtle bg-surface-0 p-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-xs uppercase text-muted">0{index + 1}</span>
+              <span className="font-mono text-xs uppercase text-muted-foreground">0{index + 1}</span>
               <StatusPill status={node.status} />
             </div>
             <div className="mt-5 text-balance text-xl font-semibold capitalize text-primary">{node.name}</div>

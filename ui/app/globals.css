@@ -22,6 +22,34 @@
   --color-warning: #e5a04d;
   --color-info: #4d8ce5;
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --background: var(--color-surface-0);
+  --foreground: var(--color-text-primary);
+  --card: var(--color-surface-1);
+  --card-foreground: var(--color-text-primary);
+  --popover: var(--color-surface-1);
+  --popover-foreground: var(--color-text-primary);
+  --primary: var(--color-accent);
+  --primary-foreground: #101010;
+  --secondary: var(--color-surface-2);
+  --secondary-foreground: var(--color-text-primary);
+  --muted: var(--color-surface-2);
+  --muted-foreground: var(--color-text-secondary);
+  --accent: var(--color-accent-subtle);
+  --accent-foreground: var(--color-accent);
+  --destructive: var(--color-error);
+  --destructive-foreground: #ffffff;
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-accent);
+  --chart-1: var(--color-accent);
+  --chart-2: var(--color-info);
+  --chart-3: var(--color-success);
+  --chart-4: var(--color-warning);
+  --chart-5: var(--color-error);
+  --radius-xl: 1rem;
+  --radius-lg: 0.75rem;
+  --radius-md: 0.625rem;
+  --radius-sm: 0.45rem;
   color-scheme: dark;
 }
 
@@ -43,6 +71,7 @@
   --color-warning: #c4850e;
   --color-info: #2d6fd6;
   --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  --primary-foreground: #ffffff;
   color-scheme: light;
 }
 
@@ -65,4 +94,26 @@ body {
   border: 1px solid var(--color-border);
   background: var(--color-surface-1);
   box-shadow: var(--shadow-card);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+  }
+  html {
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+  .industrial-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--color-border) 42%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--color-border) 42%, transparent) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
 }
