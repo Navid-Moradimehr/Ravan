@@ -124,6 +124,78 @@ services:
       IOT_TOPIC: iot.raw
       PROCESSED_TOPIC: iot.processed
 
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    command: mosquitto -c /mosquitto-no-auth.conf
+    ports:
+      - "1883:1883"
+    profiles:
+      - edge
+
+  mqtt-sim:
+    build:
+      context: ..
+      dockerfile: services/edge_ingest/Dockerfile
+    command: ["python", "-m", "services.edge_ingest.mqtt_publisher"]
+    depends_on:
+      - mqtt-broker
+    environment:
+      MQTT_HOST: mqtt-broker
+      MQTT_PORT: 1883
+      MQTT_RATE_PER_SECOND: ${MQTT_RATE_PER_SECOND:-25}
+    profiles:
+      - edge
+
+  opcua-sim:
+    build:
+      context: ..
+      dockerfile: services/edge_ingest/Dockerfile
+    command: ["python", "-m", "services.edge_ingest.opcua_simulator"]
+    ports:
+      - "4840:4840"
+    profiles:
+      - edge
+
+  modbus-sim:
+    build:
+      context: ..
+      dockerfile: services/edge_ingest/Dockerfile
+    command: ["python", "-m", "services.edge_ingest.modbus_simulator"]
+    ports:
+      - "5020:5020"
+    profiles:
+      - edge
+
+  edge-ingest:
+    build:
+      context: ..
+      dockerfile: services/edge_ingest/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_started
+      opcua-sim:
+        condition: service_started
+      modbus-sim:
+        condition: service_started
+    environment:
+      REDPANDA_BROKERS: redpanda:9092
+      EDGE_PROTOCOLS: ${EDGE_PROTOCOLS:-mqtt,opcua,modbus}
+      MQTT_HOST: mqtt-broker
+      MQTT_PORT: 1883
+      OPCUA_ENDPOINT: opc.tcp://opcua-sim:4840/freeopcua/server/
+      MODBUS_HOST: modbus-sim
+      MODBUS_PORT: 5020
+      INDUSTRIAL_RAW_TOPIC: industrial.raw
+      INDUSTRIAL_NORMALIZED_TOPIC: industrial.normalized
+      INDUSTRIAL_DLQ_TOPIC: industrial.dlq
+      IOT_TOPIC: iot.raw
+    ports:
+      - "8090:8090"
+    profiles:
+      - edge
+
   dashboard:
     build:
       context: ..

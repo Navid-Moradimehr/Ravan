@@ -25,6 +25,34 @@ def score_event(event: dict[str, Any], temperature_avg: float, vibration_avg: fl
     return min(round(score, 2), 1.0)
 
 
+def normalize_runtime_event(event: dict[str, Any]) -> dict[str, Any]:
+    if "device_id" in event:
+        return event
+
+    tag = str(event.get("tag", "")).lower()
+    value = event.get("value", 0)
+    numeric_value = float(value) if isinstance(value, int | float | bool) else 0.0
+    normalized = {
+        "event_id": event.get("event_id"),
+        "device_id": event.get("asset_id", "unknown-asset"),
+        "site_id": event.get("site", "demo-site"),
+        "timestamp": event.get("ts_source") or event.get("ts_ingest"),
+        "source_protocol": event.get("source_protocol", "unknown"),
+        "quality": event.get("quality", "unknown"),
+        "schema_version": event.get("schema_version", 1),
+        "temperature_c": 48.0,
+        "vibration_mm_s": 3.0,
+        "pressure_bar": 6.2,
+    }
+    if "temp" in tag:
+        normalized["temperature_c"] = numeric_value
+    elif "vibration" in tag:
+        normalized["vibration_mm_s"] = numeric_value
+    elif "pressure" in tag:
+        normalized["pressure_bar"] = numeric_value
+    return normalized
+
+
 def severity_for(score: float) -> str:
     if score >= 0.8:
         return "critical"
@@ -70,7 +98,7 @@ def main() -> None:
                 print(f"consumer_error={message.error()}")
                 continue
 
-            event = json.loads(message.value().decode("utf-8"))
+            event = normalize_runtime_event(json.loads(message.value().decode("utf-8")))
             device_window = windows[event["device_id"]]
             device_window.append(event)
 
