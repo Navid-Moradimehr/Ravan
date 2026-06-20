@@ -1,27 +1,29 @@
+@import "@fontsource-variable/ibm-plex-sans";
+@import "@fontsource-variable/jetbrains-mono";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-sans: "Aptos", "Segoe UI", sans-serif;
-  --font-mono: "Cascadia Code", "SFMono-Regular", monospace;
-  --color-surface-0: #0c0d0f;
-  --color-surface-1: #141519;
-  --color-surface-2: #1c1d24;
-  --color-surface-3: #25262e;
-  --color-border: #2e303a;
-  --color-border-subtle: #222330;
-  --color-text-primary: #e8e6e3;
-  --color-text-secondary: #9b9aa0;
-  --color-text-muted: #5e5d64;
-  --color-accent: #e2a336;
-  --color-accent-muted: #c48a1e;
-  --color-accent-subtle: rgba(226, 163, 54, 0.1);
-  --color-success: #3ecf72;
+  --font-sans: "IBM Plex Sans Variable", "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", "SFMono-Regular", monospace;
+  --color-surface-0: #080a0c;
+  --color-surface-1: #101418;
+  --color-surface-2: #182026;
+  --color-surface-3: #222c33;
+  --color-border: #3b4750;
+  --color-border-subtle: #28333b;
+  --color-text-primary: #f4f1ea;
+  --color-text-secondary: #d1cbc0;
+  --color-text-muted: #aaa39a;
+  --color-accent: #d6922a;
+  --color-accent-muted: #b97819;
+  --color-accent-subtle: rgba(214, 146, 42, 0.14);
+  --color-success: #58d27c;
   --color-error: #e54d4d;
-  --color-warning: #e5a04d;
-  --color-info: #4d8ce5;
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --color-warning: #f0ae44;
+  --color-info: #70a7ff;
+  --shadow-card: 0 16px 36px rgba(0, 0, 0, 0.28);
   --background: var(--color-surface-0);
   --foreground: var(--color-text-primary);
   --card: var(--color-surface-1);
@@ -29,7 +31,7 @@
   --popover: var(--color-surface-1);
   --popover-foreground: var(--color-text-primary);
   --primary: var(--color-accent);
-  --primary-foreground: #101010;
+  --primary-foreground: #12100d;
   --secondary: var(--color-surface-2);
   --secondary-foreground: var(--color-text-primary);
   --muted: var(--color-surface-2);
@@ -54,24 +56,24 @@
 }
 
 :root[data-theme="light"] {
-  --color-surface-0: #f5f4f1;
-  --color-surface-1: #ffffff;
-  --color-surface-2: #edecea;
-  --color-surface-3: #e2e0dd;
-  --color-border: #d4d2ce;
-  --color-border-subtle: #e8e6e3;
-  --color-text-primary: #1a1a1c;
-  --color-text-secondary: #5c5b62;
-  --color-text-muted: #8e8d94;
-  --color-accent: #c48a1e;
-  --color-accent-muted: #a87316;
-  --color-accent-subtle: rgba(196, 138, 30, 0.08);
-  --color-success: #1d9e4e;
-  --color-error: #d03030;
-  --color-warning: #c4850e;
-  --color-info: #2d6fd6;
-  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.03);
-  --primary-foreground: #ffffff;
+  --color-surface-0: #f2f0ea;
+  --color-surface-1: #fffdf8;
+  --color-surface-2: #e8e4dc;
+  --color-surface-3: #ddd7cd;
+  --color-border: #b9afa1;
+  --color-border-subtle: #d7d0c5;
+  --color-text-primary: #171512;
+  --color-text-secondary: #3d382f;
+  --color-text-muted: #635b50;
+  --color-accent: #9c6415;
+  --color-accent-muted: #7f4f0d;
+  --color-accent-subtle: rgba(156, 100, 21, 0.12);
+  --color-success: #14783a;
+  --color-error: #b4232c;
+  --color-warning: #92580d;
+  --color-info: #225ea8;
+  --shadow-card: 0 12px 28px rgba(45, 39, 29, 0.1), 0 0 0 1px rgba(45, 39, 29, 0.04);
+  --primary-foreground: #171512;
   color-scheme: light;
 }
 
@@ -83,6 +85,7 @@ body {
   margin: 0;
   background: var(--color-surface-0);
   color: var(--color-text-primary);
+  text-rendering: geometricPrecision;
 }
 
 :focus-visible {
@@ -110,10 +113,43 @@ body {
 }
 
 @layer utilities {
-  .industrial-grid {
-    background-image:
-      linear-gradient(to right, color-mix(in srgb, var(--color-border) 42%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in srgb, var(--color-border) 42%, transparent) 1px, transparent 1px);
-    background-size: 44px 44px;
+  .industrial-shell {
+    background:
+      var(--color-surface-0);
+  }
+
+  .shell-band {
+    background: color-mix(in srgb, var(--color-surface-1) 82%, var(--color-surface-2));
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-card);
+  }
+
+  .panel-rail {
+    background: color-mix(in srgb, var(--color-surface-1) 90%, var(--color-surface-0));
+  }
+
+  .action-primary {
+    border: 1px solid color-mix(in srgb, var(--color-accent) 70%, #000000);
+    background: var(--color-accent);
+    color: var(--primary-foreground);
+  }
+
+  .action-secondary {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+    color: var(--color-text-primary);
+  }
+
+  .action-secondary:hover {
+    background: var(--color-surface-3);
+  }
+
+  .nav-active {
+    background: var(--color-surface-2);
+    color: var(--color-text-primary);
+  }
+
+  .nav-muted {
+    color: var(--color-text-secondary);
   }
 }

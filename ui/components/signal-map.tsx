@@ -6,10 +6,10 @@ export function SignalMap({ nodes }: { nodes: PipelineNode[] }) {
     <section aria-labelledby="signal-map-title" className="surface-card rounded-2xl p-5">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h2 id="signal-map-title" className="text-balance text-lg font-semibold text-primary">
+          <h2 id="signal-map-title" className="text-balance text-lg font-semibold text-text-primary">
             Signal Map
           </h2>
-          <p className="mt-1 max-w-2xl text-pretty text-sm text-secondary">
+          <p className="mt-1 max-w-2xl text-pretty text-sm text-text-secondary">
             Live path from raw events to AI-assisted operational insight.
           </p>
         </div>
@@ -21,7 +21,7 @@ export function SignalMap({ nodes }: { nodes: PipelineNode[] }) {
               <span className="font-mono text-xs uppercase text-muted-foreground">0{index + 1}</span>
               <StatusPill status={node.status} />
             </div>
-            <div className="mt-5 text-balance text-xl font-semibold capitalize text-primary">{node.name}</div>
+            <div className="mt-5 text-balance text-xl font-semibold capitalize text-text-primary">{node.name}</div>
             <div className="mt-3 h-1 rounded-full bg-surface-3">
               <div className="h-1 rounded-full bg-accent" style={{ width: node.status === "active" ? "100%" : "45%" }} />
             </div>

@@ -54,6 +54,7 @@ The edge path publishes raw protocol payloads to `industrial.raw`, validated env
 ## Documentation
 
 - `Guide.md` contains the original product brief.
+- `docs/app-functionality.md` explains the complete app behavior and feature map.
 - `ObsidianVault/` is the project knowledge base.
 - `docs/` contains implementation-facing references and operational notes.
 

@@ -10,6 +10,7 @@ import {
   DatabaseZap,
   Factory,
   Gauge,
+  HardDrive,
   RadioTower,
   ServerCog,
   ShieldCheck,
@@ -18,13 +19,11 @@ import {
 import { getTelemetry } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 
 const sourceHealth = [
   { protocol: "OPC UA", endpoint: "opc.tcp://opcua-sim:4840", status: "active", rate: "3 tags/s", latency: "410 ms" },
@@ -62,16 +61,16 @@ export default function Home() {
   ];
 
   return (
-    <main className="industrial-grid min-h-dvh bg-surface-0 text-primary">
-      <div className="mx-auto grid max-w-[1560px] gap-4 px-4 py-4 lg:grid-cols-[248px_minmax(0,1fr)_320px]">
-        <aside className="surface-card hidden rounded-2xl p-4 lg:sticky lg:top-4 lg:block lg:h-[calc(100dvh-2rem)]">
+    <main className="industrial-shell min-h-dvh bg-surface-0 text-text-primary">
+      <div className="mx-auto grid max-w-[1560px] gap-4 px-4 py-4 lg:grid-cols-[260px_minmax(0,1fr)_332px]">
+        <aside className="shell-band panel-rail hidden rounded-2xl p-4 lg:sticky lg:top-4 lg:block lg:h-[calc(100dvh-2rem)]">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl border border-accent/30 bg-accent-subtle">
+            <div className="flex size-11 items-center justify-center rounded-xl border border-accent/40 bg-accent-subtle">
               <Factory aria-hidden="true" className="size-5 text-accent" />
             </div>
             <div>
-              <div className="font-mono text-xs uppercase tracking-[0.24em] text-accent">LSE</div>
-              <div className="text-sm font-semibold">Industrial Stream</div>
+              <div className="font-mono text-xs uppercase text-accent">LSE</div>
+              <div className="text-base font-semibold">Industrial Stream</div>
             </div>
           </div>
           <Separator className="my-5 bg-border" />
@@ -80,8 +79,8 @@ export default function Home() {
               <a
                 key={item}
                 href={`#${item.toLowerCase()}`}
-                className={`flex min-h-11 items-center rounded-xl px-3 text-sm transition-colors hover:bg-surface-2 ${
-                  index === 0 ? "bg-surface-2 text-primary" : "text-secondary"
+                className={`flex min-h-11 items-center rounded-xl px-3 text-sm font-medium transition-colors hover:bg-surface-2 ${
+                  index === 0 ? "nav-active" : "nav-muted"
                 }`}
               >
                 {item}
@@ -93,14 +92,14 @@ export default function Home() {
               <ShieldCheck aria-hidden="true" className="size-4 text-success" />
               Hardware-free mode
             </div>
-            <p className="mt-2 text-xs leading-5 text-secondary">
+            <p className="mt-2 text-pretty text-xs leading-5 text-text-secondary">
               OPC UA, MQTT, and Modbus are simulated locally so every industrial path is repeatable in tests.
             </p>
           </div>
         </aside>
 
         <section className="space-y-4">
-          <header className="surface-card rounded-2xl p-5">
+          <header className="shell-band rounded-2xl p-5">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -111,17 +110,17 @@ export default function Home() {
                     {telemetry.isError ? "Telemetry fallback" : "Telemetry online"}
                   </Badge>
                 </div>
-                <h1 className="mt-4 max-w-4xl text-balance text-4xl font-semibold tracking-[-0.04em] md:text-6xl">
-                  Industrial data command center.
+                <h1 className="mt-4 max-w-4xl text-balance text-4xl font-semibold leading-none md:text-6xl">
+                  Plant data, tested before it touches the plant.
                 </h1>
-                <p className="mt-4 max-w-3xl text-pretty text-base leading-7 text-secondary">
+                <p className="mt-4 max-w-3xl text-pretty text-base leading-7 text-text-secondary">
                   Validate protocol adapters, normalized events, stream processing, AI enrichment, and observability before
                   any physical plant integration.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <ThemeToggle />
-                <a href="http://localhost:18080" className={cn(buttonVariants({ size: "lg" }), "min-h-11 cursor-pointer")}>
+                <a href="http://localhost:18080" className="action-primary inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors duration-150 hover:brightness-95">
                   Open Redpanda Console
                 </a>
               </div>
@@ -130,25 +129,25 @@ export default function Home() {
 
           <section id="overview" aria-label="Key platform indicators" className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {[
-              { label: "Normalized topic", value: "industrial.normalized", icon: RadioTower },
+              { label: "Normalized stream", value: "industrial.normalized", icon: RadioTower },
               { label: "Burst target", value: "1k msg/s", icon: Activity },
               { label: "Latency budget", value: "p95 <500 ms", icon: Gauge },
-              { label: "DLQ capture", value: "100%", icon: AlertTriangle },
+              { label: "Exception lane", value: "industrial.dlq", icon: AlertTriangle },
             ].map((item) => {
               const Icon = item.icon;
               return (
-                <Card key={item.label} className="surface-card border-border bg-surface-1">
+                <Card key={item.label} className="shell-band border-border bg-surface-1">
                   <CardHeader>
                     <Icon aria-hidden="true" className="size-5 text-accent" />
                     <CardDescription>{item.label}</CardDescription>
-                    <CardTitle className="font-mono text-xl">{item.value}</CardTitle>
+                    <CardTitle className="font-mono text-lg tabular-nums">{item.value}</CardTitle>
                   </CardHeader>
                 </Card>
               );
             })}
           </section>
 
-          <Tabs defaultValue="pipeline" className="surface-card rounded-2xl p-4">
+          <Tabs defaultValue="pipeline" className="shell-band rounded-2xl p-4">
             <TabsList className="bg-surface-2">
               <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
               <TabsTrigger value="events">Events</TabsTrigger>
@@ -220,7 +219,7 @@ export default function Home() {
 
           <section id="sources" className="grid gap-4 xl:grid-cols-3">
             {sourceHealth.map((source) => (
-              <Card key={source.protocol} className="surface-card border-border bg-surface-1">
+              <Card key={source.protocol} className="shell-band border-border bg-surface-1">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Cable aria-hidden="true" className="size-4 text-accent" />
@@ -244,7 +243,7 @@ export default function Home() {
         </section>
 
         <aside className="space-y-4">
-          <Card id="ai" className="surface-card border-border bg-surface-1">
+          <Card id="ai" className="shell-band border-border bg-surface-1">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BrainCircuit aria-hidden="true" className="size-5 text-accent" />
@@ -279,7 +278,31 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <Card id="observability" className="surface-card border-border bg-surface-1">
+          <Card className="shell-band border-border bg-surface-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <HardDrive aria-hidden="true" className="size-5 text-accent" />
+                Current Test Stack
+              </CardTitle>
+              <CardDescription>Local, repeatable, hardware-free validation</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-text-secondary">
+              <div className="flex justify-between gap-3">
+                <span>Protocols</span>
+                <span className="font-mono text-text-primary">3 active</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Broker</span>
+                <span className="font-mono text-text-primary">Redpanda</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>AI endpoint</span>
+                <span className="font-mono text-text-primary">LM Studio</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card id="observability" className="shell-band border-border bg-surface-1">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 aria-hidden="true" className="size-5 text-accent" />
@@ -297,7 +320,7 @@ export default function Home() {
                 <a
                   key={href as string}
                   href={href as string}
-                  className={cn(buttonVariants({ variant: "outline" }), "min-h-11 cursor-pointer justify-start")}
+                  className="action-secondary inline-flex min-h-11 cursor-pointer items-center justify-start rounded-lg px-4 text-sm font-semibold transition-colors duration-150"
                 >
                   <Icon aria-hidden="true" className="mr-2 size-4" />
                   {label as string}
