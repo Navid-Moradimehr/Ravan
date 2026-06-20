@@ -7,7 +7,7 @@ const { chromium, expect } = require('@playwright/test');
   const browser = await chromium.launch(launchOptions);
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Plant data, tested before it touches the plant.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Validate plant data before it reaches the plant.' })).toBeVisible();
   for (const text of ['Normalized stream', 'Burst target', 'Latency budget', 'Exception lane', 'AI Gateway', 'Operator Links']) {
     await expect(page.getByText(text)).toBeVisible();
   }

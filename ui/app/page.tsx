@@ -110,12 +110,12 @@ export default function Home() {
                     {telemetry.isError ? "Telemetry fallback" : "Telemetry online"}
                   </Badge>
                 </div>
-                <h1 className="mt-4 max-w-4xl text-balance text-4xl font-semibold leading-none md:text-6xl">
-                  Plant data, tested before it touches the plant.
+                <h1 className="mt-4 max-w-2xl text-balance text-3xl font-semibold leading-tight md:text-5xl lg:text-[3.25rem]">
+                  Validate plant data before it reaches the plant.
                 </h1>
-                <p className="mt-4 max-w-3xl text-pretty text-base leading-7 text-text-secondary">
+                <p className="mt-4 max-w-2xl text-pretty text-sm leading-6 text-text-secondary md:text-base">
                   Validate protocol adapters, normalized events, stream processing, AI enrichment, and observability before
-                  any physical plant integration.
+                  physical plant integration.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -140,7 +140,9 @@ export default function Home() {
                   <CardHeader>
                     <Icon aria-hidden="true" className="size-5 text-accent" />
                     <CardDescription>{item.label}</CardDescription>
-                    <CardTitle className="font-mono text-lg tabular-nums">{item.value}</CardTitle>
+                    <CardTitle className="font-mono text-xs leading-tight break-all tabular-nums md:text-sm lg:text-base">
+                      {item.value}
+                    </CardTitle>
                   </CardHeader>
                 </Card>
               );
@@ -160,7 +162,7 @@ export default function Home() {
                   <Card key={node.name} className="border-border bg-surface-2">
                     <CardHeader>
                       <CardDescription>Stage {index + 1}</CardDescription>
-                      <CardTitle className="capitalize">{node.name}</CardTitle>
+                      <CardTitle className="capitalize text-base md:text-lg">{node.name}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <Badge variant="outline" className={statusTone(node.status)}>
@@ -286,7 +288,7 @@ export default function Home() {
               </CardTitle>
               <CardDescription>Local, repeatable, hardware-free validation</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm text-text-secondary">
+            <CardContent className="space-y-3 text-sm leading-6 text-text-secondary">
               <div className="flex justify-between gap-3">
                 <span>Protocols</span>
                 <span className="font-mono text-text-primary">3 active</span>
