@@ -21,6 +21,11 @@ consumed_events = Counter("ai_gateway_consumed_events_total", "Processed events 
 enriched_events = Counter("ai_gateway_enriched_events_total", "AI enriched batches emitted")
 llm_latency = Histogram("ai_gateway_llm_request_seconds", "LLM request latency in seconds")
 batch_size_gauge = Gauge("ai_gateway_batch_size", "Most recent LLM batch size")
+batch_severity_total = Counter(
+    "ai_gateway_batch_severity_total",
+    "Processed events emitted to the AI gateway grouped by severity",
+    ["severity"],
+)
 last_success_epoch = Gauge("ai_gateway_last_success_epoch", "Unix timestamp of last successful enrichment")
 service_state: dict[str, Any] = {"running": False, "last_error": None}
 
@@ -110,6 +115,10 @@ async def consume_loop() -> None:
 
 async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
     batch_size_gauge.set(len(batch))
+    for severity in ("normal", "warning", "critical"):
+        count = sum(1 for event in batch if event.get("severity") == severity)
+        if count:
+            batch_severity_total.labels(severity=severity).inc(count)
     prompt = (
         "Summarize this processed industrial IoT batch. Identify critical devices, "
         "probable causes, and operator actions. Return concise JSON.\n\n"

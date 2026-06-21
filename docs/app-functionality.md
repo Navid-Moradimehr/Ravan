@@ -97,7 +97,9 @@ The Next.js dashboard provides:
 - sample event table
 - test workflow commands
 - AI gateway state
-- operator links to Redpanda Console, Prometheus, Grafana, edge metrics, and AI health
+- live observability panels for throughput, AI latency, protocol mix, and severity mix
+- Grafana status with a local `/login` link and offline fallback state
+- operator links to Redpanda Console, Prometheus, local Grafana, edge metrics, and AI health
 - persisted light/dark theme toggle
 
 ### Observability
@@ -116,7 +118,14 @@ Edge ingest exposes:
 - reconnect counters
 - source-to-ingest latency histograms
 
+AI gateway exposes:
+
+- batch size gauge
+- LLM request latency histogram
+- batch severity counters for `normal`, `warning`, and `critical`
+
 Grafana is available for dashboards and trend analysis.
+The dashboard uses the local Grafana `/api/health` endpoint to detect whether Grafana is online and degrades gracefully to the built-in fallback snapshot when Prometheus or Grafana are offline.
 
 ## Test Modes
 

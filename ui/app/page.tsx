@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   Waves,
 } from "lucide-react";
-import { getTelemetry } from "@/lib/api";
+import { createObservabilityFallback, getObservability, getTelemetry } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ObservabilityPanels } from "@/components/observability-panels";
 
 const sourceHealth = [
   { protocol: "OPC UA", endpoint: "opc.tcp://opcua-sim:4840", status: "active", rate: "3 tags/s", latency: "410 ms" },
@@ -53,12 +54,19 @@ export default function Home() {
     refetchInterval: 5000,
   });
 
+  const observability = useQuery({
+    queryKey: ["observability"],
+    queryFn: getObservability,
+    refetchInterval: 5000,
+  });
+
   const pipeline = telemetry.data?.pipeline ?? [
     { name: "edge", status: "starting" as const },
     { name: "normalize", status: "starting" as const },
     { name: "process", status: "starting" as const },
     { name: "ai", status: "starting" as const },
   ];
+  const observabilitySnapshot = observability.data ?? createObservabilityFallback();
 
   return (
     <main className="industrial-shell min-h-dvh bg-surface-0 text-text-primary">
@@ -219,6 +227,8 @@ export default function Home() {
             </TabsContent>
           </Tabs>
 
+          <ObservabilityPanels snapshot={observabilitySnapshot} />
+
           <section id="sources" className="grid gap-4 xl:grid-cols-3">
             {sourceHealth.map((source) => (
               <Card key={source.protocol} className="shell-band border-border bg-surface-1">
@@ -304,7 +314,7 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <Card id="observability" className="shell-band border-border bg-surface-1">
+          <Card id="operator-links" className="shell-band border-border bg-surface-1">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 aria-hidden="true" className="size-5 text-accent" />
@@ -313,7 +323,7 @@ export default function Home() {
             </CardHeader>
             <CardContent className="grid gap-2">
               {[
-                ["Grafana", "http://localhost:13000", Waves],
+                ["Grafana", "http://localhost:13000/login", Waves],
                 ["Prometheus", "http://localhost:19090", Activity],
                 ["Edge Metrics", "http://localhost:8090", ServerCog],
                 ["AI Health", "http://localhost:8080/health", BrainCircuit],

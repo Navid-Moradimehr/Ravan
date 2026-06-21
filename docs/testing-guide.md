@@ -5,9 +5,11 @@
 ### Dashboard
 
 - Open `http://localhost:3000`.
-- Verify the industrial command-center title, KPI cards, protocol source cards, AI gateway panel, and operator links render.
+- Verify the industrial command-center title, KPI cards, protocol source cards, AI gateway panel, observability charts, and operator links render.
 - Click `Light mode` and confirm the theme flips to a pale surface palette.
 - Refresh the page and confirm the selected theme persists.
+- Confirm the observability section shows throughput, AI latency, protocol mix, severity mix, and a Grafana status card.
+- Confirm the Grafana operator link goes to `http://localhost:13000/login` rather than a public signup page.
 
 ### Industrial Edge Ingestion
 
@@ -53,6 +55,8 @@
 - Open Grafana at `http://localhost:13000`.
 - Open Prometheus at `http://localhost:19090`.
 - Confirm metrics are visible for broker, edge ingest, AI gateway, and service health.
+- Check the AI gateway exposes `ai_gateway_batch_size`, `ai_gateway_llm_request_seconds`, and `ai_gateway_batch_severity_total`.
+- Confirm the dashboard still renders when Grafana or Prometheus is stopped; it should fall back to the built-in snapshot and show Grafana as offline.
 
 ## Performance Tests
 
@@ -60,8 +64,9 @@
 2. Processor latency: measure the time from `iot.raw` to `iot.processed` using message timestamps.
 3. AI latency: compare LM Studio against fallback mode and note p95 response time.
 4. Restart recovery: stop one container at a time and verify offsets and topics recover cleanly.
-5. UI responsiveness: keep the dashboard open while the generator runs and confirm it stays interactive.
-6. Industrial soak: run `scripts/edge-soak.ps1 -Seconds 300 -MqttRatePerSecond 100` and verify normalized throughput, DLQ count, and service recovery.
+5. UI responsiveness: keep the dashboard open while the generator runs and confirm the charts continue updating without layout shifts.
+6. Industrial soak: run `scripts/edge-soak.ps1 -Seconds 300 -MqttRatePerSecond 100` and verify normalized throughput, DLQ count, severity mix, and service recovery.
+7. Grafana failure mode: stop Grafana and confirm the dashboard switches to offline state instead of sending you to an external signup page.
 
 ## Industrial Readiness
 

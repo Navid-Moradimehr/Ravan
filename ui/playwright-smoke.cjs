@@ -11,9 +11,16 @@ const { chromium, expect } = require('@playwright/test');
   for (const text of ['Normalized stream', 'Burst target', 'Latency budget', 'Exception lane', 'AI Gateway', 'Operator Links']) {
     await expect(page.getByText(text)).toBeVisible();
   }
-  for (const text of ['Open Redpanda Console', 'Grafana', 'Prometheus', 'Edge Metrics', 'AI Health']) {
+  for (const text of ['Live throughput', 'LLM p95 latency', 'DLQ total', 'Ingest throughput', 'AI latency', 'Protocol mix', 'Severity mix']) {
+    await expect(page.getByText(text)).toBeVisible();
+  }
+  await expect(page.getByText(/Grafana (online|offline)/).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open Redpanda Console' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Grafana', exact: true })).toBeVisible();
+  for (const text of ['Prometheus', 'Edge Metrics', 'AI Health']) {
     await expect(page.getByRole('link', { name: text })).toBeVisible();
   }
+  await expect(page.getByRole('link', { name: 'Open local Grafana' })).toHaveAttribute('href', /\/login$/);
   for (const text of ['OPC UA', 'MQTT', 'Modbus TCP']) {
     await expect(page.getByText(text).first()).toBeVisible();
   }

@@ -24,6 +24,7 @@ Prometheus scrapes broker, edge, and AI metrics; Grafana and the web dashboard e
 - AI: FastAPI service using OpenAI-compatible APIs, defaulting to LM Studio
 - Observability: Prometheus and Grafana
 - UI: Next.js, TypeScript, Tailwind CSS, shadcn/ui
+- UI observability: live charts for throughput, AI latency, protocol mix, severity mix, and Grafana health
 
 ## Quick Start
 
@@ -66,4 +67,5 @@ The edge path publishes raw protocol payloads to `industrial.raw`, validated env
 - Flink UI: `http://localhost:18088`
 - AI Gateway: `http://localhost:8080/health`
 - Grafana: `http://localhost:13000`
+- Grafana login: `http://localhost:13000/login`
 - Prometheus: `http://localhost:19090`
