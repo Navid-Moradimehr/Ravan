@@ -30,10 +30,12 @@ const config: Config = {
           1: "var(--color-surface-1)",
           2: "var(--color-surface-2)",
           3: "var(--color-surface-3)",
+          raised: "var(--color-surface-raised)",
         },
         border: {
           DEFAULT: "var(--color-border)",
           subtle: "var(--color-border-subtle)",
+          strong: "var(--color-border-strong)",
         },
         primary: {
           DEFAULT: "var(--primary)",
@@ -73,6 +75,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        heading: ["var(--font-heading)", "var(--font-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
     },

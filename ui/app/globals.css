@@ -1,3 +1,5 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/inter-tight";
 @import "@fontsource-variable/ibm-plex-sans";
 @import "@fontsource-variable/jetbrains-mono";
 @tailwind base;
@@ -5,33 +7,46 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: "IBM Plex Sans Variable", "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", "SFMono-Regular", monospace;
-  --color-surface-0: #080a0c;
-  --color-surface-1: #101418;
-  --color-surface-2: #182026;
-  --color-surface-3: #222c33;
-  --color-border: #3b4750;
-  --color-border-subtle: #28333b;
-  --color-text-primary: #f4f1ea;
-  --color-text-secondary: #d1cbc0;
-  --color-text-muted: #aaa39a;
-  --color-accent: #d6922a;
-  --color-accent-muted: #b97819;
-  --color-accent-subtle: rgba(214, 146, 42, 0.14);
-  --color-success: #58d27c;
-  --color-error: #e54d4d;
-  --color-warning: #f0ae44;
-  --color-info: #70a7ff;
-  --shadow-card: 0 16px 36px rgba(0, 0, 0, 0.28);
+  --font-sans: "Inter Variable", "Inter", "IBM Plex Sans Variable", system-ui, -apple-system, sans-serif;
+  --font-heading: "Inter Tight Variable", "Inter Tight", "Inter Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+
+  --color-surface-0: #0a0c0f;
+  --color-surface-1: #111419;
+  --color-surface-2: #171b22;
+  --color-surface-3: #1f242d;
+  --color-surface-raised: #232934;
+
+  --color-border: #2a313b;
+  --color-border-subtle: #1f252e;
+  --color-border-strong: #3a424d;
+
+  --color-text-primary: #eef1f5;
+  --color-text-secondary: #aeb6c2;
+  --color-text-muted: #6f7886;
+
+  --color-accent: #f5a623;
+  --color-accent-muted: #c47e10;
+  --color-accent-subtle: rgba(245, 166, 35, 0.12);
+  --color-accent-strong: rgba(245, 166, 35, 0.22);
+
+  --color-success: #3ddc84;
+  --color-error: #f0616d;
+  --color-warning: #f5b945;
+  --color-info: #6aa8ff;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.24);
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 28px rgba(0, 0, 0, 0.32);
+  --shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.45);
+
   --background: var(--color-surface-0);
   --foreground: var(--color-text-primary);
   --card: var(--color-surface-1);
   --card-foreground: var(--color-text-primary);
-  --popover: var(--color-surface-1);
+  --popover: var(--color-surface-raised);
   --popover-foreground: var(--color-text-primary);
   --primary: var(--color-accent);
-  --primary-foreground: #12100d;
+  --primary-foreground: #14110a;
   --secondary: var(--color-surface-2);
   --secondary-foreground: var(--color-text-primary);
   --muted: var(--color-surface-2);
@@ -48,32 +63,44 @@
   --chart-3: var(--color-success);
   --chart-4: var(--color-warning);
   --chart-5: var(--color-error);
-  --radius-xl: 1rem;
-  --radius-lg: 0.75rem;
-  --radius-md: 0.625rem;
-  --radius-sm: 0.45rem;
+
+  --radius-xl: 0.875rem;
+  --radius-lg: 0.625rem;
+  --radius-md: 0.5rem;
+  --radius-sm: 0.375rem;
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-  --color-surface-0: #f2f0ea;
-  --color-surface-1: #fffdf8;
-  --color-surface-2: #e8e4dc;
-  --color-surface-3: #ddd7cd;
-  --color-border: #b9afa1;
-  --color-border-subtle: #d7d0c5;
-  --color-text-primary: #171512;
-  --color-text-secondary: #3d382f;
-  --color-text-muted: #635b50;
-  --color-accent: #9c6415;
-  --color-accent-muted: #7f4f0d;
-  --color-accent-subtle: rgba(156, 100, 21, 0.12);
-  --color-success: #14783a;
-  --color-error: #b4232c;
-  --color-warning: #92580d;
-  --color-info: #225ea8;
-  --shadow-card: 0 12px 28px rgba(45, 39, 29, 0.1), 0 0 0 1px rgba(45, 39, 29, 0.04);
-  --primary-foreground: #171512;
+  --color-surface-0: #f7f8fa;
+  --color-surface-1: #ffffff;
+  --color-surface-2: #f1f3f6;
+  --color-surface-3: #e6e9ee;
+  --color-surface-raised: #ffffff;
+
+  --color-border: #dde1e7;
+  --color-border-subtle: #e9ecf1;
+  --color-border-strong: #c6ccd5;
+
+  --color-text-primary: #0f1318;
+  --color-text-secondary: #4a525d;
+  --color-text-muted: #787f8a;
+
+  --color-accent: #b8700a;
+  --color-accent-muted: #8f5606;
+  --color-accent-subtle: rgba(184, 112, 10, 0.1);
+  --color-accent-strong: rgba(184, 112, 10, 0.18);
+
+  --color-success: #1a9f54;
+  --color-error: #cf2f3a;
+  --color-warning: #9a6309;
+  --color-info: #2563b0;
+
+  --shadow-card: 0 1px 2px rgba(15, 19, 24, 0.04), 0 1px 3px rgba(15, 19, 24, 0.06);
+  --shadow-raised: 0 4px 16px rgba(15, 19, 24, 0.08), 0 1px 2px rgba(15, 19, 24, 0.04);
+  --shadow-overlay: 0 12px 40px rgba(15, 19, 24, 0.14);
+
+  --primary-foreground: #ffffff;
   color-scheme: light;
 }
 
@@ -85,18 +112,16 @@ body {
   margin: 0;
   background: var(--color-surface-0);
   color: var(--color-text-primary);
+  font-feature-settings: "cv11", "ss01";
   text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 :focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 3px;
-}
-
-.surface-card {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-1);
-  box-shadow: var(--shadow-card);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 @layer base {
@@ -106,32 +131,52 @@ body {
   body {
     background: var(--background);
     color: var(--foreground);
-  }
-  html {
     font-family: var(--font-sans);
+    letter-spacing: -0.011em;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
   }
 }
 
-@layer utilities {
-  .industrial-shell {
-    background:
-      var(--color-surface-0);
+@layer components {
+  .surface-card {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-1);
+    box-shadow: var(--shadow-card);
+  }
+
+  .app-card {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-1);
+    box-shadow: var(--shadow-card);
+    border-radius: var(--radius-xl);
+  }
+
+  .app-card-header {
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: color-mix(in srgb, var(--color-surface-1) 70%, var(--color-surface-0));
   }
 
   .shell-band {
-    background: color-mix(in srgb, var(--color-surface-1) 82%, var(--color-surface-2));
+    background: var(--color-surface-1);
     border: 1px solid var(--color-border);
     box-shadow: var(--shadow-card);
   }
 
   .panel-rail {
-    background: color-mix(in srgb, var(--color-surface-1) 90%, var(--color-surface-0));
+    background: color-mix(in srgb, var(--color-surface-1) 92%, var(--color-surface-0));
+    border: 1px solid var(--color-border);
   }
 
   .action-primary {
-    border: 1px solid color-mix(in srgb, var(--color-accent) 70%, #000000);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 60%, #000000);
     background: var(--color-accent);
     color: var(--primary-foreground);
+  }
+  .action-primary:hover {
+    background: color-mix(in srgb, var(--color-accent) 90%, #ffffff);
   }
 
   .action-secondary {
@@ -139,17 +184,57 @@ body {
     background: var(--color-surface-2);
     color: var(--color-text-primary);
   }
-
   .action-secondary:hover {
     background: var(--color-surface-3);
+    border-color: var(--color-border-strong);
   }
 
   .nav-active {
-    background: var(--color-surface-2);
+    background: var(--color-accent-subtle);
     color: var(--color-text-primary);
+    border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
   }
 
   .nav-muted {
     color: var(--color-text-secondary);
+  }
+  .nav-muted:hover {
+    background: var(--color-surface-2);
+    color: var(--color-text-primary);
+  }
+
+  .kpi-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-1);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .kpi-card:hover {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-raised);
+  }
+}
+
+@layer utilities {
+  .industrial-shell {
+    background:
+      radial-gradient(1200px 600px at 100% -10%, color-mix(in srgb, var(--color-accent) 4%, transparent), transparent 60%),
+      var(--color-surface-0);
+  }
+
+  .text-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .label-overline {
+    font-family: var(--font-sans);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
   }
 }

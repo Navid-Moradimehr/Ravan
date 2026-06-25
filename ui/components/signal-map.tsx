@@ -1,29 +1,43 @@
 import type { PipelineNode } from "@/lib/api";
+import { SectionHeader } from "@/components/section-header";
 import { StatusPill } from "@/components/status-pill";
+
+const nodeDescriptions: Record<string, string> = {
+  edge: "Industrial protocols ingested at the edge.",
+  normalize: "Raw payloads validated into typed envelopes.",
+  process: "Stateful processing and enrichment.",
+  ai: "AI-assisted operational insight.",
+};
 
 export function SignalMap({ nodes }: { nodes: PipelineNode[] }) {
   return (
-    <section aria-labelledby="signal-map-title" className="surface-card rounded-2xl p-5">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h2 id="signal-map-title" className="text-balance text-lg font-semibold text-text-primary">
-            Signal Map
-          </h2>
-          <p className="mt-1 max-w-2xl text-pretty text-sm text-text-secondary">
-            Live path from raw events to AI-assisted operational insight.
-          </p>
-        </div>
-      </div>
-      <ol className="grid gap-3 md:grid-cols-4">
+    <section aria-labelledby="signal-map-title" className="surface-card rounded-xl p-5">
+      <SectionHeader
+        title="Signal Map"
+        eyebrow="Pipeline"
+        description="Live path from raw events to AI-assisted operational insight."
+      />
+      <ol className="mt-5 grid gap-3 md:grid-cols-4">
         {nodes.map((node, index) => (
-          <li key={node.name} className="relative rounded-xl border border-border-subtle bg-surface-0 p-4">
+          <li
+            key={node.name}
+            className="relative flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-0 p-4"
+          >
             <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-xs uppercase text-muted-foreground">0{index + 1}</span>
+              <span className="label-overline">Stage {String(index + 1).padStart(2, "0")}</span>
               <StatusPill status={node.status} />
             </div>
-            <div className="mt-5 text-balance text-xl font-semibold capitalize text-text-primary">{node.name}</div>
-            <div className="mt-3 h-1 rounded-full bg-surface-3">
-              <div className="h-1 rounded-full bg-accent" style={{ width: node.status === "active" ? "100%" : "45%" }} />
+            <div className="mt-1">
+              <h3 className="font-heading text-base font-semibold capitalize text-text-primary">{node.name}</h3>
+              <p className="mt-1 text-xs leading-5 text-text-secondary">
+                {nodeDescriptions[node.name] ?? "Pipeline stage."}
+              </p>
+            </div>
+            <div className="mt-auto h-1 overflow-hidden rounded-full bg-surface-3">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-300"
+                style={{ width: node.status === "active" ? "100%" : node.status === "starting" ? "45%" : "12%" }}
+              />
             </div>
           </li>
         ))}
