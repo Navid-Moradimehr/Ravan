@@ -12,6 +12,7 @@ from confluent_kafka import Consumer, Producer
 from fastapi import FastAPI
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.responses import Response
+from fastapi.responses import StreamingResponse
 
 from config import Settings
 
@@ -28,6 +29,7 @@ batch_severity_total = Counter(
 )
 last_success_epoch = Gauge("ai_gateway_last_success_epoch", "Unix timestamp of last successful enrichment")
 service_state: dict[str, Any] = {"running": False, "last_error": None}
+telemetry_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
 
 
 @asynccontextmanager
@@ -58,6 +60,9 @@ async def health() -> dict[str, Any]:
 
 @app.get("/telemetry")
 async def telemetry() -> dict[str, Any]:
+    return await _build_telemetry()
+
+async def _build_telemetry() -> dict[str, Any]:
     return {
         "pipeline": [
             {"name": "ingest", "status": "active"},
@@ -71,6 +76,43 @@ async def telemetry() -> dict[str, Any]:
             "last_error": service_state["last_error"],
         },
     }
+
+async def _broadcast_telemetry() -> None:
+    payload = await _build_telemetry()
+    dead: set[asyncio.Queue[dict[str, Any]]] = set()
+    for queue in telemetry_subscribers:
+        try:
+            queue.put_nowait(payload)
+        except asyncio.QueueFull:
+            dead.add(queue)
+    for queue in dead:
+        telemetry_subscribers.discard(queue)
+
+@app.get("/events")
+async def events() -> StreamingResponse:
+    async def event_stream():
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=4)
+        telemetry_subscribers.add(queue)
+        try:
+            yield f"data: {json.dumps(await _build_telemetry())}\n\n"
+            while service_state["running"]:
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(payload)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ":heartbeat\n\n"
+        finally:
+            telemetry_subscribers.discard(queue)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
 
 
 @app.get("/metrics")
@@ -146,11 +188,13 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
     except Exception as exc:
         if not settings.llm_allow_fallback:
             service_state["last_error"] = str(exc)
+            asyncio.create_task(_broadcast_telemetry())
             llm_latency.observe(time.monotonic() - started)
             return
         fallback_reason = f"{type(exc).__name__}: {exc}"
         content = build_fallback_summary(batch, fallback_reason)
         service_state["last_error"] = f"LLM fallback active: {fallback_reason}"
+        asyncio.create_task(_broadcast_telemetry())
     finally:
         llm_latency.observe(time.monotonic() - started)
 
@@ -166,6 +210,7 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
     producer.poll(0)
     enriched_events.inc()
     last_success_epoch.set(time.time())
+    asyncio.create_task(_broadcast_telemetry())
 
 
 def build_fallback_summary(batch: list[dict[str, Any]], error: str) -> str:

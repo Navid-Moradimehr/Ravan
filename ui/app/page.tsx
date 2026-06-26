@@ -56,11 +56,7 @@ function statusTone(status: string) {
 }
 
 export default function Home() {
-  const telemetry = useQuery({
-    queryKey: ["telemetry"],
-    queryFn: getTelemetry,
-    refetchInterval: 5000,
-  });
+  const telemetryEvents = useTelemetryEvents();
 
   const observability = useQuery({
     queryKey: ["observability"],
@@ -68,14 +64,14 @@ export default function Home() {
     refetchInterval: 5000,
   });
 
-  const pipeline = telemetry.data?.pipeline ?? [
+  const pipeline = telemetryEvents.data?.pipeline ?? [
     { name: "edge", status: "starting" as const },
     { name: "normalize", status: "starting" as const },
     { name: "process", status: "starting" as const },
     { name: "ai", status: "starting" as const },
   ];
   const observabilitySnapshot = observability.data ?? createObservabilityFallback();
-  const systemOnline = !telemetry.isError;
+  const systemOnline = !!telemetryEvents.error;
 
   return (
     <div className="industrial-shell min-h-dvh bg-surface-0 text-text-primary">
@@ -129,8 +125,8 @@ export default function Home() {
                 <Badge variant="outline" className="border-accent/40 bg-accent-subtle text-accent">
                   Edge simulation profile
                 </Badge>
-                <Badge variant="outline" className={statusTone(telemetry.isError ? "degraded" : "active")}>
-                  {telemetry.isError ? "Telemetry fallback" : "Telemetry online"}
+                <Badge variant="outline" className={statusTone(!!telemetryEvents.error ? "degraded" : "active")}>
+                  {!!telemetryEvents.error ? "Telemetry fallback" : "Telemetry online"}
                 </Badge>
               </div>
               <h1 className="mt-4 max-w-2xl text-balance font-heading text-3xl font-semibold leading-tight tracking-tight text-text-primary md:text-4xl">
@@ -289,7 +285,7 @@ export default function Home() {
               <CardDescription className="text-text-secondary">LM Studio compatible enrichment path</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 p-4 text-sm">
-              {telemetry.isLoading ? (
+              {!telemetryEvents.data ? (
                 <>
                   <Skeleton className="h-5 w-full bg-surface-2" />
                   <Skeleton className="h-5 w-3/4 bg-surface-2" />
@@ -299,18 +295,18 @@ export default function Home() {
                   <div>
                     <div className="label-overline">Model</div>
                     <div className="mt-1 break-words font-mono text-xs text-text-primary">
-                      {telemetry.data?.llm.model ?? "openai/gpt-oss-20B"}
+                      {telemetryEvents.data?.llm.model ?? "openai/gpt-oss-20B"}
                     </div>
                   </div>
                   <div>
                     <div className="label-overline">Base URL</div>
                     <div className="mt-1 break-words font-mono text-xs text-text-primary">
-                      {telemetry.data?.llm.base_url ?? "http://172.17.0.1:1234/v1"}
+                      {telemetryEvents.data?.llm.base_url ?? "http://172.17.0.1:1234/v1"}
                     </div>
                   </div>
                   <div>
                     <div className="label-overline">Last error</div>
-                    <div className="mt-1 text-text-secondary">{telemetry.data?.llm.last_error ?? "None reported"}</div>
+                    <div className="mt-1 text-text-secondary">{telemetryEvents.data?.llm.last_error ?? "None reported"}</div>
                   </div>
                 </>
               )}
@@ -375,3 +371,4 @@ export default function Home() {
     </div>
   );
 }
+import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
