@@ -15,6 +15,7 @@ from prometheus_client import Counter, Gauge, Histogram, start_http_server
 from pymodbus.client import ModbusTcpClient
 
 from services.edge_ingest.model import IndustrialEvent, validate_event, to_json_bytes, utc_now
+from services.common.normalize import to_legacy_iot_event
 
 
 events_total = Counter("edge_ingest_events_total", "Validated industrial events", ["protocol"])
@@ -99,30 +100,6 @@ def observe_latency(event: IndustrialEvent) -> None:
         ingest_latency.labels(protocol=event.source_protocol).observe(max(time.time() - source_epoch, 0))
     except Exception:
         return
-
-
-def to_legacy_iot_event(event: IndustrialEvent) -> dict[str, Any]:
-    tag = event.tag.lower()
-    numeric_value = float(event.value) if isinstance(event.value, int | float | bool) else 0.0
-    base = {
-        "event_id": event.event_id,
-        "device_id": event.asset_id,
-        "site_id": event.site,
-        "timestamp": event.ts_source,
-        "source_protocol": event.source_protocol,
-        "quality": event.quality,
-        "schema_version": event.schema_version,
-        "temperature_c": 48.0,
-        "vibration_mm_s": 3.0,
-        "pressure_bar": 6.2,
-    }
-    if "temp" in tag:
-        base["temperature_c"] = numeric_value
-    elif "vibration" in tag:
-        base["vibration_mm_s"] = numeric_value
-    elif "pressure" in tag:
-        base["pressure_bar"] = numeric_value
-    return base
 
 
 async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:

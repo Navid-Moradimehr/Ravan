@@ -34,6 +34,10 @@ Every normalized event includes:
 
 Invalid records are published to `industrial.dlq`.
 
+Shared normalization behavior note:
+
+- `services/common/normalize.py` is used by both edge ingestion and runtime processing to map inbound events into the processor compatibility shape.
+
 ## Runbook
 
 ```powershell

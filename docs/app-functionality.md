@@ -56,6 +56,10 @@ It adds:
 - anomaly score
 - severity: `normal`, `warning`, or `critical`
 - processing timestamp
+- bounded per-device windows:
+  - `RUNTIME_WINDOW_LIMIT` (default `25`) controls each device history depth.
+  - `RUNTIME_DEVICE_MAX_IDLE_SECONDS` (default `0`) evicts stale device windows.
+  - `RUNTIME_MAX_ACTIVE_DEVICES` (default `0`) caps the number of active device histories.
 
 ### AI Gateway
 

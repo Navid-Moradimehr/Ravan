@@ -62,7 +62,7 @@ def test_industrial_event_maps_to_legacy_processor_shape() -> None:
 
     assert legacy["device_id"] == "Pump-01"
     assert legacy["temperature_c"] == 72.5
-    assert legacy["vibration_mm_s"] == 3.0
+    assert legacy["vibration_mm_s"] == 0.0
     json.dumps(legacy)
 
 

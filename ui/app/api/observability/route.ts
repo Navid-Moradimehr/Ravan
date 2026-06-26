@@ -46,21 +46,22 @@ function toTimeLabel(unixSeconds: number) {
 }
 
 function mergeRangeSeries(series: PrometheusRangeSeries[], keyForSeries: (metric: Record<string, string>) => string) {
-  const rows = new Map<string, ObservabilityPoint>();
+  const rows = new Map<string, { point: ObservabilityPoint; ts: number }>();
 
   for (const item of series) {
     const key = keyForSeries(item.metric ?? {});
     for (const [timestamp, rawValue] of item.values ?? []) {
       const label = toTimeLabel(timestamp);
-      const row = rows.get(label) ?? { timestamp: label };
+      const existing = rows.get(label);
+      const row = existing?.point ?? { timestamp: label };
       row[key] = Number.parseFloat(rawValue);
-      rows.set(label, row);
+      rows.set(label, { point: row, ts: timestamp });
     }
   }
 
-  return Array.from(rows.values()).sort((left, right) =>
-    String(left.timestamp).localeCompare(String(right.timestamp)),
-  );
+  return Array.from(rows.values())
+    .sort((left, right) => left.ts - right.ts)
+    .map((item) => item.point);
 }
 
 function latestValue(series: PrometheusInstantSeries[] | undefined) {
