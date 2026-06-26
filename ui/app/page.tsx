@@ -167,7 +167,7 @@ export default function Home() {
           </section>
 
           <Tabs defaultValue="pipeline" className="shell-band rounded-2xl p-4">
-            <TabsList className="bg-surface-2">
+            <TabsList className="w-full bg-surface-2">
               <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
               <TabsTrigger value="events">Events</TabsTrigger>
               <TabsTrigger value="tests">Test workflow</TabsTrigger>
