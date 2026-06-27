@@ -39,6 +39,134 @@ export type ObservabilitySnapshot = {
   };
 };
 
+export type HistorianEvent = {
+  time: string;
+  event_id: string;
+  source_protocol: string;
+  asset_id: string;
+  tag: string;
+  value: number;
+  quality: string;
+  unit: string;
+  site: string;
+  line: string;
+  fault_type: string;
+  scenario_id: string;
+  ground_truth_severity: string;
+};
+
+export type HistorianTrendPoint = {
+  time: string;
+  value: number;
+  quality: string;
+  fault_type: string;
+  ground_truth_severity: string;
+};
+
+export type AssetHierarchyNode = {
+  id: string;
+  name: string;
+  type?: string;
+  children?: AssetHierarchyNode[];
+  tags?: Array<{
+    id: string;
+    name: string;
+    unit: string;
+    min: number;
+    max: number;
+    warning_low: number;
+    warning_high: number;
+    critical_low: number;
+    critical_high: number;
+    sampling_rate_hz: number;
+  }>;
+};
+
+export type ScenarioInfo = {
+  id: string;
+  name: string;
+  description: string;
+};
+
+export type AlarmEvent = {
+  time: string;
+  asset_id: string;
+  tag: string;
+  severity: string;
+  message: string;
+  triggered_rules: string[];
+  acknowledged: boolean;
+};
+
+export type ReplayStatus = {
+  running: boolean;
+  dataset: string;
+  scenario: string;
+  progress_percent: number;
+  events_emitted: number;
+};
+
+export async function getHistorianEvents(table: string, limit: number = 100): Promise<HistorianEvent[]> {
+  const response = await fetch(`/api/historian/events?table=${encodeURIComponent(table)}&limit=${limit}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Historian events request failed: ${response.status}`);
+  return response.json();
+}
+
+export async function getHistorianTrend(
+  assetId: string,
+  tag: string,
+  hours: number = 1,
+): Promise<HistorianTrendPoint[]> {
+  const response = await fetch(
+    `/api/historian/trend?asset_id=${encodeURIComponent(assetId)}&tag=${encodeURIComponent(tag)}&hours=${hours}`,
+    { cache: "no-store" },
+  );
+  if (!response.ok) throw new Error(`Historian trend request failed: ${response.status}`);
+  return response.json();
+}
+
+export async function getAssetHierarchy(): Promise<AssetHierarchyNode[]> {
+  const response = await fetch("/api/historian/assets", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Asset hierarchy request failed: ${response.status}`);
+  return response.json();
+}
+
+export async function getScenarios(): Promise<ScenarioInfo[]> {
+  const response = await fetch("/api/historian/scenarios", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Scenarios request failed: ${response.status}`);
+  return response.json();
+}
+
+export async function getAlarms(limit: number = 50): Promise<AlarmEvent[]> {
+  const response = await fetch(`/api/historian/alarms?limit=${limit}`, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Alarms request failed: ${response.status}`);
+  return response.json();
+}
+
+export async function getReplayStatus(): Promise<ReplayStatus> {
+  const response = await fetch("/api/historian/replay", { cache: "no-store" });
+  if (!response.ok) throw new Error(`Replay status request failed: ${response.status}`);
+  return response.json();
+}
+
+export async function startReplay(dataset: string, scenario: string): Promise<{ ok: boolean }> {
+  const response = await fetch("/api/historian/replay", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dataset, scenario }),
+  });
+  if (!response.ok) throw new Error(`Start replay request failed: ${response.status}`);
+  return response.json();
+}
+
+export async function stopReplay(): Promise<{ ok: boolean }> {
+  const response = await fetch("/api/historian/replay", { method: "DELETE" });
+  if (!response.ok) throw new Error(`Stop replay request failed: ${response.status}`);
+  return response.json();
+}
+
 export function createObservabilityFallback(): ObservabilitySnapshot {
   const timestamps = Array.from({ length: 6 }, (_, index) => {
     const date = new Date(Date.now() - (5 - index) * 5 * 60 * 1000);

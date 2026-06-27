@@ -151,3 +151,63 @@ def load_hierarchy(path: Path | str) -> AssetHierarchy:
     return AssetHierarchy(
         sites={s["id"]: _load_site(s) for s in data.get("sites", [])}
     )
+
+
+def hierarchy_to_tree(hierarchy: AssetHierarchy) -> list[dict[str, Any]]:
+    """Convert AssetHierarchy to a nested tree structure for UI."""
+    result: list[dict[str, Any]] = []
+    for site in hierarchy.sites.values():
+        site_node: dict[str, Any] = {
+            "id": site.id,
+            "name": site.name,
+            "type": "site",
+            "children": [],
+        }
+        for area in site.areas.values():
+            area_node: dict[str, Any] = {
+                "id": area.id,
+                "name": area.name,
+                "type": "area",
+                "children": [],
+            }
+            for line in area.lines.values():
+                line_node: dict[str, Any] = {
+                    "id": line.id,
+                    "name": line.name,
+                    "type": "line",
+                    "children": [],
+                }
+                for cell in line.cells.values():
+                    cell_node: dict[str, Any] = {
+                        "id": cell.id,
+                        "name": cell.name,
+                        "type": "cell",
+                        "children": [],
+                    }
+                    for asset in cell.assets.values():
+                        asset_node: dict[str, Any] = {
+                            "id": asset.id,
+                            "name": asset.name,
+                            "type": asset.type,
+                            "children": [],
+                        }
+                        for tag in asset.tags.values():
+                            asset_node["children"].append({
+                                "id": tag.id,
+                                "name": tag.name,
+                                "type": "tag",
+                                "unit": tag.unit,
+                                "min": tag.min,
+                                "max": tag.max,
+                                "warning_low": tag.warning_low,
+                                "warning_high": tag.warning_high,
+                                "critical_low": tag.critical_low,
+                                "critical_high": tag.critical_high,
+                                "sampling_rate_hz": tag.sampling_rate_hz,
+                            })
+                        cell_node["children"].append(asset_node)
+                    line_node["children"].append(cell_node)
+                area_node["children"].append(line_node)
+            site_node["children"].append(area_node)
+        result.append(site_node)
+    return result

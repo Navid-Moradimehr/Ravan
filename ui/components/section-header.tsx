@@ -8,6 +8,7 @@ type SectionHeaderProps = {
   eyebrow?: string;
   actions?: React.ReactNode;
   className?: string;
+  children?: React.ReactNode;
 };
 
 export function SectionHeader({ title, description, icon: Icon, eyebrow, actions, className }: SectionHeaderProps) {

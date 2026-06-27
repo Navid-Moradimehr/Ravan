@@ -120,6 +120,59 @@ async def metrics() -> Response:
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
+from pathlib import Path
+from services.historian.client import query_recent_events, query_trend, query_alarms
+from services.assets.model import load_hierarchy, hierarchy_to_tree
+from services.scenarios.engine import list_scenarios
+
+@app.get("/historian/events")
+async def historian_events(table: str = "industrial_events", limit: int = 100) -> list[dict[str, Any]]:
+    return query_recent_events(table, limit)
+
+
+@app.get("/historian/trend")
+async def historian_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]:
+    return query_trend(asset_id, tag, hours)
+
+
+@app.get("/historian/assets")
+async def historian_assets() -> list[dict[str, Any]]:
+    hierarchy = load_hierarchy(Path("config/assets.yaml"))
+    return hierarchy_to_tree(hierarchy)
+
+
+@app.get("/historian/scenarios")
+async def historian_scenarios() -> list[dict[str, str]]:
+    return list_scenarios()
+
+
+@app.get("/historian/alarms")
+async def historian_alarms(limit: int = 50) -> list[dict[str, Any]]:
+    return query_alarms(limit)
+
+
+replay_state: dict[str, Any] = {"running": False, "dataset": "", "scenario": "", "progress": 0, "events_emitted": 0}
+
+@app.get("/historian/replay")
+async def get_replay_status() -> dict[str, Any]:
+    return replay_state
+
+@app.post("/historian/replay")
+async def start_replay(body: dict[str, Any]) -> dict[str, Any]:
+    replay_state["running"] = True
+    replay_state["dataset"] = body.get("dataset", "")
+    replay_state["scenario"] = body.get("scenario", "")
+    replay_state["progress"] = 0
+    replay_state["events_emitted"] = 0
+    return {"ok": True, "status": replay_state}
+
+@app.delete("/historian/replay")
+async def stop_replay() -> dict[str, Any]:
+    replay_state["running"] = False
+    replay_state["progress"] = 100
+    return {"ok": True, "status": replay_state}
+
+
 async def consume_loop() -> None:
     consumer = Consumer(
         {

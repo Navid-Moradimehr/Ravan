@@ -16,9 +16,12 @@ import {
   BarChart3,
   CircuitBoard,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { createObservabilityFallback, getObservability, getTelemetry } from "@/lib/api";
 import { TopBar } from "@/components/top-bar";
 import { SectionHeader } from "@/components/section-header";
+import { HistorianDashboard } from "@/components/historian-views";
+import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +50,7 @@ const nav = [
   { label: "Sources", href: "#sources" },
   { label: "AI", href: "#ai" },
   { label: "Observability", href: "#observability" },
+  { label: "Historian", href: "#historian" },
 ];
 
 function statusTone(status: string) {
@@ -271,47 +275,22 @@ export default function Home() {
           </section>
 
           {/* Observability */}
-          <ObservabilityPanels snapshot={observabilitySnapshot} />
+         <ObservabilityPanels snapshot={observabilitySnapshot} />
+
+         {/* Historian */}
+         <section id="historian" className="scroll-mt-24">
+           <SectionHeader title="Historian" icon={DatabaseZap}>
+             <p className="max-w-[720px] text-pretty text-sm leading-6 text-text-secondary">
+               Time-series storage, asset trends, and ground-truth scenario replay.
+             </p>
+           </SectionHeader>
+           <HistorianDashboard />
+         </section>
         </div>
 
         {/* Right rail */}
         <aside className="space-y-4">
-          <Card id="ai" className="app-card overflow-hidden">
-            <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <BrainCircuit aria-hidden="true" className="size-4 text-accent" />
-                AI Gateway
-              </CardTitle>
-              <CardDescription className="text-text-secondary">LM Studio compatible enrichment path</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 p-4 text-sm">
-              {!telemetryEvents.data ? (
-                <>
-                  <Skeleton className="h-5 w-full bg-surface-2" />
-                  <Skeleton className="h-5 w-3/4 bg-surface-2" />
-                </>
-              ) : (
-                <>
-                  <div>
-                    <div className="label-overline">Model</div>
-                    <div className="mt-1 break-words font-mono text-xs text-text-primary">
-                      {telemetryEvents.data?.llm.model ?? "openai/gpt-oss-20B"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="label-overline">Base URL</div>
-                    <div className="mt-1 break-words font-mono text-xs text-text-primary">
-                      {telemetryEvents.data?.llm.base_url ?? "http://172.17.0.1:1234/v1"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="label-overline">Last error</div>
-                    <div className="mt-1 text-text-secondary">{telemetryEvents.data?.llm.last_error ?? "None reported"}</div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+          {/* AI Gateway removed — now event-driven via SSE in telemetry hook */}
 
           <Card className="app-card overflow-hidden">
             <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
@@ -371,4 +350,3 @@ export default function Home() {
     </div>
   );
 }
-import { useTelemetryEvents } from "@/lib/useTelemetryEvents";

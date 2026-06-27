@@ -154,3 +154,19 @@ def apply_scenario(value: float, state: ScenarioState) -> float:
 
 def advance_scenario(state: ScenarioState) -> None:
     state.step += 1
+
+
+SCENARIO_CATALOG: list[dict[str, str]] = [
+    {"id": "normal", "name": "Normal Operation", "description": "Baseline behavior with no faults injected."},
+    {"id": "drift", "name": "Sensor Drift", "description": "Gradual offset from true value over time."},
+    {"id": "spike", "name": "Random Spike", "description": "Sudden large deviations at random intervals."},
+    {"id": "stuck", "name": "Stuck Sensor", "description": "Sensor freezes at a fixed value after a threshold."},
+    {"id": "dropout", "name": "Signal Dropout", "description": "Intermittent NaN values simulating comm loss."},
+    {"id": "noisy", "name": "Noisy Sensor", "description": "High Gaussian noise added to readings."},
+    {"id": "degradation", "name": "Slow Degradation", "description": "Progressive wear leading to elevated values."},
+    {"id": "maintenance_reset", "name": "Maintenance Reset", "description": "Post-maintenance baseline restoration."},
+]
+
+
+def list_scenarios() -> list[dict[str, str]]:
+    return SCENARIO_CATALOG

@@ -126,3 +126,47 @@ def query_recent_events(table: str, limit: int = 100) -> list[dict[str, Any]]:
                 (limit,),
             )
             return [dict(row) for row in cur.fetchall()]
+
+
+def query_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT time, value, quality, fault_type, ground_truth_severity
+                FROM industrial_events
+                WHERE asset_id = %s AND tag = %s
+                  AND time > NOW() - INTERVAL '%s hours'
+                ORDER BY time ASC
+                """,
+                (asset_id, tag, hours),
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+
+def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT time, asset_id, tag, severity, triggered_rules, evaluation
+                FROM processed_events
+                WHERE severity IN ('warning', 'critical')
+                ORDER BY time DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+            return [
+                {
+                    "time": row["time"],
+                    "asset_id": row["asset_id"],
+                    "tag": row["tag"],
+                    "severity": row["severity"],
+                    "message": f"Anomaly detected on {row['asset_id']}.{row['tag']}",
+                    "triggered_rules": row.get("triggered_rules", []),
+                    "acknowledged": False,
+                }
+                for row in rows
+            ]
