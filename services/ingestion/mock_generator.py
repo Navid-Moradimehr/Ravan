@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
 from confluent_kafka import Producer
+from services.scenarios.engine import ScenarioState, apply_scenario, advance_scenario, load_scenario_from_env
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,10 @@ class SensorEvent:
     vibration_mm_s: float
     pressure_bar: float
     schema_version: int = 1
+    fault_type: str = "normal"
+    scenario_id: str = "sc-000"
+    ground_truth_severity: str = "normal"
+    step: int = 0
 
 
 def env_int(name: str, default: int) -> int:
@@ -29,18 +34,30 @@ def env_int(name: str, default: int) -> int:
     return int(raw_value) if raw_value else default
 
 
-def build_event(device_count: int) -> SensorEvent:
+def build_event(device_count: int, scenario_state: ScenarioState) -> SensorEvent:
     device_number = random.randint(1, device_count)
-    is_anomalous = random.random() < 0.03
+    base_temp = random.gauss(48, 5)
+    base_vib = random.gauss(3, 1.2)
+    base_press = random.gauss(6.2, 0.4)
+
+    temp = apply_scenario(base_temp, scenario_state)
+    vib = apply_scenario(base_vib, scenario_state)
+    press = apply_scenario(base_press, scenario_state)
+
+    label = scenario_state.label()
 
     return SensorEvent(
         event_id=str(uuid.uuid4()),
         device_id=f"device-{device_number:03d}",
         site_id=f"site-{random.randint(1, 4):02d}",
         timestamp=datetime.now(timezone.utc).isoformat(),
-        temperature_c=round(random.gauss(72 if is_anomalous else 48, 5), 2),
-        vibration_mm_s=round(random.gauss(12 if is_anomalous else 3, 1.2), 2),
-        pressure_bar=round(random.gauss(8.8 if is_anomalous else 6.2, 0.4), 2),
+        temperature_c=round(temp, 2),
+        vibration_mm_s=round(vib, 2),
+        pressure_bar=round(press, 2),
+        fault_type=label["fault_type"],
+        scenario_id=label["scenario_id"],
+        ground_truth_severity=label["ground_truth_severity"],
+        step=label["step"],
     )
 
 
@@ -52,6 +69,7 @@ def main() -> None:
     max_events = env_int("MOCK_MAX_EVENTS", 0)
     delay = 1 / max(rate_per_second, 1)
     running = True
+    scenario_state = load_scenario_from_env()
 
     def stop(_signum: int, _frame: object) -> None:
         nonlocal running
@@ -65,15 +83,17 @@ def main() -> None:
     started_at = time.time()
 
     while running:
-        event = build_event(device_count)
+        event = build_event(device_count, scenario_state)
         payload = json.dumps(asdict(event), separators=(",", ":")).encode("utf-8")
         producer.produce(topic, key=event.device_id.encode("utf-8"), value=payload)
         producer.poll(0)
         produced += 1
+        advance_scenario(scenario_state)
 
         if produced % rate_per_second == 0:
             elapsed = max(time.time() - started_at, 0.001)
             print(f"produced={produced} rate={produced / elapsed:.1f}/sec topic={topic}")
+            print(f"scenario={scenario_state.scenario_type.value} step={scenario_state.step}")
 
         if max_events and produced >= max_events:
             running = False
