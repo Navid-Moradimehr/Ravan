@@ -173,6 +173,164 @@ async def stop_replay() -> dict[str, Any]:
     return {"ok": True, "status": replay_state}
 
 
+# Historian SSE subscribers
+historian_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+
+async def _broadcast_historian(payload: dict[str, Any]) -> None:
+    dead: set[asyncio.Queue[dict[str, Any]]] = set()
+    for queue in historian_subscribers:
+        try:
+            queue.put_nowait(payload)
+        except asyncio.QueueFull:
+            dead.add(queue)
+    for queue in dead:
+        historian_subscribers.discard(queue)
+
+@app.get("/historian/stream")
+async def historian_stream() -> StreamingResponse:
+    async def event_stream():
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=64)
+        historian_subscribers.add(queue)
+        try:
+            # Send initial snapshot
+            yield f"data: {json.dumps({'type': 'init', 'alarms': query_alarms(20), 'events': query_recent_events('industrial_events', 20)})}\n\n"
+            while service_state["running"]:
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=5.0)
+                    yield f"data: {json.dumps(payload)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ":heartbeat\n\n"
+        finally:
+            historian_subscribers.discard(queue)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+# Hook into consume_loop to broadcast new processed events
+_original_consume_loop = consume_loop
+
+async def consume_loop_with_broadcast() -> None:
+    """Wrap consume_loop to broadcast historian updates."""
+    # Start original consume loop in background
+    task = asyncio.create_task(_original_consume_loop())
+    
+    # Broadcast loop - check for new alarms/events periodically
+    last_alarm_count = 0
+    last_event_count = 0
+    while service_state["running"]:
+        try:
+            alarms = query_alarms(50)
+            events = query_recent_events('industrial_events', 50)
+            
+            # Only broadcast if data changed
+            if len(alarms) != last_alarm_count or len(events) != last_event_count:
+                last_alarm_count = len(alarms)
+                last_event_count = len(events)
+                await _broadcast_historian({
+                    "type": "update",
+                    "alarms": alarms[:20],
+                    "events": events[:20],
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+        except Exception:
+            pass
+        await asyncio.sleep(2.0)
+    
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+# Replace consume_loop reference
+import sys
+sys.modules[__name__].consume_loop = consume_loop_with_broadcast
+
+
+# Historian SSE subscribers
+historian_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+
+async def _broadcast_historian(payload: dict[str, Any]) -> None:
+    dead: set[asyncio.Queue[dict[str, Any]]] = set()
+    for queue in historian_subscribers:
+        try:
+            queue.put_nowait(payload)
+        except asyncio.QueueFull:
+            dead.add(queue)
+    for queue in dead:
+        historian_subscribers.discard(queue)
+
+@app.get("/historian/stream")
+async def historian_stream() -> StreamingResponse:
+    async def event_stream():
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=64)
+        historian_subscribers.add(queue)
+        try:
+            # Send initial snapshot
+            yield f"data: {json.dumps({'type': 'init', 'alarms': query_alarms(20), 'events': query_recent_events('industrial_events', 20)})}\n\n"
+            while service_state["running"]:
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=5.0)
+                    yield f"data: {json.dumps(payload)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ":heartbeat\n\n"
+        finally:
+            historian_subscribers.discard(queue)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+# Hook into consume_loop to broadcast new processed events
+_original_consume_loop = consume_loop
+
+async def consume_loop_with_broadcast() -> None:
+    """Wrap consume_loop to broadcast historian updates."""
+    # Start original consume loop in background
+    task = asyncio.create_task(_original_consume_loop())
+    
+    # Broadcast loop - check for new alarms/events periodically
+    last_alarm_count = 0
+    last_event_count = 0
+    while service_state["running"]:
+        try:
+            alarms = query_alarms(50)
+            events = query_recent_events('industrial_events', 50)
+            
+            # Only broadcast if data changed
+            if len(alarms) != last_alarm_count or len(events) != last_event_count:
+                last_alarm_count = len(alarms)
+                last_event_count = len(events)
+                await _broadcast_historian({
+                    "type": "update",
+                    "alarms": alarms[:20],
+                    "events": events[:20],
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+        except Exception:
+            pass
+        await asyncio.sleep(2.0)
+    
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+# Replace consume_loop reference
+import sys
+sys.modules[__name__].consume_loop = consume_loop_with_broadcast
+
+
 async def consume_loop() -> None:
     consumer = Consumer(
         {

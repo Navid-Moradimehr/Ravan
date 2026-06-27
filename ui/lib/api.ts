@@ -167,6 +167,66 @@ export async function stopReplay(): Promise<{ ok: boolean }> {
   return response.json();
 }
 
+export type HistorianStreamPayload = {
+  type: "init" | "update";
+  alarms?: HistorianEvent[];
+  events?: HistorianEvent[];
+  timestamp?: string;
+};
+
+export function subscribeHistorianStream(
+  handlers: {
+    onPayload: (payload: HistorianStreamPayload) => void;
+    onError?: () => void;
+  },
+  baseUrl: string = "http://localhost:8080",
+): () => void {
+  const source = new EventSource(`${baseUrl}/historian/stream`);
+  source.onmessage = (message) => {
+    if (!message.data || message.data.startsWith(":")) return;
+    try {
+      const payload = JSON.parse(message.data) as HistorianStreamPayload;
+      handlers.onPayload(payload);
+    } catch {
+      // ignore malformed events
+    }
+  };
+  source.onerror = () => {
+    handlers.onError?.();
+  };
+  return () => source.close();
+}
+
+export type HistorianStreamPayload = {
+  type: "init" | "update";
+  alarms?: HistorianEvent[];
+  events?: HistorianEvent[];
+  timestamp?: string;
+};
+
+export function subscribeHistorianStream(
+  handlers: {
+    onPayload: (payload: HistorianStreamPayload) => void;
+    onError?: () => void;
+  },
+  baseUrl: string = "http://localhost:8080",
+): () => void {
+  const source = new EventSource(`${baseUrl}/historian/stream`);
+  source.onmessage = (message) => {
+    if (!message.data || message.data.startsWith(":")) return;
+    try {
+      const payload = JSON.parse(message.data) as HistorianStreamPayload;
+      handlers.onPayload(payload);
+    } catch {
+      // ignore malformed events
+    }
+  };
+  source.onerror = () => {
+    handlers.onError?.();
+  };
+  return () => source.close();
+}
+
 export function createObservabilityFallback(): ObservabilitySnapshot {
   const timestamps = Array.from({ length: 6 }, (_, index) => {
     const date = new Date(Date.now() - (5 - index) * 5 * 60 * 1000);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Activity, AlertTriangle, Database, FolderTree, Play, Square, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getHistorianEvents, getHistorianTrend, getAssetHierarchy, getScenarios, getAlarms, getReplayStatus, startReplay, stopReplay } from "@/lib/api";
+import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeHistorianStream, type HistorianStreamPayload } from "@/lib/api";
 
 function TrendChart({ data }: { data: { time: string; value: number }[] }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
@@ -75,15 +75,53 @@ export function HistorianDashboard() {
   const [selectedDataset, setSelectedDataset] = useState("ai4i");
   const queryClient = useQueryClient();
 
-  const eventsQuery = useQuery({ queryKey: ["historian", "events", selectedTable], queryFn: () => getHistorianEvents(selectedTable, 50), refetchInterval: 10000 });
-  const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, 1) : Promise.resolve([]), enabled: !!selectedAsset, refetchInterval: 10000 });
+  // SSE-driven state for alarms and events
+  const [streamAlarms, setStreamAlarms] = useState<any[]>([]);
+  const [streamEvents, setStreamEvents] = useState<any[]>([]);
+  const [isStreamConnected, setIsStreamConnected] = useState(false);
+  const prevAlarmsRef = useRef<string>("");
+  const prevEventsRef = useRef<string>("");
+
+  const handleStreamPayload = useCallback((payload: HistorianStreamPayload) => {
+    if (payload.type === "init" || payload.type === "update") {
+      if (payload.alarms) {
+        const serialized = JSON.stringify(payload.alarms);
+        if (serialized !== prevAlarmsRef.current) {
+          prevAlarmsRef.current = serialized;
+          setStreamAlarms(payload.alarms);
+        }
+      }
+      if (payload.events) {
+        const serialized = JSON.stringify(payload.events);
+        if (serialized !== prevEventsRef.current) {
+          prevEventsRef.current = serialized;
+          setStreamEvents(payload.events);
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    setIsStreamConnected(true);
+    const cleanup = subscribeHistorianStream({
+      onPayload: handleStreamPayload,
+      onError: () => setIsStreamConnected(false),
+    });
+    return () => { cleanup(); };
+  }, [handleStreamPayload]);
+
+  const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, 1) : Promise.resolve([]), enabled: !!selectedAsset });
   const assetsQuery = useQuery({ queryKey: ["historian", "assets"], queryFn: getAssetHierarchy });
   const scenariosQuery = useQuery({ queryKey: ["historian", "scenarios"], queryFn: getScenarios });
-  const alarmsQuery = useQuery({ queryKey: ["historian", "alarms"], queryFn: () => getAlarms(50), refetchInterval: 10000 });
   const replayQuery = useQuery({ queryKey: ["historian", "replay"], queryFn: getReplayStatus, refetchInterval: 5000 });
 
   const startReplayMutation = useMutation({ mutationFn: () => startReplay(selectedDataset, selectedScenario), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["historian", "replay"] }); } });
   const stopReplayMutation = useMutation({ mutationFn: stopReplay, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["historian", "replay"] }); } });
+
+  const alarmsData = streamAlarms;
+  const eventsData = streamEvents;
+  const isAlarmsLoading = !isStreamConnected && streamAlarms.length === 0;
+  const isEventsLoading = !isStreamConnected && streamEvents.length === 0;
 
   return (
     <div className="space-y-5">
@@ -97,9 +135,7 @@ export function HistorianDashboard() {
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-text-secondary">Dataset</label>
               <DropdownMenu>
-                <DropdownMenuTrigger className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">
-                  {selectedDataset === "ai4i" ? "AI4I Predictive" : "Synthetic"}
-                </DropdownMenuTrigger>
+                <DropdownMenuTrigger className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">{selectedDataset === "ai4i" ? "AI4I Predictive" : "Synthetic"}</DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem onClick={() => setSelectedDataset("ai4i")}>AI4I Predictive</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setSelectedDataset("synthetic")}>Synthetic</DropdownMenuItem>
@@ -109,9 +145,7 @@ export function HistorianDashboard() {
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-text-secondary">Scenario</label>
               <DropdownMenu>
-                <DropdownMenuTrigger className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">
-                  {scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}
-                </DropdownMenuTrigger>
+                <DropdownMenuTrigger className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">{scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}</DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {scenariosQuery.data?.map((s) => (
                     <DropdownMenuItem key={s.id} onClick={() => setSelectedScenario(s.id)}>{s.name}</DropdownMenuItem>
@@ -152,7 +186,7 @@ export function HistorianDashboard() {
             {assetsQuery.isLoading ? (
               <div className="space-y-2"><Skeleton className="h-5 w-full bg-surface-2" /><Skeleton className="h-5 w-3/4 bg-surface-2" /></div>
             ) : (
-              <AssetTree nodes={assetsQuery.data ?? []} onSelect={(assetId: string, tag: string) => setSelectedAsset({ assetId, tag })} selected={selectedAsset} />
+              <AssetTree nodes={assetsQuery.data ?? []} onSelect={(assetId, tag) => setSelectedAsset({ assetId, tag })} selected={selectedAsset} />
             )}
           </CardContent>
         </Card>
@@ -188,9 +222,9 @@ export function HistorianDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {alarmsQuery.isLoading ? (Array.from({ length: 3 }).map((_, i) => (
+              {isAlarmsLoading ? (Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-5 w-full bg-surface-2" /></TableCell></TableRow>
-              ))) : alarmsQuery.data?.length ? (alarmsQuery.data.map((alarm: any, i: number) => (
+              ))) : alarmsData?.length ? (alarmsData.map((alarm: any, i: number) => (
                 <TableRow key={i} className="border-border-subtle hover:bg-surface-2">
                   <TableCell className="font-mono text-xs">{new Date(alarm.time).toLocaleTimeString()}</TableCell>
                   <TableCell className="text-sm font-medium">{alarm.asset_id}</TableCell>
@@ -215,9 +249,7 @@ export function HistorianDashboard() {
         <CardContent className="p-0">
           <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2">
             <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">
-                {selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">{selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}</DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => setSelectedTable("industrial_events")}>Industrial</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSelectedTable("processed_events")}>Processed</DropdownMenuItem>
@@ -238,9 +270,9 @@ export function HistorianDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {eventsQuery.isLoading ? (Array.from({ length: 3 }).map((_, i) => (
+              {isEventsLoading ? (Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-5 w-full bg-surface-2" /></TableCell></TableRow>
-              ))) : eventsQuery.data?.length ? (eventsQuery.data.map((event: any, i: number) => (
+              ))) : eventsData?.length ? (eventsData.map((event: any, i: number) => (
                 <TableRow key={i} className="border-border-subtle hover:bg-surface-2">
                   <TableCell className="font-mono text-xs">{new Date(event.time).toLocaleTimeString()}</TableCell>
                   <TableCell className="text-sm font-medium">{event.asset_id}</TableCell>
