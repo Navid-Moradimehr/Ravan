@@ -71,7 +71,7 @@ export default function Home() {
     { name: "ai", status: "starting" as const },
   ];
   const observabilitySnapshot = observability.data ?? createObservabilityFallback();
-  const systemOnline = !!telemetryEvents.error;
+  const systemOnline = !telemetryEvents.error;
 
   return (
     <div className="industrial-shell min-h-dvh bg-surface-0 text-text-primary">
