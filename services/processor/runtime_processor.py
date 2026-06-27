@@ -11,6 +11,7 @@ from typing import Any
 
 from confluent_kafka import Consumer, Producer
 from services.common.normalize import normalize_runtime_event
+from services.assets.model import load_hierarchy
 
 PRUNE_EVERY_N_MESSAGES = 128
 
@@ -71,6 +72,7 @@ def main() -> None:
     max_idle_seconds = int(os.getenv("RUNTIME_DEVICE_MAX_IDLE_SECONDS", "0"))
     max_devices = int(os.getenv("RUNTIME_MAX_ACTIVE_DEVICES", "0"))
     running = True
+    hierarchy = load_hierarchy("config/assets.yaml")
     windows: dict[str, deque[dict[str, Any]]] = {}
     window_last_seen: dict[str, float] = {}
 

@@ -15,6 +15,7 @@ from prometheus_client import Counter, Gauge, Histogram, start_http_server
 from pymodbus.client import ModbusTcpClient
 
 from services.edge_ingest.model import IndustrialEvent, validate_event, to_json_bytes, utc_now
+from services.assets.model import load_hierarchy
 from services.common.normalize import to_legacy_iot_event
 
 
@@ -219,6 +220,7 @@ def unit_for(tag: str) -> str:
 
 async def main() -> None:
     settings = Settings()
+    hierarchy = load_hierarchy("config/assets.yaml")
     stop_event = asyncio.Event()
     publisher = EdgePublisher(settings)
     start_http_server(settings.metrics_port)

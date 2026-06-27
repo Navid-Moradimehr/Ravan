@@ -1,0 +1,120 @@
+# Asset hierarchy and tag metadata for the Local Stream Engine industrial model.
+# Hierarchy: site -> area -> line -> cell -> asset -> tag
+
+sites:
+  - id: demo-site
+    name: "Demo Manufacturing Site"
+    areas:
+      - id: assembly-area
+        name: "Assembly Area"
+        lines:
+          - id: line-01
+            name: "Line 01"
+            cells:
+              - id: pump-cell
+                name: "Pump Cell"
+                assets:
+                  - id: Pump-01
+                    name: "Pump 01"
+                    type: pump
+                    tags:
+                      - id: Pump-01.Temperature
+                        name: "Temperature"
+                        unit: "c"
+                        min: 0
+                        max: 120
+                        warning_low: 10
+                        warning_high: 80
+                        critical_low: 0
+                        critical_high: 100
+                        sampling_rate_hz: 1
+                      - id: Pump-01.Vibration
+                        name: "Vibration"
+                        unit: "mm/s"
+                        min: 0
+                        max: 20
+                        warning_low: 0
+                        warning_high: 7
+                        critical_low: 0
+                        critical_high: 12
+                        sampling_rate_hz: 1
+                      - id: Pump-01.Pressure
+                        name: "Pressure"
+                        unit: "bar"
+                        min: 0
+                        max: 15
+                        warning_low: 2
+                        warning_high: 10
+                        critical_low: 0
+                        critical_high: 12
+                        sampling_rate_hz: 1
+
+                  - id: Pump-02
+                    name: "Pump 02"
+                    type: pump
+                    tags:
+                      - id: Pump-02.Temperature
+                        name: "Temperature"
+                        unit: "c"
+                        min: 0
+                        max: 120
+                        warning_low: 10
+                        warning_high: 80
+                        critical_low: 0
+                        critical_high: 100
+                        sampling_rate_hz: 1
+                      - id: Pump-02.Vibration
+                        name: "Vibration"
+                        unit: "mm/s"
+                        min: 0
+                        max: 20
+                        warning_low: 0
+                        warning_high: 7
+                        critical_low: 0
+                        critical_high: 12
+                        sampling_rate_hz: 1
+                      - id: Pump-02.Pressure
+                        name: "Pressure"
+                        unit: "bar"
+                        min: 0
+                        max: 15
+                        warning_low: 2
+                        warning_high: 10
+                        critical_low: 0
+                        critical_high: 12
+                        sampling_rate_hz: 1
+
+                  - id: Pump-03
+                    name: "Pump 03"
+                    type: pump
+                    tags:
+                      - id: Pump-03.Temperature
+                        name: "Temperature"
+                        unit: "c"
+                        min: 0
+                        max: 120
+                        warning_low: 10
+                        warning_high: 80
+                        critical_low: 0
+                        critical_high: 100
+                        sampling_rate_hz: 1
+                      - id: Pump-03.Vibration
+                        name: "Vibration"
+                        unit: "mm/s"
+                        min: 0
+                        max: 20
+                        warning_low: 0
+                        warning_high: 7
+                        critical_low: 0
+                        critical_high: 12
+                        sampling_rate_hz: 1
+                      - id: Pump-03.Pressure
+                        name: "Pressure"
+                        unit: "bar"
+                        min: 0
+                        max: 15
+                        warning_low: 2
+                        warning_high: 10
+                        critical_low: 0
+                        critical_high: 12
+                        sampling_rate_hz: 1
