@@ -131,6 +131,20 @@ AI gateway exposes:
 Grafana is available for dashboards and trend analysis.
 The dashboard uses the local Grafana `/api/health` endpoint to detect whether Grafana is online and degrades gracefully to the built-in fallback snapshot when Prometheus or Grafana are offline.
 
+
+### Dataset Replay
+
+The app supports replaying external industrial datasets into the streaming pipeline.
+
+-  is a generic CSV-to-Kafka replayer with configurable column mapping, rate control, looping, and max-event limits.
+-  is a specialized adapter for the AI4I 2020 Predictive Maintenance dataset, mapping sensor columns to the canonical  envelope.
+
+Usage:
+
+
+AI4I example:
+
+
 ## Test Modes
 
 ### Unit Tests

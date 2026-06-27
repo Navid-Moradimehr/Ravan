@@ -38,6 +38,14 @@ Shared normalization behavior note:
 
 - `services/common/normalize.py` is used by both edge ingestion and runtime processing to map inbound events into the processor compatibility shape.
 
+
+## Dataset Replay Path
+
+External datasets can be injected into the pipeline via the dataset replayer:
+
+
+
+This allows real-world benchmark data (e.g., AI4I 2020, NASA C-MAPSS) to flow through the same normalization, processing, and enrichment stages as live protocol data.
 ## Runbook
 
 ```powershell

@@ -25,6 +25,11 @@ Build a local-first streaming and BI control plane that combines real-time inges
 
 Commit after each major vertical slice with conventional messages. Do not combine infrastructure, service logic, and UI in one large commit unless unavoidable.
 
+
+## Dataset Replay Plan
+- Add generic CSV-to-Kafka replayer () with configurable mapping, rate control, and looping.
+- Add AI4I 2020 adapter () that maps predictive-maintenance sensor columns into the  envelope.
+- Future adapters: NASA C-MAPSS (degradation/RUL), SWaT (water-treatment ICS), Tennessee Eastman (process-control faults).
 ## Recent Refactor Notes
 - Centralized event normalization in `services/common/normalize.py` and used it from both `services/edge_ingest/main.py` (`to_legacy_iot_event`) and `services/processor/runtime_processor.py` (`normalize_runtime_event`) without changing emitted payload semantics.
 - Added bounded runtime processor state controls (`RUNTIME_WINDOW_LIMIT`, `RUNTIME_DEVICE_MAX_IDLE_SECONDS`, `RUNTIME_MAX_ACTIVE_DEVICES`) to prevent unbounded in-memory growth during long-running operation.
