@@ -12,6 +12,9 @@ from typing import Any
 from confluent_kafka import Consumer, Producer
 from services.common.normalize import normalize_runtime_event
 from services.assets.model import load_hierarchy
+from services.analytics.baseline import BaselineDetector
+from services.analytics.evaluation import evaluate_detection
+from services.analytics.rules import evaluate_rules
 
 PRUNE_EVERY_N_MESSAGES = 128
 
@@ -73,6 +76,7 @@ def main() -> None:
     max_devices = int(os.getenv("RUNTIME_MAX_ACTIVE_DEVICES", "0"))
     running = True
     hierarchy = load_hierarchy("config/assets.yaml")
+    detector = BaselineDetector()
     windows: dict[str, deque[dict[str, Any]]] = {}
     window_last_seen: dict[str, float] = {}
 
@@ -146,3 +150,9 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+from services.analytics.baseline import BaselineDetector
+from services.analytics.evaluation import evaluate_detection
+from services.analytics.rules import evaluate_rules
+from services.analytics.baseline import BaselineDetector
+from services.analytics.evaluation import evaluate_detection
+from services.analytics.rules import evaluate_rules
