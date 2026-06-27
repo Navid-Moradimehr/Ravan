@@ -97,8 +97,8 @@ export function HistorianDashboard() {
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-text-secondary">Dataset</label>
               <DropdownMenu>
-                <DropdownMenuTrigger >
-                  <button className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">{selectedDataset === "ai4i" ? "AI4I Predictive" : "Synthetic"}</button>
+                <DropdownMenuTrigger className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">
+                  {selectedDataset === "ai4i" ? "AI4I Predictive" : "Synthetic"}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem onClick={() => setSelectedDataset("ai4i")}>AI4I Predictive</DropdownMenuItem>
@@ -109,8 +109,8 @@ export function HistorianDashboard() {
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-text-secondary">Scenario</label>
               <DropdownMenu>
-                <DropdownMenuTrigger >
-                  <button className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">{scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}</button>
+                <DropdownMenuTrigger className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">
+                  {scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {scenariosQuery.data?.map((s) => (
@@ -215,8 +215,8 @@ export function HistorianDashboard() {
         <CardContent className="p-0">
           <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2">
             <DropdownMenu>
-              <DropdownMenuTrigger >
-                <button className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">{selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}</button>
+              <DropdownMenuTrigger className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">
+                {selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => setSelectedTable("industrial_events")}>Industrial</DropdownMenuItem>
