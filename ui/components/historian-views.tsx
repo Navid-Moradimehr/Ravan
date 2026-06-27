@@ -135,39 +135,43 @@ export function HistorianDashboard() {
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-text-secondary">Dataset</label>
               <DropdownMenu>
-                <DropdownMenuTrigger className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">{selectedDataset === "ai4i" ? "AI4I Predictive" : "Synthetic"}</DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => setSelectedDataset("ai4i")}>AI4I Predictive</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDataset("synthetic")}>Synthetic</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Scenario</label>
-              <DropdownMenu>
-                <DropdownMenuTrigger className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">{scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}</DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {scenariosQuery.data?.map((s) => (
-                    <DropdownMenuItem key={s.id} onClick={() => setSelectedScenario(s.id)}>{s.name}</DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <div className="flex items-end gap-2">
-              {replayQuery.data?.running ? (
-                <button onClick={() => stopReplayMutation.mutate()} className="action-danger inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium"><Square className="size-4" />Stop</button>
-              ) : (
-                <button onClick={() => startReplayMutation.mutate()} className="action-primary inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium"><Play className="size-4" />Start Replay</button>
-              )}
-            </div>
-          </div>
-          {replayQuery.data?.running ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-text-secondary">Progress</span>
-                <span className="font-mono text-text-primary">{replayQuery.data.progress_percent ?? 0}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+                 <DropdownMenuTrigger asChild>
+                   <div className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{selectedDataset === "ai4i" ? "AI4I Predictive" : "Synthetic"}</div>
+                 </DropdownMenuTrigger>
+                 <DropdownMenuContent>
+                   <DropdownMenuItem onClick={() => setSelectedDataset("ai4i")}>AI4I Predictive</DropdownMenuItem>
+                   <DropdownMenuItem onClick={() => setSelectedDataset("synthetic")}>Synthetic</DropdownMenuItem>
+                 </DropdownMenuContent>
+               </DropdownMenu>
+             </div>
+             <div className="space-y-1.5">
+               <label className="text-xs font-medium text-text-secondary">Scenario</label>
+               <DropdownMenu>
+                 <DropdownMenuTrigger asChild>
+                   <div className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}</div>
+                 </DropdownMenuTrigger>
+                 <DropdownMenuContent>
+                   {scenariosQuery.data?.map((s) => (
+                     <DropdownMenuItem key={s.id} onClick={() => setSelectedScenario(s.id)}>{s.name}</DropdownMenuItem>
+                   ))}
+                 </DropdownMenuContent>
+               </DropdownMenu>
+             </div>
+             <div className="flex items-end gap-2">
+               {replayQuery.data?.running ? (
+                 <button onClick={() => stopReplayMutation.mutate()} className="action-danger inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium"><Square className="size-4" />Stop</button>
+               ) : (
+                 <button onClick={() => startReplayMutation.mutate()} className="action-primary inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium"><Play className="size-4" />Start Replay</button>
+               )}
+             </div>
+           </div>
+           {replayQuery.data?.running ? (
+             <div className="space-y-2">
+               <div className="flex items-center justify-between text-xs">
+                 <span className="text-text-secondary">Progress</span>
+                 <span className="font-mono text-text-primary">{replayQuery.data.progress_percent ?? 0}%</span>
+               </div>
+               <div className="h-2 overflow-hidden rounded-full bg-surface-2">
                 <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${replayQuery.data.progress_percent ?? 0}%` }} />
               </div>
               <div className="text-xs text-text-secondary">{replayQuery.data.events_emitted ?? 0} events emitted</div>
@@ -292,3 +296,4 @@ export function HistorianDashboard() {
     </div>
   );
 }
+  const replayQuery = useQuery({ queryKey: ["historian", "replay"], queryFn: getReplayStatus, refetchInterval: 10000 });
