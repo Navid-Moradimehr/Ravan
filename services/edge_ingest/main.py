@@ -16,6 +16,7 @@ from pymodbus.client import ModbusTcpClient
 
 from services.edge_ingest.model import IndustrialEvent, validate_event, to_json_bytes, utc_now
 from services.assets.model import load_hierarchy
+from services.historian.client import insert_industrial_event
 from services.common.normalize import to_legacy_iot_event
 
 
@@ -87,6 +88,10 @@ class EdgePublisher:
         self.producer.produce(self.settings.normalized_topic, key=key, value=payload_bytes)
         self.producer.produce(self.settings.legacy_topic, key=key, value=to_json_bytes(to_legacy_iot_event(event)))
         self.producer.poll(0)
+        try:
+            insert_industrial_event(event.model_dump(mode="json"))
+        except Exception:
+            pass
         events_total.labels(protocol=event.source_protocol).inc()
         last_success_epoch.labels(protocol=event.source_protocol).set(time.time())
         observe_latency(event)

@@ -15,6 +15,7 @@ from services.assets.model import load_hierarchy
 from services.analytics.baseline import BaselineDetector
 from services.analytics.evaluation import evaluate_detection
 from services.analytics.rules import evaluate_rules
+from services.historian.client import insert_processed_event
 
 PRUNE_EVERY_N_MESSAGES = 128
 
@@ -133,6 +134,10 @@ def main() -> None:
 
             producer.produce(output_topic, key=event["device_id"].encode("utf-8"), value=json.dumps(event).encode("utf-8"))
             producer.poll(0)
+            try:
+                insert_processed_event(event)
+            except Exception:
+                pass
             processed += 1
 
             if processed % PRUNE_EVERY_N_MESSAGES == 0 and (max_devices > 0 or max_idle_seconds > 0):
@@ -153,6 +158,8 @@ if __name__ == "__main__":
 from services.analytics.baseline import BaselineDetector
 from services.analytics.evaluation import evaluate_detection
 from services.analytics.rules import evaluate_rules
+from services.historian.client import insert_processed_event
 from services.analytics.baseline import BaselineDetector
 from services.analytics.evaluation import evaluate_detection
 from services.analytics.rules import evaluate_rules
+from services.historian.client import insert_processed_event
