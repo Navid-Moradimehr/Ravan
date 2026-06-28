@@ -586,6 +586,31 @@ async def calculate_oee(req: dict[str, Any]) -> dict[str, Any]:
     result = oee_engine.calculate(shift, runtime_minutes=req.get("runtime_minutes", 0.0), total_count=req.get("total_count", 0), good_count=req.get("good_count", 0))
     return result.to_dict()
 
+# Collaboration endpoints
+@app.get("/api/v1/annotations")
+async def list_annotations(target_type: str | None = None, target_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    from api_service.collaboration import collaboration_store
+    return collaboration_store.list_annotations(target_type, target_id, limit)
+
+@app.post("/api/v1/annotations")
+async def create_annotation(req: dict[str, Any]) -> dict[str, str]:
+    from api_service.collaboration import collaboration_store
+    ann = collaboration_store.add_annotation(
+        target_type=req.get("target_type", "event"),
+        target_id=req.get("target_id", ""),
+        user_id=req.get("user_id", "anonymous"),
+        username=req.get("username", "Anonymous"),
+        text=req.get("text", ""),
+        tags=req.get("tags", []),
+    )
+    return {"status": "created", "annotation_id": ann.annotation_id}
+
+@app.delete("/api/v1/annotations/{annotation_id}")
+async def delete_annotation(annotation_id: str) -> dict[str, str]:
+    from api_service.collaboration import collaboration_store
+    collaboration_store.delete_annotation(annotation_id)
+    return {"status": "deleted"}
+
 from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
 
 class CreateUserRequest(BaseModel):
