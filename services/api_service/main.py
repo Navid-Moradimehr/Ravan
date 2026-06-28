@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import ssl
 import asyncio
 import json
 from contextlib import asynccontextmanager
@@ -8,7 +9,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import ORJSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -152,6 +153,33 @@ def _json_response(data):
     except ImportError:
         from fastapi.responses import JSONResponse
         return JSONResponse(content=data)
+
+
+# TLS configuration helper
+def get_tls_context() -> ssl.SSLContext | None:
+    """Load TLS certificates if available."""
+    cert_path = os.path.join(os.path.dirname(__file__), "..", "..", "tls", "localhost.pem")
+    key_path = os.path.join(os.path.dirname(__file__), "..", "..", "tls", "localhost-key.pem")
+
+    cert_path = os.path.abspath(cert_path)
+    key_path = os.path.abspath(key_path)
+
+    if os.path.exists(cert_path) and os.path.exists(key_path):
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(cert_path, key_path)
+        return context
+    return None
+
+
+@app.get("/.well-known/tls-info")
+async def tls_info() -> dict[str, Any]:
+    """Return TLS status and certificate paths."""
+    cert_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "tls", "localhost.pem"))
+    return {
+        "tls_enabled": os.path.exists(cert_path),
+        "cert_path": cert_path if os.path.exists(cert_path) else None,
+        "setup_script": "scripts/setup-local-tls.sh (or .ps1 on Windows)",
+    }
 
 
 webhook_registry: dict[str, WebhookConfig] = {}
@@ -523,3 +551,119 @@ async def get_alert_history(alert_id: str) -> list[dict[str, Any]]:
 @app.get("/api/v1/alerts/statistics")
 async def get_alert_statistics() -> dict[str, Any]:
     return alert_manager.get_statistics()
+
+
+# Notification endpoints using Apprise
+from notifications import notifier, NotificationPayload
+
+class NotifyRequest(BaseModel):
+    title: str
+    body: str
+    severity: str = "info"
+    asset_id: str | None = None
+    tag: str | None = None
+    event_id: str | None = None
+
+@app.post("/api/v1/notifications/send")
+async def send_notification(req: NotifyRequest) -> dict[str, Any]:
+    """Send a notification through all configured channels."""
+    payload = NotificationPayload(
+        title=req.title,
+        body=req.body,
+        severity=req.severity,
+        asset_id=req.asset_id,
+        tag=req.tag,
+        event_id=req.event_id,
+    )
+    result = notifier.notify(payload)
+    if not result["sent"]:
+        raise HTTPException(status_code=500, detail=result.get("error", "Notification failed"))
+    return result
+
+@app.get("/api/v1/notifications/status")
+async def notification_status() -> dict[str, Any]:
+    """Get notification service status."""
+    from notifications import APPRISE_AVAILABLE
+    return {
+        "apprise_available": APPRISE_AVAILABLE,
+        "channels_configured": len(notifier._config_urls),
+        "channels": notifier._config_urls,
+    }
+
+
+# Backup and restore endpoints
+from historian.backup import create_backup, restore_backup, list_backups, get_walg_status
+
+class BackupRequest(BaseModel):
+    tables: list[str] | None = None
+    backup_dir: str | None = None
+
+class RestoreRequest(BaseModel):
+    backup_path: str
+    target_database: str | None = None
+
+@app.post("/api/v1/historian/backup")
+async def backup_historian(req: BackupRequest) -> dict[str, Any]:
+    """Create a backup of the historian database."""
+    result = create_backup(backup_dir=req.backup_dir, tables=req.tables)
+    if result["status"] == "error":
+        raise HTTPException(status_code=500, detail=result.get("error", "Backup failed"))
+    return result
+
+@app.post("/api/v1/historian/restore")
+async def restore_historian(req: RestoreRequest) -> dict[str, Any]:
+    """Restore the historian database from a backup."""
+    result = restore_backup(req.backup_path, req.target_database)
+    if result["status"] == "error":
+        raise HTTPException(status_code=500, detail=result.get("error", "Restore failed"))
+    return result
+
+@app.get("/api/v1/historian/backups")
+async def list_historian_backups() -> list[dict[str, Any]]:
+    """List available historian backups."""
+    return list_backups()
+
+@app.get("/api/v1/historian/backup/status")
+async def backup_status() -> dict[str, Any]:
+    """Get backup tool status."""
+    return get_walg_status()
+
+
+# Correlation analysis endpoints
+from analytics.correlation import CorrelationAnalyzer, get_analyzer
+
+class CorrelationRequest(BaseModel):
+    tag: str
+    timestamp: str
+    value: float
+
+@app.post("/api/v1/analytics/correlation/ingest")
+async def ingest_correlation_data(req: CorrelationRequest) -> dict[str, str]:
+    """Ingest sensor data for correlation analysis."""
+    analyzer = get_analyzer()
+    analyzer.add_value(req.tag, req.timestamp, req.value)
+    return {"status": "ok"}
+
+@app.get("/api/v1/analytics/correlation/matrix")
+async def get_correlation_matrix() -> dict[str, Any]:
+    """Get correlation matrix between all tags."""
+    analyzer = get_analyzer()
+    return analyzer.get_correlation_matrix()
+
+@app.get("/api/v1/analytics/correlation/strong")
+async def get_strong_correlations(threshold: float = 0.7) -> list[dict[str, Any]]:
+    """Find strongly correlated tag pairs."""
+    analyzer = get_analyzer()
+    return analyzer.find_strong_correlations(threshold)
+
+@app.get("/api/v1/analytics/correlation/graph")
+async def get_causal_graph(threshold: float = 0.5) -> dict[str, Any]:
+    """Get causal graph for root-cause analysis."""
+    analyzer = get_analyzer()
+    return analyzer.build_causal_graph(threshold)
+
+@app.get("/api/v1/analytics/correlation/propagation/{tag}")
+async def get_anomaly_propagation(tag: str, lookback: int = 10) -> list[dict[str, Any]]:
+    """Detect anomaly propagation for a specific tag."""
+    analyzer = get_analyzer()
+    return analyzer.detect_anomaly_propagation(tag, lookback)
