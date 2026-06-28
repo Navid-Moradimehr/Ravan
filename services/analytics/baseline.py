@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
@@ -116,3 +117,55 @@ def detect_baseline_anomalies(values: list[float], tag: str = "unknown") -> list
     """Run baseline detection on a series of values and return all results."""
     detector = BaselineDetector()
     return [detector.update(tag, v) for v in values]
+
+
+# PyOD integration: trainable anomaly detection
+class PyODDetector:
+    """Trainable anomaly detector using PyOD models."""
+
+    def __init__(self, model_name: str = "iforest", contamination: float = 0.1):
+        self.model_name = model_name
+        self.contamination = contamination
+        self._model: Any | None = None
+        self._fitted = False
+
+    def _get_model(self) -> Any:
+        try:
+            from pyod.models.iforest import IForest
+            from pyod.models.lof import LOF
+            from pyod.models.ocsvm import OCSVM
+        except ImportError:
+            raise RuntimeError("PyOD is not installed. Install with: pip install pyod")
+        models = {
+            "iforest": IForest(contamination=self.contamination),
+            "lof": LOF(contamination=self.contamination),
+            "ocsvm": OCSVM(contamination=self.contamination),
+        }
+        return models.get(self.model_name, models["iforest"])
+
+    def fit(self, X: list[list[float]]) -> None:
+        self._model = self._get_model()
+        import numpy as np
+        self._model.fit(np.array(X))
+        self._fitted = True
+
+    def predict(self, X: list[list[float]]) -> list[int]:
+        if not self._fitted or self._model is None:
+            raise RuntimeError("Model must be fitted before prediction")
+        import numpy as np
+        return self._model.predict(np.array(X)).tolist()
+
+    def decision_function(self, X: list[list[float]]) -> list[float]:
+        if not self._fitted or self._model is None:
+            raise RuntimeError("Model must be fitted before prediction")
+        import numpy as np
+        return self._model.decision_function(np.array(X)).tolist()
+
+    def save(self, path: str) -> None:
+        import joblib
+        joblib.dump(self._model, path)
+
+    def load(self, path: str) -> None:
+        import joblib
+        self._model = joblib.load(path)
+        self._fitted = True
