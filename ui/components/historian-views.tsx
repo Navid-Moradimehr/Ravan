@@ -151,7 +151,7 @@ export function HistorianDashboard() {
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-text-secondary">Dataset</label>
               <DropdownMenu>
-                 <DropdownMenuTrigger asChild>
+                 <DropdownMenuTrigger>
                    <div className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{selectedDataset === "ai4i" ? "AI4I Predictive" : "Synthetic"}</div>
                  </DropdownMenuTrigger>
                  <DropdownMenuContent>
@@ -163,7 +163,7 @@ export function HistorianDashboard() {
              <div className="space-y-1.5">
                <label className="text-xs font-medium text-text-secondary">Scenario</label>
                <DropdownMenu>
-                 <DropdownMenuTrigger asChild>
+                 <DropdownMenuTrigger>
                    <div className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}</div>
                  </DropdownMenuTrigger>
                  <DropdownMenuContent>
@@ -269,7 +269,7 @@ export function HistorianDashboard() {
         <CardContent className="p-0">
           <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger>
                 <div className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}</div>
               </DropdownMenuTrigger>
               <DropdownMenuContent>

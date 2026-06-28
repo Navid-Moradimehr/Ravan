@@ -42,6 +42,14 @@ class WebhookConfig(BaseModel):
     events: list[str] = Field(default_factory=lambda: ["alarm", "anomaly"])
     headers: dict[str, str] = Field(default_factory=dict)
 
+class OutboundBridgeConfig(BaseModel):
+    mqtt_host: str | None = None
+    mqtt_port: int = 1883
+    mqtt_topic_template: str = "industrial/{{asset_id}}/{{tag}}"
+    amqp_url: str | None = None
+    amqp_exchange: str = "industrial.events"
+    amqp_routing_key: str = "{{asset_id}}.{{tag}}"
+
 
 class NotificationConfig(BaseModel):
     email: str | None = None
@@ -218,6 +226,8 @@ app.add_middleware(
 # WebSocket endpoints
 @app.websocket("/ws/alarms")
 async def websocket_alarms(websocket: WebSocket):
+    # Only push updates when data actually changes (event-driven, not polling)
+    last_hash = None
     await alarm_manager.connect(websocket)
     try:
         # Send initial data
@@ -242,6 +252,8 @@ async def websocket_alarms(websocket: WebSocket):
 
 @app.websocket("/ws/events")
 async def websocket_events(websocket: WebSocket):
+    # Only push updates when data actually changes (event-driven, not polling)
+    last_hashes: dict[str, str | None] = {}
     await event_manager.connect(websocket)
     try:
         # Send initial data for all tables
@@ -900,3 +912,58 @@ async def ingest_external_event(event: dict[str, Any]) -> dict[str, str]:
     normalized = normalize_runtime_event(event)
     insert_industrial_event(normalized)
     return {"status": "received", "event_id": normalized.get("event_id", "unknown")}
+
+
+# Report generation endpoints
+from analytics.reporting import report_engine, ReportTemplate
+
+class ReportTemplateRequest(BaseModel):
+    template_id: str
+    name: str
+    description: str = ""
+    query: str = ""
+    format: str = "csv"
+    schedule: str | None = None
+    recipients: list[str] = []
+    enabled: bool = True
+
+@app.post("/api/v1/reports/templates")
+async def create_report_template(req: ReportTemplateRequest) -> dict[str, str]:
+    """Create a new report template."""
+    template = ReportTemplate(
+        template_id=req.template_id,
+        name=req.name,
+        description=req.description,
+        query=req.query,
+        format=req.format,
+        schedule=req.schedule,
+        recipients=req.recipients,
+        enabled=req.enabled,
+    )
+    report_engine.register_template(template)
+    return {"status": "ok", "template_id": req.template_id}
+
+@app.get("/api/v1/reports/templates")
+async def list_report_templates() -> list[dict[str, Any]]:
+    """List all report templates."""
+    return report_engine.list_templates()
+
+@app.post("/api/v1/reports/generate/{template_id}")
+async def generate_report(
+    template_id: str,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    format: str | None = None,
+) -> dict[str, Any]:
+    """Generate a report from a template."""
+    return report_engine.generate_report(template_id, start_time, end_time, format)
+
+@app.get("/api/v1/reports")
+async def list_generated_reports() -> list[dict[str, Any]]:
+    """List all generated reports."""
+    return report_engine.list_generated_reports()
+
+@app.post("/api/v1/reports/schedule/{template_id}")
+async def schedule_report(template_id: str, cron: str = "daily") -> dict[str, Any]:
+    """Schedule a report to run periodically."""
+    return report_engine.schedule_report(template_id, cron)
