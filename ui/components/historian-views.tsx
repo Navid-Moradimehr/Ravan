@@ -296,4 +296,3 @@ export function HistorianDashboard() {
     </div>
   );
 }
-  const replayQuery = useQuery({ queryKey: ["historian", "replay"], queryFn: getReplayStatus, refetchInterval: 10000 });

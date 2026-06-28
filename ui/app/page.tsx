@@ -21,6 +21,8 @@ import { createObservabilityFallback, getObservability, getTelemetry } from "@/l
 import { TopBar } from "@/components/top-bar";
 import { SectionHeader } from "@/components/section-header";
 import { HistorianDashboard } from "@/components/historian-views";
+import { SqlQueryPanel } from "@/components/sql-query-panel";
+import { WebhookPanel } from "@/components/webhook-panel";
 import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -285,6 +287,8 @@ export default function Home() {
              </p>
            </SectionHeader>
            <HistorianDashboard />
+           <SqlQueryPanel />
+           <WebhookPanel />
          </section>
         </div>
 
