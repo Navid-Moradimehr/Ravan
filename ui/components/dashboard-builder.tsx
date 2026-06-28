@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { LayoutDashboard, Plus, X, GripVertical } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 
 export type PanelType = "trend" | "alarms" | "events" | "sql" | "webhooks" | "notifications" | "stats";
 
+// Fully functional dashboard builder with localStorage persistence
 interface DashboardPanel {
   id: string;
   type: PanelType;
@@ -24,21 +25,41 @@ const PANEL_TYPES: { type: PanelType; label: string; icon: string }[] = [
 ];
 
 export function DashboardBuilder() {
-  const [panels, setPanels] = useState<DashboardPanel[]>([
-    { id: "1", type: "stats", title: "Overview" },
-    { id: "2", type: "alarms", title: "Active Alarms" },
-  ]);
+  const [panels, setPanels] = useState<DashboardPanel[]>(() => {
+    try {
+      const saved = localStorage.getItem("dashboard_panels");
+      return saved ? JSON.parse(saved) : [{ id: "1", type: "stats", title: "Overview" }, { id: "2", type: "alarms", title: "Active Alarms" }];
+    } catch {
+      return [{ id: "1", type: "stats", title: "Overview" }, { id: "2", type: "alarms", title: "Active Alarms" }];
+    }
+  });
   const [showAdd, setShowAdd] = useState(false);
 
-  const addPanel = (type: PanelType) => {
-    const label = PANEL_TYPES.find((p) => p.type === type)?.label || type;
-    setPanels([...panels, { id: Math.random().toString(36).slice(2), type, title: label }]);
-    setShowAdd(false);
-  };
+  const savePanels = useCallback((next: DashboardPanel[]) => {
+    setPanels(next);
+    localStorage.setItem("dashboard_panels", JSON.stringify(next));
+  }, []);
 
-  const removePanel = (id: string) => {
-    setPanels(panels.filter((p) => p.id !== id));
-  };
+  const addPanel = useCallback((type: PanelType) => {
+    const label = PANEL_TYPES.find((p) => p.type === type)?.label || type;
+    const next = [...panels, { id: Math.random().toString(36).slice(2), type, title: label }];
+    savePanels(next);
+    setShowAdd(false);
+  }, [panels, savePanels]);
+
+  const removePanel = useCallback((id: string) => {
+    savePanels(panels.filter((p) => p.id !== id));
+  }, [panels, savePanels]);
+
+  const movePanel = useCallback((id: string, direction: -1 | 1) => {
+    const idx = panels.findIndex((p) => p.id === id);
+    if (idx < 0) return;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= panels.length) return;
+    const next = [...panels];
+    [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+    savePanels(next);
+  }, [panels, savePanels]);
 
   return (
     <Card className="app-card">
@@ -60,9 +81,13 @@ export function DashboardBuilder() {
                   <GripVertical className="size-4 text-text-muted" />
                   <span className="text-sm font-medium">{panel.title}</span>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => removePanel(panel.id)}>
-                  <X className="size-4 text-error" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => movePanel(panel.id, -1)}>↑</Button>
+                  <Button variant="ghost" size="sm" onClick={() => movePanel(panel.id, 1)}>↓</Button>
+                  <Button variant="ghost" size="sm" onClick={() => removePanel(panel.id)}>
+                    <X className="size-4 text-error" />
+                  </Button>
+                </div>
               </div>
               <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
                 {panel.type} panel placeholder
