@@ -3,6 +3,15 @@ from __future__ import annotations
 from typing import Any
 
 
+def severity_from_value(value: float, warning_low: float, warning_high: float, critical_low: float, critical_high: float) -> str:
+    """Determine severity based on value thresholds."""
+    if value <= critical_low or value >= critical_high:
+        return "critical"
+    if value <= warning_low or value >= warning_high:
+        return "warning"
+    return "normal"
+
+
 def evaluate_detection(
     predicted_severity: str,
     ground_truth_severity: str,
@@ -20,6 +29,23 @@ def evaluate_detection(
         "under_detected": pred_level < gt_level,
         "missed_critical": gt_level == 2 and pred_level < 2,
         "false_alarm": gt_level == 0 and pred_level > 0,
+    }
+
+
+def evaluate_against_thresholds(
+    value: float,
+    warning_low: float,
+    warning_high: float,
+    critical_low: float,
+    critical_high: float,
+    scenario_severity: str = "normal",
+) -> dict[str, Any]:
+    """Evaluate a single value against thresholds and compare to scenario ground truth."""
+    predicted = severity_from_value(value, warning_low, warning_high, critical_low, critical_high)
+    return {
+        **evaluate_detection(predicted, scenario_severity),
+        "value": value,
+        "predicted_severity": predicted,
     }
 
 
