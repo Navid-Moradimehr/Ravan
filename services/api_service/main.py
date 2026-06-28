@@ -553,6 +553,22 @@ async def get_connector_endpoint(connector_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Connector not found")
     return c.__dict__
 
+# Digital Twin endpoints
+@app.get("/api/v1/digital-twin/scenes/{scene_id}")
+async def get_digital_twin_scene(scene_id: str) -> dict[str, Any]:
+    from assets.digital_twin import demo_scene
+    return demo_scene.to_dict()
+
+@app.post("/api/v1/digital-twin/scenes/{scene_id}/entities/{entity_id}/values")
+async def update_twin_value(scene_id: str, entity_id: str, req: dict[str, Any]) -> dict[str, str]:
+    from assets.digital_twin import demo_scene
+    tag = req.get("tag", "")
+    value = float(req.get("value", 0))
+    ok = demo_scene.update_value(entity_id, tag, value)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    return {"status": "updated"}
+
 from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
 
 class CreateUserRequest(BaseModel):
