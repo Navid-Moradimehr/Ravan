@@ -485,6 +485,24 @@ async def delete_kpi_endpoint(kpi_id: str) -> dict[str, str]:
     kpi_engine.unregister_kpi(kpi_id)
     return {"status": "deleted"}
 
+# Pipeline designer endpoints
+@app.get("/api/v1/pipelines")
+async def list_pipelines() -> list[dict[str, Any]]:
+    from processor.pipeline_designer import pipeline_registry
+    return pipeline_registry.list_all()
+
+@app.post("/api/v1/pipelines")
+async def create_pipeline(req: dict[str, Any]) -> dict[str, str]:
+    from processor.pipeline_designer import pipeline_registry
+    topo = pipeline_registry.create(req.get("name", "untitled"), req.get("description", ""))
+    return {"status": "created", "topology_id": topo.topology_id}
+
+@app.delete("/api/v1/pipelines/{topology_id}")
+async def delete_pipeline(topology_id: str) -> dict[str, str]:
+    from processor.pipeline_designer import pipeline_registry
+    pipeline_registry.delete(topology_id)
+    return {"status": "deleted"}
+
 from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
 
 class CreateUserRequest(BaseModel):
