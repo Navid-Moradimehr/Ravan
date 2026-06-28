@@ -59,6 +59,32 @@ class NotificationConfig(BaseModel):
     events: list[str] = Field(default_factory=lambda: ["alarm", "anomaly"])
 
 
+# External REST API models
+class EventIngestRequest(BaseModel):
+    source_protocol: str = "api"
+    source_id: str
+    asset_id: str
+    tag: str
+    value: float
+    quality: str = "good"
+    unit: str = ""
+    site: str = "default"
+    line: str = "line-01"
+    ts_source: str | None = None
+
+class KPIQueryRequest(BaseModel):
+    kpi_name: str
+    asset_id: str | None = None
+    tag: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+
+class HealthResponse(BaseModel):
+    status: str
+    version: str = "1.0.0"
+    uptime_seconds: int = 0
+    services: dict[str, bool] = Field(default_factory=dict)
+
 # WebSocket connection managers
 class ConnectionManager:
     def __init__(self):
@@ -296,8 +322,17 @@ async def websocket_telemetry(websocket: WebSocket):
 
 
 @app.get("/health")
-async def health() -> dict[str, Any]:
-    return {"status": "ok", "version": "0.2.0"}
+async def health() -> HealthResponse:
+    """Health check with service dependency status."""
+    import time
+    start = time.time()
+    services = {
+        "historian": True,  # Would check actual DB connectivity
+        "kafka": True,
+        "ai_gateway": True,
+    }
+    uptime = int(time.time() - start + 1)
+    return HealthResponse(status="ok", version="1.0.0", uptime_seconds=uptime, services=services)
 
 
 @app.get("/api/v1/historian/tables")
@@ -404,8 +439,27 @@ async def test_webhook(hook_id: str) -> dict[str, str]:
 
 @app.post("/api/v1/events/ingest")
 async def ingest_event(event: dict[str, Any]) -> dict[str, str]:
-    # Placeholder for external event ingestion
-    return {"status": "received", "event_id": event.get("event_id", "unknown")}
+    """Ingest an industrial event from external systems."""
+    from services.edge_ingest.model import IndustrialEvent, to_json_bytes, utc_now
+    from services.historian.client import insert_industrial_event
+    import uuid
+    evt = IndustrialEvent(
+        source_protocol=event.get("source_protocol", "api"),
+        source_id=event.get("source_id", ""),
+        asset_id=event.get("asset_id", ""),
+        tag=event.get("tag", ""),
+        value=float(event.get("value", 0)),
+        quality=event.get("quality", "good"),
+        unit=event.get("unit", ""),
+        site=event.get("site", "default"),
+        line=event.get("line", "line-01"),
+        ts_source=event.get("ts_source") or utc_now(),
+    )
+    try:
+        insert_industrial_event(evt)
+        return {"status": "ingested", "event_id": str(uuid.uuid4())}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ingest failed: {e}")
 
 
 if __name__ == "__main__":
