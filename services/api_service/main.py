@@ -569,6 +569,23 @@ async def update_twin_value(scene_id: str, entity_id: str, req: dict[str, Any]) 
         raise HTTPException(status_code=404, detail="Entity not found")
     return {"status": "updated"}
 
+# OEE / Production Reporting endpoints
+@app.get("/api/v1/oee/shifts")
+async def list_shifts(date: str | None = None) -> list[dict[str, Any]]:
+    from analytics.oee_engine import oee_engine
+    from datetime import datetime
+    dt = datetime.strptime(date, "%Y-%m-%d") if date else datetime.now()
+    shifts = oee_engine.generate_shifts(dt)
+    return [s.__dict__ for s in shifts]
+
+@app.post("/api/v1/oee/calculate")
+async def calculate_oee(req: dict[str, Any]) -> dict[str, Any]:
+    from analytics.oee_engine import oee_engine, ShiftPeriod
+    from datetime import datetime
+    shift = ShiftPeriod(shift_id=req.get("shift_id", "unknown"), start=datetime.now(), end=datetime.now(), planned_production_time_minutes=req.get("planned_minutes", 480.0))
+    result = oee_engine.calculate(shift, runtime_minutes=req.get("runtime_minutes", 0.0), total_count=req.get("total_count", 0), good_count=req.get("good_count", 0))
+    return result.to_dict()
+
 from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
 
 class CreateUserRequest(BaseModel):
