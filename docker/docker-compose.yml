@@ -280,12 +280,6 @@ services:
     profiles:
       - extended
 
-volumes:
-  redpanda-data:
-  postgres-data:
-  prometheus-data:
-  grafana-data:
-  minio-data:
 
   timescaledb:
     image: timescale/timescaledb:latest-pg15
@@ -303,3 +297,31 @@ volumes:
       interval: 10s
       timeout: 5s
       retries: 10
+
+
+volumes:
+  redpanda-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+  minio-data:
+  timescale-data:
+
+  api-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      TIMESCALE_DB: stream_engine
+      TIMESCALE_USER: stream
+      TIMESCALE_PASSWORD: stream
+      API_SERVICE_PORT: 8020
+    ports:
+      - "8020:8020"
+    profiles:
+      - api

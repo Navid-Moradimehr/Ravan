@@ -128,6 +128,24 @@ def query_recent_events(table: str, limit: int = 100) -> list[dict[str, Any]]:
             return [dict(row) for row in cur.fetchall()]
 
 
+
+
+def query_sql(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, params)
+            return [dict(row) for row in cur.fetchall()]
+
+
+
+
+def query_tables() -> list[str]:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+            return [row[0] for row in cur.fetchall()]
+
+
 def query_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]:
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -142,8 +160,6 @@ def query_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]
                 (asset_id, tag, hours),
             )
             return [dict(row) for row in cur.fetchall()]
-
-
 def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:

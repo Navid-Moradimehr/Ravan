@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeHistorianStream, type HistorianStreamPayload } from "@/lib/api";
+import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeHistorianStreamSSE, type HistorianStreamPayload } from "@/lib/api";
 
 function TrendChart({ data }: { data: { time: string; value: number }[] }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
@@ -103,7 +103,7 @@ export function HistorianDashboard() {
 
   useEffect(() => {
     setIsStreamConnected(true);
-    const cleanup = subscribeHistorianStream({
+    const cleanup = subscribeHistorianStreamSSE({
       onPayload: handleStreamPayload,
       onError: () => setIsStreamConnected(false),
     });

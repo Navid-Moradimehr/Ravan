@@ -174,7 +174,7 @@ export type HistorianStreamPayload = {
   timestamp?: string;
 };
 
-export function subscribeHistorianStream(
+export function subscribeHistorianStreamSSE(
   handlers: {
     onPayload: (payload: HistorianStreamPayload) => void;
     onError?: () => void;
