@@ -539,6 +539,20 @@ async def peek_topic_endpoint(topic: str, req: dict[str, Any]) -> list[dict[str,
     limit = req.get("limit", 10)
     return peek_topic(topic, limit=limit)
 
+# Connector Marketplace endpoints
+@app.get("/api/v1/connectors")
+async def list_connectors_endpoint(category: str | None = None, protocol: str | None = None) -> list[dict[str, Any]]:
+    from datasets.data_sources_catalog import list_connectors
+    return list_connectors(category, protocol)
+
+@app.get("/api/v1/connectors/{connector_id}")
+async def get_connector_endpoint(connector_id: str) -> dict[str, Any]:
+    from datasets.data_sources_catalog import get_connector
+    c = get_connector(connector_id)
+    if not c:
+        raise HTTPException(status_code=404, detail="Connector not found")
+    return c.__dict__
+
 from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
 
 class CreateUserRequest(BaseModel):
