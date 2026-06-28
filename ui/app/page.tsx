@@ -23,6 +23,7 @@ import { SectionHeader } from "@/components/section-header";
 import { HistorianDashboard } from "@/components/historian-views";
 import { SqlQueryPanel } from "@/components/sql-query-panel";
 import { NotificationPanel } from "@/components/notification-panel";
+import { DashboardBuilder } from "@/components/dashboard-builder";
 import { WebhookPanel } from "@/components/webhook-panel";
 import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
 import { StatCard } from "@/components/stat-card";
@@ -291,6 +292,7 @@ export default function Home() {
            <SqlQueryPanel />
            <WebhookPanel />
            <NotificationPanel />
+           <DashboardBuilder />
          </section>
         </div>
 
