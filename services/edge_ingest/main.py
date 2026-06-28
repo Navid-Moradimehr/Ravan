@@ -70,6 +70,9 @@ class EdgePublisher:
         self.producer = Producer({
             "bootstrap.servers": settings.brokers,
             "client.id": "edge-ingest",
+            "enable.idempotence": True,
+            "acks": "all",
+            "retries": 10,
             "batch.size": 16384,
             "linger.ms": 10,
             "compression.type": "lz4",
