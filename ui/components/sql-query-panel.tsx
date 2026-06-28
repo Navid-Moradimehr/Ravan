@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Database, Play, Table } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
+// Self-Service BI: run ad-hoc SQL, save queries, export CSV
 async function runQuery(sql: string, params: any[] = []) {
   const response = await fetch("/api/query", {
     method: "POST",
@@ -18,8 +19,31 @@ async function runQuery(sql: string, params: any[] = []) {
   return response.json();
 }
 
+function downloadCsv(rows: any[], filename: string) {
+  if (!rows.length) return;
+  const columns = Object.keys(rows[0]);
+  const csv = [
+    columns.join(","),
+    ...rows.map((row) =>
+      columns.map((col) => {
+        const val = row[col];
+        const str = typeof val === "object" ? JSON.stringify(val) : String(val ?? "");
+        return str.includes(",") ? `"${str.replace(/"/g, """)}"` : str;
+      }).join(",")
+    ),
+  ].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function SqlQueryPanel() {
   const [sql, setSql] = useState("SELECT * FROM industrial_events ORDER BY time DESC LIMIT 10");
+  const [savedQueries, setSavedQueries] = useState<string[]>(["SELECT * FROM industrial_events ORDER BY time DESC LIMIT 10"]);
   const query = useMutation({ mutationFn: (sql: string) => runQuery(sql) });
 
   const data = query.data ?? [];
@@ -36,6 +60,13 @@ export function SqlQueryPanel() {
       </CardHeader>
       <CardContent className="space-y-4 p-4">
         <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {savedQueries.map((q, i) => (
+              <button key={i} onClick={() => setSql(q)} className="text-xs rounded-md border border-border-subtle bg-surface-2 px-2 py-1 hover:bg-accent-subtle">
+                {q.length > 40 ? q.slice(0, 40) + "..." : q}
+              </button>
+            ))}
+          </div>
           <textarea
             value={sql}
             onChange={(e) => setSql(e.target.value)}
@@ -43,10 +74,16 @@ export function SqlQueryPanel() {
             placeholder="SELECT * FROM industrial_events LIMIT 10"
           />
           <div className="flex items-center gap-2">
-            <Button onClick={() => query.mutate(sql)} disabled={query.isPending} className="inline-flex items-center gap-2">
+            <Button onClick={() => { if (!savedQueries.includes(sql)) setSavedQueries([...savedQueries, sql]); query.mutate(sql); }} disabled={query.isPending} className="inline-flex items-center gap-2">
               <Play className="size-4" />
               {query.isPending ? "Running..." : "Run Query"}
             </Button>
+            {data.length > 0 && (
+              <Button variant="outline" onClick={() => downloadCsv(data, `query_results_${Date.now()}.csv`)} className="inline-flex items-center gap-2">
+                <Table className="size-4" />
+                Export CSV
+              </Button>
+            )}
             {query.isError && <Badge variant="outline" className="border-error/30 bg-error/10 text-error">Error</Badge>}
           </div>
         </div>
