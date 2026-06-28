@@ -503,6 +503,25 @@ async def delete_pipeline(topology_id: str) -> dict[str, str]:
     pipeline_registry.delete(topology_id)
     return {"status": "deleted"}
 
+# Schema Registry endpoints
+@app.get("/api/v1/schemas")
+async def list_schemas() -> list[dict[str, Any]]:
+    from common.schema_registry import schema_registry
+    return schema_registry.list_schemas()
+
+@app.post("/api/v1/schemas/{schema_id}/validate")
+async def validate_schema(schema_id: str, req: dict[str, Any]) -> dict[str, Any]:
+    from common.schema_registry import schema_registry
+    version = req.get("version")
+    data = req.get("data", {})
+    return schema_registry.validate(schema_id, data, version)
+
+@app.post("/api/v1/schemas")
+async def register_schema(req: dict[str, Any]) -> dict[str, str]:
+    from common.schema_registry import schema_registry
+    sv = schema_registry.register(req.get("schema_id", "custom"), req.get("fields", []))
+    return {"status": "registered", "schema_id": sv.schema_id, "version": str(sv.version)}
+
 from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
 
 class CreateUserRequest(BaseModel):
