@@ -2,6 +2,9 @@
 @import "@fontsource-variable/inter-tight";
 @import "@fontsource-variable/ibm-plex-sans";
 @import "@fontsource-variable/jetbrains-mono";
+
+/* Mobile-first responsive base */
+html { -webkit-text-size-adjust: 100%; }
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -236,5 +239,18 @@ body {
     font-size: 0.6875rem;
     font-weight: 600;
     color: var(--color-text-muted);
+  }
+  /* Mobile responsive utilities */
+  .responsive-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4;
+  }
+  .responsive-table {
+    @apply overflow-x-auto;
+  }
+  .responsive-sidebar {
+    @apply fixed inset-y-0 left-0 z-50 w-64 transform -translate-x-full transition-transform duration-200 md:relative md:translate-x-0;
+  }
+  .responsive-sidebar.open {
+    @apply translate-x-0;
   }
 }
