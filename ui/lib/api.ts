@@ -168,33 +168,175 @@ export async function stopReplay(): Promise<{ ok: boolean }> {
 }
 
 export type HistorianStreamPayload = {
-  type: "init" | "update";
+  type: "init" | "update" | "heartbeat";
   alarms?: HistorianEvent[];
   events?: HistorianEvent[];
+  table?: string;
   timestamp?: string;
 };
 
-export function subscribeHistorianStreamSSE(
+// WebSocket client for alarms
+export function subscribeAlarmsWebSocket(
   handlers: {
     onPayload: (payload: HistorianStreamPayload) => void;
     onError?: () => void;
+    onConnect?: () => void;
+    onDisconnect?: () => void;
   },
-  baseUrl: string = "http://localhost:8080",
+  baseUrl: string = "ws://localhost:8020",
 ): () => void {
-  const source = new EventSource(`${baseUrl}/historian/stream`);
-  source.onmessage = (message) => {
-    if (!message.data || message.data.startsWith(":")) return;
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+
+  const connect = () => {
+    if (closed) return;
     try {
-      const payload = JSON.parse(message.data) as HistorianStreamPayload;
-      handlers.onPayload(payload);
+      ws = new WebSocket(`${baseUrl}/ws/alarms`);
+      ws.onopen = () => {
+        handlers.onConnect?.();
+      };
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data) as HistorianStreamPayload;
+          handlers.onPayload(payload);
+        } catch {
+          // ignore malformed
+        }
+      };
+      ws.onerror = () => {
+        handlers.onError?.();
+      };
+      ws.onclose = () => {
+        handlers.onDisconnect?.();
+        if (!closed) {
+          reconnectTimer = setTimeout(connect, 3000);
+        }
+      };
     } catch {
-      // ignore malformed events
+      if (!closed) {
+        reconnectTimer = setTimeout(connect, 3000);
+      }
     }
   };
-  source.onerror = () => {
-    handlers.onError?.();
+
+  connect();
+
+  return () => {
+    closed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws) ws.close();
   };
-  return () => source.close();
+}
+
+// WebSocket client for events
+export function subscribeEventsWebSocket(
+  handlers: {
+    onPayload: (payload: HistorianStreamPayload) => void;
+    onError?: () => void;
+    onConnect?: () => void;
+    onDisconnect?: () => void;
+  },
+  baseUrl: string = "ws://localhost:8020",
+): () => void {
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+
+  const connect = () => {
+    if (closed) return;
+    try {
+      ws = new WebSocket(`${baseUrl}/ws/events`);
+      ws.onopen = () => {
+        handlers.onConnect?.();
+      };
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data) as HistorianStreamPayload;
+          handlers.onPayload(payload);
+        } catch {
+          // ignore malformed
+        }
+      };
+      ws.onerror = () => {
+        handlers.onError?.();
+      };
+      ws.onclose = () => {
+        handlers.onDisconnect?.();
+        if (!closed) {
+          reconnectTimer = setTimeout(connect, 3000);
+        }
+      };
+    } catch {
+      if (!closed) {
+        reconnectTimer = setTimeout(connect, 3000);
+      }
+    }
+  };
+
+  connect();
+
+  return () => {
+    closed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws) ws.close();
+  };
+}
+
+// WebSocket client for telemetry
+export function subscribeTelemetryWebSocket(
+  handlers: {
+    onPayload: (payload: Telemetry) => void;
+    onError?: () => void;
+    onConnect?: () => void;
+    onDisconnect?: () => void;
+  },
+  baseUrl: string = "ws://localhost:8020",
+): () => void {
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+
+  const connect = () => {
+    if (closed) return;
+    try {
+      ws = new WebSocket(`${baseUrl}/ws/telemetry`);
+      ws.onopen = () => {
+        handlers.onConnect?.();
+      };
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed.type === "init" || parsed.type === "update") {
+            handlers.onPayload(parsed.telemetry as Telemetry);
+          }
+        } catch {
+          // ignore malformed
+        }
+      };
+      ws.onerror = () => {
+        handlers.onError?.();
+      };
+      ws.onclose = () => {
+        handlers.onDisconnect?.();
+        if (!closed) {
+          reconnectTimer = setTimeout(connect, 3000);
+        }
+      };
+    } catch {
+      if (!closed) {
+        reconnectTimer = setTimeout(connect, 3000);
+      }
+    }
+  };
+
+  connect();
+
+  return () => {
+    closed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws) ws.close();
+  };
 }
 
 export function createObservabilityFallback(): ObservabilitySnapshot {

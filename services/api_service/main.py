@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+import asyncio
+import json
 from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -25,6 +27,7 @@ from scenarios.engine import list_scenarios
 
 API_PORT = int(os.getenv("API_SERVICE_PORT", "8020"))
 TIMESCALE_API_BASE = os.getenv("TIMESCALE_API_BASE", "http://localhost:8010")
+WS_HEARTBEAT_INTERVAL = 15.0  # seconds
 
 
 class SqlQueryRequest(BaseModel):
@@ -46,6 +49,99 @@ class NotificationConfig(BaseModel):
     events: list[str] = Field(default_factory=lambda: ["alarm", "anomaly"])
 
 
+# WebSocket connection managers
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+        self._lock = asyncio.Lock()
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        async with self._lock:
+            self.active_connections.append(websocket)
+
+    async def disconnect(self, websocket: WebSocket):
+        async with self._lock:
+            if websocket in self.active_connections:
+                self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict[str, Any]):
+        dead = []
+        async with self._lock:
+            connections = list(self.active_connections)
+        for conn in connections:
+            try:
+                await conn.send_json(message)
+            except Exception:
+                dead.append(conn)
+        if dead:
+            async with self._lock:
+                for d in dead:
+                    if d in self.active_connections:
+                        self.active_connections.remove(d)
+
+    async def send_personal(self, websocket: WebSocket, message: dict[str, Any]):
+        try:
+            await websocket.send_json(message)
+        except Exception:
+            await self.disconnect(websocket)
+
+
+alarm_manager = ConnectionManager()
+event_manager = ConnectionManager()
+telemetry_manager = ConnectionManager()
+
+
+# Background broadcaster: polls historian and pushes to WebSocket clients
+async def _alarm_broadcaster():
+    """Poll alarms periodically and broadcast only when data changes."""
+    last_data: list[dict[str, Any]] = []
+    while True:
+        try:
+            data = query_alarms(50)
+            if data != last_data:
+                last_data = data
+                await alarm_manager.broadcast({"type": "update", "alarms": data})
+        except Exception:
+            pass
+        await asyncio.sleep(2.0)
+
+
+async def _event_broadcaster():
+    """Poll events periodically and broadcast only when data changes."""
+    last_data: dict[str, list[dict[str, Any]]] = {}
+    tables = ["industrial_events", "processed_events", "ai_enriched"]
+    while True:
+        for table in tables:
+            try:
+                data = query_historian_events(table, 100)
+                if data != last_data.get(table):
+                    last_data[table] = data
+                    await event_manager.broadcast({"type": "update", "table": table, "events": data})
+            except Exception:
+                pass
+        await asyncio.sleep(2.0)
+
+
+async def _telemetry_broadcaster():
+    """Broadcast telemetry snapshot to all connected clients."""
+    from ai_gateway.main import _build_telemetry
+    while True:
+        try:
+            payload = await _build_telemetry()
+            await telemetry_manager.broadcast({"type": "update", "telemetry": payload})
+        except Exception:
+            pass
+        await asyncio.sleep(5.0)
+
+
+async def _heartbeat_task():
+    """Send periodic heartbeat to all WebSocket connections."""
+    while True:
+        await asyncio.sleep(WS_HEARTBEAT_INTERVAL)
+        await alarm_manager.broadcast({"type": "heartbeat"})
+        await event_manager.broadcast({"type": "heartbeat"})
+        await telemetry_manager.broadcast({"type": "heartbeat"})
 
 
 # Use orjson for faster JSON responses if available
@@ -56,13 +152,27 @@ def _json_response(data):
     except ImportError:
         from fastapi.responses import JSONResponse
         return JSONResponse(content=data)
+
+
 webhook_registry: dict[str, WebhookConfig] = {}
 notification_registry: dict[str, NotificationConfig] = {}
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    tasks = [
+        asyncio.create_task(_alarm_broadcaster()),
+        asyncio.create_task(_event_broadcaster()),
+        asyncio.create_task(_telemetry_broadcaster()),
+        asyncio.create_task(_heartbeat_task()),
+    ]
     yield
+    for t in tasks:
+        t.cancel()
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Local Stream Engine API", version="0.2.0", lifespan=lifespan)
@@ -74,6 +184,74 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# WebSocket endpoints
+@app.websocket("/ws/alarms")
+async def websocket_alarms(websocket: WebSocket):
+    await alarm_manager.connect(websocket)
+    try:
+        # Send initial data
+        data = query_alarms(50)
+        await websocket.send_json({"type": "init", "alarms": data})
+        while True:
+            # Wait for client messages (ping/ack/subscribe)
+            msg = await websocket.receive_text()
+            try:
+                parsed = json.loads(msg)
+                if parsed.get("action") == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif parsed.get("action") == "subscribe":
+                    # Re-send current data on explicit subscribe
+                    data = query_alarms(50)
+                    await websocket.send_json({"type": "init", "alarms": data})
+            except json.JSONDecodeError:
+                pass
+    except WebSocketDisconnect:
+        await alarm_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/events")
+async def websocket_events(websocket: WebSocket):
+    await event_manager.connect(websocket)
+    try:
+        # Send initial data for all tables
+        for table in ["industrial_events", "processed_events", "ai_enriched"]:
+            data = query_historian_events(table, 100)
+            await websocket.send_json({"type": "init", "table": table, "events": data})
+        while True:
+            msg = await websocket.receive_text()
+            try:
+                parsed = json.loads(msg)
+                if parsed.get("action") == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif parsed.get("action") == "subscribe":
+                    table = parsed.get("table", "industrial_events")
+                    data = query_historian_events(table, 100)
+                    await websocket.send_json({"type": "init", "table": table, "events": data})
+            except json.JSONDecodeError:
+                pass
+    except WebSocketDisconnect:
+        await event_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/telemetry")
+async def websocket_telemetry(websocket: WebSocket):
+    await telemetry_manager.connect(websocket)
+    try:
+        from ai_gateway.main import _build_telemetry
+        payload = await _build_telemetry()
+        await websocket.send_json({"type": "init", "telemetry": payload})
+        while True:
+            msg = await websocket.receive_text()
+            try:
+                parsed = json.loads(msg)
+                if parsed.get("action") == "ping":
+                    await websocket.send_json({"type": "pong"})
+            except json.JSONDecodeError:
+                pass
+    except WebSocketDisconnect:
+        await telemetry_manager.disconnect(websocket)
 
 
 @app.get("/health")

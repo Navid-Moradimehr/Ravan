@@ -17,7 +17,7 @@ import {
   CircuitBoard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { createObservabilityFallback, getObservability, getTelemetry } from "@/lib/api";
+import { createObservabilityFallback, getObservability } from "@/lib/api";
 import { TopBar } from "@/components/top-bar";
 import { SectionHeader } from "@/components/section-header";
 import { HistorianDashboard } from "@/components/historian-views";
@@ -69,7 +69,7 @@ export default function Home() {
   const observability = useQuery({
     queryKey: ["observability"],
     queryFn: getObservability,
-    refetchInterval: 60000,  // Reduced from 30s to 60s - observability changes slowly
+    refetchInterval: 60000,
   });
 
   const pipeline = telemetryEvents.data?.pipeline ?? [

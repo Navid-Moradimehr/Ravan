@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeHistorianStreamSSE, type HistorianStreamPayload } from "@/lib/api";
+import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeAlarmsWebSocket, subscribeEventsWebSocket, type HistorianStreamPayload } from "@/lib/api";
 
 function TrendChart({ data }: { data: { time: string; value: number }[] }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
@@ -75,14 +75,14 @@ export function HistorianDashboard() {
   const [selectedDataset, setSelectedDataset] = useState("ai4i");
   const queryClient = useQueryClient();
 
-  // SSE-driven state for alarms and events
+  // WebSocket-driven state for alarms and events
   const [streamAlarms, setStreamAlarms] = useState<any[]>([]);
   const [streamEvents, setStreamEvents] = useState<any[]>([]);
   const [isStreamConnected, setIsStreamConnected] = useState(false);
   const prevAlarmsRef = useRef<string>("");
   const prevEventsRef = useRef<string>("");
 
-  const handleStreamPayload = useCallback((payload: HistorianStreamPayload) => {
+  const handleAlarmPayload = useCallback((payload: HistorianStreamPayload) => {
     if (payload.type === "init" || payload.type === "update") {
       if (payload.alarms) {
         const serialized = JSON.stringify(payload.alarms);
@@ -91,6 +91,11 @@ export function HistorianDashboard() {
           setStreamAlarms(payload.alarms);
         }
       }
+    }
+  }, []);
+
+  const handleEventPayload = useCallback((payload: HistorianStreamPayload) => {
+    if (payload.type === "init" || payload.type === "update") {
       if (payload.events) {
         const serialized = JSON.stringify(payload.events);
         if (serialized !== prevEventsRef.current) {
@@ -102,13 +107,24 @@ export function HistorianDashboard() {
   }, []);
 
   useEffect(() => {
-    setIsStreamConnected(true);
-    const cleanup = subscribeHistorianStreamSSE({
-      onPayload: handleStreamPayload,
+    const wsBase = process.env.NEXT_PUBLIC_WS_BASE_URL ?? "ws://localhost:8020";
+    const cleanupAlarms = subscribeAlarmsWebSocket({
+      onPayload: handleAlarmPayload,
+      onConnect: () => setIsStreamConnected(true),
+      onDisconnect: () => setIsStreamConnected(false),
       onError: () => setIsStreamConnected(false),
-    });
-    return () => { cleanup(); };
-  }, [handleStreamPayload]);
+    }, wsBase);
+    const cleanupEvents = subscribeEventsWebSocket({
+      onPayload: handleEventPayload,
+      onConnect: () => setIsStreamConnected(true),
+      onDisconnect: () => setIsStreamConnected(false),
+      onError: () => setIsStreamConnected(false),
+    }, wsBase);
+    return () => {
+      cleanupAlarms();
+      cleanupEvents();
+    };
+  }, [handleAlarmPayload, handleEventPayload]);
 
   const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, 1) : Promise.resolve([]), enabled: !!selectedAsset });
   const assetsQuery = useQuery({ queryKey: ["historian", "assets"], queryFn: getAssetHierarchy });
@@ -253,7 +269,9 @@ export function HistorianDashboard() {
         <CardContent className="p-0">
           <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2">
             <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm">{selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}</DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild>
+                <div className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}</div>
+              </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => setSelectedTable("industrial_events")}>Industrial</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSelectedTable("processed_events")}>Processed</DropdownMenuItem>
