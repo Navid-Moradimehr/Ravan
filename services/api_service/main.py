@@ -522,6 +522,23 @@ async def register_schema(req: dict[str, Any]) -> dict[str, str]:
     sv = schema_registry.register(req.get("schema_id", "custom"), req.get("fields", []))
     return {"status": "registered", "schema_id": sv.schema_id, "version": str(sv.version)}
 
+# Real-time Data Preview endpoints
+@app.get("/api/v1/preview/topics")
+async def preview_topics() -> list[str]:
+    from common.data_preview import list_topics
+    return list_topics()
+
+@app.get("/api/v1/preview/topics/{topic}")
+async def preview_topic(topic: str, limit: int = 10) -> list[dict[str, Any]]:
+    from common.data_preview import peek_topic
+    return peek_topic(topic, limit=limit)
+
+@app.post("/api/v1/preview/topics/{topic}/peek")
+async def peek_topic_endpoint(topic: str, req: dict[str, Any]) -> list[dict[str, Any]]:
+    from common.data_preview import peek_topic
+    limit = req.get("limit", 10)
+    return peek_topic(topic, limit=limit)
+
 from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
 
 class CreateUserRequest(BaseModel):
