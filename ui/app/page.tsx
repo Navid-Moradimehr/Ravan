@@ -22,6 +22,7 @@ import { TopBar } from "@/components/top-bar";
 import { SectionHeader } from "@/components/section-header";
 import { HistorianDashboard } from "@/components/historian-views";
 import { SqlQueryPanel } from "@/components/sql-query-panel";
+import { NotificationPanel } from "@/components/notification-panel";
 import { WebhookPanel } from "@/components/webhook-panel";
 import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
 import { StatCard } from "@/components/stat-card";
@@ -289,6 +290,7 @@ export default function Home() {
            <HistorianDashboard />
            <SqlQueryPanel />
            <WebhookPanel />
+           <NotificationPanel />
          </section>
         </div>
 
