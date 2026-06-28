@@ -1,6 +1,7 @@
 """Alert acknowledgment workflow with audit trail.
 
 Open-source approach: Simple in-memory store with PostgreSQL persistence option.
+Integrates with Apprise for multi-channel notifications (email, Slack, Teams, SMS).
 For production, integrate with Prometheus Alertmanager.
 """
 from __future__ import annotations
@@ -10,6 +11,13 @@ from datetime import datetime, timezone
 from typing import Any
 
 from rbac import audit_log, users_db
+from notifications import notifier, NotificationPayload, webhook_outbound
+
+try:
+    import apprise
+    APPRISE_AVAILABLE = True
+except ImportError:
+    APPRISE_AVAILABLE = False
 
 
 class AlertState:
@@ -57,6 +65,26 @@ class AlertManager:
             "source_event_id": source_event_id,
         }
         self._alerts[alert_id] = alert
+
+        # Send notification via Apprise + webhook
+        notifier.notify(NotificationPayload(
+            title=f"Alert {alert_id}: {asset_id}.{tag}",
+            body=message,
+            severity=severity,
+            asset_id=asset_id,
+            tag=tag,
+            event_id=source_event_id,
+        ))
+        webhook_outbound.send({
+            "event_type": "alarm",
+            "alert_id": alert_id,
+            "asset_id": asset_id,
+            "tag": tag,
+            "severity": severity,
+            "message": message,
+            "triggered_rules": triggered_rules or [],
+            "timestamp": alert["created_at"],
+        })
         return alert
 
     def acknowledge_alert(
