@@ -69,7 +69,7 @@ export default function Home() {
   const observability = useQuery({
     queryKey: ["observability"],
     queryFn: getObservability,
-    refetchInterval: 30000,
+    refetchInterval: 60000,  // Reduced from 30s to 60s - observability changes slowly
   });
 
   const pipeline = telemetryEvents.data?.pipeline ?? [

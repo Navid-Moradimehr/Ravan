@@ -113,7 +113,7 @@ export function HistorianDashboard() {
   const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, 1) : Promise.resolve([]), enabled: !!selectedAsset });
   const assetsQuery = useQuery({ queryKey: ["historian", "assets"], queryFn: getAssetHierarchy });
   const scenariosQuery = useQuery({ queryKey: ["historian", "scenarios"], queryFn: getScenarios });
-  const replayQuery = useQuery({ queryKey: ["historian", "replay"], queryFn: getReplayStatus, refetchInterval: 5000 });
+  const replayQuery = useQuery({ queryKey: ["historian", "replay"], queryFn: getReplayStatus, refetchInterval: 10000 });
 
   const startReplayMutation = useMutation({ mutationFn: () => startReplay(selectedDataset, selectedScenario), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["historian", "replay"] }); } });
   const stopReplayMutation = useMutation({ mutationFn: stopReplay, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["historian", "replay"] }); } });

@@ -20,16 +20,36 @@ from services.historian.client import insert_processed_event
 PRUNE_EVERY_N_MESSAGES = 128
 
 
-def score_event(event: dict[str, Any], temperature_avg: float, vibration_avg: float) -> float:
+def score_event(event: dict[str, Any], temperature_avg: float, vibration_avg: float, detector: BaselineDetector | None = None) -> float:
     score = 0.0
-    if float(event.get("temperature_c", 0)) >= 65:
+    temp = float(event.get("temperature_c", 0))
+    vib = float(event.get("vibration_mm_s", 0))
+    press = float(event.get("pressure_bar", 0))
+    
+    # Rule-based scoring
+    if temp >= 65:
         score += 0.35
-    if float(event.get("vibration_mm_s", 0)) >= 7:
+    if vib >= 7:
         score += 0.35
-    if float(event.get("pressure_bar", 0)) >= 8:
+    if press >= 8:
         score += 0.2
     if temperature_avg >= 58 or vibration_avg >= 5:
         score += 0.1
+    
+    # Baseline detector scoring (if available)
+    if detector:
+        temp_result = detector.update("temperature_c", temp)
+        vib_result = detector.update("vibration_mm_s", vib)
+        press_result = detector.update("pressure_bar", press)
+        
+        # Add anomaly score contribution
+        max_anomaly = max(
+            temp_result.get("anomaly_score", 0),
+            vib_result.get("anomaly_score", 0),
+            press_result.get("anomaly_score", 0)
+        )
+        score += min(max_anomaly / 100.0, 0.3)  # Up to 0.3 from baseline
+    
     return min(round(score, 2), 1.0)
 
 

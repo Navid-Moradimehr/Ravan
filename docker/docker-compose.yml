@@ -314,6 +314,7 @@ volumes:
     depends_on:
       timescaledb:
         condition: service_healthy
+    restart: unless-stopped
     environment:
       TIMESCALE_HOST: timescaledb
       TIMESCALE_PORT: 5432

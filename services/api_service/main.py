@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -45,6 +46,16 @@ class NotificationConfig(BaseModel):
     events: list[str] = Field(default_factory=lambda: ["alarm", "anomaly"])
 
 
+
+
+# Use orjson for faster JSON responses if available
+def _json_response(data):
+    try:
+        import orjson
+        return ORJSONResponse(content=data)
+    except ImportError:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content=data)
 webhook_registry: dict[str, WebhookConfig] = {}
 notification_registry: dict[str, NotificationConfig] = {}
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import os
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -18,13 +19,26 @@ def _connection_string() -> str:
     return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
 
+
+
+@functools.lru_cache(maxsize=1)
+def _connection_pool():
+    """Create a persistent connection pool for better performance."""
+    import psycopg2.pool
+    return psycopg2.pool.ThreadedConnectionPool(
+        minconn=1,
+        maxconn=10,
+        dsn=_connection_string(),
+    )
+
 @contextmanager
 def get_connection():
-    conn = psycopg2.connect(_connection_string())
+    pool = _connection_pool()
+    conn = pool.getconn()
     try:
         yield conn
     finally:
-        conn.close()
+        pool.putconn(conn)
 
 
 def insert_industrial_event(event: dict[str, Any]) -> None:
