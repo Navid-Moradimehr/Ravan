@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import ssl
+import sys
 import asyncio
 import json
 from contextlib import asynccontextmanager
@@ -9,7 +10,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import ORJSONResponse, FileResponse
+from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -667,3 +668,235 @@ async def get_anomaly_propagation(tag: str, lookback: int = 10) -> list[dict[str
     """Detect anomaly propagation for a specific tag."""
     analyzer = get_analyzer()
     return analyzer.detect_anomaly_propagation(tag, lookback)
+
+
+# Alert escalation endpoints
+from alert_escalation import escalation_engine, EscalationRule
+
+class EscalationRuleRequest(BaseModel):
+    rule_id: str
+    name: str
+    description: str = ""
+    severity_filter: list[str] = ["critical"]
+    asset_pattern: str | None = None
+    tag_pattern: str | None = None
+    auto_escalate_after_minutes: int = 15
+    notify_channels: list[str] = []
+    escalate_to_role: str | None = None
+    enabled: bool = True
+
+@app.post("/api/v1/alerts/escalation/rules")
+async def add_escalation_rule(req: EscalationRuleRequest) -> dict[str, str]:
+    """Add a new escalation rule."""
+    rule = EscalationRule(
+        rule_id=req.rule_id,
+        name=req.name,
+        description=req.description,
+        severity_filter=req.severity_filter,
+        asset_pattern=req.asset_pattern,
+        tag_pattern=req.tag_pattern,
+        auto_escalate_after_minutes=req.auto_escalate_after_minutes,
+        notify_channels=req.notify_channels,
+        escalate_to_role=req.escalate_to_role,
+        enabled=req.enabled,
+    )
+    escalation_engine.add_rule(rule)
+    return {"status": "ok", "rule_id": req.rule_id}
+
+@app.get("/api/v1/alerts/escalation/rules")
+async def list_escalation_rules() -> list[dict[str, Any]]:
+    """List all escalation rules."""
+    return escalation_engine.list_rules()
+
+@app.delete("/api/v1/alerts/escalation/rules/{rule_id}")
+async def delete_escalation_rule(rule_id: str) -> dict[str, str]:
+    """Delete an escalation rule."""
+    if escalation_engine.remove_rule(rule_id):
+        return {"status": "deleted", "rule_id": rule_id}
+    raise HTTPException(status_code=404, detail="Rule not found")
+
+@app.post("/api/v1/alerts/escalation/check")
+async def check_escalations() -> list[dict[str, Any]]:
+    """Manually trigger escalation check for all pending alerts."""
+    return escalation_engine.check_all_pending_alerts()
+
+
+# KPI engine endpoints
+from analytics.kpi_engine import kpi_engine, KPIFormula
+
+class KPIRequest(BaseModel):
+    kpi_id: str
+    name: str
+    description: str = ""
+    input_tags: list[str] = []
+    expression: str = ""
+    window_seconds: int = 60
+    unit: str = ""
+    warning_threshold: float | None = None
+    critical_threshold: float | None = None
+    enabled: bool = True
+
+@app.post("/api/v1/kpis")
+async def register_kpi(req: KPIRequest) -> dict[str, str]:
+    """Register a new KPI formula."""
+    kpi = KPIFormula(
+        kpi_id=req.kpi_id,
+        name=req.name,
+        description=req.description,
+        input_tags=req.input_tags,
+        expression=req.expression,
+        window_seconds=req.window_seconds,
+        unit=req.unit,
+        warning_threshold=req.warning_threshold,
+        critical_threshold=req.critical_threshold,
+        enabled=req.enabled,
+    )
+    kpi_engine.register_kpi(kpi)
+    return {"status": "ok", "kpi_id": req.kpi_id}
+
+@app.get("/api/v1/kpis")
+async def list_kpis() -> list[dict[str, Any]]:
+    """List all registered KPIs."""
+    return kpi_engine.list_kpis()
+
+@app.delete("/api/v1/kpis/{kpi_id}")
+async def unregister_kpi(kpi_id: str) -> dict[str, str]:
+    """Unregister a KPI formula."""
+    if kpi_engine.unregister_kpi(kpi_id):
+        return {"status": "deleted", "kpi_id": kpi_id}
+    raise HTTPException(status_code=404, detail="KPI not found")
+
+@app.post("/api/v1/kpis/ingest")
+async def ingest_kpi_value(tag: str, value: float) -> list[dict[str, Any]]:
+    """Ingest a tag value and evaluate dependent KPIs."""
+    return kpi_engine.ingest_value(tag, value)
+
+@app.get("/api/v1/kpis/samples")
+async def get_sample_kpis() -> list[dict[str, Any]]:
+    """Get sample KPI definitions."""
+    return [k.__dict__ for k in kpi_engine.get_sample_kpis()]
+
+
+# REST API full CRUD for external systems
+class AssetCreateRequest(BaseModel):
+    id: str
+    name: str
+    type: str
+    parent_id: str | None = None
+    metadata: dict[str, Any] = {}
+
+class TagCreateRequest(BaseModel):
+    id: str
+    name: str
+    unit: str
+    min: float
+    max: float
+    warning_low: float | None = None
+    warning_high: float | None = None
+    critical_low: float | None = None
+    critical_high: float | None = None
+    sampling_rate_hz: float = 1.0
+
+@app.post("/api/v1/assets/external")
+async def create_external_asset(req: AssetCreateRequest) -> dict[str, Any]:
+    """Create an asset from an external system."""
+    from assets.model import AssetNode, add_asset
+    asset = AssetNode(
+        id=req.id,
+        name=req.name,
+        type=req.type,
+        parent_id=req.parent_id,
+        metadata=req.metadata,
+    )
+    add_asset(asset)
+    return {"status": "created", "asset": asset.to_dict()}
+
+@app.get("/api/v1/assets/external/{asset_id}")
+async def get_external_asset(asset_id: str) -> dict[str, Any]:
+    """Get an asset by ID."""
+    from assets.model import get_asset
+    asset = get_asset(asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return asset.to_dict()
+
+@app.put("/api/v1/assets/external/{asset_id}")
+async def update_external_asset(asset_id: str, req: AssetCreateRequest) -> dict[str, Any]:
+    """Update an asset from an external system."""
+    from assets.model import update_asset
+    asset = update_asset(asset_id, name=req.name, type=req.type, metadata=req.metadata)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return {"status": "updated", "asset": asset.to_dict()}
+
+@app.delete("/api/v1/assets/external/{asset_id}")
+async def delete_external_asset(asset_id: str) -> dict[str, str]:
+    """Delete an asset."""
+    from assets.model import delete_asset
+    if delete_asset(asset_id):
+        return {"status": "deleted", "asset_id": asset_id}
+    raise HTTPException(status_code=404, detail="Asset not found")
+
+@app.post("/api/v1/assets/external/{asset_id}/tags")
+async def add_asset_tag(asset_id: str, req: TagCreateRequest) -> dict[str, Any]:
+    """Add a tag to an asset."""
+    from assets.model import add_tag_to_asset
+    tag = add_tag_to_asset(
+        asset_id=asset_id,
+        tag_id=req.id,
+        name=req.name,
+        unit=req.unit,
+        min_val=req.min,
+        max_val=req.max,
+        warning_low=req.warning_low,
+        warning_high=req.warning_high,
+        critical_low=req.critical_low,
+        critical_high=req.critical_high,
+        sampling_rate_hz=req.sampling_rate_hz,
+    )
+    if not tag:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return {"status": "created", "tag": tag}
+
+@app.get("/api/v1/events/external")
+async def get_external_events(
+    asset_id: str | None = None,
+    tag: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """Get events for external systems with filtering."""
+    from historian.client import query_sql
+    
+    conditions = []
+    params = []
+    
+    if asset_id:
+        conditions.append("asset_id = %s")
+        params.append(asset_id)
+    if tag:
+        conditions.append("tag = %s")
+        params.append(tag)
+    if start_time:
+        conditions.append("time >= %s")
+        params.append(start_time)
+    if end_time:
+        conditions.append("time <= %s")
+        params.append(end_time)
+    
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+    sql = f"SELECT * FROM industrial_events WHERE {where_clause} ORDER BY time DESC LIMIT %s"
+    params.append(limit)
+    
+    return query_sql(sql, tuple(params))
+
+@app.post("/api/v1/events/external")
+async def ingest_external_event(event: dict[str, Any]) -> dict[str, str]:
+    """Ingest an event from an external system."""
+    from historian.client import insert_industrial_event
+    from common.normalize import normalize_runtime_event
+    
+    normalized = normalize_runtime_event(event)
+    insert_industrial_event(normalized)
+    return {"status": "received", "event_id": normalized.get("event_id", "unknown")}
