@@ -466,6 +466,25 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=API_PORT)
 
+# KPI endpoints
+@app.get("/api/v1/kpis")
+async def list_kpis() -> list[dict[str, Any]]:
+    from analytics.kpi_engine import kpi_engine
+    return kpi_engine.list_kpis()
+
+@app.post("/api/v1/kpis")
+async def create_kpi_endpoint(req: dict[str, Any]) -> dict[str, str]:
+    from analytics.kpi_engine import KPIFormula, kpi_engine
+    kpi = KPIFormula(**req)
+    kpi_engine.register_kpi(kpi)
+    return {"status": "created", "kpi_id": kpi.kpi_id}
+
+@app.delete("/api/v1/kpis/{kpi_id}")
+async def delete_kpi_endpoint(kpi_id: str) -> dict[str, str]:
+    from analytics.kpi_engine import kpi_engine
+    kpi_engine.unregister_kpi(kpi_id)
+    return {"status": "deleted"}
+
 from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
 
 class CreateUserRequest(BaseModel):
