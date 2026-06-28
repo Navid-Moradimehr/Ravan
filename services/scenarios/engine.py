@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+
+from services.common.cache import ttl_cache
 import random
 from dataclasses import dataclass, field
 from enum import Enum
@@ -168,5 +170,6 @@ SCENARIO_CATALOG: list[dict[str, str]] = [
 ]
 
 
+@ttl_cache(ttl_seconds=300.0, max_size=1)
 def list_scenarios() -> list[dict[str, str]]:
     return SCENARIO_CATALOG

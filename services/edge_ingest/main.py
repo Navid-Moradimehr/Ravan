@@ -59,9 +59,20 @@ class Settings:
 
 
 class EdgePublisher:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, batch_size: int = 100, flush_interval_ms: float = 1000.0):
         self.settings = settings
-        self.producer = Producer({"bootstrap.servers": settings.brokers, "client.id": "edge-ingest"})
+        self.producer = Producer({
+            "bootstrap.servers": settings.brokers,
+            "client.id": "edge-ingest",
+            "batch.size": 16384,
+            "linger.ms": 10,
+            "compression.type": "lz4",
+            "queue.buffering.max.messages": 100000,
+        })
+        self._batch_size = batch_size
+        self._flush_interval_ms = flush_interval_ms
+        self._buffer: list[tuple[str, bytes, bytes]] = []
+        self._last_flush = time.time()
 
     def publish_raw(self, protocol: str, source_id: str, payload: dict[str, Any]) -> None:
         self.producer.produce(
@@ -69,7 +80,6 @@ class EdgePublisher:
             key=f"{protocol}:{source_id}".encode("utf-8"),
             value=to_json_bytes(payload),
         )
-        self.producer.poll(0)
 
     def publish_event(self, payload: dict[str, Any]) -> None:
         protocol = str(payload.get("source_protocol", "unknown"))
@@ -77,26 +87,38 @@ class EdgePublisher:
         self.publish_raw(protocol, source_id, payload)
         event, dlq = validate_event(payload)
         if dlq:
-            self.producer.produce(self.settings.dlq_topic, key=source_id.encode("utf-8"), value=to_json_bytes(dlq))
+            self._buffer.append((self.settings.dlq_topic, source_id.encode("utf-8"), to_json_bytes(dlq)))
             dlq_total.labels(protocol=protocol).inc()
-            self.producer.poll(0)
-            return
+        else:
+            assert event is not None
+            key = event.asset_id.encode("utf-8")
+            self._buffer.append((self.settings.normalized_topic, key, to_json_bytes(event)))
+            self._buffer.append((self.settings.legacy_topic, key, to_json_bytes(to_legacy_iot_event(event))))
+            try:
+                insert_industrial_event(event.model_dump(mode="json"))
+            except Exception:
+                pass
+            events_total.labels(protocol=event.source_protocol).inc()
+            last_success_epoch.labels(protocol=event.source_protocol).set(time.time())
+            observe_latency(event)
+        
+        self._maybe_flush()
 
-        assert event is not None
-        key = event.asset_id.encode("utf-8")
-        payload_bytes = to_json_bytes(event)
-        self.producer.produce(self.settings.normalized_topic, key=key, value=payload_bytes)
-        self.producer.produce(self.settings.legacy_topic, key=key, value=to_json_bytes(to_legacy_iot_event(event)))
+    def _maybe_flush(self) -> None:
+        now = time.time()
+        elapsed_ms = (now - self._last_flush) * 1000
+        if len(self._buffer) >= self._batch_size or elapsed_ms >= self._flush_interval_ms:
+            self._flush_buffer()
+
+    def _flush_buffer(self) -> None:
+        for topic, key, value in self._buffer:
+            self.producer.produce(topic, key=key, value=value)
+        self._buffer.clear()
         self.producer.poll(0)
-        try:
-            insert_industrial_event(event.model_dump(mode="json"))
-        except Exception:
-            pass
-        events_total.labels(protocol=event.source_protocol).inc()
-        last_success_epoch.labels(protocol=event.source_protocol).set(time.time())
-        observe_latency(event)
+        self._last_flush = time.time()
 
     def flush(self) -> None:
+        self._flush_buffer()
         self.producer.flush(10)
 
 

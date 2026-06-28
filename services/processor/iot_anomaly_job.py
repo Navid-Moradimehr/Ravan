@@ -15,7 +15,9 @@ def main() -> None:
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
 
     env = StreamExecutionEnvironment.get_execution_environment()
-    env.set_parallelism(1)
+    # Parallelism: auto-detect from environment or default to 4
+parallelism = int(os.getenv("FLINK_PARALLELISM", "4"))
+env.set_parallelism(parallelism)
 
     source = (
         KafkaSource.builder()
@@ -24,6 +26,8 @@ def main() -> None:
         .set_group_id("iot-anomaly-processor")
         .set_starting_offsets(KafkaOffsetsInitializer.latest())
         .set_value_only_deserializer(SimpleStringSchema())
+        .set_property("fetch.min.bytes", "1048576")  # 1MB batch fetch
+        .set_property("fetch.max.wait.ms", "500")
         .build()
     )
 
@@ -36,6 +40,10 @@ def main() -> None:
             .set_value_serialization_schema(SimpleStringSchema())
             .build()
         )
+        .set_delivery_guarantee("at_least_once")
+        .set_property("batch.size", "16384")
+        .set_property("linger.ms", "10")
+        .set_property("compression.type", "lz4")
         .build()
     )
 
