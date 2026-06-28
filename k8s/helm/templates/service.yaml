@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "data-stream.fullname" . }}
+  labels:
+    app: {{ include "data-stream.name" . }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.services.apiService.port }}
+      targetPort: {{ .Values.services.apiService.targetPort }}
+      name: api
+    - port: {{ .Values.services.aiGateway.port }}
+      targetPort: {{ .Values.services.aiGateway.targetPort }}
+      name: ai-gateway
+    - port: {{ .Values.services.edgeIngest.port }}
+      targetPort: {{ .Values.services.edgeIngest.targetPort }}
+      name: edge-ingest
+  selector:
+    app: {{ include "data-stream.name" . }}

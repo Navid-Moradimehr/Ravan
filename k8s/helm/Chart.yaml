@@ -1,0 +1,15 @@
+apiVersion: v2
+name: data-stream
+version: 1.0.0
+appVersion: "1.0.0"
+description: Industrial Data Stream Platform — edge ingestion, stream processing, historian, AI gateway
+keywords:
+  - industrial-iot
+  - streaming
+  - timescaledb
+  - kafka
+  - opcua
+  - modbus
+home: https://github.com/your-org/data-stream
+sources:
+  - https://github.com/your-org/data-stream

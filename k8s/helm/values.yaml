@@ -1,0 +1,68 @@
+# Default values for data-stream
+replicaCount: 1
+
+image:
+  repository: data-stream
+  tag: latest
+  pullPolicy: IfNotPresent
+
+services:
+  apiService:
+    port: 8020
+    targetPort: 8020
+  aiGateway:
+    port: 8080
+    targetPort: 8080
+  edgeIngest:
+    port: 8090
+    targetPort: 8090
+
+env:
+  REDPANDA_BROKERS: "redpanda:9092"
+  TIMESCALE_HOST: "timescaledb"
+  TIMESCALE_PORT: "5432"
+  TIMESCALE_DB: "stream_engine"
+  API_SERVICE_PORT: "8020"
+  AI_GATEWAY_PORT: "8080"
+  EDGE_METRICS_PORT: "8090"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Deployment profiles
+profile: dev  # dev, demo, edge, prod
+
+profiles:
+  dev:
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  demo:
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  edge:
+    replicaCount: 1
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  prod:
+    replicaCount: 3
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
