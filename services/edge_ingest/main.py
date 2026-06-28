@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+try:
+    import serial.tools.list_ports
+except ImportError:
+    serial = None
 import json
 import os
 import signal
@@ -18,6 +22,8 @@ from services.edge_ingest.model import IndustrialEvent, validate_event, to_json_
 from services.assets.model import load_hierarchy
 from services.historian.client import insert_industrial_event
 from services.common.normalize import to_legacy_iot_event
+from services.edge_ingest.modbus_rtu_client import ModbusRTUClient, scan_modbus_rtu_devices
+from services.edge_ingest.opcua_discovery import OPCUADiscoveryClient
 
 
 events_total = Counter("edge_ingest_events_total", "Validated industrial events", ["protocol"])
@@ -245,6 +251,52 @@ def unit_for(tag: str) -> str:
     return ""
 
 
+async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:
+    """Modbus RTU serial ingestion loop."""
+    if "modbus_rtu" not in settings.enabled_protocols:
+        return
+    port = os.getenv("MODBUS_RTU_PORT", "/dev/ttyUSB0")
+    baudrate = int(os.getenv("MODBUS_RTU_BAUDRATE", "9600"))
+    slave_id = int(os.getenv("MODBUS_RTU_SLAVE_ID", "1"))
+    registers = [(int(a.split(":")[0]), int(a.split(":")[1])) for a in os.getenv("MODBUS_RTU_REGISTERS", "0:1").split(",") if ":" in a]
+    client = ModbusRTUClient(port=port, baudrate=baudrate, slave_id=slave_id)
+    while not stop_event.is_set():
+        try:
+            if not client._client or not client._client.connected:
+                client.connect()
+            for addr, count in registers:
+                values = client.read_holding_registers(addr, count)
+                if values:
+                    for i, val in enumerate(values):
+                        publisher.publish_event("modbus_rtu", f"{port}:{slave_id}:{addr+i}", f"RTU-{slave_id}", f"register_{addr+i}", float(val))
+            await asyncio.sleep(settings.poll_seconds)
+        except Exception:
+            adapter_errors.labels(protocol="modbus_rtu").inc()
+            client.disconnect()
+            await asyncio.sleep(5)
+
+async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:
+    """OPC UA discovery and subscription loop."""
+    if "opcua_discovery" not in settings.enabled_protocols:
+        return
+    endpoint = os.getenv("OPCUA_DISCOVERY_ENDPOINT", "opc.tcp://localhost:4840")
+    nodes = [n.strip() for n in os.getenv("OPCUA_DISCOVERY_NODES", "").split(",") if n.strip()]
+    client = OPCUADiscoveryClient(endpoint)
+    while not stop_event.is_set():
+        try:
+            connected = await client.connect()
+            if not connected:
+                await asyncio.sleep(5)
+                continue
+            for node_id in nodes:
+                value = await client.read_node_value(node_id)
+                if value is not None:
+                    publisher.publish_event("opcua", node_id, node_id.split(".")[0] if "." in node_id else "unknown", node_id.split(".")[-1] if "." in node_id else node_id, float(value))
+            await asyncio.sleep(settings.poll_seconds)
+        except Exception:
+            adapter_errors.labels(protocol="opcua_discovery").inc()
+            await asyncio.sleep(5)
+
 async def main() -> None:
     settings = Settings()
     hierarchy = load_hierarchy("config/assets.yaml")
@@ -263,6 +315,10 @@ async def main() -> None:
         tasks.append(asyncio.create_task(run_opcua(settings, publisher, stop_event)))
     if "modbus" in settings.enabled_protocols:
         tasks.append(asyncio.create_task(run_modbus(settings, publisher, stop_event)))
+    if "modbus_rtu" in settings.enabled_protocols:
+        tasks.append(asyncio.create_task(run_modbus_rtu(settings, publisher, stop_event)))
+    if "opcua_discovery" in settings.enabled_protocols:
+        tasks.append(asyncio.create_task(run_opcua_discovery(settings, publisher, stop_event)))
 
     try:
         await stop_event.wait()
