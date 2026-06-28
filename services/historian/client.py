@@ -200,3 +200,133 @@ def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
                 }
                 for row in rows
             ]
+
+
+# Data retention and compression policies
+import logging
+logger = logging.getLogger(__name__)
+
+
+def setup_retention_policies() -> None:
+    """Configure TimescaleDB compression and retention policies.
+
+    - Compress data older than 7 days
+    - Drop raw data older than 90 days
+    - Keep processed events for 1 year
+    - Keep AI enriched events for 2 years
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            # Enable compression on hypertables
+            for table in ["industrial_events", "processed_events", "ai_enriched"]:
+                try:
+                    cur.execute(f"""
+                        ALTER TABLE {table} SET (
+                            timescaledb.compress,
+                            timescaledb.compress_segmentby = 'asset_id, tag'
+                        );
+                    """)
+                    logger.info(f"Compression enabled for {table}")
+                except psycopg2.Error as e:
+                    logger.warning(f"Compression may already be enabled for {table}: {e}")
+                    conn.rollback()
+
+                # Add compression policy (compress after 7 days)
+                try:
+                    cur.execute(f"""
+                        SELECT add_compression_policy('{table}', INTERVAL '7 days');
+                    """)
+                    logger.info(f"Compression policy added for {table}")
+                except psycopg2.Error as e:
+                    logger.warning(f"Compression policy may already exist for {table}: {e}")
+                    conn.rollback()
+
+                # Add retention policy
+                retention_days = 90 if table == "industrial_events" else 365 if table == "processed_events" else 730
+                try:
+                    cur.execute(f"""
+                        SELECT add_retention_policy('{table}', INTERVAL '{retention_days} days');
+                    """)
+                    logger.info(f"Retention policy ({retention_days} days) added for {table}")
+                except psycopg2.Error as e:
+                    logger.warning(f"Retention policy may already exist for {table}: {e}")
+                    conn.rollback()
+
+        conn.commit()
+
+
+def get_storage_stats() -> dict[str, Any]:
+    """Return storage statistics for all hypertables."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT
+                    hypertable_name,
+                    num_chunks,
+                    table_size,
+                    index_size,
+                    total_size
+                FROM timescaledb_information.hypertables
+                ORDER BY hypertable_name;
+            """)
+            hypertables = [dict(row) for row in cur.fetchall()]
+
+            cur.execute("""
+                SELECT
+                    hypertable_name,
+                    chunk_name,
+                    compression_status,
+                    before_compression_total_bytes,
+                    after_compression_total_bytes
+                FROM timescaledb_information.chunks
+                WHERE compression_status = 'Compressed'
+                ORDER BY hypertable_name;
+            """)
+            compressed = [dict(row) for row in cur.fetchall()]
+
+            return {
+                "hypertables": hypertables,
+                "compressed_chunks": compressed,
+                "compression_ratio": _calculate_compression_ratio(compressed),
+            }
+
+
+def _calculate_compression_ratio(compressed: list[dict]) -> float:
+    if not compressed:
+        return 1.0
+    total_before = sum(row.get("before_compression_total_bytes", 0) or 0 for row in compressed)
+    total_after = sum(row.get("after_compression_total_bytes", 0) or 0 for row in compressed)
+    if total_after == 0:
+        return 1.0
+    return round(total_before / total_after, 2)
+
+
+def manual_compress_chunk(table: str, older_than_days: int = 7) -> dict[str, Any]:
+    """Manually compress chunks older than specified days."""
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT chunk_name, range_start, range_end
+                FROM timescaledb_information.chunks
+                WHERE hypertable_name = %s
+                  AND range_end < NOW() - INTERVAL '%s days'
+                  AND compression_status = 'Uncompressed'
+                ORDER BY range_start;
+            """, (table, older_than_days))
+            chunks = [dict(row) for row in cur.fetchall()]
+
+            compressed = 0
+            for chunk in chunks:
+                try:
+                    cur.execute(f"SELECT compress_chunk('_timescaledb_internal.{chunk['chunk_name']}');")
+                    compressed += 1
+                except psycopg2.Error as e:
+                    logger.warning(f"Failed to compress {chunk['chunk_name']}: {e}")
+                    conn.rollback()
+
+            conn.commit()
+            return {
+                "table": table,
+                "chunks_found": len(chunks),
+                "chunks_compressed": compressed,
+            }

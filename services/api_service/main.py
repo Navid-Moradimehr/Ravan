@@ -407,3 +407,119 @@ async def login(req: AuthRequest) -> dict[str, Any]:
 @app.get("/api/v1/audit-logs")
 async def get_audit_logs(limit: int = 100) -> list[dict[str, Any]]:
     return audit_log.get_logs(limit)
+
+
+# Data retention and storage management endpoints
+@app.post("/api/v1/historian/retention/setup")
+async def setup_retention() -> dict[str, str]:
+    from historian.client import setup_retention_policies
+    try:
+        setup_retention_policies()
+        return {"status": "ok", "message": "Retention and compression policies configured"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/historian/storage")
+async def get_storage() -> dict[str, Any]:
+    from historian.client import get_storage_stats
+    try:
+        return get_storage_stats()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/historian/compress")
+async def manual_compress(table: str = "industrial_events", older_than_days: int = 7) -> dict[str, Any]:
+    from historian.client import manual_compress_chunk
+    try:
+        return manual_compress_chunk(table, older_than_days)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Alert management endpoints
+from alert_manager import alert_manager, AlertState
+
+class AlertCreateRequest(BaseModel):
+    asset_id: str
+    tag: str
+    severity: str
+    message: str
+    triggered_rules: list[str] = []
+    source_event_id: str | None = None
+
+class AlertAcknowledgeRequest(BaseModel):
+    alert_id: str
+    user_id: str
+    note: str | None = None
+
+class AlertEscalateRequest(BaseModel):
+    alert_id: str
+    user_id: str
+    reason: str
+
+class AlertResolveRequest(BaseModel):
+    alert_id: str
+    user_id: str
+    note: str | None = None
+
+@app.post("/api/v1/alerts")
+async def create_alert(req: AlertCreateRequest) -> dict[str, Any]:
+    try:
+        alert = alert_manager.create_alert(
+            asset_id=req.asset_id,
+            tag=req.tag,
+            severity=req.severity,
+            message=req.message,
+            triggered_rules=req.triggered_rules,
+            source_event_id=req.source_event_id,
+        )
+        return alert
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/alerts/acknowledge")
+async def acknowledge_alert(req: AlertAcknowledgeRequest) -> dict[str, Any]:
+    try:
+        return alert_manager.acknowledge_alert(req.alert_id, req.user_id, req.note)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/alerts/escalate")
+async def escalate_alert(req: AlertEscalateRequest) -> dict[str, Any]:
+    try:
+        return alert_manager.escalate_alert(req.alert_id, req.user_id, req.reason)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/alerts/resolve")
+async def resolve_alert(req: AlertResolveRequest) -> dict[str, Any]:
+    try:
+        return alert_manager.resolve_alert(req.alert_id, req.user_id, req.note)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/v1/alerts")
+async def list_alerts(
+    state: str | None = None,
+    asset_id: str | None = None,
+    severity: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    return alert_manager.list_alerts(state=state, asset_id=asset_id, severity=severity, limit=limit)
+
+@app.get("/api/v1/alerts/{alert_id}")
+async def get_alert(alert_id: str) -> dict[str, Any]:
+    alert = alert_manager.get_alert(alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return alert
+
+@app.get("/api/v1/alerts/{alert_id}/history")
+async def get_alert_history(alert_id: str) -> list[dict[str, Any]]:
+    return alert_manager.get_alert_history(alert_id)
+
+@app.get("/api/v1/alerts/statistics")
+async def get_alert_statistics() -> dict[str, Any]:
+    return alert_manager.get_statistics()
