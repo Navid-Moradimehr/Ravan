@@ -85,7 +85,7 @@ export default function Home() {
     <div className="industrial-shell min-h-dvh bg-surface-0 text-text-primary">
       <TopBar systemStatus={systemOnline ? "online" : "degraded"} />
 
-      <main className="mx-auto grid max-w-[1560px] gap-5 px-4 py-5 lg:grid-cols-[248px_minmax(0,1fr)_320px]">
+      <main className="mx-auto grid max-w-[1560px] gap-5 px-4 py-5 grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)_320px]">
         {/* Sidebar */}
         <aside className="panel-rail hidden flex-col rounded-xl p-4 lg:sticky lg:top-[4.5rem] lg:flex lg:h-[calc(100dvh-5.5rem)]">
           <div className="flex items-center gap-3">
