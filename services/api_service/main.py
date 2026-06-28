@@ -181,3 +181,40 @@ async def ingest_event(event: dict[str, Any]) -> dict[str, str]:
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=API_PORT)
+
+from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
+
+class CreateUserRequest(BaseModel):
+    user_id: str
+    username: str
+    role: str
+    email: str | None = None
+
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/v1/users")
+async def create_user_endpoint(req: CreateUserRequest) -> dict[str, Any]:
+    role = Role(req.role)
+    user = create_user(req.user_id, req.username, role, req.email)
+    return user.to_dict()
+
+@app.get("/api/v1/users/{user_id}")
+async def get_user_endpoint(user_id: str) -> dict[str, Any]:
+    user = get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user.to_dict()
+
+@app.post("/api/v1/auth/login")
+async def login(req: AuthRequest) -> dict[str, Any]:
+    user = authenticate_user(req.username, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    audit_log.log(user.user_id, "login", "auth")
+    return {"token": f"mock-{user.user_id}", "user": user.to_dict()}
+
+@app.get("/api/v1/audit-logs")
+async def get_audit_logs(limit: int = 100) -> list[dict[str, Any]]:
+    return audit_log.get_logs(limit)
