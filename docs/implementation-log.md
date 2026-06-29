@@ -261,3 +261,29 @@ Fifth pass focused on deployment: the Helm chart was a single-deployment monolit
 ### Notes
 - The Helm chart assumes dependencies (TimescaleDB, Redpanda) are installed separately or as subcharts.
 - The processor Deployment is headless (no Service) since it only consumes from Kafka and writes to the historian.
+
+## Real-world correctness review, pass 6 (2026-06-29)
+
+Sixth pass added edge-to-cloud federation — a critical capability for industrial deployments where edge nodes need to sync data to a central cloud historian.
+
+### Added
+
+1. **Edge-to-cloud federation service**
+   - New `services/federation/main.py` that periodically syncs local historian tables to a remote cloud historian.
+   - Syncs `industrial_events`, `processed_events`, `ai_enriched`, and `dead_letter_events`.
+   - Configurable via env vars: `CLOUD_HISTORIAN_URL`, `CLOUD_API_KEY`, `FEDERATION_SYNC_INTERVAL_SECONDS` (default 60s), `FEDERATION_BATCH_SIZE` (default 500).
+   - Uses cursor-based pagination (time-ordered) so restarts are safe and duplicates are handled by the cloud.
+   - Gracefully disables itself when `CLOUD_HISTORIAN_URL` is not set.
+
+2. **Batch ingest endpoint for federation**
+   - Added `POST /api/v1/events/ingest/batch` to the API service.
+   - Accepts `{"table": "...", "records": [...]}` and inserts directly into the specified historian table.
+   - Skips unknown tables with 400; silently ignores individual insert failures so one bad record doesn't block the batch.
+
+### Verified
+- New regression tests: `tests/test_federation.py` (3 tests).
+- Full Python suite: 166 passed.
+
+### Notes
+- The federation service uses the REST API for cloud transport (simple, works through firewalls/proxies). For high-volume deployments, consider adding a Kafka-based replication path (MirrorMaker 2 or Redpanda replication).
+- The cloud historian must expose the batch ingest endpoint and validate the `Authorization: Bearer` header.

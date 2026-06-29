@@ -541,6 +541,48 @@ async def ingest_event(event: dict[str, Any]) -> dict[str, str]:
     Kafka so it flows through processing/analytics/AI like any edge event.
     On validation failure the event is routed to the DLQ topic instead of a 500.
     """
+    return _do_ingest_event(event)
+
+
+@app.post("/api/v1/events/ingest/batch")
+async def ingest_batch(req: dict[str, Any]) -> dict[str, Any]:
+    """Batch ingest for edge-to-cloud federation.
+
+    Accepts a payload like {"table": "industrial_events", "records": [...]}
+    and inserts each record directly into the specified historian table.
+    Duplicate records (same time + event_id) are silently skipped.
+    """
+    table = req.get("table", "industrial_events")
+    records = req.get("records", [])
+    if not records:
+        return {"status": "ok", "inserted": 0, "table": table}
+
+    try:
+        from services.historian.client import insert_industrial_event, insert_processed_event, insert_ai_enriched, insert_dead_letter
+    except ImportError:
+        from historian.client import insert_industrial_event, insert_processed_event, insert_ai_enriched, insert_dead_letter  # type: ignore
+
+    inserters = {
+        "industrial_events": insert_industrial_event,
+        "processed_events": insert_processed_event,
+        "ai_enriched": insert_ai_enriched,
+        "dead_letter_events": insert_dead_letter,
+    }
+    inserter = inserters.get(table)
+    if inserter is None:
+        raise HTTPException(status_code=400, detail=f"Unknown table: {table}")
+
+    inserted = 0
+    for record in records:
+        try:
+            inserter(record)
+            inserted += 1
+        except Exception:
+            pass
+    return {"status": "ok", "inserted": inserted, "table": table}
+
+
+def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     import uuid as _uuid
 
     # The edge model package is referenced two ways depending on layout:
