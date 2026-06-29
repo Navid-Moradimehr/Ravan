@@ -75,6 +75,7 @@ class WebhookConfig(BaseModel):
 class OutboundBridgeConfig(BaseModel):
     mqtt_host: str | None = None
     mqtt_port: int = 1883
+    mqtt_use_tls: bool = False
     mqtt_topic_template: str = "industrial/{{asset_id}}/{{tag}}"
     amqp_url: str | None = None
     amqp_exchange: str = "industrial.events"
@@ -1428,6 +1429,111 @@ async def list_generated_reports() -> list[dict[str, Any]]:
 async def schedule_report(template_id: str, cron: str = "daily") -> dict[str, Any]:
     """Schedule a report to run periodically."""
     return report_engine.schedule_report(template_id, cron)
+
+# Outbound MQTT/AMQP bridge endpoints
+class OutboundBridgeState(BaseModel):
+    enabled: bool = True
+    config: OutboundBridgeConfig
+
+
+class OutboundEventRequest(BaseModel):
+    asset_id: str
+    tag: str
+    value: float
+    quality: str = "good"
+    unit: str = ""
+    timestamp: str | None = None
+
+
+# In-memory bridge state (replace with DB in production)
+_outbound_bridge_state: OutboundBridgeState | None = None
+_mqtt_client: Any = None
+_amqp_connection: Any = None
+
+
+def _render_topic(template: str, event: dict[str, Any]) -> str:
+    return template.replace("{{asset_id}}", event.get("asset_id", "")).replace("{{tag}}", event.get("tag", ""))
+
+
+def _publish_mqtt(config: OutboundBridgeConfig, event: dict[str, Any]) -> dict[str, Any]:
+    try:
+        import paho.mqtt.publish as mqtt_publish
+        topic = _render_topic(config.mqtt_topic_template, event)
+        payload = json.dumps(event)
+        mqtt_publish.single(
+            topic,
+            payload=payload,
+            hostname=config.mqtt_host,
+            port=config.mqtt_port,
+            tls={} if config.mqtt_use_tls else None,
+        )
+        return {"ok": True, "protocol": "mqtt", "topic": topic}
+    except Exception as e:
+        return {"ok": False, "protocol": "mqtt", "error": str(e)}
+
+
+def _publish_amqp(config: OutboundBridgeConfig, event: dict[str, Any]) -> dict[str, Any]:
+    try:
+        import pika
+        if not config.amqp_url:
+            return {"ok": False, "protocol": "amqp", "error": "amqp_url not configured"}
+        params = pika.URLParameters(config.amqp_url)
+        connection = pika.BlockingConnection(params)
+        channel = connection.channel()
+        channel.exchange_declare(exchange=config.amqp_exchange, exchange_type="topic", durable=True)
+        routing_key = _render_topic(config.amqp_routing_key, event)
+        channel.basic_publish(
+            exchange=config.amqp_exchange,
+            routing_key=routing_key,
+            body=json.dumps(event).encode(),
+            properties=pika.BasicProperties(content_type="application/json", delivery_mode=2),
+        )
+        connection.close()
+        return {"ok": True, "protocol": "amqp", "routing_key": routing_key}
+    except Exception as e:
+        return {"ok": False, "protocol": "amqp", "error": str(e)}
+
+
+@app.post("/api/v1/outbound-bridge/config")
+async def set_outbound_bridge_config(req: OutboundBridgeState) -> dict[str, Any]:
+    global _outbound_bridge_state
+    _outbound_bridge_state = req
+    return {"ok": True, "enabled": req.enabled, "config": req.config.model_dump()}
+
+
+@app.get("/api/v1/outbound-bridge/config")
+async def get_outbound_bridge_config() -> dict[str, Any]:
+    if _outbound_bridge_state is None:
+        return {"enabled": False, "config": None}
+    return {"enabled": _outbound_bridge_state.enabled, "config": _outbound_bridge_state.config.model_dump()}
+
+
+@app.post("/api/v1/outbound-bridge/publish")
+async def publish_outbound_event(req: OutboundEventRequest) -> dict[str, Any]:
+    if _outbound_bridge_state is None or not _outbound_bridge_state.enabled:
+        raise HTTPException(status_code=400, detail="Outbound bridge not enabled")
+    config = _outbound_bridge_state.config
+    event = req.model_dump()
+    if event.get("timestamp") is None:
+        event["timestamp"] = datetime.utcnow().isoformat()
+    results = []
+    if config.mqtt_host:
+        results.append(_publish_mqtt(config, event))
+    if config.amqp_url:
+        results.append(_publish_amqp(config, event))
+    if not results:
+        raise HTTPException(status_code=400, detail="No outbound protocol configured")
+    return {"ok": all(r.get("ok") for r in results), "results": results}
+
+
+@app.post("/api/v1/outbound-bridge/enable")
+async def enable_outbound_bridge(enabled: bool = True) -> dict[str, Any]:
+    global _outbound_bridge_state
+    if _outbound_bridge_state is None:
+        raise HTTPException(status_code=400, detail="Bridge config not set")
+    _outbound_bridge_state.enabled = enabled
+    return {"ok": True, "enabled": enabled}
+
 try:
     from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
 except ImportError:
