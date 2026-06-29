@@ -44,7 +44,7 @@ function AssetTree({ nodes, onSelect, selected }: { nodes: any[]; onSelect: (ass
             <FolderTree className="size-3.5 text-text-secondary" />
             <span className="font-medium">{node.name}</span>
             <Badge variant="outline" className="text-[10px] px-1.5 py-0">{node.type}</Badge>
-          </div>
+        </div>
           {node.children?.length ? (
             <div className="ml-4 border-l border-border-subtle pl-2">
               {node.type === "asset" ? (
@@ -56,11 +56,11 @@ function AssetTree({ nodes, onSelect, selected }: { nodes: any[]; onSelect: (ass
                       <span className="ml-auto text-[10px] text-text-secondary">{tag.unit}</span>
                     </button>
                   ))}
-                </div>
+            </div>
               ) : (
                 <AssetTree nodes={node.children} onSelect={onSelect} selected={selected} />
               )}
-            </div>
+        </div>
           ) : null}
         </li>
       ))}
@@ -152,19 +152,19 @@ export function HistorianDashboard() {
               <label className="text-xs font-medium text-text-secondary">Dataset</label>
               <DropdownMenu>
                  <DropdownMenuTrigger>
-                   <div className="inline-flex h-9 w-40 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{selectedDataset === "ai4i" ? "AI4I Predictive" : "Synthetic"}</div>
+                   <div className="inline-flex h-9 w-full max-w-[10rem] items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{selectedDataset === "ai4i" ? "AI4I Predictive" : "Synthetic"}</div>
                  </DropdownMenuTrigger>
                  <DropdownMenuContent>
                    <DropdownMenuItem onClick={() => setSelectedDataset("ai4i")}>AI4I Predictive</DropdownMenuItem>
                    <DropdownMenuItem onClick={() => setSelectedDataset("synthetic")}>Synthetic</DropdownMenuItem>
                  </DropdownMenuContent>
                </DropdownMenu>
-             </div>
+         </div>
              <div className="space-y-1.5">
                <label className="text-xs font-medium text-text-secondary">Scenario</label>
-               <DropdownMenu>
+              <DropdownMenu>
                  <DropdownMenuTrigger>
-                   <div className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}</div>
+                   <div className="inline-flex h-9 w-full max-w-[12rem] items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}</div>
                  </DropdownMenuTrigger>
                  <DropdownMenuContent>
                    {scenariosQuery.data?.map((s) => (
@@ -172,29 +172,29 @@ export function HistorianDashboard() {
                    ))}
                  </DropdownMenuContent>
                </DropdownMenu>
-             </div>
+         </div>
              <div className="flex items-end gap-2">
                {replayQuery.data?.running ? (
                  <button onClick={() => stopReplayMutation.mutate()} className="action-danger inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium"><Square className="size-4" />Stop</button>
                ) : (
                  <button onClick={() => startReplayMutation.mutate()} className="action-primary inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium"><Play className="size-4" />Start Replay</button>
                )}
-             </div>
-           </div>
+         </div>
+         </div>
            {replayQuery.data?.running ? (
              <div className="space-y-2">
                <div className="flex items-center justify-between text-xs">
                  <span className="text-text-secondary">Progress</span>
                  <span className="font-mono text-text-primary">{replayQuery.data.progress_percent ?? 0}%</span>
-               </div>
+           </div>
                <div className="h-2 overflow-hidden rounded-full bg-surface-2">
                 <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${replayQuery.data.progress_percent ?? 0}%` }} />
-              </div>
+          </div>
               <div className="text-xs text-text-secondary">{replayQuery.data.events_emitted ?? 0} events emitted</div>
-            </div>
+        </div>
           ) : null}
-        </CardContent>
-      </Card>
+      </CardContent>
+</Card>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card className="app-card overflow-hidden">
@@ -208,8 +208,8 @@ export function HistorianDashboard() {
             ) : (
               <AssetTree nodes={assetsQuery.data ?? []} onSelect={(assetId, tag) => setSelectedAsset({ assetId, tag })} selected={selectedAsset} />
             )}
-          </CardContent>
-        </Card>
+      </CardContent>
+</Card>
 
         <Card className="app-card overflow-hidden">
           <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
@@ -221,7 +221,7 @@ export function HistorianDashboard() {
               <p className="py-8 text-center text-sm text-text-secondary">Select a tag from the asset hierarchy to view its trend</p>
             )}
           </CardContent>
-        </Card>
+</Card>
       </div>
 
       <Card className="app-card overflow-hidden">
@@ -230,18 +230,19 @@ export function HistorianDashboard() {
           <CardDescription className="text-text-secondary">Recent warning and critical events from processed stream</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border-subtle hover:bg-transparent">
-                <TableHead className="text-text-secondary">Time</TableHead>
-                <TableHead className="text-text-secondary">Asset</TableHead>
-                <TableHead className="text-text-secondary">Tag</TableHead>
-                <TableHead className="text-text-secondary">Severity</TableHead>
-                <TableHead className="text-text-secondary">Message</TableHead>
-                <TableHead className="text-text-secondary">Rules</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border-subtle hover:bg-transparent">
+                  <TableHead className="text-text-secondary">Time</TableHead>
+                  <TableHead className="text-text-secondary">Asset</TableHead>
+                  <TableHead className="text-text-secondary">Tag</TableHead>
+                  <TableHead className="text-text-secondary">Severity</TableHead>
+                  <TableHead className="text-text-secondary">Message</TableHead>
+                  <TableHead className="text-text-secondary">Rules</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
               {isAlarmsLoading ? (Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-5 w-full bg-surface-2" /></TableCell></TableRow>
               ))) : alarmsData?.length ? (alarmsData.map((alarm: any, i: number) => (
@@ -254,14 +255,15 @@ export function HistorianDashboard() {
                   <TableCell><div className="flex flex-wrap gap-1">{alarm.triggered_rules?.map((rule: string, j: number) => (<Badge key={j} variant="secondary" className="text-[10px]">{rule}</Badge>))}</div></TableCell>
                 </TableRow>
               ))) : (
-                <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-text-secondary">No alarms in the selected window</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+              <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-text-secondary">No alarms in the selected window</TableCell></TableRow>
+            )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
-      <Card className="app-card overflow-hidden">
+    <Card className="app-card overflow-hidden">
         <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold"><Database className="size-4 text-accent" />Raw Events</CardTitle>
           <CardDescription className="text-text-secondary">Recent events from the historian</CardDescription>
@@ -270,7 +272,7 @@ export function HistorianDashboard() {
           <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2">
             <DropdownMenu>
               <DropdownMenuTrigger>
-                <div className="inline-flex h-9 w-48 items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}</div>
+                <div className="inline-flex h-9 w-full max-w-[12rem] items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}</div>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => setSelectedTable("industrial_events")}>Industrial</DropdownMenuItem>
@@ -278,7 +280,7 @@ export function HistorianDashboard() {
                 <DropdownMenuItem onClick={() => setSelectedTable("ai_enriched")}>AI Enriched</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+        </div>
           <Table>
             <TableHeader>
               <TableRow className="border-border-subtle hover:bg-transparent">
@@ -309,8 +311,8 @@ export function HistorianDashboard() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+      </CardContent>
+</Card>
     </div>
   );
 }
