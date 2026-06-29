@@ -41,6 +41,24 @@ def test_configmap_template_exists():
     assert "ConfigMap" in content
 
 
+def test_hpa_template_exists():
+    assert (HELM_DIR / "templates" / "hpa.yaml").exists()
+    content = (HELM_DIR / "templates" / "hpa.yaml").read_text()
+    assert "HorizontalPodAutoscaler" in content
+    assert "api-service" in content
+    assert "ai-gateway" in content
+    assert "processor" in content
+    assert "edge-ingest" in content
+
+
+def test_helm_values_include_autoscaling():
+    values = (HELM_DIR / "values.yaml").read_text()
+    assert "autoScaling:" in values
+    assert "minReplicas:" in values
+    assert "maxReplicas:" in values
+    assert "targetCPUUtilizationPercentage:" in values
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

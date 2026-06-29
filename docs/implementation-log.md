@@ -316,3 +316,27 @@ Seventh pass added TLS support for protocol connections — essential for produc
 ### Notes
 - These are optional; when env vars are unset the protocol clients connect in plaintext (backward-compatible with dev/demo setups).
 - For mTLS (client certificate authentication), set both the certificate and key env vars. For server-only TLS, set only the CA cert.
+
+## Real-world correctness review, pass 8 (2026-06-29)
+
+Eighth pass added auto-scaling, completed the dataset catalog, and improved Helm chart coverage.
+
+### Added
+
+1. **Horizontal Pod Autoscaler (HPA) templates**
+   - Added `k8s/helm/templates/hpa.yaml` with per-service HPA resources.
+   - Configurable in `values.yaml`: `autoScaling.{service}.enabled`, `minReplicas`, `maxReplicas`, `targetCPUUtilizationPercentage`, `targetMemoryUtilizationPercentage`.
+   - Edge ingest can scale up to 20 replicas (high connection fan-out); processor up to 10; API/AI gateway up to 5.
+
+2. **Missing datasets added to datastream-import**
+   - NASA Bearing Dataset (IMS): `nasa-bearing` source, ~250 MB zip.
+   - SWaT/WADI Water Treatment Testbed: `swat` source, ~30 MB xlsx.
+   - All 6 industrial datasets now cataloged: AI4I, C-MAPSS, NAB, SKAB, NASA Bearing, SWaT/WADI.
+
+### Verified
+- New regression tests: `tests/test_helm_chart.py` (8 tests), `tests/test_datastream_import_datasets.py` (3 tests).
+- Full Python suite: 175 passed.
+
+### Notes
+- HPA requires the Kubernetes Metrics Server to be installed in the cluster.
+- The SWaT dataset requires academic registration; the URL in the catalog is the public landing page.

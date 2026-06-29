@@ -1,0 +1,129 @@
+{{- $fullname := include "data-stream.fullname" . -}}
+{{- $name := include "data-stream.name" . -}}
+
+{{- /* API Service HPA */ -}}
+{{- if and .Values.apiService.enabled .Values.autoScaling.apiService.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $fullname }}-api
+  labels:
+    app: {{ $name }}
+    component: api-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $fullname }}-api
+  minReplicas: {{ .Values.autoScaling.apiService.minReplicas }}
+  maxReplicas: {{ .Values.autoScaling.apiService.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoScaling.apiService.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoScaling.apiService.targetMemoryUtilizationPercentage }}
+{{- end }}
+
+---
+{{- /* AI Gateway HPA */ -}}
+{{- if and .Values.aiGateway.enabled .Values.autoScaling.aiGateway.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $fullname }}-ai-gateway
+  labels:
+    app: {{ $name }}
+    component: ai-gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $fullname }}-ai-gateway
+  minReplicas: {{ .Values.autoScaling.aiGateway.minReplicas }}
+  maxReplicas: {{ .Values.autoScaling.aiGateway.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoScaling.aiGateway.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoScaling.aiGateway.targetMemoryUtilizationPercentage }}
+{{- end }}
+
+---
+{{- /* Processor HPA */ -}}
+{{- if and .Values.processor.enabled .Values.autoScaling.processor.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $fullname }}-processor
+  labels:
+    app: {{ $name }}
+    component: processor
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $fullname }}-processor
+  minReplicas: {{ .Values.autoScaling.processor.minReplicas }}
+  maxReplicas: {{ .Values.autoScaling.processor.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoScaling.processor.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoScaling.processor.targetMemoryUtilizationPercentage }}
+{{- end }}
+
+---
+{{- /* Edge Ingest HPA */ -}}
+{{- if and .Values.edgeIngest.enabled .Values.autoScaling.edgeIngest.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $fullname }}-edge-ingest
+  labels:
+    app: {{ $name }}
+    component: edge-ingest
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $fullname }}-edge-ingest
+  minReplicas: {{ .Values.autoScaling.edgeIngest.minReplicas }}
+  maxReplicas: {{ .Values.autoScaling.edgeIngest.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoScaling.edgeIngest.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoScaling.edgeIngest.targetMemoryUtilizationPercentage }}
+{{- end }}

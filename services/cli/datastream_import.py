@@ -87,6 +87,28 @@ SOURCES: tuple[ImportSource, ...] = (
         license_note="MIT",
         licensed=True,
     ),
+    ImportSource(
+        source_id="nasa-bearing",
+        name="NASA Bearing Dataset (IMS)",
+        category="industrial",
+        format="zip",
+        url="https://ti.arc.nasa.gov/m/project/prognostic-repository/IMS.zip",
+        filename="nasa-bearing.zip",
+        size_note="~250 MB",
+        license_note="NASA Open Data (US Gov public domain)",
+        licensed=True,
+    ),
+    ImportSource(
+        source_id="swat",
+        name="SWaT / WADI Water Treatment Testbed",
+        category="industrial",
+        format="zip",
+        url="https://itrust.sutd.edu.sg/wp-content/uploads/2021/11/SWaT_Dataset_Attack_v0.xlsx",
+        filename="swat.xlsx",
+        size_note="~30 MB",
+        license_note="Academic use (registration required)",
+        licensed=True,
+    ),
 )
 
 SOURCE_BY_ID = {s.source_id: s for s in SOURCES}
