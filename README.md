@@ -36,6 +36,38 @@ Prometheus scrapes broker, edge, and AI metrics; Grafana and the web dashboard e
 6. Start the dashboard locally: `cd ui; npm run dev`.
 7. Open the dashboard: `http://localhost:3000`.
 
+## Control CLI
+
+Install the package and get a browser-free operator surface:
+
+```bash
+pip install -e .
+datastreamctl status
+datastreamctl datasets --category synthetic
+datastreamctl doctor
+```
+
+Or run without installing:
+
+```bash
+python -m services.cli.datastreamctl scenarios
+```
+
+### Runtime supervisor
+
+Start, stop, and inspect the platform services without Docker-only orchestration:
+
+```bash
+datastreamd up --only api,ai --wait 12
+datastreamd status
+datastreamd logs api -n 50
+datastreamd down
+```
+
+`datastreamd` manages Python services only; run `docker compose` first for Redpanda, Postgres/TimescaleDB, and Grafana.
+
+See `docs/phase8-distribution.md` for the full distribution plan.
+
 ## Industrial Simulation
 
 Run the hardware-free industrial pipeline:
@@ -55,7 +87,11 @@ The edge path publishes raw protocol payloads to `industrial.raw`, validated env
 ## Documentation
 
 - `Guide.md` contains the original product brief.
-- `docs/app-functionality.md` explains the complete app behavior and feature map.
+- `docs/app-functionality.md` explains the platform in plain language: what each part does, its inputs and outputs, and how users interact with it.
+- `docs/feature-audit.md` lists the implemented feature set and current completion status.
+- `docs/benchmark-results.md` records benchmark and test results.
+- `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
+- `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
 - `ObsidianVault/` is the project knowledge base.
 - `docs/` contains implementation-facing references and operational notes.
 

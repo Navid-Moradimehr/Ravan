@@ -28,7 +28,7 @@ function downloadCsv(rows: any[], filename: string) {
       columns.map((col) => {
         const val = row[col];
         const str = typeof val === "object" ? JSON.stringify(val) : String(val ?? "");
-        return str.includes(",") ? `"${str.replace(/"/g, """)}"` : str;
+        return str.includes(",") ? `"${str.replace(/"/g, '""')}"` : str;
       }).join(",")
     ),
   ].join("\n");

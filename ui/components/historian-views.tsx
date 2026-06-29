@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeAlarmsWebSocket, subscribeEventsWebSocket, type HistorianStreamPayload } from "@/lib/api";
+import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeHistorianStream, subscribeEventsWebSocket, type HistorianStreamPayload } from "@/lib/api";
 
 function TrendChart({ data }: { data: { time: string; value: number }[] }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
@@ -108,7 +108,7 @@ export function HistorianDashboard() {
 
   useEffect(() => {
     const wsBase = process.env.NEXT_PUBLIC_WS_BASE_URL ?? "ws://localhost:8020";
-    const cleanupAlarms = subscribeAlarmsWebSocket({
+    const cleanupAlarms = subscribeHistorianStream({
       onPayload: handleAlarmPayload,
       onConnect: () => setIsStreamConnected(true),
       onDisconnect: () => setIsStreamConnected(false),

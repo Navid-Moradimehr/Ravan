@@ -176,7 +176,7 @@ export type HistorianStreamPayload = {
 };
 
 // WebSocket client for alarms
-export function subscribeAlarmsWebSocket(
+export function subscribeHistorianStream(
   handlers: {
     onPayload: (payload: HistorianStreamPayload) => void;
     onError?: () => void;
@@ -192,7 +192,7 @@ export function subscribeAlarmsWebSocket(
   const connect = () => {
     if (closed) return;
     try {
-      ws = new WebSocket(`${baseUrl}/ws/alarms`);
+      ws = new WebSocket(`${baseUrl}/ws/historian`);
       ws.onopen = () => {
         handlers.onConnect?.();
       };
