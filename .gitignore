@@ -17,3 +17,4 @@ docker/grafana/data/
 docker/prometheus/data/
 .DS_Store
 Thumbs.db
+.datastream/

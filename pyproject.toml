@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-stream-engine"
+version = "0.3.0"
+description = "Industrial streaming, historian, analytics, and AI-assisted operations platform."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Local Stream Engine Contributors" }]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[project.scripts]
+datastreamctl = "services.cli.datastreamctl:main"
+datastreamd = "services.cli.datastreamd:main"
+
+[tool.setuptools]
+packages = ["services"]
