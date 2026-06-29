@@ -79,6 +79,14 @@ env:
   EDGE_METRICS_PORT: "8090"
   JWT_SECRET: "change-me-in-production"
   HISTORIAN_AUTO_SETUP: "1"
+  # Protocol TLS (optional)
+  MQTT_CA_CERT: ""
+  MQTT_CERTFILE: ""
+  MQTT_KEYFILE: ""
+  OPCUA_CERTIFICATE: ""
+  OPCUA_PRIVATE_KEY: ""
+  MODBUS_TLS: "false"
+  MODBUS_CA_CERT: ""
 
 # ---------------------------------------------------------------------------
 # Node placement

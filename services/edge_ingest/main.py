@@ -169,6 +169,16 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="edge-ingest-mqtt")
     client.on_connect = on_connect
     client.on_message = on_message
+    # TLS for MQTT (optional)
+    mqtt_ca_cert = os.getenv("MQTT_CA_CERT", "")
+    mqtt_certfile = os.getenv("MQTT_CERTFILE", "")
+    mqtt_keyfile = os.getenv("MQTT_KEYFILE", "")
+    if mqtt_ca_cert:
+        client.tls_set(
+            ca_certs=mqtt_ca_cert,
+            certfile=mqtt_certfile or None,
+            keyfile=mqtt_keyfile or None,
+        )
     while not stop_event.is_set():
         try:
             client.connect(settings.mqtt_host, settings.mqtt_port, keepalive=30)
@@ -186,7 +196,14 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
 async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:
     while not stop_event.is_set():
         try:
-            async with Client(settings.opcua_endpoint) as client:
+            # TLS for OPC UA (optional)
+            opcua_cert = os.getenv("OPCUA_CERTIFICATE", "")
+            opcua_key = os.getenv("OPCUA_PRIVATE_KEY", "")
+            client_kwargs: dict[str, Any] = {}
+            if opcua_cert and opcua_key:
+                client_kwargs["certificate"] = opcua_cert
+                client_kwargs["private_key"] = opcua_key
+            async with Client(settings.opcua_endpoint, **client_kwargs) as client:
                 while not stop_event.is_set():
                     for node_id in settings.opcua_nodes:
                         value = await client.get_node(node_id).read_value()
@@ -213,7 +230,18 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
 async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:
     register_map = [(0, "Temperature", "c"), (1, "Vibration", "mm/s"), (2, "Pressure", "bar")]
     while not stop_event.is_set():
-        client = ModbusTcpClient(settings.modbus_host, port=settings.modbus_port)
+        # TLS for Modbus TCP (optional)
+        modbus_tls = os.getenv("MODBUS_TLS", "false").lower() == "true"
+        modbus_ca = os.getenv("MODBUS_CA_CERT", "")
+        import ssl
+        sslctx: ssl.SSLContext | None = None
+        if modbus_tls and modbus_ca:
+            sslctx = ssl.create_default_context(cafile=modbus_ca)
+        client = ModbusTcpClient(
+            settings.modbus_host,
+            port=settings.modbus_port,
+            sslctx=sslctx,
+        )
         try:
             if not client.connect():
                 raise ConnectionError("modbus connect failed")

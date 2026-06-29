@@ -287,3 +287,32 @@ Sixth pass added edge-to-cloud federation — a critical capability for industri
 ### Notes
 - The federation service uses the REST API for cloud transport (simple, works through firewalls/proxies). For high-volume deployments, consider adding a Kafka-based replication path (MirrorMaker 2 or Redpanda replication).
 - The cloud historian must expose the batch ingest endpoint and validate the `Authorization: Bearer` header.
+
+## Real-world correctness review, pass 7 (2026-06-29)
+
+Seventh pass added TLS support for protocol connections — essential for production industrial deployments where data integrity and confidentiality are required.
+
+### Added
+
+1. **MQTT TLS (medium)**
+   - Added `MQTT_CA_CERT`, `MQTT_CERTFILE`, `MQTT_KEYFILE` env vars.
+   - When `MQTT_CA_CERT` is set, the MQTT client calls `tls_set()` before connecting, enabling encrypted and optionally mutual-TLS connections to the broker.
+
+2. **OPC UA TLS (medium)**
+   - Added `OPCUA_CERTIFICATE` and `OPCUA_PRIVATE_KEY` env vars.
+   - When both are set, the asyncua `Client` is initialized with the certificate and key, enabling encrypted OPC UA connections.
+
+3. **Modbus TCP TLS (low)**
+   - Added `MODBUS_TLS` (boolean) and `MODBUS_CA_CERT` env vars.
+   - When enabled, `ModbusTcpClient` is created with an `ssl.SSLContext` using the CA cert, enabling TLS-wrapped Modbus TCP.
+
+4. **Helm chart updated**
+   - All TLS env vars added to the shared ConfigMap in `k8s/helm/values.yaml`.
+
+### Verified
+- New regression tests: `tests/test_tls_config.py` (4 tests).
+- Full Python suite: 170 passed.
+
+### Notes
+- These are optional; when env vars are unset the protocol clients connect in plaintext (backward-compatible with dev/demo setups).
+- For mTLS (client certificate authentication), set both the certificate and key env vars. For server-only TLS, set only the CA cert.
