@@ -298,6 +298,17 @@ async def lifespan(_app: FastAPI):
         asyncio.create_task(_telemetry_broadcaster()),
         asyncio.create_task(_heartbeat_task()),
     ]
+    # Best-effort: self-configure compression/retention on startup so a fresh
+    # deploy doesn't silently keep uncompressed data forever. Non-fatal.
+    if os.getenv("HISTORIAN_AUTO_SETUP", "1") == "1":
+        try:
+            try:
+                from historian.client import setup_retention_policies
+            except ImportError:
+                from services.historian.client import setup_retention_policies  # type: ignore
+            setup_retention_policies()
+        except Exception:
+            pass
     yield
     for t in tasks:
         t.cancel()
@@ -542,6 +553,10 @@ async def ingest_event(event: dict[str, Any]) -> dict[str, str]:
         from services.historian.client import insert_industrial_event  # type: ignore
     except Exception:
         from historian.client import insert_industrial_event  # type: ignore
+    try:
+        from services.historian.client import insert_dead_letter  # type: ignore
+    except Exception:
+        from historian.client import insert_dead_letter  # type: ignore
 
     brokers = os.getenv("REDPANDA_BROKERS", "localhost:19092")
     normalized_topic = os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized")
@@ -568,6 +583,10 @@ async def ingest_event(event: dict[str, Any]) -> dict[str, str]:
     if dlq is not None:
         try:
             _publish_kafka(brokers, dlq_topic, str(payload.get("source_id", "api")).encode(), to_json_bytes(dlq))
+        except Exception:
+            pass
+        try:
+            insert_dead_letter({**dlq.model_dump(mode="json"), "origin": "api"})
         except Exception:
             pass
         return {"status": "rejected", "event_id": dlq.event_id, "reason": "validation_failed"}
@@ -827,6 +846,20 @@ async def get_storage() -> dict[str, Any]:
         return get_storage_stats()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/historian/dead-letters")
+async def list_dead_letters(limit: int = 100) -> list[dict[str, Any]]:
+    """List recently rejected (dead-letter) events so operators can inspect/replay them."""
+    try:
+        from historian.client import query_recent_events
+        return query_recent_events("dead_letter_events", limit)
+    except Exception:
+        try:
+            from services.historian.client import query_recent_events
+            return query_recent_events("dead_letter_events", limit)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/v1/historian/compress")

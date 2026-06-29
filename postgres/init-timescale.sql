@@ -62,6 +62,24 @@ CREATE INDEX IF NOT EXISTS idx_processed_events_severity ON processed_events (se
 CREATE INDEX IF NOT EXISTS idx_processed_events_asset ON processed_events (asset_id, time DESC);
 CREATE INDEX IF NOT EXISTS idx_processed_events_tag ON processed_events (tag, time DESC);
 
+-- Dead-letter events: records that failed validation and were not ingested.
+-- Persisted so operators can inspect/replay rejected data, not just dropped.
+CREATE TABLE IF NOT EXISTS dead_letter_events (
+    time TIMESTAMPTZ NOT NULL,
+    event_id TEXT,
+    source_protocol TEXT,
+    source_id TEXT,
+    error TEXT,
+    payload JSONB,
+    schema_version INT,
+    origin TEXT
+);
+
+SELECT create_hypertable('dead_letter_events', 'time', if_not_exists => TRUE);
+
+CREATE INDEX IF NOT EXISTS idx_dead_letter_source ON dead_letter_events (source_protocol, time DESC);
+CREATE INDEX IF NOT EXISTS idx_dead_letter_event_id ON dead_letter_events (event_id);
+
 -- AI enriched events
 CREATE TABLE IF NOT EXISTS ai_enriched (
     time TIMESTAMPTZ NOT NULL,

@@ -155,8 +155,9 @@ def main() -> None:
             producer.poll(0)
             try:
                 insert_processed_event(event)
-            except Exception:
-                pass
+            except Exception as exc:  # pragma: no cover - logged failure path
+                import logging
+                logging.getLogger(__name__).warning("historian processed-event write failed: %s", exc)
             processed += 1
 
             if processed % PRUNE_EVERY_N_MESSAGES == 0 and (max_devices > 0 or max_idle_seconds > 0):

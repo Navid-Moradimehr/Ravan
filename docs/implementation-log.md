@@ -163,3 +163,43 @@ A second pass over the data path and service startup. Found and fixed six more i
 - DLQ events from the REST ingest endpoint are published to the Kafka DLQ topic only (consistent with edge ingest, which does not persist DLQ rows to the historian).
 - Webhook persistence is JSON-file based and intentionally simple; for HA/multi-replica deployments this should move to the historian (Phase 5/6 territory).
 - Dead duplicate imports at the end of `services/processor/runtime_processor.py` (after `main()`) were removed.
+
+## Real-world correctness review, pass 3 (2026-06-29)
+
+Third pass focused on compression, DB write resilience, and dead-letter observability.
+
+### Fixed
+
+1. **Compression segmentby mismatch for ai_enriched (high)**
+   - `setup_retention_policies()` set `compress_segmentby = 'asset_id, tag'` for all three tables, but `ai_enriched` has no `asset_id`/`tag` columns.
+   - This would cause `ALTER TABLE` to error every time on a fresh database, leaving `ai_enriched` uncompressed.
+   - Fixed: per-table segmentby mapping (`industrial_events` → `asset_id, tag`, `processed_events` → `asset_id, tag`, `ai_enriched` → `source, model`).
+
+2. **DB writes had no retry or failure metrics (high)**
+   - All three `insert_*` functions used a single-shot write with no retry on transient failures (connection drops, server restart, network blip).
+   - Added `_execute_with_retry()` with exponential backoff (0.2s, 0.6s, 1.8s) for `OperationalError`/`InterfaceError` and `SerializationFailure`.
+   - Added optional Prometheus metrics (`historian_write_total`, `historian_write_latency_seconds`) so failures are observable.
+   - On transient failure the connection pool is recycled (`closeall` + `cache_clear`) so the next attempt gets a fresh connection.
+
+3. **Silent data-path failures swallowed with no logging (medium)**
+   - `processor/runtime_processor.py`, `edge_ingest/main.py`, and `ai_gateway/main.py` all had bare `except Exception: pass` around historian writes and broadcast loops.
+   - Replaced with `logger.warning(...)` so operators can see when writes are failing instead of silently losing data.
+
+4. **DLQ events not persisted or queryable (medium)**
+   - Invalid events from the REST ingest endpoint were sent to the Kafka DLQ topic but never stored, so operators had no way to inspect or replay them.
+   - Added `dead_letter_events` hypertable with JSONB payload, error text, and origin.
+   - Added `insert_dead_letter()` (uses the same retry wrapper) and wired it into the ingest endpoint.
+   - Added `GET /api/v1/historian/dead-letters` endpoint.
+
+5. **Retention/compression only manual (low)**
+   - `setup_retention_policies()` existed but was only reachable via a manual POST.
+   - Added auto-run in `api_service` lifespan (gated by `HISTORIAN_AUTO_SETUP=1`, default on) so a fresh deployment self-configures.
+
+### Verified
+- New regression tests: `tests/test_realworld_fixes_3.py` (9 tests).
+- Full Python suite: 153 passed.
+- `import services.api_service.main` still succeeds in the repo layout.
+
+### Notes
+- `HISTORIAN_AUTO_SETUP` can be set to `0` to disable the startup retention setup if you prefer manual control.
+- The retry helper raises after max retries so callers still see the failure (not silently swallowed).

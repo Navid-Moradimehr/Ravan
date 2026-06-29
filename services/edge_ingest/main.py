@@ -105,8 +105,9 @@ class EdgePublisher:
             self._buffer.append((self.settings.legacy_topic, key, to_json_bytes(to_legacy_iot_event(event))))
             try:
                 insert_industrial_event(event.model_dump(mode="json"))
-            except Exception:
-                pass
+            except Exception as exc:  # pragma: no cover - logged failure path
+                import logging
+                logging.getLogger(__name__).warning("historian industrial-event write failed: %s", exc)
             events_total.labels(protocol=event.source_protocol).inc()
             last_success_epoch.labels(protocol=event.source_protocol).set(time.time())
             observe_latency(event)

@@ -238,8 +238,9 @@ async def historian_broadcast_loop() -> None:
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     }
                 )
-        except Exception:
-            pass
+        except Exception as exc:  # pragma: no cover - keep stream alive but surface errors
+            import logging
+            logging.getLogger(__name__).warning("historian broadcast loop error: %s", exc)
         await asyncio.sleep(2.0)
 
 
