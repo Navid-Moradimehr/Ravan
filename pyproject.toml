@@ -18,6 +18,7 @@ dependencies = { file = ["requirements.txt"] }
 [project.scripts]
 datastreamctl = "services.cli.datastreamctl:main"
 datastreamd = "services.cli.datastreamd:main"
+datastream-import = "services.cli.datastream_import:main"
 
 [tool.setuptools]
 packages = ["services"]
