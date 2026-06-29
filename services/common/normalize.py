@@ -32,6 +32,7 @@ def normalize_runtime_event(event: dict[str, Any]) -> dict[str, Any]:
     normalized = {
         "event_id": event.get("event_id"),
         "device_id": event.get("asset_id", "unknown-asset"),
+        "asset_id": event.get("asset_id", "unknown-asset"),
         "site_id": event.get("site", "demo-site"),
         "timestamp": timestamp,
         "source_protocol": event.get("source_protocol", "unknown"),
@@ -40,6 +41,12 @@ def normalize_runtime_event(event: dict[str, Any]) -> dict[str, Any]:
         "temperature_c": 0.0,
         "vibration_mm_s": 0.0,
         "pressure_bar": 0.0,
+        "tag": tag,
+        "value": _to_float(value),
+        "unit": event.get("unit", ""),
+        "fault_type": event.get("fault_type", "normal"),
+        "scenario_id": event.get("scenario_id", "sc-000"),
+        "ground_truth_severity": event.get("ground_truth_severity", "normal"),
     }
 
     legacy_field = tag_to_legacy_field(tag)

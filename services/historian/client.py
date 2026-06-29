@@ -11,11 +11,11 @@ from psycopg2.extras import RealDictCursor
 
 
 def _connection_string() -> str:
-    host = os.getenv("TIMESCALE_HOST", "localhost")
-    port = os.getenv("TIMESCALE_PORT", "15433")
-    db = os.getenv("TIMESCALE_DB", "stream_engine")
-    user = os.getenv("TIMESCALE_USER", "stream")
-    password = os.getenv("TIMESCALE_PASSWORD", "stream")
+    host = os.getenv("TIMESCALE_HOST", os.getenv("POSTGRES_HOST", "localhost"))
+    port = os.getenv("TIMESCALE_PORT", os.getenv("POSTGRES_PORT", "15432"))
+    db = os.getenv("TIMESCALE_DB", os.getenv("POSTGRES_DB", "stream_engine"))
+    user = os.getenv("TIMESCALE_USER", os.getenv("POSTGRES_USER", "stream"))
+    password = os.getenv("TIMESCALE_PASSWORD", os.getenv("POSTGRES_PASSWORD", "stream"))
     return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
 

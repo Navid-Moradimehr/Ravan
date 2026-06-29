@@ -89,3 +89,32 @@ Still open (28):
 - Digital Twin Integration
 - Shift/Production Reporting (OEE)
 - Collaboration features
+
+## Real-world correctness review (2026-06-29)
+
+Reviewed the live data path (edge ingest -> normalize -> processor -> historian) for correctness with real datasets, not just mock data. Found and fixed three issues that would have broken real-world operation.
+
+### Fixed
+
+1. **Edge protocol literal rejected non-edge producers (critical)**
+   - `services/edge_ingest/model.py` `Protocol` was limited to `opcua/mqtt/modbus`.
+   - Every `dataset`, `mock`, `sparkplug_b`, `modbus_rtu`, and `api` event failed Pydantic validation and was routed to the DLQ instead of into the pipeline.
+   - Added all producer protocols to the literal so real-data replay, the mock generator, Sparkplug B, and Modbus RTU events validate and flow.
+
+2. **Historian connection ignored `.env` (critical)**
+   - `services/historian/client.py` read only `TIMESCALE_*` env vars, but `.env.example`/`.env` define `POSTGRES_*`.
+   - Defaults silently won, pointing the historian at the wrong host/port.
+   - Now reads `TIMESCALE_*` with `POSTGRES_*` fallback, matching `.env`.
+
+3. **Processor dropped non-temperature/vibration/pressure tags (high)**
+   - `normalize_runtime_event` collapsed every real tag into three legacy fields; any other tag was lost (value 0.0).
+   - `score_event` only scored the three legacy fields.
+   - Normalization now preserves the real `tag`, `value`, `unit`, asset id, and fault labels.
+   - The processor's baseline detector now also scores the actual tag, so e.g. `RotationalSpeed` from AI4I gets anomaly detection instead of being ignored.
+
+### Verified
+- New regression tests: `tests/test_realworld_fixes.py` (11 tests).
+- Full Python suite: 135 passed.
+
+### Notes
+- The processor's legacy-field scoring (temperature/vibration/pressure thresholds) is intentionally preserved for backward compatibility with existing dashboards and rule sets.

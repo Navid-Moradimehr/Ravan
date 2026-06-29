@@ -8,7 +8,16 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 
-Protocol = Literal["opcua", "mqtt", "modbus"]
+Protocol = Literal[
+    "opcua",
+    "mqtt",
+    "modbus",
+    "modbus_rtu",
+    "sparkplug_b",
+    "dataset",
+    "mock",
+    "api",
+]
 Quality = Literal["good", "uncertain", "bad"]
 
 

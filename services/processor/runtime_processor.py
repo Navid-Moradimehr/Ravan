@@ -36,18 +36,17 @@ def score_event(event: dict[str, Any], temperature_avg: float, vibration_avg: fl
     if temperature_avg >= 58 or vibration_avg >= 5:
         score += 0.1
     
-    # Baseline detector scoring (if available)
+    # Baseline detector scoring (if available). Score the actual tag carried
+    # by the event so non-temperature/vibration/pressure tags are not ignored.
     if detector:
-        temp_result = detector.update("temperature_c", temp)
-        vib_result = detector.update("vibration_mm_s", vib)
-        press_result = detector.update("pressure_bar", press)
-        
-        # Add anomaly score contribution
-        max_anomaly = max(
-            temp_result.get("anomaly_score", 0),
-            vib_result.get("anomaly_score", 0),
-            press_result.get("anomaly_score", 0)
-        )
+        max_anomaly = 0.0
+        for field_name in ("temperature_c", "vibration_mm_s", "pressure_bar"):
+            result = detector.update(field_name, float(event.get(field_name, 0)))
+            max_anomaly = max(max_anomaly, result.get("anomaly_score", 0))
+        tag = str(event.get("tag", "")).strip()
+        if tag and tag not in ("temperature_c", "vibration_mm_s", "pressure_bar"):
+            tag_result = detector.update(tag, float(event.get("value", 0)))
+            max_anomaly = max(max_anomaly, tag_result.get("anomaly_score", 0))
         score += min(max_anomaly / 100.0, 0.3)  # Up to 0.3 from baseline
     
     return min(round(score, 2), 1.0)
