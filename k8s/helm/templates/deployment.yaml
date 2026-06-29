@@ -1,36 +1,177 @@
+{{- /*
+  Multi-service deployment template for the Data Stream platform.
+  Creates a separate Deployment for each enabled service so they can be
+  scaled, updated, and restarted independently.
+*/ -}}
+{{- $fullname := include "data-stream.fullname" . -}}
+{{- $name := include "data-stream.name" . -}}
+{{- $chart := include "data-stream.chart" . -}}
+{{- $envFrom := list -}}
+
+{{- /* API Service */ -}}
+{{- if .Values.apiService.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "data-stream.fullname" . }}
+  name: {{ $fullname }}-api
   labels:
-    app: {{ include "data-stream.name" . }}
-    chart: {{ include "data-stream.chart" . }}
+    app: {{ $name }}
+    component: api-service
+    chart: {{ $chart }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.apiService.replicaCount }}
   selector:
     matchLabels:
-      app: {{ include "data-stream.name" . }}
+      app: {{ $name }}
+      component: api-service
   template:
     metadata:
       labels:
-        app: {{ include "data-stream.name" . }}
+        app: {{ $name }}
+        component: api-service
     spec:
       containers:
         - name: api-service
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.services.apiService.targetPort }}
-          env:
-            {{- range $key, $value := .Values.env }}
-            - name: {{ $key }}
-              value: {{ $value | quote }}
-            {{- end }}
+            - containerPort: {{ .Values.apiService.targetPort }}
+              name: http
+          envFrom:
+            - configMapRef:
+                name: {{ $fullname }}-env
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.apiService.resources | nindent 12 }}
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       tolerations:
         {{- toYaml .Values.tolerations | nindent 8 }}
       affinity:
         {{- toYaml .Values.affinity | nindent 8 }}
+{{- end }}
+
+---
+{{- /* AI Gateway */ -}}
+{{- if .Values.aiGateway.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-ai-gateway
+  labels:
+    app: {{ $name }}
+    component: ai-gateway
+    chart: {{ $chart }}
+spec:
+  replicas: {{ .Values.aiGateway.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+      component: ai-gateway
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        component: ai-gateway
+    spec:
+      containers:
+        - name: ai-gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.aiGateway.targetPort }}
+              name: http
+          envFrom:
+            - configMapRef:
+                name: {{ $fullname }}-env
+          resources:
+            {{- toYaml .Values.aiGateway.resources | nindent 12 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+{{- end }}
+
+---
+{{- /* Stream Processor */ -}}
+{{- if .Values.processor.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-processor
+  labels:
+    app: {{ $name }}
+    component: processor
+    chart: {{ $chart }}
+spec:
+  replicas: {{ .Values.processor.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+      component: processor
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        component: processor
+    spec:
+      containers:
+        - name: processor
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ $fullname }}-env
+          resources:
+            {{- toYaml .Values.processor.resources | nindent 12 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+{{- end }}
+
+---
+{{- /* Edge Ingest */ -}}
+{{- if .Values.edgeIngest.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-edge-ingest
+  labels:
+    app: {{ $name }}
+    component: edge-ingest
+    chart: {{ $chart }}
+spec:
+  replicas: {{ .Values.edgeIngest.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+      component: edge-ingest
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        component: edge-ingest
+    spec:
+      containers:
+        - name: edge-ingest
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.edgeIngest.targetPort }}
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: {{ $fullname }}-env
+          resources:
+            {{- toYaml .Values.edgeIngest.resources | nindent 12 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+{{- end }}

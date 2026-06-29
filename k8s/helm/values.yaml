@@ -1,68 +1,98 @@
-# Default values for data-stream
-replicaCount: 1
+# ---------------------------------------------------------------------------
+# Data Stream Platform — Helm values
+# ---------------------------------------------------------------------------
+# Each service can be enabled/disabled independently. Dependencies
+# (TimescaleDB, Redpanda) are expected to be installed separately or via
+# subcharts.
+# ---------------------------------------------------------------------------
 
 image:
   repository: data-stream
   tag: latest
   pullPolicy: IfNotPresent
 
-services:
-  apiService:
-    port: 8020
-    targetPort: 8020
-  aiGateway:
-    port: 8080
-    targetPort: 8080
-  edgeIngest:
-    port: 8090
-    targetPort: 8090
+# ---------------------------------------------------------------------------
+# Service toggles
+# ---------------------------------------------------------------------------
+apiService:
+  enabled: true
+  replicaCount: 1
+  port: 8020
+  targetPort: 8020
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
 
+aiGateway:
+  enabled: true
+  replicaCount: 1
+  port: 8080
+  targetPort: 8080
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+processor:
+  enabled: true
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+edgeIngest:
+  enabled: true
+  replicaCount: 1
+  port: 8090
+  targetPort: 8090
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# Shared environment (injected into all services via ConfigMap)
+# ---------------------------------------------------------------------------
 env:
   REDPANDA_BROKERS: "redpanda:9092"
   TIMESCALE_HOST: "timescaledb"
   TIMESCALE_PORT: "5432"
   TIMESCALE_DB: "stream_engine"
+  TIMESCALE_USER: "stream"
+  TIMESCALE_PASSWORD: "stream"
   API_SERVICE_PORT: "8020"
   AI_GATEWAY_PORT: "8080"
   EDGE_METRICS_PORT: "8090"
+  JWT_SECRET: "change-me-in-production"
+  HISTORIAN_AUTO_SETUP: "1"
 
-resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
-    cpu: 500m
-    memory: 512Mi
-
+# ---------------------------------------------------------------------------
+# Node placement
+# ---------------------------------------------------------------------------
 nodeSelector: {}
 tolerations: []
 affinity: {}
 
-# Deployment profiles
-profile: dev  # dev, demo, edge, prod
-
-profiles:
-  dev:
-    replicaCount: 1
-    resources:
-      limits:
-        cpu: 500m
-        memory: 512Mi
-  demo:
-    replicaCount: 1
-    resources:
-      limits:
-        cpu: 1000m
-        memory: 1Gi
-  edge:
-    replicaCount: 1
-    resources:
-      limits:
-        cpu: 500m
-        memory: 256Mi
-  prod:
-    replicaCount: 3
-    resources:
-      limits:
-        cpu: 2000m
-        memory: 4Gi
+# ---------------------------------------------------------------------------
+# Dependencies (install separately or use subcharts)
+# ---------------------------------------------------------------------------
+# timescaledb:
+#   enabled: false
+#   # Use TimescaleDB Helm chart: https://github.com/timescale/helm-charts
+# redpanda:
+#   enabled: false
+#   # Use Redpanda Helm chart: https://github.com/redpanda-data/helm-charts

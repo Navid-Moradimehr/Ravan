@@ -1,20 +1,61 @@
+{{- $fullname := include "data-stream.fullname" . -}}
+{{- $name := include "data-stream.name" . -}}
+
+{{- if .Values.apiService.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "data-stream.fullname" . }}
+  name: {{ $fullname }}-api
   labels:
-    app: {{ include "data-stream.name" . }}
+    app: {{ $name }}
+    component: api-service
 spec:
   type: ClusterIP
   ports:
-    - port: {{ .Values.services.apiService.port }}
-      targetPort: {{ .Values.services.apiService.targetPort }}
-      name: api
-    - port: {{ .Values.services.aiGateway.port }}
-      targetPort: {{ .Values.services.aiGateway.targetPort }}
-      name: ai-gateway
-    - port: {{ .Values.services.edgeIngest.port }}
-      targetPort: {{ .Values.services.edgeIngest.targetPort }}
-      name: edge-ingest
+    - port: {{ .Values.apiService.port }}
+      targetPort: http
+      name: http
   selector:
-    app: {{ include "data-stream.name" . }}
+    app: {{ $name }}
+    component: api-service
+{{- end }}
+
+---
+{{- if .Values.aiGateway.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-ai-gateway
+  labels:
+    app: {{ $name }}
+    component: ai-gateway
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.aiGateway.port }}
+      targetPort: http
+      name: http
+  selector:
+    app: {{ $name }}
+    component: ai-gateway
+{{- end }}
+
+---
+{{- if .Values.edgeIngest.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-edge-ingest
+  labels:
+    app: {{ $name }}
+    component: edge-ingest
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.edgeIngest.port }}
+      targetPort: metrics
+      name: metrics
+  selector:
+    app: {{ $name }}
+    component: edge-ingest
+{{- end }}

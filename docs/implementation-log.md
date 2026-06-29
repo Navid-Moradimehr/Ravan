@@ -236,3 +236,28 @@ Fourth pass focused on security: RBAC was in-memory with mock passwords and no J
 - `JWT_EXPIRE_MINUTES` defaults to 8 hours; set shorter for production.
 - The `users` and `audit_logs` tables are created by `postgres/init-timescale.sql` on fresh deploys.
 - Existing in-memory users are still usable if the DB is unreachable (dev/demo fallback).
+
+## Real-world correctness review, pass 5 (2026-06-29)
+
+Fifth pass focused on deployment: the Helm chart was a single-deployment monolith that could not run the platform's actual multi-service architecture.
+
+### Fixed
+
+1. **Helm chart was a single-deployment monolith (high)**
+   - The original `deployment.yaml` created one pod with a single container that tried to expose all three service ports (api, ai-gateway, edge-ingest) simultaneously.
+   - This doesn't match the actual platform architecture (4 separate services: api-service, ai-gateway, processor, edge-ingest).
+   - Rewrote the chart:
+     - Separate Deployments for each service (`api-service`, `ai-gateway`, `processor`, `edge-ingest`) with independent replica counts and resource limits.
+     - Separate Services for each exposed component.
+     - Shared environment via a ConfigMap (`data-stream-env`) so all services get the same Kafka/DB/JWT config.
+     - Service-level `enabled` toggles so operators can turn off components they don't need.
+     - Added `JWT_SECRET` and `HISTORIAN_AUTO_SETUP` to the shared env.
+     - Added `NOTES.txt` with post-install instructions and dependency links.
+
+### Verified
+- New regression tests: `tests/test_helm_chart.py` (5 tests).
+- Full Python suite: 163 passed.
+
+### Notes
+- The Helm chart assumes dependencies (TimescaleDB, Redpanda) are installed separately or as subcharts.
+- The processor Deployment is headless (no Service) since it only consumes from Kafka and writes to the historian.

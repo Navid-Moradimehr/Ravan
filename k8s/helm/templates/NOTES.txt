@@ -1,0 +1,24 @@
+{{- $name := include "data-stream.fullname" . -}}
+Data Stream Platform installed.
+
+Services:
+{{- if .Values.apiService.enabled }}
+  API Service:     {{ $name }}-api:{{ .Values.apiService.port }}
+{{- end }}
+{{- if .Values.aiGateway.enabled }}
+  AI Gateway:      {{ $name }}-ai-gateway:{{ .Values.aiGateway.port }}
+{{- end }}
+{{- if .Values.processor.enabled }}
+  Processor:       {{ $name }}-processor (headless)
+{{- end }}
+{{- if .Values.edgeIngest.enabled }}
+  Edge Ingest:     {{ $name }}-edge-ingest:{{ .Values.edgeIngest.port }}
+{{- end }}
+
+Dependencies (install separately):
+  TimescaleDB:  https://github.com/timescale/helm-charts
+  Redpanda:     https://github.com/redpanda-data/helm-charts
+
+Security:
+  Change JWT_SECRET before production use:
+    helm upgrade {{ .Release.Name }} . --set env.JWT_SECRET=<random>
