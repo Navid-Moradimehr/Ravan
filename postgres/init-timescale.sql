@@ -100,3 +100,26 @@ ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS value DOUBLE PRECISION;
 ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS unit TEXT;
 CREATE INDEX IF NOT EXISTS idx_processed_events_asset ON processed_events (asset_id, time DESC);
 CREATE INDEX IF NOT EXISTS idx_processed_events_tag ON processed_events (tag, time DESC);
+
+-- Users and audit logs for RBAC + security
+CREATE TABLE IF NOT EXISTS users (
+    user_id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL,
+    email TEXT,
+    password_hash TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    time TIMESTAMPTZ NOT NULL,
+    user_id TEXT,
+    action TEXT,
+    resource TEXT,
+    details JSONB
+);
+
+SELECT create_hypertable('audit_logs', 'time', if_not_exists => TRUE);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs (user_id, time DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action, time DESC);

@@ -203,3 +203,36 @@ Third pass focused on compression, DB write resilience, and dead-letter observab
 ### Notes
 - `HISTORIAN_AUTO_SETUP` can be set to `0` to disable the startup retention setup if you prefer manual control.
 - The retry helper raises after max retries so callers still see the failure (not silently swallowed).
+
+## Real-world correctness review, pass 4 (2026-06-29)
+
+Fourth pass focused on security: RBAC was in-memory with mock passwords and no JWT.
+
+### Fixed
+
+1. **RBAC had no password hashing or JWT (critical)**
+   - `authenticate_user()` ignored the password entirely (returned any user with matching username).
+   - Login returned a mock token (`mock-{user_id}`) with no signature or expiration.
+   - Users and audit logs were in-memory dicts lost on every restart.
+   - No endpoint was protected by authentication or authorization.
+   - Added `services/api_service/auth.py` with:
+     - `bcrypt` password hashing and verification.
+     - JWT access tokens (HS256, expiring, signed with `JWT_SECRET`).
+     - `get_current_user` FastAPI dependency that validates the Bearer token.
+     - `require_permission` dependency that returns 403 for unauthorized roles.
+     - Best-effort persistent user/audit storage in the historian DB (`users` table + `audit_logs` hypertable).
+     - Backward-compatible in-memory fallback for dev/demo mode when the DB is unavailable.
+
+2. **Sensitive endpoints unprotected (high)**
+   - User creation, user lookup, and audit log listing now require `Permission.ADMIN`.
+   - Other endpoints remain open for backward compatibility; production deployments should add `get_current_user` to write/delete routes.
+
+### Verified
+- New regression tests: `tests/test_auth.py` (5 tests).
+- Full Python suite: 158 passed.
+
+### Notes
+- `JWT_SECRET` must be changed from the default (`change-me-in-production`) before deploying.
+- `JWT_EXPIRE_MINUTES` defaults to 8 hours; set shorter for production.
+- The `users` and `audit_logs` tables are created by `postgres/init-timescale.sql` on fresh deploys.
+- Existing in-memory users are still usable if the DB is unreachable (dev/demo fallback).

@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends
 from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -786,30 +787,44 @@ async def delete_annotation(annotation_id: str) -> dict[str, str]:
     return {"status": "deleted"}
 
 try:
-    from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
+    from rbac import Role, Permission
 except ImportError:
-    from services.api_service.rbac import (  # type: ignore
-        Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission,
-    )
+    from services.api_service.rbac import Role, Permission  # type: ignore
+try:
+    from auth import require_permission
+except ImportError:
+    from services.api_service.auth import require_permission  # type: ignore
 
 class CreateUserRequest(BaseModel):
     user_id: str
     username: str
     role: str
     email: str | None = None
+    password: str | None = None
 
 class AuthRequest(BaseModel):
     username: str
     password: str
 
 @app.post("/api/v1/users")
-async def create_user_endpoint(req: CreateUserRequest) -> dict[str, Any]:
+async def create_user_endpoint(
+    req: CreateUserRequest,
+    _admin: Any = Depends(require_permission(Permission.ADMIN)),
+) -> dict[str, Any]:
+    """Create a new user (admin only)."""
+    from auth import create_user, hash_password
+    from rbac import Role
     role = Role(req.role)
-    user = create_user(req.user_id, req.username, role, req.email)
+    user = create_user(req.user_id, req.username, role, req.email, req.password)
     return user.to_dict()
 
 @app.get("/api/v1/users/{user_id}")
-async def get_user_endpoint(user_id: str) -> dict[str, Any]:
+async def get_user_endpoint(
+    user_id: str,
+    _admin: Any = Depends(require_permission(Permission.ADMIN)),
+) -> dict[str, Any]:
+    """Get a user by ID (admin only)."""
+    from auth import get_user
     user = get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -817,14 +832,23 @@ async def get_user_endpoint(user_id: str) -> dict[str, Any]:
 
 @app.post("/api/v1/auth/login")
 async def login(req: AuthRequest) -> dict[str, Any]:
+    """Authenticate and return a JWT access token."""
+    from auth import authenticate_user, create_access_token
+    from auth import audit_log
     user = authenticate_user(req.username, req.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     audit_log.log(user.user_id, "login", "auth")
-    return {"token": f"mock-{user.user_id}", "user": user.to_dict()}
+    token = create_access_token(user.user_id, user.role.value)
+    return {"token": token, "user": user.to_dict()}
 
 @app.get("/api/v1/audit-logs")
-async def get_audit_logs(limit: int = 100) -> list[dict[str, Any]]:
+async def get_audit_logs(
+    limit: int = 100,
+    _admin: Any = Depends(require_permission(Permission.ADMIN)),
+) -> list[dict[str, Any]]:
+    """List audit logs (admin only)."""
+    from auth import audit_log
     return audit_log.get_logs(limit)
 
 
@@ -1368,3 +1392,4 @@ except ImportError:
     from services.api_service.rbac import (  # type: ignore
         Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission,
     )
+from fastapi import Depends
