@@ -118,3 +118,48 @@ Reviewed the live data path (edge ingest -> normalize -> processor -> historian)
 
 ### Notes
 - The processor's legacy-field scoring (temperature/vibration/pressure thresholds) is intentionally preserved for backward compatibility with existing dashboards and rule sets.
+
+## Real-world correctness review, pass 2 (2026-06-29)
+
+A second pass over the data path and service startup. Found and fixed six more issues, several of which would have prevented the platform from running at all in the repo layout.
+
+### Fixed
+
+1. **AI Gateway duplication broke the UI historian stream (critical)**
+   - `services/ai_gateway/main.py` had duplicated `consume_loop_with_broadcast` + monkeypatch + `historian/stream` route blocks. A third `consume_loop` definition shadowed the broadcast wiring, so the UI SSE/WS stream never received live historian updates (it appeared to "constantly refresh" because the UI fell back to polling).
+   - Deduplicated, added an explicit `historian_broadcast_loop()` task started in `lifespan()`, fixed the `Settings` import path (`services.ai_gateway.config`), and added `datetime`/`timezone` imports.
+
+2. **`/api/v1/events/ingest` bypassed the pipeline (critical)**
+   - The endpoint stored the event in the historian but never published it to Kafka, so externally-ingested events skipped processing, analytics, and AI enrichment entirely.
+   - It also passed a Pydantic model to `insert_industrial_event()`, which expects a dict.
+   - Rewritten to validate via `validate_event` (routes invalid events to the DLQ topic), store a dict, and publish to `industrial.raw`, `industrial.normalized`, and the legacy `iot.raw` topic so the full pipeline runs on every API-ingested event.
+
+3. **`processed_events` schema dropped real tags (high)**
+   - The table had no `asset_id`/`tag`/`value`/`unit` columns, so the tag-preservation fix in normalize.py was thrown away at storage time.
+   - Added the columns + indexes to `postgres/init-timescale.sql` and an idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` migration for existing databases.
+
+4. **`insert_processed_event` array/JSON adaptation (medium)**
+   - `triggered_rules` was passed as a Python list to a `TEXT[]` column and `baseline`/`evaluation` as raw Python objects to `JSONB`. Now stores the new columns, passes a plain list, and wraps JSONB values with `psycopg2.extras.Json`.
+
+5. **`api_service` failed to import in the repo layout (critical)**
+   - `from historian.client import query_historian_events` referenced a function that never existed.
+   - `build_asset_hierarchy()` was used but never defined (the real API is `hierarchy_to_tree(load_hierarchy(path))`).
+   - The `tls_info` route decorator ran before `app = FastAPI(...)` was created.
+   - `from rbac import ...` and `from alert_manager import ...` only resolved in the flattened Docker image.
+   - All fixed: `query_historian_events` is now `query_recent_events as query_historian_events`, a `build_asset_hierarchy()` helper loads the asset config, the TLS route moved after app creation, and a `sys.path` shim plus resilient imports make the service load in both layouts. The service now imports cleanly in the repo.
+
+6. **Webhook/notification reliability (medium)**
+   - `WebhookOutbound.send()` had no retry logic.
+   - The webhook/notification registries were in-memory dicts lost on every restart.
+   - `notifications.py` had a broken duplicate `add_channel` method floating at module scope.
+   - `send()` now retries transient failures (connection errors, 5xx, 429) with exponential backoff. Registries persist to `data/webhooks.json` and `data/notifications.json` and rehydrate on startup. The stray method was moved into the `AppriseNotifier` class.
+
+### Verified
+- New regression tests: `tests/test_realworld_fixes_2.py` (9 tests).
+- Full Python suite: 144 passed.
+- `import services.api_service.main` succeeds in the repo layout.
+
+### Notes
+- DLQ events from the REST ingest endpoint are published to the Kafka DLQ topic only (consistent with edge ingest, which does not persist DLQ rows to the historian).
+- Webhook persistence is JSON-file based and intentionally simple; for HA/multi-replica deployments this should move to the historian (Phase 5/6 territory).
+- Dead duplicate imports at the end of `services/processor/runtime_processor.py` (after `main()`) were removed.

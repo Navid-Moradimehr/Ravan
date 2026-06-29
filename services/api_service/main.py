@@ -17,15 +17,44 @@ from pydantic import BaseModel, Field
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from historian.client import (
-    query_sql,
-    query_tables,
-    query_alarms,
-    query_trend,
-    query_historian_events,
-)
-from assets.model import build_asset_hierarchy
-from scenarios.engine import list_scenarios
+# Ensure sibling modules (rbac, alert_manager, collaboration) resolve in both
+# the repo layout and the flattened Docker layout.
+sys.path.insert(0, os.path.dirname(__file__))
+
+try:
+    from historian.client import (
+        query_sql,
+        query_tables,
+        query_alarms,
+        query_trend,
+        query_recent_events as query_historian_events,
+    )
+except ImportError:
+    # Repo (non-flattened) layout: the package lives under services/.
+    from services.historian.client import (  # type: ignore
+        query_sql,
+        query_tables,
+        query_alarms,
+        query_trend,
+        query_recent_events as query_historian_events,
+    )
+try:
+    from assets.model import load_hierarchy, hierarchy_to_tree
+except ImportError:
+    from services.assets.model import load_hierarchy, hierarchy_to_tree  # type: ignore
+try:
+    from scenarios.engine import list_scenarios
+except ImportError:
+    from services.scenarios.engine import list_scenarios  # type: ignore
+
+
+def build_asset_hierarchy() -> list[dict[str, Any]]:
+    """Load the asset config and return a UI-ready tree (site→area→line→...)."""
+    config_path = os.getenv("ASSETS_CONFIG_PATH", os.path.join(os.path.dirname(__file__), "..", "config", "assets.yaml"))
+    try:
+        return hierarchy_to_tree(load_hierarchy(config_path))
+    except Exception:
+        return []
 
 API_PORT = int(os.getenv("API_SERVICE_PORT", "8020"))
 TIMESCALE_API_BASE = os.getenv("TIMESCALE_API_BASE", "http://localhost:8010")
@@ -206,19 +235,59 @@ def get_tls_context() -> ssl.SSLContext | None:
     return None
 
 
-@app.get("/.well-known/tls-info")
-async def tls_info() -> dict[str, Any]:
-    """Return TLS status and certificate paths."""
-    cert_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "tls", "localhost.pem"))
-    return {
-        "tls_enabled": os.path.exists(cert_path),
-        "cert_path": cert_path if os.path.exists(cert_path) else None,
-        "setup_script": "scripts/setup-local-tls.sh (or .ps1 on Windows)",
-    }
-
-
 webhook_registry: dict[str, WebhookConfig] = {}
 notification_registry: dict[str, NotificationConfig] = {}
+
+
+WEBHOOK_STORE_PATH = os.getenv("WEBHOOK_STORE_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "webhooks.json"))
+NOTIFICATION_STORE_PATH = os.getenv("NOTIFICATION_STORE_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "notifications.json"))
+
+
+def _persist_registry(path: str, data: dict[str, Any]) -> None:
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2)
+    except Exception:
+        pass
+
+
+def _load_registry(path: str) -> dict[str, Any]:
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+def _persist_webhooks() -> None:
+    _persist_registry(WEBHOOK_STORE_PATH, {k: v.model_dump() for k, v in webhook_registry.items()})
+
+
+def _persist_notifications() -> None:
+    _persist_registry(NOTIFICATION_STORE_PATH, {k: v.model_dump() for k, v in notification_registry.items()})
+
+
+def _hydrate_webhooks() -> None:
+    raw = _load_registry(WEBHOOK_STORE_PATH)
+    for hook_id, cfg in raw.items():
+        try:
+            webhook_registry[hook_id] = WebhookConfig(**cfg)
+        except Exception:
+            pass
+
+
+def _hydrate_notifications() -> None:
+    raw = _load_registry(NOTIFICATION_STORE_PATH)
+    for notif_id, cfg in raw.items():
+        try:
+            notification_registry[notif_id] = NotificationConfig(**cfg)
+        except Exception:
+            pass
+
+
+_hydrate_webhooks()
+_hydrate_notifications()
 
 
 @asynccontextmanager
@@ -247,6 +316,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# TLS info endpoint (defined after app creation)
+@app.get("/.well-known/tls-info")
+async def tls_info() -> dict[str, Any]:
+    """Return TLS status and certificate paths."""
+    cert_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "tls", "localhost.pem"))
+    return {
+        "tls_enabled": os.path.exists(cert_path),
+        "cert_path": cert_path if os.path.exists(cert_path) else None,
+        "setup_script": "scripts/setup-local-tls.sh (or .ps1 on Windows)",
+    }
 
 
 # WebSocket endpoints
@@ -390,6 +471,7 @@ async def register_webhook(config: WebhookConfig) -> dict[str, str]:
     import uuid
     hook_id = str(uuid.uuid4())[:8]
     webhook_registry[hook_id] = config
+    _persist_webhooks()
     return {"id": hook_id, "status": "registered"}
 
 
@@ -403,6 +485,7 @@ async def delete_webhook(hook_id: str) -> dict[str, str]:
     if hook_id not in webhook_registry:
         raise HTTPException(status_code=404, detail="Webhook not found")
     del webhook_registry[hook_id]
+    _persist_webhooks()
     return {"status": "deleted"}
 
 
@@ -411,6 +494,7 @@ async def register_notification(config: NotificationConfig) -> dict[str, str]:
     import uuid
     notif_id = str(uuid.uuid4())[:8]
     notification_registry[notif_id] = config
+    _persist_notifications()
     return {"id": notif_id, "status": "registered"}
 
 
@@ -439,27 +523,98 @@ async def test_webhook(hook_id: str) -> dict[str, str]:
 
 @app.post("/api/v1/events/ingest")
 async def ingest_event(event: dict[str, Any]) -> dict[str, str]:
-    """Ingest an industrial event from external systems."""
-    from services.edge_ingest.model import IndustrialEvent, to_json_bytes, utc_now
-    from services.historian.client import insert_industrial_event
-    import uuid
-    evt = IndustrialEvent(
-        source_protocol=event.get("source_protocol", "api"),
-        source_id=event.get("source_id", ""),
-        asset_id=event.get("asset_id", ""),
-        tag=event.get("tag", ""),
-        value=float(event.get("value", 0)),
-        quality=event.get("quality", "good"),
-        unit=event.get("unit", ""),
-        site=event.get("site", "default"),
-        line=event.get("line", "line-01"),
-        ts_source=event.get("ts_source") or utc_now(),
-    )
+    """Ingest an industrial event from external systems.
+
+    Validates, stores in the historian, and publishes the normalized event to
+    Kafka so it flows through processing/analytics/AI like any edge event.
+    On validation failure the event is routed to the DLQ topic instead of a 500.
+    """
+    import uuid as _uuid
+
+    # The edge model package is referenced two ways depending on layout:
+    # - dev/repo root: services.edge_ingest.model
+    # - flattened Docker image: edge_ingest.model
     try:
-        insert_industrial_event(evt)
-        return {"status": "ingested", "event_id": str(uuid.uuid4())}
+        from services.edge_ingest.model import validate_event, to_json_bytes, utc_now  # type: ignore
+    except Exception:
+        from edge_ingest.model import validate_event, to_json_bytes, utc_now  # type: ignore
+    try:
+        from services.historian.client import insert_industrial_event  # type: ignore
+    except Exception:
+        from historian.client import insert_industrial_event  # type: ignore
+
+    brokers = os.getenv("REDPANDA_BROKERS", "localhost:19092")
+    normalized_topic = os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized")
+    raw_topic = os.getenv("INDUSTRIAL_RAW_TOPIC", "industrial.raw")
+    legacy_topic = os.getenv("IOT_TOPIC", "iot.raw")
+    dlq_topic = os.getenv("INDUSTRIAL_DLQ_TOPIC", "industrial.dlq")
+
+    payload = {
+        "event_id": str(_uuid.uuid4()),
+        "source_protocol": event.get("source_protocol", "api"),
+        "source_id": event.get("source_id", ""),
+        "asset_id": event.get("asset_id", ""),
+        "tag": event.get("tag", ""),
+        "value": event.get("value", 0),
+        "quality": event.get("quality", "good"),
+        "unit": event.get("unit", ""),
+        "site": event.get("site", "demo-site"),
+        "line": event.get("line", "line-01"),
+        "ts_source": event.get("ts_source") or utc_now(),
+    }
+
+    validated, dlq = validate_event(payload)
+    event_id = str(_uuid.uuid4())
+    if dlq is not None:
+        try:
+            _publish_kafka(brokers, dlq_topic, str(payload.get("source_id", "api")).encode(), to_json_bytes(dlq))
+        except Exception:
+            pass
+        return {"status": "rejected", "event_id": dlq.event_id, "reason": "validation_failed"}
+
+    assert validated is not None
+    event_dict = validated.model_dump(mode="json")
+    try:
+        insert_industrial_event(event_dict)
+    except Exception:
+        pass
+
+    key = validated.asset_id.encode("utf-8")
+    try:
+        _publish_kafka(brokers, raw_topic, key, to_json_bytes(event_dict))
+        _publish_kafka(brokers, normalized_topic, key, to_json_bytes(validated))
+        _publish_kafka(brokers, legacy_topic, key, to_json_bytes(_to_legacy_iot_event(validated)))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ingest failed: {e}")
+        return {"status": "stored_only", "event_id": event_id, "warning": f"kafka_publish_failed: {e}"}
+    return {"status": "ingested", "event_id": event_id}
+
+
+def _publish_kafka(brokers: str, topic: str, key: bytes, value: bytes) -> None:
+    from confluent_kafka import Producer
+    producer = Producer({"bootstrap.servers": brokers, "client.id": "api-ingest"})
+    producer.produce(topic, key=key, value=value)
+    producer.flush(5)
+
+
+def _to_legacy_iot_event(event: Any) -> dict[str, Any]:
+    """Local fallback for the legacy transform (no hard import dependency)."""
+    try:
+        from common.normalize import to_legacy_iot_event
+        return to_legacy_iot_event(event)
+    except Exception:
+        d = event.model_dump(mode="json") if hasattr(event, "model_dump") else dict(event)
+        return {
+            "event_id": d.get("event_id"),
+            "device_id": d.get("asset_id", "unknown-asset"),
+            "site_id": d.get("site", "demo-site"),
+            "timestamp": d.get("ts_source"),
+            "source_protocol": d.get("source_protocol", "unknown"),
+            "quality": d.get("quality", "unknown"),
+            "schema_version": d.get("schema_version", 1),
+            "temperature_c": 0.0,
+            "vibration_mm_s": 0.0,
+            "pressure_bar": 0.0,
+        }
 
 
 if __name__ == "__main__":
@@ -611,7 +766,12 @@ async def delete_annotation(annotation_id: str) -> dict[str, str]:
     collaboration_store.delete_annotation(annotation_id)
     return {"status": "deleted"}
 
-from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
+try:
+    from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
+except ImportError:
+    from services.api_service.rbac import (  # type: ignore
+        Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission,
+    )
 
 class CreateUserRequest(BaseModel):
     user_id: str
@@ -679,7 +839,10 @@ async def manual_compress(table: str = "industrial_events", older_than_days: int
 
 
 # Alert management endpoints
-from alert_manager import alert_manager, AlertState
+try:
+    from alert_manager import alert_manager, AlertState
+except ImportError:
+    from services.api_service.alert_manager import alert_manager, AlertState  # type: ignore
 
 class AlertCreateRequest(BaseModel):
     asset_id: str
@@ -1166,3 +1329,9 @@ async def list_generated_reports() -> list[dict[str, Any]]:
 async def schedule_report(template_id: str, cron: str = "daily") -> dict[str, Any]:
     """Schedule a report to run periodically."""
     return report_engine.schedule_report(template_id, cron)
+try:
+    from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
+except ImportError:
+    from services.api_service.rbac import (  # type: ignore
+        Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission,
+    )

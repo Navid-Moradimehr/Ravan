@@ -174,11 +174,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-from services.analytics.baseline import BaselineDetector
-from services.analytics.evaluation import evaluate_detection
-from services.analytics.rules import evaluate_rules
-from services.historian.client import insert_processed_event
-from services.analytics.baseline import BaselineDetector
-from services.analytics.evaluation import evaluate_detection
-from services.analytics.rules import evaluate_rules
-from services.historian.client import insert_processed_event

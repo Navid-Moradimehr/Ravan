@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import Json, RealDictCursor
 
 
 def _connection_string() -> str:
@@ -80,16 +80,21 @@ def insert_processed_event(event: dict[str, Any]) -> None:
             cur.execute(
                 """
                 INSERT INTO processed_events (
-                    time, event_id, device_id, site_id, source_protocol, quality,
+                    time, event_id, device_id, asset_id, tag, value, unit,
+                    site_id, source_protocol, quality,
                     schema_version, temperature_c, vibration_mm_s, pressure_bar,
                     processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
                     anomaly_score, severity, triggered_rules, baseline, evaluation
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     event.get("timestamp", datetime.now(timezone.utc).isoformat()),
                     event.get("event_id"),
                     event.get("device_id"),
+                    event.get("asset_id", event.get("device_id")),
+                    event.get("tag", ""),
+                    float(event.get("value", 0) or 0),
+                    event.get("unit", ""),
                     event.get("site_id"),
                     event.get("source_protocol"),
                     event.get("quality"),
@@ -103,9 +108,9 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                     event.get("vibration_avg_mm_s", 0),
                     event.get("anomaly_score", 0),
                     event.get("severity", "normal"),
-                    event.get("triggered_rules", []),
-                    event.get("baseline"),
-                    event.get("evaluation"),
+                    list(event.get("triggered_rules") or []),
+                    Json(event.get("baseline")),
+                    Json(event.get("evaluation")),
                 ),
             )
         conn.commit()

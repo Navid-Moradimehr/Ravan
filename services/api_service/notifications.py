@@ -94,21 +94,40 @@ class AppriseNotifier:
 
         return result
 
+    def add_channel(self, url: str) -> bool:
+        """Add a notification channel (e.g., slack://token@channel)."""
+        if not APPRISE_AVAILABLE:
+            return False
+        try:
+            self._apprise.add(url)
+            self._config_urls.append(url)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add channel {url}: {e}")
+            return False
+
 class WebhookOutbound:
     """Generic HTTP webhook outbound for alarms/events."""
 
-    def __init__(self, endpoints: list[dict[str, Any]] | None = None):
+    def __init__(self, endpoints: list[dict[str, Any]] | None = None, max_retries: int = 3):
         self._endpoints = endpoints or []
         self._session: Any = None
+        self._max_retries = max_retries
+        self._backoff_seconds = (0.5, 1.5, 4.0)
 
     def _get_session(self) -> Any:
         if self._session is None:
             import httpx
-            self._session = httpx.Client(timeout=10.0)
+            self._session = httpx.Client(timeout=10.0, transport=httpx.HTTPTransport(retries=0))
         return self._session
 
     def send(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """POST payload to all configured webhook endpoints."""
+        """POST payload to all configured webhook endpoints.
+
+        Retries transient failures (connection errors, 5xx, 429) with exponential
+        backoff up to max_retries so transient network blips don't drop alerts.
+        """
+        import time as _time
         results = []
         session = self._get_session()
         for endpoint in self._endpoints:
@@ -118,11 +137,27 @@ class WebhookOutbound:
             event_type = payload.get("event_type", "alarm")
             if event_type not in events:
                 continue
-            try:
-                resp = session.post(url, json=payload, headers=headers)
-                results.append({"url": url, "status": resp.status_code, "ok": resp.status_code < 400})
-            except Exception as e:
-                results.append({"url": url, "status": 0, "ok": False, "error": str(e)})
+            attempt = 0
+            last_error: str | None = None
+            status = 0
+            while True:
+                try:
+                    resp = session.post(url, json=payload, headers=headers)
+                    status = resp.status_code
+                    ok = status < 400
+                    retryable = status == 429 or status >= 500
+                    if ok or not retryable or attempt >= self._max_retries:
+                        results.append({"url": url, "status": status, "ok": ok, "attempts": attempt + 1})
+                        break
+                    last_error = f"http_{status}"
+                except Exception as e:
+                    last_error = str(e)
+                    if attempt >= self._max_retries:
+                        results.append({"url": url, "status": status, "ok": False, "attempts": attempt + 1, "error": last_error})
+                        break
+                attempt += 1
+                backoff = self._backoff_seconds[min(attempt - 1, len(self._backoff_seconds) - 1)]
+                _time.sleep(backoff)
         return {"sent": any(r["ok"] for r in results), "results": results}
 
     def add_endpoint(self, url: str, events: list[str] | None = None, headers: dict[str, str] | None = None) -> None:
@@ -135,6 +170,12 @@ class WebhookOutbound:
                 return True
         return False
 
+    def list_endpoints(self) -> list[dict[str, Any]]:
+        return list(self._endpoints)
+
+    def set_endpoints(self, endpoints: list[dict[str, Any]]) -> None:
+        self._endpoints = list(endpoints)
+
 def _load_webhooks_from_env() -> list[dict[str, Any]]:
     """Load webhook endpoints from WEBHOOK_URLS env var."""
     import os, json
@@ -145,20 +186,6 @@ def _load_webhooks_from_env() -> list[dict[str, Any]]:
         return json.loads(raw)
     except json.JSONDecodeError:
         return [{"url": u.strip(), "events": ["alarm", "anomaly"]} for u in raw.split(",") if u.strip()]
-
-
-    def add_channel(self, url: str) -> bool:
-        """Add a notification channel (e.g., slack://token@channel)."""
-        if not APPRISE_AVAILABLE:
-            return False
-
-        try:
-            self._apprise.add(url)
-            self._config_urls.append(url)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to add channel {url}: {e}")
-            return False
 
 
 # Global notifier instance (initialized with env var URLs)

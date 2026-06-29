@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS processed_events (
     time TIMESTAMPTZ NOT NULL,
     event_id TEXT,
     device_id TEXT,
+    asset_id TEXT,
+    tag TEXT,
+    value DOUBLE PRECISION,
+    unit TEXT,
     site_id TEXT,
     source_protocol TEXT,
     quality TEXT,
@@ -55,6 +59,8 @@ SELECT create_hypertable('processed_events', 'time', if_not_exists => TRUE);
 
 CREATE INDEX IF NOT EXISTS idx_processed_events_device ON processed_events (device_id, time DESC);
 CREATE INDEX IF NOT EXISTS idx_processed_events_severity ON processed_events (severity, time DESC);
+CREATE INDEX IF NOT EXISTS idx_processed_events_asset ON processed_events (asset_id, time DESC);
+CREATE INDEX IF NOT EXISTS idx_processed_events_tag ON processed_events (tag, time DESC);
 
 -- AI enriched events
 CREATE TABLE IF NOT EXISTS ai_enriched (
@@ -67,3 +73,12 @@ CREATE TABLE IF NOT EXISTS ai_enriched (
 );
 
 SELECT create_hypertable('ai_enriched', 'time', if_not_exists => TRUE);
+
+-- Idempotent migration: add tag/asset/value/unit columns to processed_events
+-- for databases created before these columns existed. Safe to re-run.
+ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS asset_id TEXT;
+ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS tag TEXT;
+ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS value DOUBLE PRECISION;
+ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS unit TEXT;
+CREATE INDEX IF NOT EXISTS idx_processed_events_asset ON processed_events (asset_id, time DESC);
+CREATE INDEX IF NOT EXISTS idx_processed_events_tag ON processed_events (tag, time DESC);
