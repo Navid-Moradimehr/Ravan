@@ -10,7 +10,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Any, Callable
 
-from alert_manager import alert_manager, AlertState
+try:
+    from alert_manager import alert_manager, AlertState
+except ImportError:
+    from services.api_service.alert_manager import alert_manager, AlertState  # type: ignore
 
 logger = logging.getLogger(__name__)
 

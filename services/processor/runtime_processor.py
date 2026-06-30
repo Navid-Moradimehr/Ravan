@@ -52,6 +52,7 @@ def main() -> None:
     brokers = os.getenv("REDPANDA_BROKERS", "localhost:19092")
     input_topic = os.getenv("IOT_TOPIC", "iot.raw")
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
+    progress_every = int(os.getenv("PROCESSOR_PROGRESS_EVERY", "1000"))
     window_limit = max(1, int(os.getenv("RUNTIME_WINDOW_LIMIT", "25")))
     db_batch_size = max(1, int(os.getenv("RUNTIME_DB_BATCH_SIZE", "256")))
     db_flush_seconds = float(os.getenv("RUNTIME_DB_FLUSH_SECONDS", "1.0"))
@@ -147,7 +148,7 @@ def main() -> None:
                 if removed_windows:
                     print(f"pruned_windows={removed_windows} active_devices={len(windows)}")
 
-            if processed % 100 == 0:
+            if progress_every > 0 and processed % progress_every == 0:
                 elapsed = max(time.time() - started_at, 0.001)
                 print(f"processed={processed} rate={processed / elapsed:.1f}/sec topic={output_topic}")
     finally:

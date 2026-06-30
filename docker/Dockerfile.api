@@ -11,4 +11,4 @@ ENV PYTHONPATH=/app
 
 EXPOSE 8020
 
-CMD ["python", "-m", "uvicorn", "services.api_service.main:app", "--host", "0.0.0.0", "--port", "8020"]
+CMD ["python", "-m", "uvicorn", "services.api_service.main:app", "--host", "0.0.0.0", "--port", "8020", "--no-access-log"]

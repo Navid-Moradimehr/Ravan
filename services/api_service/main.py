@@ -28,6 +28,30 @@ def _prune_legacy_routes() -> None:
         "/api/v1/historian/storage",
         "/api/v1/historian/dead-letters",
         "/api/v1/historian/compress",
+        "/api/v1/alerts",
+        "/api/v1/alerts/acknowledge",
+        "/api/v1/alerts/escalate",
+        "/api/v1/alerts/resolve",
+        "/api/v1/alerts/{alert_id}",
+        "/api/v1/alerts/{alert_id}/history",
+        "/api/v1/alerts/statistics",
+        "/api/v1/notifications/send",
+        "/api/v1/notifications/status",
+        "/api/v1/analytics/correlation/ingest",
+        "/api/v1/analytics/correlation/matrix",
+        "/api/v1/analytics/correlation/strong",
+        "/api/v1/analytics/correlation/graph",
+        "/api/v1/analytics/correlation/propagation/{tag}",
+        "/api/v1/alerts/escalation/rules",
+        "/api/v1/alerts/escalation/rules/{rule_id}",
+        "/api/v1/alerts/escalation/check",
+        "/api/v1/kpis",
+        "/api/v1/kpis/{kpi_id}",
+        "/api/v1/kpis/ingest",
+        "/api/v1/kpis/samples",
+        "/api/v1/outbound-bridge/config",
+        "/api/v1/outbound-bridge/publish",
+        "/api/v1/outbound-bridge/enable",
     }
     app.router.routes = [
         route
@@ -344,9 +368,12 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Local Stream Engine API", version="0.2.0", lifespan=lifespan)
 
 from services.api_service.routers.historian import router as historian_router
+from services.api_service.routers.operations import router as operations_router
 
 app.include_router(historian_router)
+app.include_router(operations_router)
 from services.api_service.routers.historian import ingest_batch, ingest_event
+from services.api_service.ops_runtime import _render_topic
 
 app.add_middleware(
     CORSMiddleware,

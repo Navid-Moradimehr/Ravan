@@ -10,8 +10,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from rbac import audit_log, users_db
-from notifications import notifier, NotificationPayload, webhook_outbound
+try:
+    from rbac import audit_log, users_db
+except ImportError:
+    from services.api_service.rbac import audit_log, users_db  # type: ignore
+
+try:
+    from notifications import notifier, NotificationPayload, webhook_outbound
+except ImportError:
+    from services.api_service.notifications import notifier, NotificationPayload, webhook_outbound  # type: ignore
 
 try:
     import apprise
