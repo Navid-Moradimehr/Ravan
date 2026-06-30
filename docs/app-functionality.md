@@ -195,14 +195,14 @@ This turns machine events into human-readable operational context.
 **What it does**
 
 - batches processed events
-- sends them to an OpenAI-compatible API
+- sends them to a provider-neutral LLM backend
 - generates operational summaries or explanations
 - falls back to deterministic summaries if the LLM is unavailable
 
 **Main inputs**
 
 - processed streaming events
-- LLM configuration such as base URL, model, and batch settings
+- LLM configuration such as provider, endpoint URL, model, and batch settings
 
 **Main outputs**
 
@@ -214,13 +214,13 @@ This turns machine events into human-readable operational context.
 
 - keeps the pipeline running even when AI is down
 - adds operator-friendly context instead of only raw metrics
-- works with local or remote OpenAI-compatible endpoints
+- works with local or remote OpenAI-compatible endpoints and local open-weight model servers
 
 **How users interact with it**
 
 - operators read summaries in the UI
 - admins configure model endpoints and keys
-- developers can point it to LM Studio or cloud APIs
+- developers can point it to LM Studio, Ollama, vLLM, TGI, llama.cpp, Triton, or cloud APIs
 
 ### 6) Historian
 

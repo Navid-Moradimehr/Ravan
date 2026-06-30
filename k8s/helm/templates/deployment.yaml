@@ -6,7 +6,6 @@
 {{- $fullname := include "data-stream.fullname" . -}}
 {{- $name := include "data-stream.name" . -}}
 {{- $chart := include "data-stream.chart" . -}}
-{{- $envFrom := list -}}
 
 {{- /* API Service */ -}}
 {{- if .Values.apiService.enabled }}
@@ -40,6 +39,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ $fullname }}-env
+            - secretRef:
+                name: {{ .Values.secrets.existingSecret }}
+                optional: true
           resources:
             {{- toYaml .Values.apiService.resources | nindent 12 }}
       nodeSelector:
@@ -83,6 +85,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ $fullname }}-env
+            - secretRef:
+                name: {{ .Values.secrets.existingSecret }}
+                optional: true
           resources:
             {{- toYaml .Values.aiGateway.resources | nindent 12 }}
       nodeSelector:
@@ -123,6 +128,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ $fullname }}-env
+            - secretRef:
+                name: {{ .Values.secrets.existingSecret }}
+                optional: true
           resources:
             {{- toYaml .Values.processor.resources | nindent 12 }}
       nodeSelector:
@@ -166,6 +174,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ $fullname }}-env
+            - secretRef:
+                name: {{ .Values.secrets.existingSecret }}
+                optional: true
           resources:
             {{- toYaml .Values.edgeIngest.resources | nindent 12 }}
       nodeSelector:

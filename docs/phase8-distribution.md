@@ -180,6 +180,33 @@ Configuration should support:
 - profiles such as `dev`, `demo`, `edge`, and `prod-like`
 - export/import of configuration bundles
 
+### Model Backend Compatibility
+
+The AI gateway should stay provider-neutral so industrial users can connect the model stack they already operate.
+
+The platform should support:
+
+- OpenAI-compatible backends
+- open-weight model servers such as vLLM, TGI, Ollama, llama.cpp, Triton, and custom HTTP wrappers
+- local-only mode for air-gapped or plant-network deployments
+
+The platform should own:
+
+- request routing
+- batch shaping
+- response parsing
+- fallback summaries when a model server is unavailable
+
+Users should own:
+
+- model weights
+- GPU/CPU sizing
+- endpoint URLs
+- API keys or local auth tokens
+- network placement inside their site or tenant boundary
+
+This keeps the release compatible with local LLMs and future distributed inference without forcing one vendor.
+
 ## Upgrade Model
 
 The safest upgrade path is:
@@ -218,6 +245,19 @@ Phase 8 should eventually include:
 - local dataset packs
 - no mandatory external SaaS dependency
 
+## Multi-Site Rollout
+
+For a company rolling this out across multiple plants or business units, the safest implementation path is:
+
+1. standardize the runtime image and version across sites
+2. keep a site-local broker, historian, and AI gateway per plant or region when latency or data sovereignty matters
+3. centralize only the metadata or rollup layer if cross-site aggregation is needed
+4. use configuration bundles per site so endpoints, models, and storage targets do not leak between locations
+5. stage the rollout with one pilot line, then one plant, then a multi-site fleet
+6. keep backups, replay packs, and model endpoints site-specific unless there is an explicit central platform team
+
+This avoids turning one failed model server or broker into a company-wide outage.
+
 ## Practical Recommendation
 
 ### Phase 8A
@@ -251,6 +291,13 @@ If the goal is an installable industrial open-source tool and not only a browser
 - **Add CLI/service structure first**
 - **Keep the current UI temporarily**
 - **Decide later between desktop shell and TUI based on target users**
+
+For the AI path specifically:
+
+- make the gateway work with OpenAI-compatible and open-weight backends from day one
+- let users provide their own model servers and keys
+- keep secure secrets out of the shared defaults
+- ship local fallback behavior so ingest does not stall when inference is unavailable
 
 That path is faster, safer, and better aligned with how industrial tools usually mature.
 

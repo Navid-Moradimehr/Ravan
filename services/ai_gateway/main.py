@@ -16,9 +16,15 @@ from starlette.responses import Response
 from fastapi.responses import StreamingResponse
 
 from services.ai_gateway.config import Settings
+from services.ai_gateway.providers import (
+    LLMProviderClient,
+    build_fallback_summary,
+    build_industrial_prompt,
+)
 
 
 settings = Settings()
+llm_client = LLMProviderClient(settings)
 consumed_events = Counter("ai_gateway_consumed_events_total", "Processed events consumed by AI gateway")
 enriched_events = Counter("ai_gateway_enriched_events_total", "AI enriched batches emitted")
 llm_latency = Histogram("ai_gateway_llm_request_seconds", "LLM request latency in seconds")
@@ -55,8 +61,9 @@ app = FastAPI(title="Local Stream Engine AI Gateway", version="0.1.0", lifespan=
 async def health() -> dict[str, Any]:
     return {
         "status": "ok" if service_state["running"] else "starting",
-        "model": settings.openai_model,
-        "base_url": settings.openai_base_url,
+        "provider": settings.llm_provider,
+        "model": settings.llm_model_id,
+        "base_url": settings.llm_endpoint_url,
         "last_error": service_state["last_error"],
     }
 
@@ -74,8 +81,10 @@ async def _build_telemetry() -> dict[str, Any]:
             {"name": "observe", "status": "active"},
         ],
         "llm": {
-            "model": settings.openai_model,
-            "base_url": settings.openai_base_url,
+            "provider": settings.llm_provider,
+            "model": settings.llm_model_id,
+            "base_url": settings.llm_endpoint_url,
+            "request_format": settings.llm_request_format,
             "last_error": service_state["last_error"],
         },
     }
@@ -285,30 +294,11 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
         count = sum(1 for event in batch if event.get("severity") == severity)
         if count:
             batch_severity_total.labels(severity=severity).inc(count)
-    prompt = (
-        "Summarize this processed industrial IoT batch. Identify critical devices, "
-        "probable causes, and operator actions. Return concise JSON.\n\n"
-        f"{json.dumps(batch[: settings.llm_max_batch_size], separators=(',', ':'))}"
-    )
+    prompt = build_industrial_prompt(batch[: settings.llm_max_batch_size])
 
     started = time.monotonic()
     try:
-        async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-            response = await client.post(
-                f"{settings.openai_base_url.rstrip('/')}/chat/completions",
-                headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-                json={
-                    "model": settings.openai_model,
-                    "messages": [
-                        {"role": "system", "content": "You are an operations analyst for a streaming BI platform."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0.2,
-                },
-            )
-            response.raise_for_status()
-            payload = response.json()
-            content = payload["choices"][0]["message"]["content"]
+        content = await llm_client.summarize(prompt, settings.llm_timeout_seconds)
     except Exception as exc:
         if not settings.llm_allow_fallback:
             service_state["last_error"] = str(exc)
@@ -324,7 +314,9 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
 
     enriched_payload = {
         "source": "ai-gateway",
-        "model": settings.openai_model,
+        "provider": settings.llm_provider,
+        "model": settings.llm_model_id,
+        "endpoint": settings.llm_endpoint_url,
         "batch_size": len(batch),
         "summary": content,
         "events": batch,
@@ -335,25 +327,6 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
     enriched_events.inc()
     last_success_epoch.set(time.time())
     asyncio.create_task(_broadcast_telemetry())
-
-
-def build_fallback_summary(batch: list[dict[str, Any]], error: str) -> str:
-    critical = [event for event in batch if event.get("severity") == "critical"]
-    warning = [event for event in batch if event.get("severity") == "warning"]
-    devices = sorted({event.get("device_id", "unknown") for event in critical + warning})
-    return json.dumps(
-        {
-            "mode": "deterministic_fallback",
-            "reason": error,
-            "batch_size": len(batch),
-            "critical_count": len(critical),
-            "warning_count": len(warning),
-            "devices": devices[:10],
-            "operator_action": "Inspect critical devices first; verify temperature, vibration, and pressure thresholds.",
-        },
-        separators=(",", ":"),
-    )
-
 
 if __name__ == "__main__":
     import uvicorn

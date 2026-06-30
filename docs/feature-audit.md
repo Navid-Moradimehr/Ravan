@@ -20,7 +20,7 @@
 - Exactly-Once Processing (idempotent producer, acks=all)
 
 ### AI Gateway (4/4)
-- OpenAI-compatible API support
+- Provider-neutral AI gateway support for OpenAI-compatible and open-weight backends
 - Deterministic fallback
 - LLM batching
 - Latency metrics (p95)

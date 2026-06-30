@@ -1,7 +1,7 @@
 # Benchmark Results
 
 ## Test Environment
-- **Date**: 2026-06-28
+- **Date**: 2026-06-30
 - **Platform**: Local Stream Engine (Python 3.11, Windows/WSL2)
 - **Hardware**: Single-node development machine
 - **Broker**: Redpanda (Kafka-compatible)
@@ -58,8 +58,8 @@ Latest local run on the current codebase:
 | Invalid events | 0 |
 | Batches | 391 |
 | Batch size | 256 |
-| Elapsed | 1.4962s |
-| Throughput | 66,835 events/sec |
+| Elapsed | 1.6770s |
+| Throughput | 59,628.62 events/sec |
 | Serialized bytes | 40,112,500 |
 
 Batch-size sweep on the same pack:
@@ -67,14 +67,36 @@ Batch-size sweep on the same pack:
 | Batch size | Throughput | Batches |
 |-----------|------------|---------|
 | 64 | 64,237 events/sec | 782 |
-| 256 | 64,093 events/sec | 196 |
+| 256 | 59,629 events/sec | 391 |
 | 1024 | 63,756 events/sec | 49 |
 
 Interpretation:
 
 - CPU-path throughput is stable across the tested batch sizes.
-- 256 is a sensible default because it reduces flush count without hurting throughput on this workload.
+- 256 is still a sensible default because it reduces flush count without materially changing throughput on this workload.
 - The live DB writer still needs an on-container TimescaleDB measurement before the historian path can be sized for production.
+
+### AI Gateway Provider Benchmark
+
+Command:
+
+```bash
+python scripts/benchmark_ai_gateway_mock.py --provider openai_compat --events 100000 --batch-size 64
+python scripts/benchmark_ai_gateway_mock.py --provider ollama --events 100000 --batch-size 64
+```
+
+Latest local run on the current codebase:
+
+| Provider | Events | Batches | Batch Size | Elapsed | Throughput | Avg Prompt Bytes | Avg Summary Bytes |
+|----------|--------|---------|------------|---------|------------|------------------|-------------------|
+| openai_compat | 100,000 | 1,563 | 64 | 0.6142s | 162,812.89 events/sec | 18,434.4 | 29.0 |
+| ollama | 100,000 | 1,563 | 64 | 0.6935s | 144,191.18 events/sec | 18,434.4 | 29.0 |
+
+Interpretation:
+
+- The provider abstraction adds very little overhead compared with the mock transport.
+- OpenAI-compatible and Ollama-style backends both work through the same industrial prompt path.
+- Real model servers will be slower than this mock benchmark because inference time dominates transport and parsing overhead.
 
 ## Performance Benchmarks
 
@@ -84,6 +106,8 @@ Interpretation:
 |-----------|-----------|-------------------|
 | Mock Data Generation | 1,803 events/sec | 10,000 events in 5.55s |
 | Full Pipeline (scenario + normalize + rules + baseline) | **125,830 events/sec** | 10,000 events in 0.079s |
+| AI Gateway Provider Path (openai_compat, mock transport) | 162,813 events/sec | 100,000 events in 0.614s |
+| AI Gateway Provider Path (ollama, mock transport) | 144,191 events/sec | 100,000 events in 0.694s |
 | Scenario Engine Mutations | 1,698,717 mutations/sec | 10,000 mutations in 0.006s |
 | Baseline Detection (z-score, EWMA, ROC, stuck) | 212,912 updates/sec | 10,000 updates in 0.047s |
 | Event Normalization | 18,433,186 normalizations/sec | 10,000 normalizations in 0.001s |
@@ -123,10 +147,11 @@ Interpretation:
 
 1. **Full pipeline throughput of 125K events/sec** is excellent for a Python-based single-node validation stack
 2. **Mock generation is I/O bound** at ~1,800/sec due to sleep-based rate limiting; processing is CPU-bound at 125K+/sec
-3. **Mixed replay throughput is ~64K-69K events/sec** on the current benchmark pack, with 256 chosen as the default batch size
-4. **WebSocket streaming successfully eliminated all HTTP polling** in the UI
-5. **All 47 tests pass** with no regressions
-6. **Memory footprint is efficient**: ~0.38 KB per event
+3. **Mixed replay throughput is ~59K-64K events/sec** on the current benchmark pack, with 256 still a sensible default batch size
+4. **AI gateway provider plumbing is fast enough that mock transport overhead stays below 1s for 100K events**
+5. **WebSocket streaming successfully eliminated all HTTP polling** in the UI
+6. **The targeted refactor verification slice passed 33 tests** with no regressions
+7. **Memory footprint is efficient**: ~0.38 KB per event
 
 ## Bottlenecks Identified
 

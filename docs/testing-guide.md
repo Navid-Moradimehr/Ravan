@@ -25,6 +25,9 @@
 - Confirm `base_url` is `http://172.17.0.1:1234/v1`.
 - Open `http://localhost:8080/telemetry`.
 - Confirm the pipeline list appears and the last error is either empty or a fallback notice.
+- Verify the gateway can be pointed at any OpenAI-compatible or open-weight backend by setting `LLM_PROVIDER`, `LLM_ENDPOINT_URL`, `LLM_MODEL_ID`, and `LLM_API_KEY`.
+- For local-only deployments, set `LLM_LOCAL_ONLY=true` so the gateway refuses remote model endpoints.
+- If you use a custom provider shape, set `LLM_REQUEST_PATH` and `LLM_REQUEST_FORMAT` explicitly.
 
 ### Streaming Ingestion
 
@@ -68,6 +71,7 @@
 6. Industrial soak: run `scripts/edge-soak.ps1 -Seconds 300 -MqttRatePerSecond 100` and verify normalized throughput, DLQ count, severity mix, and service recovery.
 7. Full-stack soak and restart: run `scripts/full-stack-soak.ps1 -Seconds 300 -MqttRatePerSecond 100 -RecoveryService processor` and verify the restarted service resumes without manual offset repair.
 8. Grafana failure mode: stop Grafana and confirm the dashboard switches to offline state instead of sending you to an external signup page.
+9. AI gateway mock benchmark: run `python scripts/benchmark_ai_gateway_mock.py --provider openai_compat --events 100000 --batch-size 64` and the same command with `--provider ollama`, then confirm the provider abstraction stays above 140K events/sec on the local mock transport.
 
 ## Industrial Readiness
 
@@ -99,6 +103,24 @@ npm --prefix ui run test:smoke
 
 ```powershell
 Invoke-RestMethod http://172.17.0.1:1234/v1/models
+```
+
+## Open-Weight Model Checks
+
+The AI gateway also supports open-weight model servers that expose OpenAI-compatible APIs or their own HTTP shapes.
+
+Examples:
+
+```powershell
+Invoke-RestMethod http://localhost:11434/api/tags
+```
+
+```powershell
+$env:LLM_PROVIDER = "ollama"
+$env:LLM_ENDPOINT_URL = "http://localhost:11434"
+$env:LLM_MODEL_ID = "mistral"
+$env:LLM_API_KEY = "unused"
+Invoke-RestMethod http://localhost:8080/health
 ```
 
 ```powershell

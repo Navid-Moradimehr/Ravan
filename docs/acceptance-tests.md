@@ -33,9 +33,11 @@ Invoke-RestMethod http://localhost:8080/health
 Invoke-RestMethod http://localhost:8080/telemetry
 ```
 
-Expected result: the service reports the configured OpenAI-compatible endpoint and no persistent error after events are processed.
+Expected result: the service reports the configured provider and endpoint and no persistent error after events are processed.
 
-If LM Studio is not reachable, the gateway emits deterministic fallback summaries so the stream does not stall.
+Expected result: the service reports the configured provider, endpoint, and no persistent error after events are processed.
+
+If the model server is not reachable, the gateway emits deterministic fallback summaries so the stream does not stall.
 
 ## Dashboard
 

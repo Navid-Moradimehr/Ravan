@@ -30,7 +30,7 @@ the remaining application surface without changing the public API.
 - Processing: Apache Flink / PyFlink plus the runtime Python processor
 - Processing internals: shared scoring module used by both processing paths
 - CDC: PostgreSQL plus Debezium Kafka Connect
-- AI: FastAPI service using OpenAI-compatible APIs, defaulting to LM Studio
+- AI: provider-neutral FastAPI gateway for OpenAI-compatible and open-weight model backends
 - Observability: Prometheus and Grafana
 - UI: Next.js, TypeScript, Tailwind CSS, shadcn/ui
 - UI observability: live charts for throughput, AI latency, protocol mix, severity mix, and Grafana health
@@ -103,16 +103,27 @@ This replays `data/benchmarks/industrial_mixed_benchmark.csv` through the
 validation, normalization, scoring, and serialization path used by the
 industrial pipeline.
 
+Run the AI gateway mock benchmark pack:
+
+```powershell
+python scripts/benchmark_ai_gateway_mock.py --provider openai_compat --events 100000 --batch-size 64
+python scripts/benchmark_ai_gateway_mock.py --provider ollama --events 100000 --batch-size 64
+```
+
+This measures prompt construction, provider request shaping, and response parsing
+against realistic industrial batches without depending on a live model server.
+
 ## Documentation
 
 - `Guide.md` contains the original product brief.
 - `docs/app-functionality.md` explains the platform in plain language: what each part does, its inputs and outputs, and how users interact with it.
 - `docs/feature-audit.md` lists the implemented feature set and current completion status.
-- `docs/benchmark-results.md` records benchmark and test results.
 - `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
 - `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
+- `docs/benchmark-results.md` includes the latest local benchmark numbers for the mixed replay path and the AI gateway provider abstraction.
 - `services/api_service/routers/historian.py` and `services/api_service/runtime.py` hold the split historian routing and shared API runtime helpers.
 - `scripts/benchmark_mixed_replay.py` runs the mixed replay benchmark against the local industrial replay pack.
+- `scripts/benchmark_ai_gateway_mock.py` benchmarks the provider-neutral AI gateway against realistic mock industrial batches.
 - `data/benchmarks/industrial_mixed_benchmark.csv` is a local replay pack for mixed-protocol benchmark and stress cases.
 - `ObsidianVault/` is the project knowledge base.
 - `docs/` contains implementation-facing references and operational notes.

@@ -17,7 +17,8 @@ def test_values_yaml_has_service_toggles():
     assert "aiGateway:" in content
     assert "processor:" in content
     assert "edgeIngest:" in content
-    assert "JWT_SECRET" in content
+    assert "secrets:" in content
+    assert "existingSecret:" in content
 
 
 def test_deployment_template_creates_multiple_deployments():
@@ -26,6 +27,7 @@ def test_deployment_template_creates_multiple_deployments():
     assert "component: ai-gateway" in content
     assert "component: processor" in content
     assert "component: edge-ingest" in content
+    assert "secretRef" in content
 
 
 def test_service_template_creates_multiple_services():
@@ -39,6 +41,14 @@ def test_configmap_template_exists():
     assert (HELM_DIR / "templates" / "configmap.yaml").exists()
     content = (HELM_DIR / "templates" / "configmap.yaml").read_text()
     assert "ConfigMap" in content
+    assert "JWT_SECRET" not in content
+
+
+def test_secret_template_exists():
+    assert (HELM_DIR / "templates" / "secret.yaml").exists()
+    content = (HELM_DIR / "templates" / "secret.yaml").read_text()
+    assert "Secret" in content
+    assert "stringData" in content
 
 
 def test_hpa_template_exists():
