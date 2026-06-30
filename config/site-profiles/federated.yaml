@@ -1,0 +1,30 @@
+schema_version: 1
+profile_id: federated-rollup-a
+deployment_mode: federated
+
+site:
+  id: plant-b
+  name: Plant B
+  region: tehran-east
+  network_zone: plant-ops
+
+runtime:
+  image_tag: latest
+  redpanda_brokers: redpanda.plant-b.svc.cluster.local:9092
+  historian_backend: timescaledb
+  ai:
+    provider: vllm
+    endpoint_url: http://vllm.plant-b.svc.cluster.local:8000/v1
+    model_id: mistralai/Mistral-7B-Instruct-v0.3
+    local_only: true
+
+backups:
+  directory: backups/plant-b
+  schedule: daily
+  retention_days: 30
+  restore_test_database: stream_engine_restore_plant_b
+
+federation:
+  enabled: true
+  export_mode: rollup
+  central_endpoint: https://central-ops.example.internal/datastream-rollup

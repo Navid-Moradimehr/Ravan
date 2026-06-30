@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 from contextlib import redirect_stdout
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +13,9 @@ from services.datasets.runtime_catalog import (
     get_dataset_source,
     list_dataset_sources,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SITE_PROFILE = REPO_ROOT / "config" / "site-profiles" / "single-site.yaml"
 
 
 class TestRuntimeCatalog:
@@ -73,6 +77,34 @@ class TestDatastreamctl:
         rc, out = self._run(["config"])
         assert rc == 0
         assert "DATASTREAM_API_BASE" in out
+
+    def test_site_profile_validate_command_runs(self):
+        rc, out = self._run(["site-profile", "validate", str(SITE_PROFILE)])
+        assert rc == 0
+        assert "valid" in out
+
+    def test_site_profile_show_json_runs(self):
+        rc, out = self._run(["site-profile", "show", str(SITE_PROFILE), "--json"])
+        assert rc == 0
+        assert '"profile_id": "single-site-demo"' in out
+
+    def test_backup_drill_uses_backup_helpers(self, monkeypatch):
+        monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
+        monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
+        monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
+        monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": False})
+        rc, out = self._run(["backup-drill", "--restore-db", "restore_db"])
+        assert rc == 0
+        assert "backup_status" in out
+
+    def test_release_gate_can_skip_network_and_run_backup(self, monkeypatch):
+        monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
+        monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
+        monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
+        monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": True})
+        rc, out = self._run(["release-gate", str(SITE_PROFILE), "--skip-network"])
+        assert rc == 0
+        assert "release gate" in out
 
 
 if __name__ == "__main__":

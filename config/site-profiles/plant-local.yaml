@@ -1,0 +1,30 @@
+schema_version: 1
+profile_id: plant-local-a
+deployment_mode: plant-local
+
+site:
+  id: plant-a
+  name: Plant A
+  region: tehran-west
+  network_zone: plant-ops
+
+runtime:
+  image_tag: latest
+  redpanda_brokers: redpanda.plant-a.svc.cluster.local:9092
+  historian_backend: timescaledb
+  ai:
+    provider: ollama
+    endpoint_url: http://ollama.plant-a.svc.cluster.local:11434
+    model_id: mistral
+    local_only: true
+
+backups:
+  directory: backups/plant-a
+  schedule: daily
+  retention_days: 30
+  restore_test_database: stream_engine_restore_plant_a
+
+federation:
+  enabled: false
+  export_mode: none
+  central_endpoint:

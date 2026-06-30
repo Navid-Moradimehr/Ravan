@@ -1,0 +1,32 @@
+env:
+  SITE_ID: "plant-b"
+  SITE_NAME: "Plant B"
+  DEPLOYMENT_MODE: "federated"
+  REGION: "tehran-east"
+  NETWORK_ZONE: "plant-ops"
+  REDPANDA_BROKERS: "redpanda.plant-b.svc.cluster.local:9092"
+  DATASTREAM_BACKUP_DIR: "backups/plant-b"
+  DATASTREAM_FEDERATION_ENABLED: "true"
+  DATASTREAM_FEDERATION_EXPORT_MODE: "rollup"
+  DATASTREAM_CENTRAL_ENDPOINT: "https://central-ops.example.internal/datastream-rollup"
+  LLM_PROVIDER: "vllm"
+  LLM_ENDPOINT_URL: "http://vllm.plant-b.svc.cluster.local:8000/v1"
+  LLM_MODEL_ID: "mistralai/Mistral-7B-Instruct-v0.3"
+
+autoScaling:
+  apiService:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+  aiGateway:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+  processor:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+  edgeIngest:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10

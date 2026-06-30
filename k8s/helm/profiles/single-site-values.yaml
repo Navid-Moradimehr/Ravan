@@ -1,0 +1,21 @@
+env:
+  SITE_ID: "demo-site"
+  SITE_NAME: "Demo Site"
+  DEPLOYMENT_MODE: "single-site"
+  REGION: "local-lab"
+  NETWORK_ZONE: "zone-a"
+  REDPANDA_BROKERS: "redpanda:9092"
+  DATASTREAM_BACKUP_DIR: "backups/demo-site"
+  DATASTREAM_FEDERATION_ENABLED: "false"
+  DATASTREAM_FEDERATION_EXPORT_MODE: "none"
+  DATASTREAM_CENTRAL_ENDPOINT: ""
+
+autoScaling:
+  apiService:
+    enabled: false
+  aiGateway:
+    enabled: false
+  processor:
+    enabled: false
+  edgeIngest:
+    enabled: false

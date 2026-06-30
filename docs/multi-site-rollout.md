@@ -245,10 +245,16 @@ The repo is already close to the required shape for a site-local rollout because
 - CLI and runtime supervisor entry points
 - Helm values that separate public config from secrets
 
+Implemented in the repo now:
+
+- a formal site profile schema with example `single-site`, `plant-local`, and `federated` YAMLs
+- `datastreamctl` commands for profile validation, backup drills, and release-gate checks
+- `datastreamd --site-profile` so runtime services can start from a site contract
+- Helm profile overlays for `single-site`, `plant-local`, and `federated`
+
 What still needs to be finished for a true multi-site production rollout:
 
-- a formal site profile schema
-- documented backup cadence and restore drill
+- documented backup cadence and restore drill ownership per site
 - installable packages for Windows and Linux
 - site-by-site benchmark reports
 - central aggregation design, if the company wants fleet-wide reporting
@@ -256,4 +262,3 @@ What still needs to be finished for a true multi-site production rollout:
 ## Recommended Next Step
 
 Implement a site profile contract and an operator-facing release checklist, then run the same benchmark and soak suite against at least two different site profiles.
-

@@ -91,6 +91,12 @@ Real industrial systems typically use this shape:
 ```
 
 ```powershell
+datastreamctl site-profile validate config/site-profiles/single-site.yaml
+datastreamctl backup-drill --restore-db stream_engine_restore_demo
+datastreamctl release-gate config/site-profiles/single-site.yaml --skip-network
+```
+
+```powershell
 npm --prefix ui run build
 ```
 

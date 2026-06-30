@@ -1,0 +1,32 @@
+env:
+  SITE_ID: "plant-a"
+  SITE_NAME: "Plant A"
+  DEPLOYMENT_MODE: "plant-local"
+  REGION: "tehran-west"
+  NETWORK_ZONE: "plant-ops"
+  REDPANDA_BROKERS: "redpanda.plant-a.svc.cluster.local:9092"
+  DATASTREAM_BACKUP_DIR: "backups/plant-a"
+  DATASTREAM_FEDERATION_ENABLED: "false"
+  DATASTREAM_FEDERATION_EXPORT_MODE: "none"
+  DATASTREAM_CENTRAL_ENDPOINT: ""
+  LLM_PROVIDER: "ollama"
+  LLM_ENDPOINT_URL: "http://ollama.plant-a.svc.cluster.local:11434"
+  LLM_MODEL_ID: "mistral"
+
+autoScaling:
+  apiService:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+  aiGateway:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 2
+  processor:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 4
+  edgeIngest:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8

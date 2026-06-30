@@ -54,6 +54,8 @@ pip install -e .
 datastreamctl status
 datastreamctl datasets --category synthetic
 datastreamctl doctor
+datastreamctl site-profile validate config/site-profiles/single-site.yaml
+datastreamctl release-gate config/site-profiles/single-site.yaml --skip-network
 ```
 
 Or run without installing:
@@ -67,7 +69,7 @@ python -m services.cli.datastreamctl scenarios
 Start, stop, and inspect the platform services without Docker-only orchestration:
 
 ```bash
-datastreamd up --only api,ai --wait 12
+datastreamd up --only api,ai --wait 12 --site-profile config/site-profiles/single-site.yaml
 datastreamd status
 datastreamd logs api -n 50
 datastreamd down
@@ -120,6 +122,7 @@ against realistic industrial batches without depending on a live model server.
 - `docs/feature-audit.md` lists the implemented feature set and current completion status.
 - `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
 - `docs/multi-site-rollout.md` defines the production-hardening plan for multi-site industrial deployment.
+- `config/site-profiles/` contains example site profile contracts for `single-site`, `plant-local`, and `federated` rollout shapes.
 - `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
 - `docs/benchmark-results.md` includes the latest local benchmark numbers for the mixed replay path and the AI gateway provider abstraction.
 - `services/api_service/routers/historian.py` and `services/api_service/runtime.py` hold the split historian routing and shared API runtime helpers.

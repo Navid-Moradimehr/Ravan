@@ -97,6 +97,11 @@ autoScaling:
 # Shared environment (injected into all services via ConfigMap)
 # ---------------------------------------------------------------------------
 env:
+  SITE_ID: "demo-site"
+  SITE_NAME: "Demo Site"
+  DEPLOYMENT_MODE: "single-site"
+  REGION: "local-lab"
+  NETWORK_ZONE: "zone-a"
   REDPANDA_BROKERS: "redpanda:9092"
   TIMESCALE_HOST: "timescaledb"
   TIMESCALE_PORT: "5432"
@@ -106,6 +111,17 @@ env:
   AI_GATEWAY_PORT: "8080"
   EDGE_METRICS_PORT: "8090"
   HISTORIAN_AUTO_SETUP: "1"
+  HISTORIAN_BACKEND: "timescaledb"
+  DATASTREAM_BACKUP_DIR: "backups/demo-site"
+  DATASTREAM_BACKUP_SCHEDULE: "daily"
+  DATASTREAM_BACKUP_RETENTION_DAYS: "14"
+  DATASTREAM_FEDERATION_ENABLED: "false"
+  DATASTREAM_FEDERATION_EXPORT_MODE: "none"
+  DATASTREAM_CENTRAL_ENDPOINT: ""
+  LLM_PROVIDER: "openai_compat"
+  LLM_ENDPOINT_URL: "http://host.docker.internal:1234/v1"
+  LLM_MODEL_ID: "openai/gpt-oss-20B"
+  LLM_LOCAL_ONLY: "true"
   # Protocol TLS (optional)
   MQTT_CA_CERT: ""
   MQTT_CERTFILE: ""

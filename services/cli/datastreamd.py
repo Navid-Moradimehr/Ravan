@@ -25,6 +25,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from services.common.site_profiles import load_site_profile, validate_site_profile
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PID_DIR = Path(os.getenv("DATASTREAM_PID_DIR", PROJECT_ROOT / ".datastream"))
 PID_FILE = PID_DIR / "processes.json"
@@ -88,6 +90,9 @@ class ProcRecord:
     module: str
     started_at: float
     health_url: str = ""
+    site_profile: str = ""
+    site_id: str = ""
+    deployment_mode: str = ""
 
 
 def _ensure_dir() -> None:
@@ -121,13 +126,32 @@ def _is_alive(rec: ProcRecord) -> bool:
     return True
 
 
-def _start_one(spec: ServiceSpec) -> ProcRecord | None:
+def _load_site_profile_context(path: str | None) -> tuple[dict[str, str], dict[str, str]]:
+    if not path:
+        return {}, {}
+    profile = load_site_profile(path)
+    errors = validate_site_profile(profile)
+    if errors:
+        raise ValueError(f"invalid site profile {path}: {'; '.join(errors)}")
+    return (
+        profile.to_env(),
+        {
+            "site_profile": str(path),
+            "site_id": profile.site.id,
+            "deployment_mode": profile.deployment_mode,
+        },
+    )
+
+
+def _start_one(spec: ServiceSpec, extra_env: dict[str, str] | None = None, profile_meta: dict[str, str] | None = None) -> ProcRecord | None:
     log_dir = PID_DIR / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{spec.name}.log"
     log_fp = open(log_path, "a", encoding="utf-8")
     env = os.environ.copy()
     env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    if extra_env:
+        env.update(extra_env)
     try:
         proc = subprocess.Popen(
             [PY, "-m", spec.module],
@@ -148,6 +172,9 @@ def _start_one(spec: ServiceSpec) -> ProcRecord | None:
         module=spec.module,
         started_at=time.time(),
         health_url=spec.health_url,
+        site_profile=(profile_meta or {}).get("site_profile", ""),
+        site_id=(profile_meta or {}).get("site_id", ""),
+        deployment_mode=(profile_meta or {}).get("deployment_mode", ""),
     )
 
 
@@ -172,6 +199,7 @@ def _resolve_order(names: list[str]) -> list[str]:
 def cmd_up(args: argparse.Namespace) -> int:
     records = _load_records()
     records = {k: v for k, v in records.items() if _is_alive(v)}
+    extra_env, profile_meta = _load_site_profile_context(args.site_profile)
 
     if args.only:
         wanted = [n.strip() for n in args.only.split(",") if n.strip()]
@@ -189,7 +217,7 @@ def cmd_up(args: argparse.Namespace) -> int:
         if missing:
             print(f"[{name}] skipping, missing dependencies: {missing}")
             continue
-        rec = _start_one(spec)
+        rec = _start_one(spec, extra_env=extra_env, profile_meta=profile_meta)
         if rec:
             records[name] = rec
             started += 1
@@ -259,6 +287,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         if not alive:
             any_dead = True
         print(f"{name:<12}{state:<24}{spec.description}")
+        if rec and (rec.site_id or rec.deployment_mode):
+            print(f"{'':12}{'':24}site={rec.site_id or 'n/a'} mode={rec.deployment_mode or 'n/a'}")
         if args.json:
             pass
     if args.json:
@@ -267,6 +297,9 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "alive": bool(records.get(name) and _is_alive(records[name])),
                 "pid": records[name].pid if records.get(name) else None,
                 "module": spec.module,
+                "site_id": records[name].site_id if records.get(name) else "",
+                "deployment_mode": records[name].deployment_mode if records.get(name) else "",
+                "site_profile": records[name].site_profile if records.get(name) else "",
             }
             for name, spec in ((n, SPEC_BY_NAME[n]) for n in DEFAULT_ORDER)
         }
@@ -282,7 +315,7 @@ def cmd_restart(args: argparse.Namespace) -> int:
             return 2
     down_args = argparse.Namespace(only=",".join(names))
     cmd_down(down_args)
-    up_args = argparse.Namespace(only=",".join(names), wait=args.wait)
+    up_args = argparse.Namespace(only=",".join(names), wait=args.wait, site_profile=args.site_profile)
     cmd_up(up_args)
     return 0
 
@@ -317,6 +350,7 @@ def build_parser() -> argparse.ArgumentParser:
     up = sub.add_parser("up", help="Start managed services")
     up.add_argument("--only", default=None, help="Comma-separated subset to start")
     up.add_argument("--wait", type=float, default=0.0, help="Seconds to wait for each health check")
+    up.add_argument("--site-profile", default=os.getenv("DATASTREAM_SITE_PROFILE"), help="Optional site profile YAML")
     up.set_defaults(func=cmd_up)
 
     down = sub.add_parser("down", help="Stop managed services")
@@ -331,6 +365,7 @@ def build_parser() -> argparse.ArgumentParser:
     restart = sub.add_parser("restart", help="Restart services")
     restart.add_argument("names", help="Comma-separated service names")
     restart.add_argument("--wait", type=float, default=0.0)
+    restart.add_argument("--site-profile", default=os.getenv("DATASTREAM_SITE_PROFILE"), help="Optional site profile YAML")
     restart.set_defaults(func=cmd_restart)
 
     logs = sub.add_parser("logs", help="Tail a service log")

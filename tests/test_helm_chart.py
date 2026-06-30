@@ -69,6 +69,16 @@ def test_helm_values_include_autoscaling():
     assert "targetCPUUtilizationPercentage:" in values
 
 
+def test_profile_overlays_exist():
+    profiles_dir = HELM_DIR / "profiles"
+    assert (profiles_dir / "single-site-values.yaml").exists()
+    assert (profiles_dir / "plant-local-values.yaml").exists()
+    assert (profiles_dir / "federated-values.yaml").exists()
+    federated = (profiles_dir / "federated-values.yaml").read_text()
+    assert "DEPLOYMENT_MODE: \"federated\"" in federated
+    assert "DATASTREAM_CENTRAL_ENDPOINT:" in federated
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

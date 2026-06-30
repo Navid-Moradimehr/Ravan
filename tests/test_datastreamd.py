@@ -76,6 +76,12 @@ class TestSupervisorLifecycle:
             rc = d.main(["down"])
         assert rc == 0
 
+    def test_site_profile_context_loads_env(self):
+        profile = Path(__file__).resolve().parents[1] / "config" / "site-profiles" / "single-site.yaml"
+        env, meta = d._load_site_profile_context(str(profile))
+        assert env["SITE_ID"] == "demo-site"
+        assert meta["deployment_mode"] == "single-site"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -1,0 +1,30 @@
+schema_version: 1
+profile_id: single-site-demo
+deployment_mode: single-site
+
+site:
+  id: demo-site
+  name: Demo Site
+  region: local-lab
+  network_zone: zone-a
+
+runtime:
+  image_tag: latest
+  redpanda_brokers: localhost:19092
+  historian_backend: timescaledb
+  ai:
+    provider: openai_compat
+    endpoint_url: http://127.0.0.1:1234/v1
+    model_id: openai/gpt-oss-20B
+    local_only: true
+
+backups:
+  directory: backups/demo-site
+  schedule: daily
+  retention_days: 14
+  restore_test_database: stream_engine_restore_demo
+
+federation:
+  enabled: false
+  export_mode: none
+  central_endpoint:

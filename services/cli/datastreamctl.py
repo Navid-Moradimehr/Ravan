@@ -13,6 +13,9 @@ import os
 import sys
 from typing import Any
 
+from services.common.site_profiles import load_site_profile, validate_site_profile
+from services.historian.backup import create_backup, get_walg_status, list_backups, restore_backup
+
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
 DEFAULT_AI_BASE = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080")
 
@@ -56,6 +59,27 @@ def _http_get(url: str, timeout: float = 2.0) -> tuple[int, Any]:
 
 def _print_row(label: str, value: Any) -> None:
     print(f"{label:<22}{value}")
+
+
+def _parse_tables(value: str | None) -> list[str] | None:
+    if not value:
+        return None
+    tables = [part.strip() for part in value.split(",") if part.strip()]
+    return tables or None
+
+
+def _run_backup_drill(backup_dir: str | None, tables: list[str] | None, restore_db: str | None) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "backup": create_backup(backup_dir=backup_dir, tables=tables),
+        "restore": None,
+        "backups": list_backups(backup_dir=backup_dir),
+        "wal_g": get_walg_status(),
+    }
+    if result["backup"].get("status") != "success":
+        return result
+    if restore_db:
+        result["restore"] = restore_backup(result["backup"]["path"], restore_db)
+    return result
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -146,6 +170,117 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_site_profile(args: argparse.Namespace) -> int:
+    profile = load_site_profile(args.path)
+    errors = validate_site_profile(profile)
+    payload = {
+        "path": args.path,
+        "profile": profile.to_dict(),
+        "errors": errors,
+        "valid": not errors,
+    }
+    if args.action == "show":
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("Site profile")
+            print("=" * 40)
+            _print_row("path", args.path)
+            _print_row("profile_id", profile.profile_id)
+            _print_row("deployment_mode", profile.deployment_mode)
+            _print_row("site_id", profile.site.id)
+            _print_row("site_name", profile.site.name)
+            _print_row("region", profile.site.region)
+            _print_row("network_zone", profile.site.network_zone)
+            _print_row("brokers", profile.runtime.redpanda_brokers)
+            _print_row("ai_provider", profile.runtime.ai.provider)
+            _print_row("backup_dir", profile.backups.directory)
+            _print_row("federation", profile.federation.enabled)
+        return 0 if not errors else 1
+
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print("site-profile validation")
+        print("=" * 40)
+        _print_row("path", args.path)
+        _print_row("valid", "yes" if not errors else "no")
+        if errors:
+            for err in errors:
+                print(f"ERROR  {err}")
+    return 0 if not errors else 1
+
+
+def cmd_backup_drill(args: argparse.Namespace) -> int:
+    tables = _parse_tables(args.tables)
+    result = _run_backup_drill(args.backup_dir, tables, args.restore_db)
+    backup_ok = result["backup"].get("status") == "success"
+    restore_ok = result["restore"] is None or result["restore"].get("status") == "success"
+    ok = backup_ok and restore_ok
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print("backup drill")
+        print("=" * 40)
+        _print_row("backup_status", result["backup"].get("status", "unknown"))
+        _print_row("backup_path", result["backup"].get("path", result["backup"].get("error", "n/a")))
+        _print_row("restore_status", result["restore"].get("status", "skipped") if result["restore"] else "skipped")
+        _print_row("available_backups", len(result["backups"]))
+        _print_row("wal_g_installed", result["wal_g"].get("installed"))
+    return 0 if ok else 2
+
+
+def cmd_release_gate(args: argparse.Namespace) -> int:
+    profile = load_site_profile(args.site_profile)
+    profile_errors = validate_site_profile(profile)
+    checks: list[tuple[str, bool, str]] = [
+        ("site profile valid", not profile_errors, "; ".join(profile_errors) if profile_errors else "ok"),
+        ("scenario engine importable", bool(_load_scenario_catalog()), "ok" if _load_scenario_catalog() else "unavailable"),
+        ("dataset catalog importable", bool(_load_runtime_catalog()), "ok" if _load_runtime_catalog() else "unavailable"),
+    ]
+
+    if not args.skip_network:
+        api_status, _ = _http_get(f"{args.api_base}/health")
+        ai_status, _ = _http_get(f"{args.ai_base}/health")
+        checks.append(("api reachable", api_status == 200, str(api_status)))
+        checks.append(("ai reachable", ai_status == 200, str(ai_status)))
+
+    drill_result: dict[str, Any] | None = None
+    if not args.skip_backup:
+        restore_db = args.restore_db or profile.backups.restore_test_database
+        drill_result = _run_backup_drill(args.backup_dir or profile.backups.directory, None, restore_db)
+        backup_ok = drill_result["backup"].get("status") == "success"
+        restore_ok = drill_result["restore"] is None or drill_result["restore"].get("status") == "success"
+        checks.append(("backup drill", backup_ok, drill_result["backup"].get("error", "ok")))
+        checks.append(("restore drill", restore_ok, drill_result["restore"].get("error", "ok") if drill_result["restore"] else "skipped"))
+
+    payload = {
+        "profile_id": profile.profile_id,
+        "site_id": profile.site.id,
+        "deployment_mode": profile.deployment_mode,
+        "checks": [
+            {"name": name, "ok": ok, "detail": detail}
+            for name, ok, detail in checks
+        ],
+        "backup_drill": drill_result,
+    }
+    passed = all(item["ok"] for item in payload["checks"])
+
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print("release gate")
+        print("=" * 40)
+        _print_row("profile_id", profile.profile_id)
+        _print_row("site_id", profile.site.id)
+        _print_row("deployment_mode", profile.deployment_mode)
+        for item in payload["checks"]:
+            mark = "OK" if item["ok"] else "FAIL"
+            print(f"{mark:<6}{item['name']:<22}{item['detail']}")
+    return 0 if passed else 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="datastreamctl",
@@ -168,6 +303,33 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("doctor", help="Run health/diagnostic checks").set_defaults(func=cmd_doctor)
     sub.add_parser("config", help="Show effective control configuration").set_defaults(func=cmd_config)
+
+    site_profile = sub.add_parser("site-profile", help="Show or validate a site profile")
+    site_profile_sub = site_profile.add_subparsers(dest="action", required=True)
+    site_show = site_profile_sub.add_parser("show", help="Show parsed site profile values")
+    site_show.add_argument("path")
+    site_show.add_argument("--json", action="store_true")
+    site_show.set_defaults(func=cmd_site_profile)
+    site_validate = site_profile_sub.add_parser("validate", help="Validate a site profile")
+    site_validate.add_argument("path")
+    site_validate.add_argument("--json", action="store_true")
+    site_validate.set_defaults(func=cmd_site_profile)
+
+    backup = sub.add_parser("backup-drill", help="Run a historian backup/restore drill")
+    backup.add_argument("--backup-dir", default=None)
+    backup.add_argument("--tables", default=None, help="Comma-separated table names")
+    backup.add_argument("--restore-db", default=None, help="Optional restore target database")
+    backup.add_argument("--json", action="store_true")
+    backup.set_defaults(func=cmd_backup_drill)
+
+    release = sub.add_parser("release-gate", help="Run production readiness checks for one site profile")
+    release.add_argument("site_profile", help="Path to the site profile YAML")
+    release.add_argument("--backup-dir", default=None)
+    release.add_argument("--restore-db", default=None)
+    release.add_argument("--skip-network", action="store_true")
+    release.add_argument("--skip-backup", action="store_true")
+    release.add_argument("--json", action="store_true")
+    release.set_defaults(func=cmd_release_gate)
     return parser
 
 
