@@ -66,7 +66,8 @@
 4. Restart recovery: stop one container at a time and verify offsets and topics recover cleanly.
 5. UI responsiveness: keep the dashboard open while the generator runs and confirm the charts continue updating without layout shifts.
 6. Industrial soak: run `scripts/edge-soak.ps1 -Seconds 300 -MqttRatePerSecond 100` and verify normalized throughput, DLQ count, severity mix, and service recovery.
-7. Grafana failure mode: stop Grafana and confirm the dashboard switches to offline state instead of sending you to an external signup page.
+7. Full-stack soak and restart: run `scripts/full-stack-soak.ps1 -Seconds 300 -MqttRatePerSecond 100 -RecoveryService processor` and verify the restarted service resumes without manual offset repair.
+8. Grafana failure mode: stop Grafana and confirm the dashboard switches to offline state instead of sending you to an external signup page.
 
 ## Industrial Readiness
 
