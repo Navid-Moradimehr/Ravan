@@ -258,6 +258,8 @@ For a company rolling this out across multiple plants or business units, the saf
 
 This avoids turning one failed model server or broker into a company-wide outage.
 
+See `docs/multi-site-rollout.md` for the full hardening checklist, rollout sequence, and release gates.
+
 ## Practical Recommendation
 
 ### Phase 8A

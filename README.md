@@ -119,6 +119,7 @@ against realistic industrial batches without depending on a live model server.
 - `docs/app-functionality.md` explains the platform in plain language: what each part does, its inputs and outputs, and how users interact with it.
 - `docs/feature-audit.md` lists the implemented feature set and current completion status.
 - `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
+- `docs/multi-site-rollout.md` defines the production-hardening plan for multi-site industrial deployment.
 - `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
 - `docs/benchmark-results.md` includes the latest local benchmark numbers for the mixed replay path and the AI gateway provider abstraction.
 - `services/api_service/routers/historian.py` and `services/api_service/runtime.py` hold the split historian routing and shared API runtime helpers.
