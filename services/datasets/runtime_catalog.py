@@ -32,6 +32,14 @@ DATASET_SOURCES: tuple[DatasetSource, ...] = (
         licensed=True,
     ),
     DatasetSource(
+        dataset_id="industrial-benchmark",
+        name="Industrial Mixed Benchmark Pack",
+        category="benchmark",
+        signals="Mixed protocol telemetry across pumps and motors with severity labels",
+        best_use="Replay-based load testing and industrial scenario benchmarking",
+        licensed=False,
+    ),
+    DatasetSource(
         dataset_id="cmapss",
         name="NASA C-MAPSS",
         category="synthetic",

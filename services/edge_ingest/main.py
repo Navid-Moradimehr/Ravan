@@ -20,7 +20,7 @@ from pymodbus.client import ModbusTcpClient
 
 from services.edge_ingest.model import IndustrialEvent, validate_event, to_json_bytes, utc_now
 from services.assets.model import load_hierarchy
-from services.historian.client import insert_industrial_event
+from services.historian.client import insert_industrial_event, insert_industrial_events
 from services.common.normalize import to_legacy_iot_event
 from services.edge_ingest.modbus_rtu_client import ModbusRTUClient, scan_modbus_rtu_devices
 from services.edge_ingest.opcua_discovery import OPCUADiscoveryClient
@@ -81,6 +81,7 @@ class EdgePublisher:
         self._batch_size = batch_size
         self._flush_interval_ms = flush_interval_ms
         self._buffer: list[tuple[str, bytes, bytes]] = []
+        self._historian_buffer: list[dict[str, Any]] = []
         self._last_flush = time.time()
 
     def publish_raw(self, protocol: str, source_id: str, payload: dict[str, Any]) -> None:
@@ -103,11 +104,7 @@ class EdgePublisher:
             key = event.asset_id.encode("utf-8")
             self._buffer.append((self.settings.normalized_topic, key, to_json_bytes(event)))
             self._buffer.append((self.settings.legacy_topic, key, to_json_bytes(to_legacy_iot_event(event))))
-            try:
-                insert_industrial_event(event.model_dump(mode="json"))
-            except Exception as exc:  # pragma: no cover - logged failure path
-                import logging
-                logging.getLogger(__name__).warning("historian industrial-event write failed: %s", exc)
+            self._historian_buffer.append(event.model_dump(mode="json"))
             events_total.labels(protocol=event.source_protocol).inc()
             last_success_epoch.labels(protocol=event.source_protocol).set(time.time())
             observe_latency(event)
@@ -119,6 +116,8 @@ class EdgePublisher:
         elapsed_ms = (now - self._last_flush) * 1000
         if len(self._buffer) >= self._batch_size or elapsed_ms >= self._flush_interval_ms:
             self._flush_buffer()
+        if len(self._historian_buffer) >= self._batch_size or elapsed_ms >= self._flush_interval_ms:
+            self._flush_historian_buffer()
 
     def _flush_buffer(self) -> None:
         for topic, key, value in self._buffer:
@@ -127,7 +126,26 @@ class EdgePublisher:
         self.producer.poll(0)
         self._last_flush = time.time()
 
+    def _flush_historian_buffer(self) -> None:
+        if not self._historian_buffer:
+            return
+
+        batch = self._historian_buffer[:]
+        self._historian_buffer.clear()
+        try:
+            insert_industrial_events(batch)
+        except Exception as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning("historian industrial-event batch write failed: %s", exc)
+            for event in batch:
+                try:
+                    insert_industrial_event(event)
+                except Exception as inner_exc:  # pragma: no cover - logged failure path
+                    logger.warning("historian industrial-event fallback write failed: %s", inner_exc)
+
     def flush(self) -> None:
+        self._flush_historian_buffer()
         self._flush_buffer()
         self.producer.flush(10)
 

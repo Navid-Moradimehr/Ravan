@@ -5,6 +5,9 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY services/ai_gateway /app
+COPY services /app/services
+COPY config /app/config
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+ENV PYTHONPATH=/app
+
+CMD ["uvicorn", "services.ai_gateway.main:app", "--host", "0.0.0.0", "--port", "8080"]

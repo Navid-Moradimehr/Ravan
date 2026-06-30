@@ -1,0 +1,17 @@
+event_id,source_protocol,source_id,asset_id,tag,value,quality,unit,site,line,ts_source,schema_version,fault_type,scenario_id,ground_truth_severity,step
+bmk-0001,mqtt,factory-a/line-1/pump-01/Temperature,Pump-01,Temperature,55.1,good,c,Factory-A,Line-1,2026-06-27T08:00:00Z,1,normal,bmk-normal,normal,0
+bmk-0002,mqtt,factory-a/line-1/pump-01/Vibration,Pump-01,Vibration,3.4,good,mm/s,Factory-A,Line-1,2026-06-27T08:00:01Z,1,normal,bmk-normal,normal,1
+bmk-0003,opcua,ns=2;s=Pump-02.Temperature,Pump-02,Temperature,57.2,good,c,Factory-A,Line-2,2026-06-27T08:00:02Z,1,drift,bmk-drift,warning,2
+bmk-0004,opcua,ns=2;s=Pump-02.Vibration,Pump-02,Vibration,4.1,good,mm/s,Factory-A,Line-2,2026-06-27T08:00:03Z,1,drift,bmk-drift,warning,3
+bmk-0005,modbus,modbus://plc-01/hr/0,Pump-03,Temperature,63.8,good,c,Factory-A,Line-3,2026-06-27T08:00:04Z,1,degradation,bmk-degrade,critical,4
+bmk-0006,modbus,modbus://plc-01/hr/1,Pump-03,Vibration,7.6,good,mm/s,Factory-A,Line-3,2026-06-27T08:00:05Z,1,degradation,bmk-degrade,critical,5
+bmk-0007,mqtt,factory-b/line-2/motor-01/Current,Motor-01,Current,12.8,good,A,Factory-B,Line-2,2026-06-27T08:00:06Z,1,normal,bmk-normal,normal,6
+bmk-0008,mqtt,factory-b/line-2/motor-01/Temperature,Motor-01,Temperature,66.5,good,c,Factory-B,Line-2,2026-06-27T08:00:07Z,1,spike,bmk-spike,critical,7
+bmk-0009,opcua,ns=2;s=Motor-02.RPM,Motor-02,RPM,1695,good,rpm,Factory-B,Line-3,2026-06-27T08:00:08Z,1,noisy,bmk-noisy,warning,8
+bmk-0010,opcua,ns=2;s=Motor-02.Temperature,Motor-02,Temperature,61.8,good,c,Factory-B,Line-3,2026-06-27T08:00:09Z,1,drift,bmk-drift,warning,9
+bmk-0011,modbus,modbus://plc-02/hr/2,Motor-02,Voltage,382.4,good,V,Factory-B,Line-3,2026-06-27T08:00:10Z,1,normal,bmk-normal,normal,10
+bmk-0012,mqtt,factory-c/line-4/turbine-01/Vibration,Turbine-01,Vibration,2.7,good,mm/s,Factory-C,Line-4,2026-06-27T08:00:11Z,1,maintenance_reset,bmk-reset,normal,11
+bmk-0013,mqtt,factory-c/line-4/turbine-01/Power,Turbine-01,Power,2.8,good,MW,Factory-C,Line-4,2026-06-27T08:00:12Z,1,normal,bmk-normal,normal,12
+bmk-0014,opcua,ns=2;s=Turbine-01.InletTemp,Turbine-01,InletTemp,462.0,good,c,Factory-C,Line-4,2026-06-27T08:00:13Z,1,spike,bmk-spike,critical,13
+bmk-0015,opcua,ns=2;s=Turbine-01.OutletTemp,Turbine-01,OutletTemp,286.4,good,c,Factory-C,Line-4,2026-06-27T08:00:14Z,1,normal,bmk-normal,normal,14
+bmk-0016,modbus,modbus://plc-03/hr/0,Pump-01,Temperature,71.3,good,c,Factory-A,Line-1,2026-06-27T08:00:15Z,1,degradation,bmk-degrade,critical,15

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 import psycopg2
-from psycopg2.extras import Json, RealDictCursor
+from psycopg2.extras import Json, RealDictCursor, execute_values
 
 
 logger = logging.getLogger(__name__)
@@ -150,6 +150,49 @@ def insert_industrial_event(event: dict[str, Any]) -> None:
     _execute_with_retry("industrial_events", do_write)
 
 
+def insert_industrial_events(events: list[dict[str, Any]]) -> None:
+    if not events:
+        return
+
+    def do_write() -> None:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                execute_values(
+                    cur,
+                    """
+                    INSERT INTO industrial_events (
+                        time, event_id, source_protocol, source_id, asset_id, tag,
+                        value, quality, unit, site, line, schema_version,
+                        fault_type, scenario_id, ground_truth_severity, step
+                    ) VALUES %s
+                    """,
+                    [
+                        (
+                            event.get("ts_ingest", datetime.now(timezone.utc).isoformat()),
+                            event.get("event_id"),
+                            event.get("source_protocol"),
+                            event.get("source_id"),
+                            event.get("asset_id"),
+                            event.get("tag"),
+                            float(event.get("value", 0)),
+                            event.get("quality", "good"),
+                            event.get("unit"),
+                            event.get("site", "demo-site"),
+                            event.get("line", "line-01"),
+                            event.get("schema_version", 1),
+                            event.get("fault_type", "normal"),
+                            event.get("scenario_id", "sc-000"),
+                            event.get("ground_truth_severity", "normal"),
+                            event.get("step", 0),
+                        )
+                        for event in events
+                    ],
+                )
+            conn.commit()
+
+    _execute_with_retry("industrial_events", do_write)
+
+
 def insert_processed_event(event: dict[str, Any]) -> None:
     def do_write() -> None:
         with get_connection() as conn:
@@ -189,6 +232,58 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                         Json(event.get("baseline")),
                         Json(event.get("evaluation")),
                     ),
+                )
+            conn.commit()
+
+    _execute_with_retry("processed_events", do_write)
+
+
+def insert_processed_events(events: list[dict[str, Any]]) -> None:
+    if not events:
+        return
+
+    def do_write() -> None:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                execute_values(
+                    cur,
+                    """
+                    INSERT INTO processed_events (
+                        time, event_id, device_id, asset_id, tag, value, unit,
+                        site_id, source_protocol, quality,
+                        schema_version, temperature_c, vibration_mm_s, pressure_bar,
+                        processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
+                        anomaly_score, severity, triggered_rules, baseline, evaluation
+                    ) VALUES %s
+                    """,
+                    [
+                        (
+                            event.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                            event.get("event_id"),
+                            event.get("device_id"),
+                            event.get("asset_id", event.get("device_id")),
+                            event.get("tag", ""),
+                            float(event.get("value", 0) or 0),
+                            event.get("unit", ""),
+                            event.get("site_id"),
+                            event.get("source_protocol"),
+                            event.get("quality"),
+                            event.get("schema_version", 1),
+                            float(event.get("temperature_c", 0)),
+                            float(event.get("vibration_mm_s", 0)),
+                            float(event.get("pressure_bar", 0)),
+                            event.get("processed_at"),
+                            event.get("window_size", 0),
+                            event.get("temperature_avg_c", 0),
+                            event.get("vibration_avg_mm_s", 0),
+                            event.get("anomaly_score", 0),
+                            event.get("severity", "normal"),
+                            list(event.get("triggered_rules") or []),
+                            Json(event.get("baseline")),
+                            Json(event.get("evaluation")),
+                        )
+                        for event in events
+                    ],
                 )
             conn.commit()
 

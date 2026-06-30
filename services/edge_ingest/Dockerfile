@@ -5,7 +5,8 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY services/edge_ingest /app/services/edge_ingest
+COPY services /app/services
+COPY config /app/config
 
 ENV PYTHONPATH=/app
 

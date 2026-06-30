@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import json
 import os
 import signal
@@ -10,54 +11,14 @@ from statistics import mean
 from typing import Any
 
 from confluent_kafka import Consumer, Producer
-from services.common.normalize import normalize_runtime_event
-from services.assets.model import load_hierarchy
 from services.analytics.baseline import BaselineDetector
-from services.analytics.evaluation import evaluate_detection
-from services.analytics.rules import evaluate_rules
-from services.historian.client import insert_processed_event
+from services.common.normalize import normalize_runtime_event
+from services.historian.client import insert_processed_event, insert_processed_events
+from services.processor.scoring import score_event, severity_for
 
 PRUNE_EVERY_N_MESSAGES = 128
 
-
-def score_event(event: dict[str, Any], temperature_avg: float, vibration_avg: float, detector: BaselineDetector | None = None) -> float:
-    score = 0.0
-    temp = float(event.get("temperature_c", 0))
-    vib = float(event.get("vibration_mm_s", 0))
-    press = float(event.get("pressure_bar", 0))
-    
-    # Rule-based scoring
-    if temp >= 65:
-        score += 0.35
-    if vib >= 7:
-        score += 0.35
-    if press >= 8:
-        score += 0.2
-    if temperature_avg >= 58 or vibration_avg >= 5:
-        score += 0.1
-    
-    # Baseline detector scoring (if available). Score the actual tag carried
-    # by the event so non-temperature/vibration/pressure tags are not ignored.
-    if detector:
-        max_anomaly = 0.0
-        for field_name in ("temperature_c", "vibration_mm_s", "pressure_bar"):
-            result = detector.update(field_name, float(event.get(field_name, 0)))
-            max_anomaly = max(max_anomaly, result.get("anomaly_score", 0))
-        tag = str(event.get("tag", "")).strip()
-        if tag and tag not in ("temperature_c", "vibration_mm_s", "pressure_bar"):
-            tag_result = detector.update(tag, float(event.get("value", 0)))
-            max_anomaly = max(max_anomaly, tag_result.get("anomaly_score", 0))
-        score += min(max_anomaly / 100.0, 0.3)  # Up to 0.3 from baseline
-    
-    return min(round(score, 2), 1.0)
-
-
-def severity_for(score: float) -> str:
-    if score >= 0.8:
-        return "critical"
-    if score >= 0.4:
-        return "warning"
-    return "normal"
+logger = logging.getLogger(__name__)
 
 
 def _prune_windows(
@@ -92,13 +53,37 @@ def main() -> None:
     input_topic = os.getenv("IOT_TOPIC", "iot.raw")
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
     window_limit = max(1, int(os.getenv("RUNTIME_WINDOW_LIMIT", "25")))
+    db_batch_size = max(1, int(os.getenv("RUNTIME_DB_BATCH_SIZE", "100")))
+    db_flush_seconds = float(os.getenv("RUNTIME_DB_FLUSH_SECONDS", "1.0"))
     max_idle_seconds = int(os.getenv("RUNTIME_DEVICE_MAX_IDLE_SECONDS", "0"))
     max_devices = int(os.getenv("RUNTIME_MAX_ACTIVE_DEVICES", "0"))
     running = True
-    hierarchy = load_hierarchy("config/assets.yaml")
     detector = BaselineDetector()
     windows: dict[str, deque[dict[str, Any]]] = {}
     window_last_seen: dict[str, float] = {}
+    processed_buffer: list[dict[str, Any]] = []
+    last_db_flush = time.monotonic()
+
+    def flush_processed_buffer(force: bool = False) -> None:
+        nonlocal last_db_flush
+        if not processed_buffer:
+            return
+        elapsed = time.monotonic() - last_db_flush
+        if not force and len(processed_buffer) < db_batch_size and elapsed < db_flush_seconds:
+            return
+
+        batch = processed_buffer[:]
+        processed_buffer.clear()
+        try:
+            insert_processed_events(batch)
+        except Exception as exc:  # pragma: no cover - logged failure path
+            logger.warning("historian processed-event batch write failed: %s", exc)
+            for event in batch:
+                try:
+                    insert_processed_event(event)
+                except Exception as inner_exc:
+                    logger.warning("historian processed-event fallback write failed: %s", inner_exc)
+        last_db_flush = time.monotonic()
 
     def stop(_signum: int, _frame: object) -> None:
         nonlocal running
@@ -127,7 +112,7 @@ def main() -> None:
             if message is None:
                 continue
             if message.error():
-                print(f"consumer_error={message.error()}")
+                logger.warning("consumer_error=%s", message.error())
                 continue
 
             event = normalize_runtime_event(json.loads(message.value().decode("utf-8")))
@@ -153,11 +138,8 @@ def main() -> None:
 
             producer.produce(output_topic, key=event["device_id"].encode("utf-8"), value=json.dumps(event).encode("utf-8"))
             producer.poll(0)
-            try:
-                insert_processed_event(event)
-            except Exception as exc:  # pragma: no cover - logged failure path
-                import logging
-                logging.getLogger(__name__).warning("historian processed-event write failed: %s", exc)
+            processed_buffer.append(event)
+            flush_processed_buffer()
             processed += 1
 
             if processed % PRUNE_EVERY_N_MESSAGES == 0 and (max_devices > 0 or max_idle_seconds > 0):
@@ -169,6 +151,7 @@ def main() -> None:
                 elapsed = max(time.time() - started_at, 0.001)
                 print(f"processed={processed} rate={processed / elapsed:.1f}/sec topic={output_topic}")
     finally:
+        flush_processed_buffer(force=True)
         consumer.close()
         producer.flush(10)
 

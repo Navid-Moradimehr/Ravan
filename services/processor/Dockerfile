@@ -5,6 +5,9 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY services/processor/runtime_processor.py /app/runtime_processor.py
+COPY services /app/services
+COPY config /app/config
 
-CMD ["python", "runtime_processor.py"]
+ENV PYTHONPATH=/app
+
+CMD ["python", "/app/services/processor/runtime_processor.py"]

@@ -85,6 +85,11 @@ def map_row_to_event(row: dict[str, str], mapping: dict[str, str]) -> dict[str, 
                 event[event_field] = float(raw)
             except ValueError:
                 event[event_field] = 0.0
+        elif event_field in ("schema_version", "step"):
+            try:
+                event[event_field] = int(raw)
+            except ValueError:
+                event[event_field] = 0
         else:
             event[event_field] = raw
     return event
@@ -152,7 +157,12 @@ def main() -> None:
     parser.add_argument("--time-travel-end", default=None, help="ISO timestamp to end replay at")
     parser.add_argument(
         "--mapping",
-        default="asset_id=asset_id,tag=tag,value=value",
+        default=(
+            "asset_id=asset_id,tag=tag,value=value,source_protocol=source_protocol,"
+            "source_id=source_id,quality=quality,unit=unit,site=site,line=line,"
+            "ts_source=ts_source,schema_version=schema_version,fault_type=fault_type,"
+            "scenario_id=scenario_id,ground_truth_severity=ground_truth_severity,step=step"
+        ),
         help="Comma-separated CSV-col=event-field mappings",
     )
     args = parser.parse_args()

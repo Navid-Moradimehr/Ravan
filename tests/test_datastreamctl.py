@@ -27,6 +27,11 @@ class TestRuntimeCatalog:
         assert get_dataset_source("ai4i") is not None
         assert get_dataset_source("ai4i").name.startswith("AI4I")
 
+    def test_get_benchmark_pack(self):
+        benchmark = get_dataset_source("industrial-benchmark")
+        assert benchmark is not None
+        assert benchmark.category == "benchmark"
+
     def test_get_unknown(self):
         assert get_dataset_source("nope") is None
 

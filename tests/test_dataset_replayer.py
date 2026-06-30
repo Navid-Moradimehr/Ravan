@@ -37,3 +37,27 @@ def test_map_row_to_event_handles_bad_numeric() -> None:
     mapping = {"asset_id": "asset_id", "tag": "tag", "value": "value"}
     event = map_row_to_event(row, mapping)
     assert event["value"] == 0.0
+
+
+def test_map_row_to_event_parses_metadata_fields() -> None:
+    row = {
+        "asset_id": "Pump-01",
+        "tag": "Temperature",
+        "value": "64.2",
+        "schema_version": "2",
+        "step": "7",
+        "ts_source": "2026-06-27T08:00:00Z",
+    }
+    mapping = {
+        "asset_id": "asset_id",
+        "tag": "tag",
+        "value": "value",
+        "schema_version": "schema_version",
+        "step": "step",
+        "ts_source": "ts_source",
+    }
+    event = map_row_to_event(row, mapping)
+    assert event["value"] == 64.2
+    assert event["schema_version"] == 2
+    assert event["step"] == 7
+    assert event["ts_source"] == "2026-06-27T08:00:00Z"

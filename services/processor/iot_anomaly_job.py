@@ -8,6 +8,8 @@ from pyflink.common.typeinfo import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.connectors.kafka import KafkaOffsetsInitializer, KafkaRecordSerializationSchema, KafkaSink, KafkaSource
 
+from services.processor.scoring import score_event, severity_for
+
 
 def main() -> None:
     brokers = os.getenv("REDPANDA_BROKERS", "redpanda:9092")
@@ -64,19 +66,16 @@ def enrich_event(raw: str) -> str:
     event = json.loads(raw)
     temperature = float(event.get("temperature_c", 0))
     vibration = float(event.get("vibration_mm_s", 0))
-    pressure = float(event.get("pressure_bar", 0))
-    anomaly_score = 0
-
-    if temperature >= 65:
-        anomaly_score += 0.4
-    if vibration >= 7:
-        anomaly_score += 0.4
-    if pressure >= 8:
-        anomaly_score += 0.2
+    anomaly_score = score_event(
+        event,
+        temperature_avg=temperature,
+        vibration_avg=vibration,
+        detector=None,
+    )
 
     event["processed_at"] = datetime.now(timezone.utc).isoformat()
-    event["anomaly_score"] = round(anomaly_score, 2)
-    event["severity"] = "critical" if anomaly_score >= 0.8 else "warning" if anomaly_score >= 0.4 else "normal"
+    event["anomaly_score"] = anomaly_score
+    event["severity"] = severity_for(anomaly_score)
     return json.dumps(event, separators=(",", ":"))
 
 
