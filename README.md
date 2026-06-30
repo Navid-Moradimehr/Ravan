@@ -19,6 +19,10 @@ The ingest path now batches historian writes and the runtime processor and Flink
 job share a single scoring module, which reduces duplicate logic and lowers
 write amplification on the historian path.
 
+The API service is being split into domain routers with shared runtime helpers
+so historian ingestion, asset views, and scenario endpoints are separated from
+the remaining application surface without changing the public API.
+
 ## Stack
 
 - Streaming: Redpanda, Redpanda Console, Schema Registry-compatible API
@@ -89,6 +93,16 @@ powershell -ExecutionPolicy Bypass -File scripts/edge-soak.ps1 -Seconds 300 -Mqt
 
 The edge path publishes raw protocol payloads to `industrial.raw`, validated envelopes to `industrial.normalized`, compatibility events to `iot.raw`, and invalid records to `industrial.dlq`.
 
+Run the mixed replay benchmark pack:
+
+```powershell
+python scripts/benchmark_mixed_replay.py --events 100000 --batch-size 256
+```
+
+This replays `data/benchmarks/industrial_mixed_benchmark.csv` through the
+validation, normalization, scoring, and serialization path used by the
+industrial pipeline.
+
 ## Documentation
 
 - `Guide.md` contains the original product brief.
@@ -97,6 +111,8 @@ The edge path publishes raw protocol payloads to `industrial.raw`, validated env
 - `docs/benchmark-results.md` records benchmark and test results.
 - `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
 - `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
+- `services/api_service/routers/historian.py` and `services/api_service/runtime.py` hold the split historian routing and shared API runtime helpers.
+- `scripts/benchmark_mixed_replay.py` runs the mixed replay benchmark against the local industrial replay pack.
 - `data/benchmarks/industrial_mixed_benchmark.csv` is a local replay pack for mixed-protocol benchmark and stress cases.
 - `ObsidianVault/` is the project knowledge base.
 - `docs/` contains implementation-facing references and operational notes.

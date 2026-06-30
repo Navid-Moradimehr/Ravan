@@ -53,7 +53,7 @@ def main() -> None:
     input_topic = os.getenv("IOT_TOPIC", "iot.raw")
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
     window_limit = max(1, int(os.getenv("RUNTIME_WINDOW_LIMIT", "25")))
-    db_batch_size = max(1, int(os.getenv("RUNTIME_DB_BATCH_SIZE", "100")))
+    db_batch_size = max(1, int(os.getenv("RUNTIME_DB_BATCH_SIZE", "256")))
     db_flush_seconds = float(os.getenv("RUNTIME_DB_FLUSH_SECONDS", "1.0"))
     max_idle_seconds = int(os.getenv("RUNTIME_DEVICE_MAX_IDLE_SECONDS", "0"))
     max_devices = int(os.getenv("RUNTIME_MAX_ACTIVE_DEVICES", "0"))

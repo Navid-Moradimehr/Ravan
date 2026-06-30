@@ -65,7 +65,7 @@ class Settings:
 
 
 class EdgePublisher:
-    def __init__(self, settings: Settings, batch_size: int = 100, flush_interval_ms: float = 1000.0):
+    def __init__(self, settings: Settings, batch_size: int = 256, flush_interval_ms: float = 1000.0):
         self.settings = settings
         self.producer = Producer({
             "bootstrap.servers": settings.brokers,

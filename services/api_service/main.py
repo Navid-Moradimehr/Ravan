@@ -11,6 +11,32 @@ from typing import Any
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi import Depends
+
+
+def _prune_legacy_routes() -> None:
+    moved_paths = {
+        "/api/v1/historian/tables",
+        "/api/v1/historian/query",
+        "/api/v1/historian/alarms",
+        "/api/v1/historian/trend",
+        "/api/v1/historian/events",
+        "/api/v1/assets",
+        "/api/v1/scenarios",
+        "/api/v1/events/ingest",
+        "/api/v1/events/ingest/batch",
+        "/api/v1/historian/retention/setup",
+        "/api/v1/historian/storage",
+        "/api/v1/historian/dead-letters",
+        "/api/v1/historian/compress",
+    }
+    app.router.routes = [
+        route
+        for route in app.router.routes
+        if not (
+            getattr(route, "path", None) in moved_paths
+            and getattr(getattr(route, "endpoint", None), "__module__", None) == __name__
+        )
+    ]
 from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -60,11 +86,6 @@ def build_asset_hierarchy() -> list[dict[str, Any]]:
 API_PORT = int(os.getenv("API_SERVICE_PORT", "8020"))
 TIMESCALE_API_BASE = os.getenv("TIMESCALE_API_BASE", "http://localhost:8010")
 WS_HEARTBEAT_INTERVAL = 15.0  # seconds
-
-
-class SqlQueryRequest(BaseModel):
-    sql: str = Field(..., min_length=1, max_length=2000)
-    params: list[Any] = Field(default_factory=list)
 
 
 class WebhookConfig(BaseModel):
@@ -322,6 +343,11 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Local Stream Engine API", version="0.2.0", lifespan=lifespan)
 
+from services.api_service.routers.historian import router as historian_router
+
+app.include_router(historian_router)
+from services.api_service.routers.historian import ingest_batch, ingest_event
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -429,56 +455,6 @@ async def health() -> HealthResponse:
     return HealthResponse(status="ok", version="1.0.0", uptime_seconds=uptime, services=services)
 
 
-@app.get("/api/v1/historian/tables")
-async def get_tables() -> list[str]:
-    try:
-        return query_tables()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-
-@app.post("/api/v1/historian/query")
-async def post_query(req: SqlQueryRequest) -> list[dict[str, Any]]:
-    try:
-        return query_sql(req.sql, tuple(req.params))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/api/v1/historian/alarms")
-async def get_alarms(limit: int = 50) -> list[dict[str, Any]]:
-    try:
-        return query_alarms(limit)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-
-@app.get("/api/v1/historian/trend")
-async def get_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]:
-    try:
-        return query_trend(asset_id, tag, hours)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-
-@app.get("/api/v1/historian/events")
-async def get_events(table: str = "industrial_events", limit: int = 100) -> list[dict[str, Any]]:
-    try:
-        return query_historian_events(table, limit)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-
-@app.get("/api/v1/assets")
-async def get_assets() -> list[dict[str, Any]]:
-    return build_asset_hierarchy()
-
-
-@app.get("/api/v1/scenarios")
-async def get_scenarios() -> list[dict[str, Any]]:
-    return list_scenarios()
-
-
 @app.post("/api/v1/webhooks")
 async def register_webhook(config: WebhookConfig) -> dict[str, str]:
     import uuid
@@ -532,55 +508,6 @@ async def test_webhook(hook_id: str) -> dict[str, str]:
             return {"status": "sent", "http_status": resp.status_code}
         except Exception as e:
             return {"status": "failed", "error": str(e)}
-
-
-@app.post("/api/v1/events/ingest")
-async def ingest_event(event: dict[str, Any]) -> dict[str, str]:
-    """Ingest an industrial event from external systems.
-
-    Validates, stores in the historian, and publishes the normalized event to
-    Kafka so it flows through processing/analytics/AI like any edge event.
-    On validation failure the event is routed to the DLQ topic instead of a 500.
-    """
-    return _do_ingest_event(event)
-
-
-@app.post("/api/v1/events/ingest/batch")
-async def ingest_batch(req: dict[str, Any]) -> dict[str, Any]:
-    """Batch ingest for edge-to-cloud federation.
-
-    Accepts a payload like {"table": "industrial_events", "records": [...]}
-    and inserts each record directly into the specified historian table.
-    Duplicate records (same time + event_id) are silently skipped.
-    """
-    table = req.get("table", "industrial_events")
-    records = req.get("records", [])
-    if not records:
-        return {"status": "ok", "inserted": 0, "table": table}
-
-    try:
-        from services.historian.client import insert_industrial_event, insert_processed_event, insert_ai_enriched, insert_dead_letter
-    except ImportError:
-        from historian.client import insert_industrial_event, insert_processed_event, insert_ai_enriched, insert_dead_letter  # type: ignore
-
-    inserters = {
-        "industrial_events": insert_industrial_event,
-        "processed_events": insert_processed_event,
-        "ai_enriched": insert_ai_enriched,
-        "dead_letter_events": insert_dead_letter,
-    }
-    inserter = inserters.get(table)
-    if inserter is None:
-        raise HTTPException(status_code=400, detail=f"Unknown table: {table}")
-
-    inserted = 0
-    for record in records:
-        try:
-            inserter(record)
-            inserted += 1
-        except Exception:
-            pass
-    return {"status": "ok", "inserted": inserted, "table": table}
 
 
 def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
@@ -1541,3 +1468,6 @@ except ImportError:
         Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission,
     )
 from fastapi import Depends
+
+
+_prune_legacy_routes()

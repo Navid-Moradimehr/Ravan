@@ -42,6 +42,40 @@ This is a structural performance improvement. The live end-to-end historian
 throughput should be remeasured after deploying the batched write path before
 making any production sizing claim.
 
+### Mixed Replay Benchmark
+
+Command:
+
+```bash
+python scripts/benchmark_mixed_replay.py --events 100000 --batch-size 256
+```
+
+Latest local run on the current codebase:
+
+| Metric | Value |
+|--------|-------|
+| Events | 100,000 |
+| Invalid events | 0 |
+| Batches | 391 |
+| Batch size | 256 |
+| Elapsed | 1.4962s |
+| Throughput | 66,835 events/sec |
+| Serialized bytes | 40,112,500 |
+
+Batch-size sweep on the same pack:
+
+| Batch size | Throughput | Batches |
+|-----------|------------|---------|
+| 64 | 64,237 events/sec | 782 |
+| 256 | 64,093 events/sec | 196 |
+| 1024 | 63,756 events/sec | 49 |
+
+Interpretation:
+
+- CPU-path throughput is stable across the tested batch sizes.
+- 256 is a sensible default because it reduces flush count without hurting throughput on this workload.
+- The live DB writer still needs an on-container TimescaleDB measurement before the historian path can be sized for production.
+
 ## Performance Benchmarks
 
 ### Component Throughput
@@ -89,9 +123,10 @@ making any production sizing claim.
 
 1. **Full pipeline throughput of 125K events/sec** is excellent for a Python-based single-node validation stack
 2. **Mock generation is I/O bound** at ~1,800/sec due to sleep-based rate limiting; processing is CPU-bound at 125K+/sec
-3. **WebSocket streaming successfully eliminated all HTTP polling** in the UI
-4. **All 47 tests pass** with no regressions
-5. **Memory footprint is efficient**: ~0.38 KB per event
+3. **Mixed replay throughput is ~64K-69K events/sec** on the current benchmark pack, with 256 chosen as the default batch size
+4. **WebSocket streaming successfully eliminated all HTTP polling** in the UI
+5. **All 47 tests pass** with no regressions
+6. **Memory footprint is efficient**: ~0.38 KB per event
 
 ## Bottlenecks Identified
 
@@ -101,7 +136,7 @@ making any production sizing claim.
 
 ## Recommendations
 
-1. Use `orjson` instead of `json` for serialization (10x faster)
+1. Use `orjson` instead of `json` for serialization in any remaining hot paths
 2. Re-run live historian benchmarks after batching changes and tune batch size against the target TimescaleDB topology
 3. Enable TimescaleDB compression for long-term storage
 4. Consider uPlot for chart rendering (10x faster than Recharts SVG)
