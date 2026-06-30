@@ -23,6 +23,25 @@
 | UI Telemetry | 3 | 3 passed |
 | **Total** | **47** | **47 passed** |
 
+## Refactor Impact
+
+The current refactor pass changed the runtime shape of the platform:
+
+- shared anomaly scoring now lives in `services/processor/scoring.py`
+- historian writes are batched in the edge ingest and runtime processor paths
+- the service Dockerfiles now copy the full `services/` tree so imports resolve in containers
+- a local mixed-protocol benchmark pack was added at `data/benchmarks/industrial_mixed_benchmark.csv`
+
+Expected effect:
+
+- lower write amplification on TimescaleDB under sustained ingest
+- fewer duplicate scoring rules to maintain across processing paths
+- lower container boot risk from missing package imports
+
+This is a structural performance improvement. The live end-to-end historian
+throughput should be remeasured after deploying the batched write path before
+making any production sizing claim.
+
 ## Performance Benchmarks
 
 ### Component Throughput
@@ -77,12 +96,12 @@
 ## Bottlenecks Identified
 
 1. **Mock generation rate**: Sleep-based timing limits to ~1,800/sec. For higher throughput, use batch generation or remove sleep delays.
-2. **JSON serialization**: 329K/sec is good but could be improved with orjson (10x faster) or msgpack.
-3. **Database writes**: Not benchmarked yet. TimescaleDB insert performance depends on batch size and indexing.
+2. **JSON serialization**: 329K/sec is good but could still be improved with orjson or msgpack in the non-API hot paths.
+3. **Database writes**: historian writes now batch by default in the ingest and processor paths, but live TimescaleDB throughput should be remeasured after deployment.
 
 ## Recommendations
 
 1. Use `orjson` instead of `json` for serialization (10x faster)
-2. Batch historian inserts (100-1000 events per transaction)
+2. Re-run live historian benchmarks after batching changes and tune batch size against the target TimescaleDB topology
 3. Enable TimescaleDB compression for long-term storage
 4. Consider uPlot for chart rendering (10x faster than Recharts SVG)

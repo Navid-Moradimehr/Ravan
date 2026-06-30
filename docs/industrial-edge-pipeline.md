@@ -14,6 +14,10 @@ Modbus TCP simulator --+                                           |
                                                                iot.raw --> processor --> iot.processed --> ai-gateway
 ```
 
+The edge layer now batches historian writes instead of inserting each event
+individually on the ingest hot path. The processor and Flink job also share
+the same scoring logic so severity labels stay aligned across execution paths.
+
 ## Envelope
 
 Every normalized event includes:
@@ -37,11 +41,14 @@ Invalid records are published to `industrial.dlq`.
 Shared normalization behavior note:
 
 - `services/common/normalize.py` is used by both edge ingestion and runtime processing to map inbound events into the processor compatibility shape.
+- `services/processor/scoring.py` is the shared scoring contract for the runtime processor and Flink job.
 
 
 ## Dataset Replay Path
 
 External datasets can be injected into the pipeline via the dataset replayer:
+
+- `data/benchmarks/industrial_mixed_benchmark.csv` is a local mixed-protocol benchmark pack for replay and load testing.
 
 
 

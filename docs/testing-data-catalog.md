@@ -104,7 +104,42 @@ Best for:
 - supports fault-labeled replay
 - easy starting point for UI and analytics validation
 
-## 3) NASA C-MAPSS
+## 3) Industrial Mixed Benchmark Pack
+
+**Type**
+
+- local benchmark replay data
+
+**Location**
+
+- `data/benchmarks/industrial_mixed_benchmark.csv`
+
+**Signals**
+
+- mixed MQTT, OPC UA, and Modbus-style telemetry
+- pumps, motors, and turbine tags
+- labeled normal, drift, spike, degradation, and reset scenarios
+
+**Best use**
+
+- replay-based load testing
+- historian write-path validation
+- severity and alert tuning
+- multi-protocol benchmark cases
+
+**How to use**
+
+- replay the CSV with `services/datasets/replayer.py`
+- stage it with `datastream-import fetch industrial-benchmark --local data/benchmarks/industrial_mixed_benchmark.csv`
+- use it for repeatable performance runs when you need a mixed plant-like payload set
+
+**Why it fits this platform**
+
+- exercises the same normalization shape as the real ingest path
+- includes multiple protocols and assets in one compact file
+- useful for testing batch historian writes and UI behavior under realistic event mixes
+
+## 4) NASA C-MAPSS
 
 **Type**
 
@@ -128,7 +163,7 @@ Best for:
 - useful for slow-degradation scenarios
 - good candidate for transfer-learning examples
 
-## 4) IMS / NASA Bearing Run-to-Failure
+## 5) IMS / NASA Bearing Run-to-Failure
 
 **Type**
 
@@ -150,7 +185,7 @@ Best for:
 - aligns well with condition-monitoring workflows
 - good for asset-tag mapping where one machine has multiple vibration channels
 
-## 5) SKAB
+## 6) SKAB
 
 **Type**
 
@@ -171,7 +206,7 @@ Best for:
 - compact and practical for repeated experiments
 - good for evaluating multiple detector strategies quickly
 
-## 6) NAB
+## 7) NAB
 
 **Type**
 
@@ -192,7 +227,7 @@ Best for:
 - good benchmark for analytics quality even if not purely industrial
 - useful for algorithm testing before plant-specific fine-tuning
 
-## 7) SWaT
+## 8) SWaT
 
 **Type**
 
@@ -214,7 +249,7 @@ Best for:
 - very strong match for process-industry use cases
 - useful for security-aware alarms and multi-tag event analysis
 
-## 8) WADI
+## 9) WADI
 
 **Type**
 
@@ -235,7 +270,7 @@ Best for:
 - complements SWaT
 - useful for multi-stage and distributed process patterns
 
-## 9) MIMII
+## 10) MIMII
 
 **Type**
 

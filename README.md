@@ -15,11 +15,16 @@ PostgreSQL orders --> Debezium CDC --> Redpanda topics
 Prometheus scrapes broker, edge, and AI metrics; Grafana and the web dashboard expose operational views.
 ```
 
+The ingest path now batches historian writes and the runtime processor and Flink
+job share a single scoring module, which reduces duplicate logic and lowers
+write amplification on the historian path.
+
 ## Stack
 
 - Streaming: Redpanda, Redpanda Console, Schema Registry-compatible API
 - Industrial edge: local OPC UA, MQTT, and Modbus TCP simulators plus normalized edge ingest
 - Processing: Apache Flink / PyFlink plus the runtime Python processor
+- Processing internals: shared scoring module used by both processing paths
 - CDC: PostgreSQL plus Debezium Kafka Connect
 - AI: FastAPI service using OpenAI-compatible APIs, defaulting to LM Studio
 - Observability: Prometheus and Grafana
@@ -92,6 +97,7 @@ The edge path publishes raw protocol payloads to `industrial.raw`, validated env
 - `docs/benchmark-results.md` records benchmark and test results.
 - `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
 - `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
+- `data/benchmarks/industrial_mixed_benchmark.csv` is a local replay pack for mixed-protocol benchmark and stress cases.
 - `ObsidianVault/` is the project knowledge base.
 - `docs/` contains implementation-facing references and operational notes.
 
