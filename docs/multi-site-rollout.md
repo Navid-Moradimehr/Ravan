@@ -257,9 +257,10 @@ Validated locally:
 
 - `single-site.yaml` release gate passed
 - `plant-local.yaml` release gate passed
-- backup and restore drills passed in both profiles
-- processor restart recovery passed in both profiles
-- site-profile soak ran end to end for both profiles
+- `federated.yaml` release gate passed
+- backup and restore drills passed in all three profiles
+- processor restart recovery passed in all three profiles
+- site-profile soak ran end to end for all three profiles
 
 What still needs to be finished for a true multi-site production rollout:
 

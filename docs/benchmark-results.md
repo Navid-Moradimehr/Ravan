@@ -105,6 +105,7 @@ Command:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/site-profile-soak.ps1 -SiteProfile config/site-profiles/single-site.yaml -Seconds 60 -MqttRatePerSecond 100 -RecoveryService processor
 powershell -ExecutionPolicy Bypass -File scripts/site-profile-soak.ps1 -SiteProfile config/site-profiles/plant-local.yaml -Seconds 60 -MqttRatePerSecond 100 -RecoveryService processor
+powershell -ExecutionPolicy Bypass -File scripts/site-profile-soak.ps1 -SiteProfile config/site-profiles/federated.yaml -Seconds 60 -MqttRatePerSecond 100 -RecoveryService processor
 ```
 
 Latest local run on the current codebase:
@@ -113,10 +114,11 @@ Latest local run on the current codebase:
 |---------|-----------------|--------------|---------|------------|-----------|----------------------|-------------|----------|
 | single-site.yaml | single-site | 189 | 64.0s | 2.95 events/sec | 0 | 0 | openai_compat | openai/gpt-oss-20B |
 | plant-local.yaml | plant-local | 1,514 | 64.1s | 23.63 events/sec | 0 | 0 | ollama | mistral |
+| federated.yaml | federated | 1,553 | 64.7s | 24.00 events/sec | 0 | 0 | vllm | mistralai/Mistral-7B-Instruct-v0.3 |
 
 Interpretation:
 
-- The release-gate path now passes on both profile shapes.
+- The release-gate path now passes on all three profile shapes.
 - Backup and restore drills completed successfully for each profile.
 - The live soak harness exercises host-run services from the site profile contract and restarts the processor mid-run without manual repair.
 - The numbers are environment-specific and should be rerun on each target site before production sizing.
@@ -172,7 +174,7 @@ Interpretation:
 2. **Mock generation is I/O bound** at ~1,800/sec due to sleep-based rate limiting; processing is CPU-bound at 125K+/sec
 3. **Mixed replay throughput is ~59K-64K events/sec** on the current benchmark pack, with 256 still a sensible default batch size
 4. **AI gateway provider plumbing is fast enough that mock transport overhead stays below 1s for 100K events**
-5. **The site-profile soak passed on both single-site and plant-local profiles, with backup/restore drills green**
+5. **The site-profile soak passed on single-site, plant-local, and federated profiles, with backup/restore drills green**
 6. **WebSocket streaming successfully eliminated all HTTP polling** in the UI
 7. **The targeted refactor verification slice passed 33 tests** with no regressions
 8. **Memory footprint is efficient**: ~0.38 KB per event
