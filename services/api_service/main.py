@@ -52,6 +52,31 @@ def _prune_legacy_routes() -> None:
         "/api/v1/outbound-bridge/config",
         "/api/v1/outbound-bridge/publish",
         "/api/v1/outbound-bridge/enable",
+        "/api/v1/pipelines",
+        "/api/v1/pipelines/{topology_id}",
+        "/api/v1/schemas",
+        "/api/v1/schemas/{schema_id}/validate",
+        "/api/v1/preview/topics",
+        "/api/v1/preview/topics/{topic}",
+        "/api/v1/preview/topics/{topic}/peek",
+        "/api/v1/connectors",
+        "/api/v1/connectors/{connector_id}",
+        "/api/v1/digital-twin/scenes/{scene_id}",
+        "/api/v1/digital-twin/scenes/{scene_id}/entities/{entity_id}/values",
+        "/api/v1/oee/shifts",
+        "/api/v1/oee/calculate",
+        "/api/v1/assets/external",
+        "/api/v1/assets/external/{asset_id}",
+        "/api/v1/assets/external/{asset_id}/tags",
+        "/api/v1/events/external",
+        "/api/v1/historian/backup",
+        "/api/v1/historian/restore",
+        "/api/v1/historian/backups",
+        "/api/v1/historian/backup/status",
+        "/api/v1/reports/templates",
+        "/api/v1/reports/generate/{template_id}",
+        "/api/v1/reports",
+        "/api/v1/reports/schedule/{template_id}",
     }
     app.router.routes = [
         route
@@ -369,9 +394,15 @@ app = FastAPI(title="Local Stream Engine API", version="0.2.0", lifespan=lifespa
 
 from services.api_service.routers.historian import router as historian_router
 from services.api_service.routers.operations import router as operations_router
+from services.api_service.routers.design import router as design_router
+from services.api_service.routers.external import router as external_router
+from services.api_service.routers.support import router as support_router
 
 app.include_router(historian_router)
 app.include_router(operations_router)
+app.include_router(design_router)
+app.include_router(external_router)
+app.include_router(support_router)
 from services.api_service.routers.historian import ingest_batch, ingest_event
 from services.api_service.ops_runtime import _render_topic
 
