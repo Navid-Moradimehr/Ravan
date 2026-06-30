@@ -117,6 +117,18 @@ def _save_records(records: dict[str, ProcRecord]) -> None:
 def _is_alive(rec: ProcRecord) -> bool:
     if rec.pid <= 0:
         return False
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {rec.pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return False
+        output = result.stdout.strip()
+        return bool(output and "No tasks are running" not in output and "INFO:" not in output)
     try:
         os.kill(rec.pid, 0)
     except (ProcessLookupError, PermissionError):

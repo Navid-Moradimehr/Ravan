@@ -251,6 +251,15 @@ Implemented in the repo now:
 - `datastreamctl` commands for profile validation, backup drills, and release-gate checks
 - `datastreamd --site-profile` so runtime services can start from a site contract
 - Helm profile overlays for `single-site`, `plant-local`, and `federated`
+- a live soak harness at `scripts/site-profile-soak.ps1`
+
+Validated locally:
+
+- `single-site.yaml` release gate passed
+- `plant-local.yaml` release gate passed
+- backup and restore drills passed in both profiles
+- processor restart recovery passed in both profiles
+- site-profile soak ran end to end for both profiles
 
 What still needs to be finished for a true multi-site production rollout:
 

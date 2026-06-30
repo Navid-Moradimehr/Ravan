@@ -72,6 +72,7 @@
 7. Full-stack soak and restart: run `scripts/full-stack-soak.ps1 -Seconds 300 -MqttRatePerSecond 100 -RecoveryService processor` and verify the restarted service resumes without manual offset repair.
 8. Grafana failure mode: stop Grafana and confirm the dashboard switches to offline state instead of sending you to an external signup page.
 9. AI gateway mock benchmark: run `python scripts/benchmark_ai_gateway_mock.py --provider openai_compat --events 100000 --batch-size 64` and the same command with `--provider ollama`, then confirm the provider abstraction stays above 140K events/sec on the local mock transport.
+10. Site-profile soak: run `powershell -ExecutionPolicy Bypass -File scripts/site-profile-soak.ps1 -SiteProfile config/site-profiles/single-site.yaml -Seconds 60 -MqttRatePerSecond 100 -RecoveryService processor` and repeat it for `plant-local.yaml`; confirm release-gate, backup, restore, and restart recovery all pass.
 
 ## Industrial Readiness
 

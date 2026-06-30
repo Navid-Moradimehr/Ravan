@@ -91,6 +91,7 @@ Run a mixed-protocol soak:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/edge-soak.ps1 -Seconds 300 -MqttRatePerSecond 100
+powershell -ExecutionPolicy Bypass -File scripts/site-profile-soak.ps1 -SiteProfile config/site-profiles/single-site.yaml -Seconds 60 -MqttRatePerSecond 100 -RecoveryService processor
 ```
 
 The edge path publishes raw protocol payloads to `industrial.raw`, validated envelopes to `industrial.normalized`, compatibility events to `iot.raw`, and invalid records to `industrial.dlq`.
@@ -128,6 +129,7 @@ against realistic industrial batches without depending on a live model server.
 - `services/api_service/routers/historian.py` and `services/api_service/runtime.py` hold the split historian routing and shared API runtime helpers.
 - `scripts/benchmark_mixed_replay.py` runs the mixed replay benchmark against the local industrial replay pack.
 - `scripts/benchmark_ai_gateway_mock.py` benchmarks the provider-neutral AI gateway against realistic mock industrial batches.
+- `scripts/site-profile-soak.ps1` runs a live site-profile release gate and soak harness against the host-run runtime services.
 - `data/benchmarks/industrial_mixed_benchmark.csv` is a local replay pack for mixed-protocol benchmark and stress cases.
 - `ObsidianVault/` is the project knowledge base.
 - `docs/` contains implementation-facing references and operational notes.

@@ -378,7 +378,11 @@ async def main() -> None:
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, stop_event.set)
+        try:
+            loop.add_signal_handler(sig, stop_event.set)
+        except NotImplementedError:
+            # Windows event loops do not support signal handlers here.
+            pass
 
     tasks = []
     if "mqtt" in settings.enabled_protocols:

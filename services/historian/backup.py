@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DOCKER_COMPOSE_FILE = PROJECT_ROOT / "docker" / "docker-compose.yml"
 
 
 def _connection_params() -> dict[str, str]:
@@ -29,6 +31,186 @@ def _connection_params() -> dict[str, str]:
         "user": os.getenv("TIMESCALE_USER", "stream"),
         "password": os.getenv("TIMESCALE_PASSWORD", "stream"),
     }
+
+
+def _compose_base_cmd() -> list[str]:
+    return ["docker", "compose", "-f", str(DOCKER_COMPOSE_FILE)]
+
+
+def _detect_docker_db_service() -> str | None:
+    preferred = os.getenv("DATASTREAM_DOCKER_DB_SERVICE")
+    candidates = [preferred] if preferred else ["timescaledb", "postgres"]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            result = subprocess.run(
+                _compose_base_cmd() + ["ps", "-q", candidate],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=str(PROJECT_ROOT),
+            )
+        except FileNotFoundError:
+            return None
+        if result.returncode == 0 and result.stdout.strip():
+            return candidate
+    return None
+
+
+def _docker_exec_env(conn: dict[str, str]) -> list[str]:
+    return [
+        "-e", f"PGPASSWORD={conn['password']}",
+        "-e", f"PGUSER={conn['user']}",
+        "-e", "PGHOST=localhost",
+        "-e", "PGPORT=5432",
+        "-e", f"PGDATABASE={conn['database']}",
+    ]
+
+
+def _create_backup_via_docker(filepath: Path, conn: dict[str, str], tables: list[str] | None) -> dict[str, Any]:
+    service = _detect_docker_db_service()
+    if not service:
+        return {
+            "status": "error",
+            "error": "pg_dump not found and no running docker database service detected.",
+        }
+
+    cmd = _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [service, "pg_dump", "--format=custom", "--blobs"]
+    if tables:
+        for table in tables:
+            cmd.extend(["--table", table])
+    else:
+        cmd.append("--schema=public")
+    cmd.append(conn["database"])
+
+    try:
+        with open(filepath, "wb") as out:
+            subprocess.run(
+                cmd,
+                stdout=out,
+                stderr=subprocess.PIPE,
+                check=True,
+                cwd=str(PROJECT_ROOT),
+            )
+        logger.info("Backup created via docker service %s: %s", service, filepath)
+        return {
+            "status": "success",
+            "path": str(filepath),
+            "filename": filepath.name,
+            "timestamp": filepath.stem.removeprefix("historian_backup_"),
+            "tables": tables or ["all"],
+            "size_bytes": filepath.stat().st_size if filepath.exists() else 0,
+            "transport": f"docker:{service}",
+        }
+    except subprocess.CalledProcessError as e:
+        logger.error("Docker backup failed: %s", e.stderr.decode("utf-8", errors="replace") if isinstance(e.stderr, bytes) else e.stderr)
+        return {
+            "status": "error",
+            "error": e.stderr.decode("utf-8", errors="replace") if isinstance(e.stderr, bytes) else str(e.stderr),
+            "transport": f"docker:{service}",
+        }
+
+
+def _restore_backup_via_docker(filepath: Path, conn: dict[str, str]) -> dict[str, Any]:
+    service = _detect_docker_db_service()
+    if not service:
+        return {
+            "status": "error",
+            "error": "pg_restore not found and no running docker database service detected.",
+        }
+
+    container_path = f"/tmp/{filepath.name}"
+    container_name_cmd = _compose_base_cmd() + ["ps", "-q", service]
+    try:
+        container_id = subprocess.run(
+            container_name_cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=str(PROJECT_ROOT),
+        ).stdout.strip()
+        if not container_id:
+            return {
+                "status": "error",
+                "error": f"Docker database service '{service}' is not running.",
+            }
+        subprocess.run(["docker", "cp", str(filepath), f"{container_id}:{container_path}"], check=True, cwd=str(PROJECT_ROOT))
+        exists = subprocess.run(
+            _compose_base_cmd() + ["exec", "-T", service] + [
+                "psql",
+                "-U",
+                conn["user"],
+                "-d",
+                "postgres",
+                "-tAc",
+                f"SELECT 1 FROM pg_database WHERE datname = '{conn['database']}'",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=str(PROJECT_ROOT),
+        )
+        if exists.stdout.strip() != "1":
+            subprocess.run(
+                _compose_base_cmd() + ["exec", "-T", service] + [
+                    "createdb",
+                    "-U",
+                    conn["user"],
+                    "-O",
+                    conn["user"],
+                    conn["database"],
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=str(PROJECT_ROOT),
+            )
+        result = subprocess.run(
+            _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [
+                service,
+                "pg_restore",
+                "--verbose",
+                "--clean",
+                "--if-exists",
+                "--no-owner",
+                "--no-privileges",
+                "--dbname",
+                conn["database"],
+                container_path,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=str(PROJECT_ROOT),
+        )
+        subprocess.run(
+            _compose_base_cmd() + ["exec", "-T", service, "rm", "-f", container_path],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(PROJECT_ROOT),
+        )
+        logger.info("Backup restored via docker service %s to %s", service, conn["database"])
+        return {
+            "status": "success",
+            "database": conn["database"],
+            "backup_path": str(filepath),
+            "output": result.stdout,
+            "transport": f"docker:{service}",
+        }
+    except subprocess.CalledProcessError as e:
+        logger.error("Docker restore failed: %s", e.stderr)
+        return {
+            "status": "error",
+            "error": e.stderr,
+            "transport": f"docker:{service}",
+        }
+    except FileNotFoundError:
+        return {
+            "status": "error",
+            "error": "docker not found. Install Docker Desktop or PostgreSQL client tools.",
+        }
 
 
 def create_backup(backup_dir: str | None = None, tables: list[str] | None = None) -> dict[str, Any]:
@@ -99,11 +281,8 @@ def create_backup(backup_dir: str | None = None, tables: list[str] | None = None
             "command": " ".join(cmd),
         }
     except FileNotFoundError:
-        logger.error("pg_dump not found. Install PostgreSQL client tools.")
-        return {
-            "status": "error",
-            "error": "pg_dump not found. Install PostgreSQL client tools.",
-        }
+        logger.warning("pg_dump not found on host; attempting docker-based backup fallback.")
+        return _create_backup_via_docker(filepath, conn, tables)
 
 
 def restore_backup(backup_path: str, target_database: str | None = None) -> dict[str, Any]:
@@ -134,6 +313,8 @@ def restore_backup(backup_path: str, target_database: str | None = None) -> dict
         f"--username={conn['user']}",
         "--dbname", conn["database"],
         "--verbose",
+        "--clean",
+        "--if-exists",
         "--no-owner",
         "--no-privileges",
         str(filepath),
@@ -164,11 +345,8 @@ def restore_backup(backup_path: str, target_database: str | None = None) -> dict
             "error": e.stderr,
         }
     except FileNotFoundError:
-        logger.error("pg_restore not found. Install PostgreSQL client tools.")
-        return {
-            "status": "error",
-            "error": "pg_restore not found. Install PostgreSQL client tools.",
-        }
+        logger.warning("pg_restore not found on host; attempting docker-based restore fallback.")
+        return _restore_backup_via_docker(filepath, conn)
 
 
 def list_backups(backup_dir: str | None = None) -> list[dict[str, Any]]:
