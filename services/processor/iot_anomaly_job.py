@@ -16,8 +16,8 @@ def main() -> None:
 
     env = StreamExecutionEnvironment.get_execution_environment()
     # Parallelism: auto-detect from environment or default to 4
-parallelism = int(os.getenv("FLINK_PARALLELISM", "4"))
-env.set_parallelism(parallelism)
+    parallelism = int(os.getenv("FLINK_PARALLELISM", "4"))
+    env.set_parallelism(parallelism)
 
     source = (
         KafkaSource.builder()

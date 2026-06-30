@@ -300,7 +300,18 @@ async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_even
                 values = client.read_holding_registers(addr, count)
                 if values:
                     for i, val in enumerate(values):
-                        publisher.publish_event("modbus_rtu", f"{port}:{slave_id}:{addr+i}", f"RTU-{slave_id}", f"register_{addr+i}", float(val))
+                        publisher.publish_event(
+                            {
+                                "source_protocol": "modbus_rtu",
+                                "source_id": f"{port}:{slave_id}:hr/{addr+i}",
+                                "asset_id": f"RTU-{slave_id}",
+                                "tag": f"register_{addr+i}",
+                                "value": float(val),
+                                "quality": "good",
+                                "unit": "",
+                                "ts_source": utc_now(),
+                            }
+                        )
             await asyncio.sleep(settings.poll_seconds)
         except Exception:
             adapter_errors.labels(protocol="modbus_rtu").inc()
@@ -323,7 +334,18 @@ async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop
             for node_id in nodes:
                 value = await client.read_node_value(node_id)
                 if value is not None:
-                    publisher.publish_event("opcua", node_id, node_id.split(".")[0] if "." in node_id else "unknown", node_id.split(".")[-1] if "." in node_id else node_id, float(value))
+                    publisher.publish_event(
+                        {
+                            "source_protocol": "opcua",
+                            "source_id": node_id,
+                            "asset_id": node_id.split(".")[0] if "." in node_id else "unknown",
+                            "tag": node_id.split(".")[-1] if "." in node_id else node_id,
+                            "value": float(value),
+                            "quality": "good",
+                            "unit": unit_for(node_id),
+                            "ts_source": utc_now(),
+                        }
+                    )
             await asyncio.sleep(settings.poll_seconds)
         except Exception:
             adapter_errors.labels(protocol="opcua_discovery").inc()

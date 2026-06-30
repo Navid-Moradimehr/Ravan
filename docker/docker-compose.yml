@@ -313,15 +313,6 @@ services:
     profiles:
       - cache
 
-volumes:
-  redpanda-data:
-  postgres-data:
-  prometheus-data:
-  grafana-data:
-  minio-data:
-  timescale-data:
-  redis-data:
-
   api-service:
     build:
       context: ..
@@ -341,3 +332,12 @@ volumes:
       - "8020:8020"
     profiles:
       - api
+
+volumes:
+  redpanda-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+  minio-data:
+  timescale-data:
+  redis-data:
