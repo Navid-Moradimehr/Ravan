@@ -398,6 +398,43 @@ class ProjectManifest:
             ]
         )
 
+    def _render_kubernetes_helm_values(self, site_id: str, env: dict[str, str]) -> str:
+        profile = load_site_profile(self.site_profile_paths()[site_id])
+        payload = {
+            "fullnameOverride": f"datastream-{site_id}",
+            "image": {
+                "repository": "data-stream",
+                "tag": profile.runtime.image_tag,
+                "pullPolicy": "IfNotPresent",
+            },
+            "env": env,
+            "secrets": {
+                "create": False,
+                "existingSecret": "data-stream-secrets",
+                "data": {
+                    "TIMESCALE_PASSWORD": "",
+                    "JWT_SECRET": "",
+                    "LLM_API_KEY": "",
+                },
+            },
+        }
+        return yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
+
+    def _render_kubernetes_helm_readme(self, site_id: str) -> str:
+        return "\n".join(
+            [
+                f"# Helm overlay for {self.name} - {site_id}",
+                "",
+                "Use this overlay with the chart in `k8s/helm`.",
+                "",
+                "Example:",
+                "  helm upgrade --install datastream ./k8s/helm -f kubernetes/helm/values.generated.yaml",
+                "",
+                "Replace the generated image tag and provide secrets through your cluster secret workflow.",
+                "",
+            ]
+        )
+
     def _render_kubernetes_kustomization(self, site_id: str) -> str:
         payload = {
             "apiVersion": "kustomize.config.k8s.io/v1beta1",
@@ -445,6 +482,8 @@ class ProjectManifest:
             written.append(self._write_text(site_root / "kubernetes" / "service.yaml", self._render_kubernetes_service(site_id)))
             written.append(self._write_text(site_root / "kubernetes" / "kustomization.yaml", self._render_kubernetes_kustomization(site_id)))
             written.append(self._write_text(site_root / "kubernetes" / "README.md", self._render_kubernetes_readme(site_id)))
+            written.append(self._write_text(site_root / "kubernetes" / "helm" / "values.generated.yaml", self._render_kubernetes_helm_values(site_id, env)))
+            written.append(self._write_text(site_root / "kubernetes" / "helm" / "README.md", self._render_kubernetes_helm_readme(site_id)))
 
     def lint(self) -> list[str]:
         issues = validate_project_manifest(self)

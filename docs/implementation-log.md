@@ -46,6 +46,7 @@
    - Added `--layout flat|systemd|kubernetes` so export can generate a deployment-ready directory tree for OS services or cluster rollouts.
    - Systemd exports now include a unit file, install/uninstall helpers, and operator README alongside the site profile and env bundle.
    - Kubernetes exports now include a config map, site-profile config map, deployment, service, kustomization, and README scaffold.
+   - Kubernetes exports now include a Helm overlay at `kubernetes/helm/values.generated.yaml` plus operator notes for `k8s/helm`.
    - Added `datastreamctl project-manifest lint` to catch source/topic collisions and policy drift.
    - Added `datastreamd --project-manifest` and `--site-id` so runtime services can start from the company manifest and select a site bundle.
 
@@ -60,6 +61,7 @@
   - stream key separation check: distinct PLC source IDs produce distinct Kafka keys while correlation groups stay aligned on site/asset/tag
   - persistent retrieval index over 40 mock docs: build 1.79 ops/sec, 557.55 ms per build; repeated search 21.52 ops/sec, 46.474 ms avg; evaluation hit rate@5 = 1.0
   - manifest bundle and project release-gate commands validated across the sample fleet manifest
+  - deployment-pack benchmark validates both `systemd` and Kubernetes export layouts plus mock mixed replay data
 
 ## 2026-07-01 - Model and Agent Contract Layer
 
