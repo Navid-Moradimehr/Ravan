@@ -15,7 +15,7 @@ from services.historian.client import (
     query_alarms,
     query_tables,
     query_recent_events,
-    query_sql,
+    query_sql_readonly,
     query_trend,
     setup_retention_policies,
     manual_compress_chunk,
@@ -40,7 +40,7 @@ async def get_tables() -> list[str]:
 @router.post("/api/v1/historian/query")
 async def post_query(req: SqlQueryRequest) -> list[dict[str, Any]]:
     try:
-        return query_sql(req.sql, tuple(req.params))
+        return query_sql_readonly(req.sql, tuple(req.params))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

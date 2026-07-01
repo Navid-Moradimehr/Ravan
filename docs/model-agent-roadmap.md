@@ -93,7 +93,7 @@ Scope:
 
 Status:
 
-- partially implemented as a deterministic retrieval boundary
+- partially implemented as a deterministic + hybrid retrieval boundary
 
 Already present:
 
@@ -101,11 +101,14 @@ Already present:
 - prompt registry for structured model inputs
 - read-only context package endpoint for historian, alarms, assets, reports, and scenarios
 - retrieval search/catalog endpoint over historian, alarms, assets, reports, and scenarios
+- provider-neutral embedding client with deterministic fallback
+- structured semantic query planning and read-only SQL compilation
+- hybrid retrieval API that combines token, phrase, and embedding scoring
 
 Still needed:
 
-- embedding/indexing pipeline
-- vector store or equivalent retrieval backend
+- persistent embedding/indexing pipeline
+- vector store or equivalent retrieval backend for large-scale corpora
 - chunking strategy for manuals and historical notes
 - retrieval evaluation harness
 

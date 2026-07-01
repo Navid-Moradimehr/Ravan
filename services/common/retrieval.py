@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import math
 from pathlib import Path
 from typing import Any
 
 from services.analytics.reporting import report_engine
+from services.common.cache import ttl_cache
+from services.common.embeddings import build_embedding_client
 from services.assets.model import hierarchy_to_tree, load_hierarchy
 from services.historian.client import query_alarms, query_recent_events, query_trend
 from services.scenarios.engine import list_scenarios
@@ -53,6 +56,7 @@ class RetrievalHit:
     snippet: str
     payload: dict[str, Any]
     tags: tuple[str, ...]
+    signals: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -78,7 +82,8 @@ def _snippet(text: str, terms: list[str], width: int = 160) -> str:
     return text[:width].strip()
 
 
-def build_retrieval_documents(
+@ttl_cache(ttl_seconds=15.0, max_size=32)
+def _build_retrieval_documents_cached(
     *,
     table: str = "industrial_events",
     limit: int = 25,
@@ -210,6 +215,15 @@ def build_retrieval_documents(
     return documents
 
 
+def build_retrieval_documents(
+    *,
+    table: str = "industrial_events",
+    limit: int = 25,
+    asset_config: Path | str = Path("config/assets.yaml"),
+) -> list[RetrievalDocument]:
+    return _build_retrieval_documents_cached(table=table, limit=limit, asset_config=str(asset_config))
+
+
 def _score_document(query_terms: list[str], document: RetrievalDocument) -> float:
     doc_tokens = _tokenize(document.text)
     if not doc_tokens or not query_terms:
@@ -229,6 +243,49 @@ def _score_document(query_terms: list[str], document: RetrievalDocument) -> floa
     return round(score, 4)
 
 
+def _cosine_similarity(left: list[float], right: list[float]) -> float:
+    if not left or not right:
+        return 0.0
+    length = min(len(left), len(right))
+    dot = sum(left[i] * right[i] for i in range(length))
+    left_norm = math.sqrt(sum(value * value for value in left[:length]))
+    right_norm = math.sqrt(sum(value * value for value in right[:length]))
+    if left_norm == 0 or right_norm == 0:
+        return 0.0
+    return dot / (left_norm * right_norm)
+
+
+def _phrase_score(query: str, document: RetrievalDocument) -> float:
+    query_text = " ".join(_tokenize(query))
+    if not query_text:
+        return 0.0
+    lowered = document.text.lower()
+    if query_text in lowered:
+        return 1.0
+    parts = query_text.split()
+    if len(parts) > 2 and all(part in lowered for part in parts[: min(3, len(parts))]):
+        return 0.5
+    return 0.0
+
+
+def _hybrid_score(query: str, query_terms: list[str], document: RetrievalDocument, query_embedding: list[float], doc_embedding: list[float]) -> tuple[float, dict[str, float]]:
+    token_score = _score_document(query_terms, document)
+    phrase_score = _phrase_score(query, document)
+    semantic_score = _cosine_similarity(query_embedding, doc_embedding)
+    source_boost = 0.0
+    if document.source.startswith("historian"):
+        source_boost += 0.1
+    if document.source.startswith("assets") and any(term in {"asset", "assets", "equipment"} for term in query_terms):
+        source_boost += 0.1
+    hybrid = round((token_score * 0.45) + (phrase_score * 0.15) + (semantic_score * 0.35) + source_boost, 4)
+    return hybrid, {
+        "token": round(token_score, 4),
+        "phrase": round(phrase_score, 4),
+        "semantic": round(semantic_score, 4),
+        "source_boost": round(source_boost, 4),
+    }
+
+
 def search_retrieval_corpus(
     query: str,
     *,
@@ -236,12 +293,16 @@ def search_retrieval_corpus(
     limit: int = 25,
     asset_config: Path | str = Path("config/assets.yaml"),
     max_results: int = 5,
+    use_embeddings: bool = True,
 ) -> dict[str, Any]:
     documents = build_retrieval_documents(table=table, limit=limit, asset_config=asset_config)
     query_terms = _tokenize(query)
+    client = build_embedding_client()
+    query_embedding = client.embed_text(query) if use_embeddings else []
+    document_embeddings = client.embed_texts([document.text for document in documents]) if use_embeddings else [[] for _ in documents]
     hits: list[RetrievalHit] = []
-    for document in documents:
-        score = _score_document(query_terms, document)
+    for document, doc_embedding in zip(documents, document_embeddings):
+        score, signals = _hybrid_score(query, query_terms, document, query_embedding, doc_embedding)
         if score <= 0:
             continue
         hits.append(
@@ -253,14 +314,17 @@ def search_retrieval_corpus(
                 snippet=_snippet(document.text, query_terms),
                 payload=document.payload,
                 tags=document.tags,
+                signals=signals,
             )
         )
     hits.sort(key=lambda hit: (-hit.score, hit.title.lower(), hit.doc_id))
     return {
         "query": query,
         "query_terms": query_terms,
+        "backend": client.backend_info().to_dict(),
         "result_count": len(hits[:max_results]),
         "documents_indexed": len(documents),
+        "mode": "hybrid" if use_embeddings else "token",
         "hits": [hit.to_dict() for hit in hits[:max_results]],
     }
 
@@ -305,9 +369,11 @@ def build_retrieval_catalog(*, asset_config: Path | str = Path("config/assets.ya
             },
         ],
         "asset_nodes": len(assets),
+        "search_modes": ["token", "hybrid", "semantic"],
+        "embedding_backend": build_embedding_client().backend_info().to_dict(),
         "notes": [
             "This is a deterministic retrieval boundary, not a governed BI semantic layer.",
+            "Hybrid search combines token overlap, phrase match, and embeddings when available.",
             "Use it for read-only context assembly and future agent tooling.",
         ],
     }
-

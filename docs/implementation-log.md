@@ -1,5 +1,40 @@
 # Implementation Log
 
+## 2026-07-01 - Provider-Neutral Semantic Search And Query Planning
+
+### Added
+
+1. **Provider-neutral embedding client**
+   - Added `services/common/embeddings.py` to support OpenAI-compatible embeddings endpoints, LM Studio, vLLM, Ollama, and custom HTTP backends.
+   - The client defaults to the local LM Studio-compatible endpoint but falls back to deterministic embeddings if the remote backend is unavailable.
+   - The implementation is not locked to one model provider, so users can swap in cloud or local backends later without changing application code.
+
+2. **Semantic model and query compiler**
+   - Added `services/common/semantic_model.py`, `services/common/query_plan.py`, and `services/common/sql_compiler.py`.
+   - Queries now compile from a structured plan into validated read-only SQL instead of relying on raw free-form SQL for operator-facing paths.
+   - Added a semantic model config at `config/semantic-model.yaml`.
+
+3. **Hybrid search API**
+   - Added `services/api_service/routers/search.py` with:
+     - `/api/v1/search/catalog`
+     - `/api/v1/search/plan`
+     - `/api/v1/search/semantic`
+     - `/api/v1/search/hybrid`
+   - Search now combines normalized token matching, phrase match, and embeddings when available.
+
+4. **Historian SQL guardrail**
+   - Added `query_sql_readonly()` in `services/historian/client.py`.
+   - The historian query endpoint now rejects non-read-only SQL before execution.
+
+### Verified
+
+- Focused contract tests for embeddings, semantic planning, hybrid retrieval, and route registration: 21 passed
+- `python -m compileall services tests`: passed
+- Mock-data benchmark:
+  - semantic query plan + read-only SQL compilation: 17,458 ops/sec, 0.057 ms avg
+  - hybrid search over mocked historian/assets/reports/scenarios: 4,792.7 ops/sec, 0.209 ms avg
+  - top-hit verification: `alarm:compressor-1:motor_vibration:2026-07-01T00:05:00Z`
+
 ## 2026-07-01 - Model and Agent Contract Layer
 
 ### Added

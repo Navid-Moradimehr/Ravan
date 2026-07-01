@@ -11,6 +11,8 @@ from typing import Any, Callable
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor, execute_values
 
+from services.common.sql_compiler import validate_readonly_sql
+
 
 logger = logging.getLogger(__name__)
 
@@ -357,6 +359,16 @@ def query_recent_events(table: str, limit: int = 100) -> list[dict[str, Any]]:
 
 
 def query_sql(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, params)
+            return [dict(row) for row in cur.fetchall()]
+
+
+def query_sql_readonly(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
+    safety = validate_readonly_sql(sql)
+    if not safety.allowed:
+        raise ValueError(safety.reason or "readonly sql rejected")
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(sql, params)

@@ -86,12 +86,12 @@ class ModelRegistry:
         self.register(
             ModelBinding(
                 role="embeddings",
-                provider=self._env("EMBEDDING_PROVIDER", "disabled"),
-                endpoint_url=self._env("EMBEDDING_ENDPOINT_URL", ""),
+                provider=self._env("EMBEDDING_PROVIDER", "openai_compat"),
+                endpoint_url=self._env("EMBEDDING_ENDPOINT_URL", "http://172.17.0.1:1234/v1"),
                 model_id=self._env("EMBEDDING_MODEL_ID", "text-embedding-nomic-embed-text-v1.5"),
                 request_format=self._env("EMBEDDING_REQUEST_FORMAT", "embeddings"),
-                local_only=self._env_bool("EMBEDDING_LOCAL_ONLY", True),
-                enabled=self._env("EMBEDDING_PROVIDER", "disabled").lower() != "disabled",
+                local_only=self._env_bool("EMBEDDING_LOCAL_ONLY", False),
+                enabled=self._env("EMBEDDING_PROVIDER", "openai_compat").lower() != "disabled",
                 capabilities=("embeddings", "retrieval"),
                 notes="configure for semantic search and indexing",
             )

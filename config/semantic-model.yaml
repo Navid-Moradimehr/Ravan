@@ -1,0 +1,130 @@
+name: industrial-streaming-semantic-model
+version: "1.0"
+notes:
+  - Deterministic semantic layer for industrial historian, alarms, assets, reports, and scenarios.
+  - The model compiles only read-only SQL and can be used as a compatibility layer for future LLM planners.
+entities:
+  - name: industrial_events
+    table: industrial_events
+    kind: fact
+    time_field: time
+    aliases: [events, historian, telemetry, measurements]
+    default_limit: 100
+    fields:
+      - name: time
+        expression: time
+        kind: dimension
+        aliases: [timestamp, datetime]
+      - name: asset_id
+        expression: asset_id
+        kind: dimension
+        aliases: [device, machine, asset]
+      - name: tag
+        expression: tag
+        kind: dimension
+        aliases: [signal, sensor]
+      - name: site
+        expression: site
+        kind: dimension
+        aliases: [plant]
+      - name: line
+        expression: line
+        kind: dimension
+        aliases: [area, production_line]
+      - name: value
+        expression: value
+        kind: measure
+      - name: quality
+        expression: quality
+        kind: dimension
+      - name: fault_type
+        expression: fault_type
+        kind: dimension
+      - name: ground_truth_severity
+        expression: ground_truth_severity
+        kind: dimension
+  - name: processed_events
+    table: processed_events
+    kind: fact
+    time_field: time
+    aliases: [alarms, warnings, anomalies]
+    default_limit: 100
+    fields:
+      - name: time
+        expression: time
+        kind: dimension
+      - name: asset_id
+        expression: asset_id
+        kind: dimension
+      - name: tag
+        expression: tag
+        kind: dimension
+      - name: severity
+        expression: severity
+        kind: dimension
+      - name: window_size
+        expression: window_size
+        kind: measure
+      - name: anomaly_score
+        expression: anomaly_score
+        kind: measure
+      - name: evaluation
+        expression: evaluation
+        kind: dimension
+  - name: assets
+    table: assets
+    kind: dimension
+    aliases: [hierarchy, site topology, equipment]
+    default_limit: 500
+    fields:
+      - name: id
+        expression: id
+        kind: dimension
+      - name: name
+        expression: name
+        kind: dimension
+      - name: type
+        expression: type
+        kind: dimension
+      - name: path
+        expression: path
+        kind: dimension
+      - name: parent_id
+        expression: parent_id
+        kind: dimension
+  - name: report_templates
+    table: report_templates
+    kind: dimension
+    aliases: [reports, templates]
+    default_limit: 100
+    fields:
+      - name: template_id
+        expression: template_id
+        kind: dimension
+      - name: name
+        expression: name
+        kind: dimension
+      - name: description
+        expression: description
+        kind: dimension
+      - name: format
+        expression: format
+        kind: dimension
+  - name: scenarios
+    table: scenarios
+    kind: dimension
+    aliases: [simulation, test cases, benchmarks]
+    default_limit: 100
+    fields:
+      - name: scenario_id
+        expression: scenario_id
+        kind: dimension
+      - name: name
+        expression: name
+        kind: dimension
+      - name: description
+        expression: description
+        kind: dimension
+      - name: category
+        expression: category
+        kind: dimension
