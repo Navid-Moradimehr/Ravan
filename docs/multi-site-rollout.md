@@ -197,6 +197,12 @@ Recommended pattern:
 
 The repo now includes `config/project-manifest.yaml` as a concrete starting point.
 
+Operationally, the manifest is now useful in three ways:
+
+- `datastreamctl project-manifest bundle` prints per-site environment bundles for deployment automation
+- `datastreamctl project-manifest release-gate` validates the entire fleet topology site by site
+- `datastreamd --project-manifest` can start the runtime for one selected site from the company contract
+
 Suggested SLOs for initial rollout:
 
 - ingest path availability: 99.5% per site

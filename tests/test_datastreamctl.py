@@ -123,6 +123,21 @@ class TestDatastreamctl:
         assert "demo-site" in out
         assert "plant-a" in out
 
+    def test_project_manifest_bundle_json_runs(self):
+        rc, out = self._run(["project-manifest", "bundle", str(PROJECT_MANIFEST), "--site-id", "demo-site", "--json"])
+        assert rc == 0
+        assert '"DATASTREAM_PROJECT_ID": "demo-industrial-fleet"' in out
+        assert '"SITE_ID": "demo-site"' in out
+
+    def test_project_manifest_release_gate_runs(self, monkeypatch):
+        monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
+        monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
+        monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
+        monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": True})
+        rc, out = self._run(["project-manifest", "release-gate", str(PROJECT_MANIFEST), "--skip-network"])
+        assert rc == 0
+        assert "project release gate" in out
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

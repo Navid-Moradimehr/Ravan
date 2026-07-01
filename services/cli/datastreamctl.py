@@ -83,6 +83,53 @@ def _run_backup_drill(backup_dir: str | None, tables: list[str] | None, restore_
     return result
 
 
+def _run_release_gate_for_profile(
+    profile_path: str,
+    *,
+    api_base: str,
+    ai_base: str,
+    backup_dir: str | None = None,
+    restore_db: str | None = None,
+    skip_network: bool = False,
+    skip_backup: bool = False,
+) -> dict[str, Any]:
+    profile = load_site_profile(profile_path)
+    profile_errors = validate_site_profile(profile)
+    checks: list[tuple[str, bool, str]] = [
+        ("site profile valid", not profile_errors, "; ".join(profile_errors) if profile_errors else "ok"),
+        ("scenario engine importable", bool(_load_scenario_catalog()), "ok" if _load_scenario_catalog() else "unavailable"),
+        ("dataset catalog importable", bool(_load_runtime_catalog()), "ok" if _load_runtime_catalog() else "unavailable"),
+    ]
+
+    if not skip_network:
+        api_status, _ = _http_get(f"{api_base}/health")
+        ai_status, _ = _http_get(f"{ai_base}/health")
+        checks.append(("api reachable", api_status == 200, str(api_status)))
+        checks.append(("ai reachable", ai_status == 200, str(ai_status)))
+
+    drill_result: dict[str, Any] | None = None
+    if not skip_backup:
+        restore_target = restore_db or profile.backups.restore_test_database
+        drill_result = _run_backup_drill(backup_dir or profile.backups.directory, None, restore_target)
+        backup_ok = drill_result["backup"].get("status") == "success"
+        restore_ok = drill_result["restore"] is None or drill_result["restore"].get("status") == "success"
+        checks.append(("backup drill", backup_ok, drill_result["backup"].get("error", "ok")))
+        checks.append(("restore drill", restore_ok, drill_result["restore"].get("error", "ok") if drill_result["restore"] else "skipped"))
+
+    payload = {
+        "profile_id": profile.profile_id,
+        "site_id": profile.site.id,
+        "deployment_mode": profile.deployment_mode,
+        "checks": [
+            {"name": name, "ok": ok, "detail": detail}
+            for name, ok, detail in checks
+        ],
+        "backup_drill": drill_result,
+    }
+    payload["passed"] = all(item["ok"] for item in payload["checks"])
+    return payload
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     api_base = args.api_base
     ai_base = args.ai_base
@@ -233,49 +280,25 @@ def cmd_backup_drill(args: argparse.Namespace) -> int:
 
 
 def cmd_release_gate(args: argparse.Namespace) -> int:
-    profile = load_site_profile(args.site_profile)
-    profile_errors = validate_site_profile(profile)
-    checks: list[tuple[str, bool, str]] = [
-        ("site profile valid", not profile_errors, "; ".join(profile_errors) if profile_errors else "ok"),
-        ("scenario engine importable", bool(_load_scenario_catalog()), "ok" if _load_scenario_catalog() else "unavailable"),
-        ("dataset catalog importable", bool(_load_runtime_catalog()), "ok" if _load_runtime_catalog() else "unavailable"),
-    ]
-
-    if not args.skip_network:
-        api_status, _ = _http_get(f"{args.api_base}/health")
-        ai_status, _ = _http_get(f"{args.ai_base}/health")
-        checks.append(("api reachable", api_status == 200, str(api_status)))
-        checks.append(("ai reachable", ai_status == 200, str(ai_status)))
-
-    drill_result: dict[str, Any] | None = None
-    if not args.skip_backup:
-        restore_db = args.restore_db or profile.backups.restore_test_database
-        drill_result = _run_backup_drill(args.backup_dir or profile.backups.directory, None, restore_db)
-        backup_ok = drill_result["backup"].get("status") == "success"
-        restore_ok = drill_result["restore"] is None or drill_result["restore"].get("status") == "success"
-        checks.append(("backup drill", backup_ok, drill_result["backup"].get("error", "ok")))
-        checks.append(("restore drill", restore_ok, drill_result["restore"].get("error", "ok") if drill_result["restore"] else "skipped"))
-
-    payload = {
-        "profile_id": profile.profile_id,
-        "site_id": profile.site.id,
-        "deployment_mode": profile.deployment_mode,
-        "checks": [
-            {"name": name, "ok": ok, "detail": detail}
-            for name, ok, detail in checks
-        ],
-        "backup_drill": drill_result,
-    }
-    passed = all(item["ok"] for item in payload["checks"])
+    payload = _run_release_gate_for_profile(
+        args.site_profile,
+        api_base=args.api_base,
+        ai_base=args.ai_base,
+        backup_dir=args.backup_dir,
+        restore_db=args.restore_db,
+        skip_network=args.skip_network,
+        skip_backup=args.skip_backup,
+    )
+    passed = bool(payload["passed"])
 
     if args.json:
         print(json.dumps(payload, indent=2))
     else:
         print("release gate")
         print("=" * 40)
-        _print_row("profile_id", profile.profile_id)
-        _print_row("site_id", profile.site.id)
-        _print_row("deployment_mode", profile.deployment_mode)
+        _print_row("profile_id", payload["profile_id"])
+        _print_row("site_id", payload["site_id"])
+        _print_row("deployment_mode", payload["deployment_mode"])
         for item in payload["checks"]:
             mark = "OK" if item["ok"] else "FAIL"
             print(f"{mark:<6}{item['name']:<22}{item['detail']}")
@@ -319,6 +342,73 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
                 if site.label:
                     print(f"{'':22}{site.label}")
         return 0 if not errors else 1
+
+    if args.action == "bundle":
+        bundle = manifest.bundle_for_site(args.site_id)
+        if args.json:
+            print(json.dumps(bundle, indent=2))
+        else:
+            print("Project bundle")
+            print("=" * 40)
+            _print_row("project_id", bundle["project_id"])
+            _print_row("name", bundle["name"])
+            if "site_id" in bundle:
+                _print_row("site_id", bundle["site_id"])
+                _print_row("site_profile", bundle["site_profile"])
+                print("env:")
+                for key, value in sorted(bundle["env"].items()):
+                    print(f"  {key}={value}")
+            else:
+                for site in bundle["sites"]:
+                    print(f"{site['site_id']:<22}{site['site_profile']}")
+        return 0 if not errors else 1
+
+    if args.action == "release-gate":
+        checks: list[dict[str, Any]] = []
+        for site in manifest.sites:
+            result = _run_release_gate_for_profile(
+                site.profile_path,
+                api_base=args.api_base,
+                ai_base=args.ai_base,
+                backup_dir=args.backup_dir,
+                restore_db=args.restore_db,
+                skip_network=args.skip_network,
+                skip_backup=args.skip_backup,
+            )
+            checks.append(
+                {
+                    "site_id": site.site_id,
+                    "profile_path": site.profile_path,
+                    "passed": result["passed"],
+                    "checks": result["checks"],
+                    "backup_drill": result["backup_drill"],
+                }
+            )
+        passed = not errors and all(item["passed"] for item in checks)
+        payload = {
+            "project_id": manifest.project_id,
+            "name": manifest.name,
+            "manifest_errors": errors,
+            "sites": checks,
+            "passed": passed,
+        }
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("project release gate")
+            print("=" * 40)
+            _print_row("project_id", manifest.project_id)
+            _print_row("name", manifest.name)
+            for item in checks:
+                mark = "OK" if item["passed"] else "FAIL"
+                print(f"{mark:<6}{item['site_id']:<22}{item['profile_path']}")
+                for check in item["checks"]:
+                    inner_mark = "OK" if check["ok"] else "FAIL"
+                    print(f"{'':6}{inner_mark:<6}{check['name']:<22}{check['detail']}")
+            if errors:
+                for err in errors:
+                    print(f"ERROR  {err}")
+        return 0 if passed else 2
 
     if args.json:
         print(json.dumps(payload, indent=2))
@@ -397,6 +487,21 @@ def build_parser() -> argparse.ArgumentParser:
     project_sites.add_argument("path")
     project_sites.add_argument("--json", action="store_true")
     project_sites.set_defaults(func=cmd_project_manifest)
+    project_bundle = project_sub.add_parser("bundle", help="Print per-site environment bundles")
+    project_bundle.add_argument("path")
+    project_bundle.add_argument("--site-id", default=None, help="Optional site to print")
+    project_bundle.add_argument("--json", action="store_true")
+    project_bundle.set_defaults(func=cmd_project_manifest)
+    project_release = project_sub.add_parser("release-gate", help="Run release-gate checks for all sites in a project manifest")
+    project_release.add_argument("path")
+    project_release.add_argument("--api-base", default=DEFAULT_API_BASE)
+    project_release.add_argument("--ai-base", default=DEFAULT_AI_BASE)
+    project_release.add_argument("--backup-dir", default=None)
+    project_release.add_argument("--restore-db", default=None)
+    project_release.add_argument("--skip-network", action="store_true")
+    project_release.add_argument("--skip-backup", action="store_true")
+    project_release.add_argument("--json", action="store_true")
+    project_release.set_defaults(func=cmd_project_manifest)
     return parser
 
 

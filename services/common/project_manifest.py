@@ -117,6 +117,31 @@ class ProjectManifest:
             envs[site.site_id] = env
         return envs
 
+    def bundle_for_site(self, site_id: str | None = None) -> dict[str, Any]:
+        envs = self.to_site_envs()
+        if site_id:
+            if site_id not in envs:
+                raise ValueError(f"site_id not found in manifest: {site_id}")
+            return {
+                "project_id": self.project_id,
+                "name": self.name,
+                "site_id": site_id,
+                "site_profile": str(self.site_profile_paths()[site_id]),
+                "env": envs[site_id],
+            }
+        return {
+            "project_id": self.project_id,
+            "name": self.name,
+            "sites": [
+                {
+                    "site_id": sid,
+                    "site_profile": str(self.site_profile_paths()[sid]),
+                    "env": env,
+                }
+                for sid, env in envs.items()
+            ],
+        }
+
 
 def _load_tuple(items: Any, factory) -> tuple[Any, ...]:
     if not items:

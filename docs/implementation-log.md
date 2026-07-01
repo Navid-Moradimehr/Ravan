@@ -40,6 +40,8 @@
    - Added `services/common/project_manifest.py` and `config/project-manifest.yaml`.
    - The manifest groups sites, PLC/source inventory, bridge rules, correlation groups, and project-level retention into one control-plane contract.
    - Added CLI support for `datastreamctl project-manifest show|validate|sites`.
+   - Added `datastreamctl project-manifest bundle` for per-site deployment env output.
+   - Added `datastreamctl project-manifest release-gate` to validate the full manifest across all sites.
    - Added `datastreamd --project-manifest` and `--site-id` so runtime services can start from the company manifest and select a site bundle.
 
 ### Verified
@@ -52,6 +54,7 @@
   - top-hit verification: `alarm:compressor-1:motor_vibration:2026-07-01T00:05:00Z`
   - stream key separation check: distinct PLC source IDs produce distinct Kafka keys while correlation groups stay aligned on site/asset/tag
   - persistent retrieval index over 40 mock docs: build 1.79 ops/sec, 557.55 ms per build; repeated search 21.52 ops/sec, 46.474 ms avg; evaluation hit rate@5 = 1.0
+  - manifest bundle and project release-gate commands validated across the sample fleet manifest
 
 ## 2026-07-01 - Model and Agent Contract Layer
 
