@@ -18,9 +18,22 @@
    - The AI gateway now validates model output and falls back to deterministic summaries if the response is not usable.
    - Summaries are still provider-neutral and compatible with open-weight or OpenAI-compatible backends.
 
+## 2026-07-01 - Retrieval Boundary
+
+### Added
+
+1. **Deterministic retrieval/search layer**
+   - Added `services/common/retrieval.py` with a read-only corpus over historian events, alarms, assets, reports, and scenarios.
+   - Added `/api/v1/retrieval/catalog` and `/api/v1/retrieval/search` to expose the retrieval boundary without introducing a vector database yet.
+   - The layer is deterministic and lightweight so it can run locally and in industrial edge installs.
+
+2. **Contracts and tests**
+   - Added route coverage and retrieval contract tests.
+   - Verified the ranking and catalog behavior with monkeypatched deterministic inputs.
+
 ### Verified
 
-- Targeted contract and gateway tests: 13 passed
+- Targeted contract and gateway tests: 15 passed
 - `python -m compileall services tests`: passed
 - AI gateway mock benchmark:
   - `openai_compat`: 256 events, 8 batches, 69,230.35 events/sec, avg prompt 9,434.2 bytes

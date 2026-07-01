@@ -126,6 +126,7 @@ against realistic industrial batches without depending on a live model server.
 - `docs/multi-site-rollout.md` defines the production-hardening plan for multi-site industrial deployment.
 - `docs/model-agent-roadmap.md` defines the production model stack plan, including LLM roles, future agent infrastructure, and production gaps.
 - `services/api_service/routers/modeling.py` exposes the read-only model, prompt, tool, and context contract surface.
+- `services/api_service/routers/retrieval.py` exposes deterministic retrieval/search over historian, alarms, assets, reports, and scenarios.
 - `config/site-profiles/` contains example site profile contracts for `single-site`, `plant-local`, and `federated` rollout shapes.
 - `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
 - `docs/benchmark-results.md` includes the latest local benchmark numbers for the mixed replay path and the AI gateway provider abstraction.

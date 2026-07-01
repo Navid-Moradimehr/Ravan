@@ -93,13 +93,14 @@ Scope:
 
 Status:
 
-- partially implemented as a service boundary
+- partially implemented as a deterministic retrieval boundary
 
 Already present:
 
 - model registry entries for embeddings and retrieval roles
 - prompt registry for structured model inputs
 - read-only context package endpoint for historian, alarms, assets, reports, and scenarios
+- retrieval search/catalog endpoint over historian, alarms, assets, reports, and scenarios
 
 Still needed:
 
@@ -186,6 +187,7 @@ Already present:
 - read-only context package assembly endpoint
 - model role registry
 - prompt registry for future diagnostic agent prompts
+- deterministic retrieval search boundary that future agents can call
 
 ### Layer 6: Supervised Action Agents
 

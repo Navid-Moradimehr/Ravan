@@ -141,3 +141,4 @@ The following foundation already exists and should be treated as infrastructure,
 - structured response validation
 - read-only tool schemas
 - read-only context package assembly
+- deterministic retrieval/search boundary for historian, alarms, assets, reports, and scenarios

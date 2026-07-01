@@ -19,6 +19,8 @@ def test_split_domain_routes_registered():
         "/api/v1/modeling/tools",
         "/api/v1/modeling/prompts",
         "/api/v1/modeling/context",
+        "/api/v1/retrieval/catalog",
+        "/api/v1/retrieval/search",
         "/api/v1/digital-twin/scenes/{scene_id}",
         "/api/v1/digital-twin/scenes/{scene_id}/entities/{entity_id}/values",
         "/api/v1/oee/shifts",
