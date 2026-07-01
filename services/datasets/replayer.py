@@ -12,7 +12,12 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterator
 
-from confluent_kafka import Producer
+try:
+    from confluent_kafka import Producer
+    HAS_KAFKA = True
+except Exception:  # pragma: no cover - optional runtime dependency
+    Producer = Any  # type: ignore[assignment]
+    HAS_KAFKA = False
 
 from services.edge_ingest.model import IndustrialEvent, to_json_bytes, utc_now
 from services.common.stream_scope import stream_partition_key
@@ -33,6 +38,8 @@ class ReplayConfig:
 
 
 def build_producer(brokers: str) -> Producer:
+    if not HAS_KAFKA:
+        raise RuntimeError("confluent_kafka is required for live dataset replay")
     return Producer({"bootstrap.servers": brokers, "client.id": "dataset-replayer"})
 
 

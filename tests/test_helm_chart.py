@@ -69,6 +69,11 @@ def test_helm_values_include_autoscaling():
     assert "targetCPUUtilizationPercentage:" in values
 
 
+def test_helm_values_include_namespace_override():
+    values = (HELM_DIR / "values.yaml").read_text()
+    assert "namespaceOverride:" in values
+
+
 def test_profile_overlays_exist():
     profiles_dir = HELM_DIR / "profiles"
     assert (profiles_dir / "single-site-values.yaml").exists()

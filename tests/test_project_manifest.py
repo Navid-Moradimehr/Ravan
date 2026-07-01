@@ -70,6 +70,7 @@ def test_manifest_export_kubernetes_layout(tmp_path: Path):
     assert (site_root / "kubernetes" / "deployment.yaml").exists()
     assert (site_root / "kubernetes" / "service.yaml").exists()
     assert (site_root / "kubernetes" / "kustomization.yaml").exists()
+    assert "namespaceOverride: datastream-plant-a" in (site_root / "kubernetes" / "helm" / "values.generated.yaml").read_text(encoding="utf-8")
     assert (site_root / "kubernetes" / "README.md").exists()
     assert any(path.name == "deployment.yaml" for path in written)
 

@@ -13,6 +13,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $fullname }}-api
+  namespace: {{ include "data-stream.namespace" . }}
   labels:
     app: {{ $name }}
     component: api-service
@@ -59,6 +60,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $fullname }}-ai-gateway
+  namespace: {{ include "data-stream.namespace" . }}
   labels:
     app: {{ $name }}
     component: ai-gateway
@@ -105,6 +107,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $fullname }}-processor
+  namespace: {{ include "data-stream.namespace" . }}
   labels:
     app: {{ $name }}
     component: processor
@@ -148,6 +151,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $fullname }}-edge-ingest
+  namespace: {{ include "data-stream.namespace" . }}
   labels:
     app: {{ $name }}
     component: edge-ingest

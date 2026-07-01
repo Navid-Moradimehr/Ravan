@@ -7,6 +7,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ $fullname }}-api
+  namespace: {{ include "data-stream.namespace" . }}
   labels:
     app: {{ $name }}
     component: api-service
@@ -39,6 +40,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ $fullname }}-ai-gateway
+  namespace: {{ include "data-stream.namespace" . }}
   labels:
     app: {{ $name }}
     component: ai-gateway
@@ -71,6 +73,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ $fullname }}-processor
+  namespace: {{ include "data-stream.namespace" . }}
   labels:
     app: {{ $name }}
     component: processor
@@ -103,6 +106,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ $fullname }}-edge-ingest
+  namespace: {{ include "data-stream.namespace" . }}
   labels:
     app: {{ $name }}
     component: edge-ingest

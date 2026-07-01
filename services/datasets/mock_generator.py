@@ -14,7 +14,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
-from confluent_kafka import Producer
+try:
+    from confluent_kafka import Producer
+    HAS_KAFKA = True
+except Exception:  # pragma: no cover - optional runtime dependency
+    Producer = Any  # type: ignore[assignment]
+    HAS_KAFKA = False
 
 from services.edge_ingest.model import utc_now
 from services.scenarios.engine import ScenarioState, ScenarioType, apply_scenario, advance_scenario, load_scenario_from_env
@@ -152,6 +157,8 @@ def replay_to_kafka(
     brokers: str = None,
 ) -> None:
     """Stream mock events to Kafka/Redpanda."""
+    if not HAS_KAFKA:
+        raise RuntimeError("confluent_kafka is required for live mock replay")
     if brokers is None:
         brokers = os.getenv("REDPANDA_BROKERS", "localhost:19092")
 

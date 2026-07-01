@@ -402,6 +402,7 @@ class ProjectManifest:
         profile = load_site_profile(self.site_profile_paths()[site_id])
         payload = {
             "fullnameOverride": f"datastream-{site_id}",
+            "namespaceOverride": f"datastream-{site_id}",
             "image": {
                 "repository": "data-stream",
                 "tag": profile.runtime.image_tag,
@@ -428,7 +429,7 @@ class ProjectManifest:
                 "Use this overlay with the chart in `k8s/helm`.",
                 "",
                 "Example:",
-                "  helm upgrade --install datastream ./k8s/helm -f kubernetes/helm/values.generated.yaml",
+                "  helm upgrade --install datastream-demo-site ./k8s/helm --namespace datastream-demo-site -f kubernetes/helm/values.generated.yaml",
                 "",
                 "Replace the generated image tag and provide secrets through your cluster secret workflow.",
                 "",

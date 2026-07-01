@@ -16,6 +16,8 @@ from pathlib import Path
 
 from services.common.project_manifest import load_project_manifest, validate_project_manifest
 from services.common.site_profiles import load_site_profile, validate_site_profile
+from services.benchmarks.deployment_pack import format_result as format_deployment_pack_result
+from services.benchmarks.deployment_pack import run_benchmark as run_deployment_pack_benchmark
 from services.historian.backup import create_backup, get_walg_status, list_backups, restore_backup
 
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
@@ -475,6 +477,42 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
     return 0 if not errors else 1
 
 
+def cmd_benchmark(args: argparse.Namespace) -> int:
+    if args.action == "deployment-pack":
+        result = run_deployment_pack_benchmark(
+            Path(args.manifest),
+            Path(args.csv),
+            site_id=args.site_id,
+            target_events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "manifest": result.manifest_path,
+                    "csv": result.csv_path,
+                    "site_id": result.site_id,
+                    "export_elapsed_seconds": result.export_elapsed_seconds,
+                    "export_file_count": result.export_file_count,
+                    "export_files_per_second": result.export_files_per_second,
+                    "systemd_file_count": result.systemd_file_count,
+                    "kubernetes_file_count": result.kubernetes_file_count,
+                    "replay_events": result.replay_events,
+                    "replay_events_per_second": result.replay_events_per_second,
+                    "replay_batches": result.replay_batches,
+                    "replay_serialized_bytes": result.replay_serialized_bytes,
+                },
+                indent=2,
+            ))
+        else:
+            print("deployment pack benchmark")
+            print("=" * 40)
+            print(format_deployment_pack_result(result))
+        return 0
+    raise ValueError(f"unknown benchmark action: {args.action}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="datastreamctl",
@@ -566,6 +604,18 @@ def build_parser() -> argparse.ArgumentParser:
     project_release.add_argument("--skip-backup", action="store_true")
     project_release.add_argument("--json", action="store_true")
     project_release.set_defaults(func=cmd_project_manifest)
+
+    benchmark = sub.add_parser("benchmark", help="Run performance benchmarks")
+    benchmark_sub = benchmark.add_subparsers(dest="action", required=True)
+    deployment_pack = benchmark_sub.add_parser("deployment-pack", help="Benchmark deployment exports and mock replay data")
+    deployment_pack.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
+    deployment_pack.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    deployment_pack.add_argument("--site-id", default="demo-site")
+    deployment_pack.add_argument("--events", type=int, default=10_000)
+    deployment_pack.add_argument("--batch-size", type=int, default=256)
+    deployment_pack.add_argument("--warmup-events", type=int, default=0)
+    deployment_pack.add_argument("--json", action="store_true")
+    deployment_pack.set_defaults(func=cmd_benchmark)
     return parser
 
 

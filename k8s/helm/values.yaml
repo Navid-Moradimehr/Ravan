@@ -11,6 +11,10 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+fullnameOverride: ""
+namespaceOverride: ""
+nameOverride: ""
+
 # ---------------------------------------------------------------------------
 # Service toggles
 # ---------------------------------------------------------------------------
