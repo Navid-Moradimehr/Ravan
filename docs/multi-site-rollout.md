@@ -175,6 +175,28 @@ Recommended behavior:
 
 This keeps the platform safe for a full production line with multiple PLCs and sensors feeding the same asset model.
 
+### Project Manifest
+
+For multi-site rollouts, define one top-level project manifest that points at each site profile and declares the company-wide stream topology.
+
+The manifest should own:
+
+- the list of sites and their site-profile files
+- the source inventory for each PLC, gateway, and sensor stream
+- bridge rules for replication, fan-out, rollup, or correlation
+- correlation groups for related signals across PLCs or assets
+- project-level retention defaults
+
+Site profiles should remain the runtime contract for one site. The project manifest is the control-plane contract that ties all sites together without merging their raw data.
+
+Recommended pattern:
+
+- load the project manifest in CI, release tooling, and fleet operations
+- load the site profile in each runtime node
+- keep cross-site correlation explicit in the manifest instead of implicit in topic names
+
+The repo now includes `config/project-manifest.yaml` as a concrete starting point.
+
 Suggested SLOs for initial rollout:
 
 - ingest path availability: 99.5% per site

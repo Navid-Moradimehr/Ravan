@@ -1,0 +1,61 @@
+schema_version: 1
+project_id: demo-industrial-fleet
+name: Demo Industrial Fleet
+description: Example company-wide manifest for multi-site industrial rollout.
+
+sites:
+  - site_id: demo-site
+    profile_path: config/site-profiles/single-site.yaml
+    label: Pilot line
+    notes: First pilot install
+  - site_id: plant-a
+    profile_path: config/site-profiles/plant-local.yaml
+    label: Plant A
+    notes: Independent plant-local rollout
+
+sources:
+  - source_id: plc-01-pump-temp
+    site_id: demo-site
+    source_protocol: opcua
+    asset_id: Pump-01
+    line: line-01
+    tags: [Temperature]
+    topic: industrial/demo-site/line-01/plc-01-pump-temp
+  - source_id: plc-02-pump-temp
+    site_id: demo-site
+    source_protocol: mqtt
+    asset_id: Pump-01
+    line: line-01
+    tags: [Temperature]
+    topic: industrial/demo-site/line-01/plc-02-pump-temp
+  - source_id: line-a-pump-vibration
+    site_id: plant-a
+    source_protocol: modbus
+    asset_id: Pump-03
+    line: line-02
+    tags: [Vibration, Pressure]
+    topic: industrial/plant-a/line-02/pump-03
+
+bridge_rules:
+  - name: demo-line-correlation
+    mode: correlate
+    from_sources: [plc-01-pump-temp, plc-02-pump-temp]
+    description: Correlate duplicate asset signals across two PLCs on the same line.
+  - name: plant-rollup
+    mode: rollup
+    from_sources: [plc-01-pump-temp, plc-02-pump-temp, line-a-pump-vibration]
+    to_sources: [plc-01-pump-temp, line-a-pump-vibration]
+    topic_template: analytics/{{site_id}}/{{asset_id}}/rollup
+
+correlation_groups:
+  - name: pump-01-temperature-group
+    members: [plc-01-pump-temp, plc-02-pump-temp]
+    strategy: site_asset_tag
+    window_minutes: 30
+    description: Same asset/tag from two PLCs should remain separate but comparable.
+
+retention:
+  historian_days: 90
+  raw_days: 30
+  compressed_days: 7
+  backup_days: 30

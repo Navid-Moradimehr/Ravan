@@ -13,6 +13,7 @@ import os
 import sys
 from typing import Any
 
+from services.common.project_manifest import load_project_manifest, validate_project_manifest
 from services.common.site_profiles import load_site_profile, validate_site_profile
 from services.historian.backup import create_backup, get_walg_status, list_backups, restore_backup
 
@@ -281,6 +282,57 @@ def cmd_release_gate(args: argparse.Namespace) -> int:
     return 0 if passed else 2
 
 
+def cmd_project_manifest(args: argparse.Namespace) -> int:
+    manifest = load_project_manifest(args.path)
+    errors = validate_project_manifest(manifest)
+    payload = {
+        "path": args.path,
+        "manifest": manifest.to_dict(),
+        "errors": errors,
+        "valid": not errors,
+    }
+
+    if args.action == "show":
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("Project manifest")
+            print("=" * 40)
+            _print_row("path", args.path)
+            _print_row("project_id", manifest.project_id)
+            _print_row("name", manifest.name)
+            _print_row("sites", len(manifest.sites))
+            _print_row("sources", len(manifest.sources))
+            _print_row("bridge_rules", len(manifest.bridge_rules))
+            _print_row("correlation_groups", len(manifest.correlation_groups))
+            _print_row("historian_days", manifest.retention.historian_days)
+        return 0 if not errors else 1
+
+    if args.action == "sites":
+        if args.json:
+            print(json.dumps({"sites": [site.to_dict() for site in manifest.sites]}, indent=2))
+        else:
+            print("Project sites")
+            print("=" * 40)
+            for site in manifest.sites:
+                print(f"{site.site_id:<22}{site.profile_path}")
+                if site.label:
+                    print(f"{'':22}{site.label}")
+        return 0 if not errors else 1
+
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print("project-manifest validation")
+        print("=" * 40)
+        _print_row("path", args.path)
+        _print_row("valid", "yes" if not errors else "no")
+        if errors:
+            for err in errors:
+                print(f"ERROR  {err}")
+    return 0 if not errors else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="datastreamctl",
@@ -330,6 +382,21 @@ def build_parser() -> argparse.ArgumentParser:
     release.add_argument("--skip-backup", action="store_true")
     release.add_argument("--json", action="store_true")
     release.set_defaults(func=cmd_release_gate)
+
+    project = sub.add_parser("project-manifest", help="Show or validate a project manifest")
+    project_sub = project.add_subparsers(dest="action", required=True)
+    project_show = project_sub.add_parser("show", help="Show parsed project manifest values")
+    project_show.add_argument("path")
+    project_show.add_argument("--json", action="store_true")
+    project_show.set_defaults(func=cmd_project_manifest)
+    project_validate = project_sub.add_parser("validate", help="Validate a project manifest")
+    project_validate.add_argument("path")
+    project_validate.add_argument("--json", action="store_true")
+    project_validate.set_defaults(func=cmd_project_manifest)
+    project_sites = project_sub.add_parser("sites", help="List sites in a project manifest")
+    project_sites.add_argument("path")
+    project_sites.add_argument("--json", action="store_true")
+    project_sites.set_defaults(func=cmd_project_manifest)
     return parser
 
 

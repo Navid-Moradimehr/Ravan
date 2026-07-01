@@ -25,6 +25,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from services.common.project_manifest import load_project_manifest, validate_project_manifest
 from services.common.site_profiles import load_site_profile, validate_site_profile
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -93,6 +94,8 @@ class ProcRecord:
     site_profile: str = ""
     site_id: str = ""
     deployment_mode: str = ""
+    project_manifest: str = ""
+    project_id: str = ""
 
 
 def _ensure_dir() -> None:
@@ -155,6 +158,48 @@ def _load_site_profile_context(path: str | None) -> tuple[dict[str, str], dict[s
     )
 
 
+def _load_project_manifest_context(path: str | None, site_id: str | None = None) -> tuple[dict[str, str], dict[str, str]]:
+    if not path:
+        return {}, {}
+    manifest = load_project_manifest(path)
+    errors = validate_project_manifest(manifest)
+    if errors:
+        raise ValueError(f"invalid project manifest {path}: {'; '.join(errors)}")
+    selected_site = None
+    if site_id:
+        for site in manifest.sites:
+            if site.site_id == site_id:
+                selected_site = site
+                break
+        if selected_site is None:
+            raise ValueError(f"site_id {site_id} not found in project manifest {path}")
+    else:
+        if not manifest.sites:
+            raise ValueError(f"project manifest {path} has no sites")
+        selected_site = manifest.sites[0]
+    profile = load_site_profile(selected_site.profile_path)
+    profile_errors = validate_site_profile(profile)
+    if profile_errors:
+        raise ValueError(f"invalid site profile {selected_site.profile_path}: {'; '.join(profile_errors)}")
+    env = profile.to_env()
+    env.update(
+        {
+            "DATASTREAM_PROJECT_MANIFEST": str(path),
+            "DATASTREAM_PROJECT_ID": manifest.project_id,
+            "DATASTREAM_PROJECT_NAME": manifest.name,
+            "DATASTREAM_PROJECT_RETENTION_DAYS": str(manifest.retention.historian_days),
+        }
+    )
+    meta = {
+        "project_manifest": str(path),
+        "project_id": manifest.project_id,
+        "site_profile": selected_site.profile_path,
+        "site_id": selected_site.site_id,
+        "deployment_mode": profile.deployment_mode,
+    }
+    return env, meta
+
+
 def _start_one(spec: ServiceSpec, extra_env: dict[str, str] | None = None, profile_meta: dict[str, str] | None = None) -> ProcRecord | None:
     log_dir = PID_DIR / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -187,6 +232,8 @@ def _start_one(spec: ServiceSpec, extra_env: dict[str, str] | None = None, profi
         site_profile=(profile_meta or {}).get("site_profile", ""),
         site_id=(profile_meta or {}).get("site_id", ""),
         deployment_mode=(profile_meta or {}).get("deployment_mode", ""),
+        project_manifest=(profile_meta or {}).get("project_manifest", ""),
+        project_id=(profile_meta or {}).get("project_id", ""),
     )
 
 
@@ -211,7 +258,11 @@ def _resolve_order(names: list[str]) -> list[str]:
 def cmd_up(args: argparse.Namespace) -> int:
     records = _load_records()
     records = {k: v for k, v in records.items() if _is_alive(v)}
-    extra_env, profile_meta = _load_site_profile_context(args.site_profile)
+    extra_env, profile_meta = {}, {}
+    if args.project_manifest:
+        extra_env, profile_meta = _load_project_manifest_context(args.project_manifest, args.site_id)
+    elif args.site_profile:
+        extra_env, profile_meta = _load_site_profile_context(args.site_profile)
 
     if args.only:
         wanted = [n.strip() for n in args.only.split(",") if n.strip()]
@@ -301,6 +352,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(f"{name:<12}{state:<24}{spec.description}")
         if rec and (rec.site_id or rec.deployment_mode):
             print(f"{'':12}{'':24}site={rec.site_id or 'n/a'} mode={rec.deployment_mode or 'n/a'}")
+        if rec and (rec.project_id or rec.project_manifest):
+            print(f"{'':12}{'':24}project={rec.project_id or 'n/a'} manifest={rec.project_manifest or 'n/a'}")
         if args.json:
             pass
     if args.json:
@@ -327,7 +380,13 @@ def cmd_restart(args: argparse.Namespace) -> int:
             return 2
     down_args = argparse.Namespace(only=",".join(names))
     cmd_down(down_args)
-    up_args = argparse.Namespace(only=",".join(names), wait=args.wait, site_profile=args.site_profile)
+    up_args = argparse.Namespace(
+        only=",".join(names),
+        wait=args.wait,
+        site_profile=args.site_profile,
+        project_manifest=args.project_manifest,
+        site_id=args.site_id,
+    )
     cmd_up(up_args)
     return 0
 
@@ -363,6 +422,8 @@ def build_parser() -> argparse.ArgumentParser:
     up.add_argument("--only", default=None, help="Comma-separated subset to start")
     up.add_argument("--wait", type=float, default=0.0, help="Seconds to wait for each health check")
     up.add_argument("--site-profile", default=os.getenv("DATASTREAM_SITE_PROFILE"), help="Optional site profile YAML")
+    up.add_argument("--project-manifest", default=os.getenv("DATASTREAM_PROJECT_MANIFEST"), help="Optional project manifest YAML")
+    up.add_argument("--site-id", default=os.getenv("DATASTREAM_SITE_ID"), help="Select a site from the project manifest")
     up.set_defaults(func=cmd_up)
 
     down = sub.add_parser("down", help="Stop managed services")
@@ -378,6 +439,8 @@ def build_parser() -> argparse.ArgumentParser:
     restart.add_argument("names", help="Comma-separated service names")
     restart.add_argument("--wait", type=float, default=0.0)
     restart.add_argument("--site-profile", default=os.getenv("DATASTREAM_SITE_PROFILE"), help="Optional site profile YAML")
+    restart.add_argument("--project-manifest", default=os.getenv("DATASTREAM_PROJECT_MANIFEST"), help="Optional project manifest YAML")
+    restart.add_argument("--site-id", default=os.getenv("DATASTREAM_SITE_ID"), help="Select a site from the project manifest")
     restart.set_defaults(func=cmd_restart)
 
     logs = sub.add_parser("logs", help="Tail a service log")

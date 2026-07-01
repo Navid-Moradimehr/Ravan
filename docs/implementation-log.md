@@ -36,6 +36,12 @@
    - Added API endpoints to rebuild and evaluate the persistent index.
    - Repeated searches use a file-mtime cache so the index does not have to be re-parsed on every query.
 
+7. **Project manifest**
+   - Added `services/common/project_manifest.py` and `config/project-manifest.yaml`.
+   - The manifest groups sites, PLC/source inventory, bridge rules, correlation groups, and project-level retention into one control-plane contract.
+   - Added CLI support for `datastreamctl project-manifest show|validate|sites`.
+   - Added `datastreamd --project-manifest` and `--site-id` so runtime services can start from the company manifest and select a site bundle.
+
 ### Verified
 
 - Focused contract tests for embeddings, semantic planning, hybrid retrieval, and route registration: 21 passed

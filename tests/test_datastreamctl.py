@@ -16,6 +16,7 @@ from services.datasets.runtime_catalog import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SITE_PROFILE = REPO_ROOT / "config" / "site-profiles" / "single-site.yaml"
+PROJECT_MANIFEST = REPO_ROOT / "config" / "project-manifest.yaml"
 
 
 class TestRuntimeCatalog:
@@ -105,6 +106,22 @@ class TestDatastreamctl:
         rc, out = self._run(["release-gate", str(SITE_PROFILE), "--skip-network"])
         assert rc == 0
         assert "release gate" in out
+
+    def test_project_manifest_show_json_runs(self):
+        rc, out = self._run(["project-manifest", "show", str(PROJECT_MANIFEST), "--json"])
+        assert rc == 0
+        assert '"project_id": "demo-industrial-fleet"' in out
+
+    def test_project_manifest_validate_runs(self):
+        rc, out = self._run(["project-manifest", "validate", str(PROJECT_MANIFEST)])
+        assert rc == 0
+        assert "valid" in out
+
+    def test_project_manifest_sites_runs(self):
+        rc, out = self._run(["project-manifest", "sites", str(PROJECT_MANIFEST)])
+        assert rc == 0
+        assert "demo-site" in out
+        assert "plant-a" in out
 
 
 if __name__ == "__main__":
