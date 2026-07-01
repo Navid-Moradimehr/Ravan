@@ -157,6 +157,42 @@ class TestDatastreamctl:
         assert (tmp_path / "demo-site.yaml").exists()
         assert "project export" in out
 
+    def test_project_manifest_export_systemd_layout(self, tmp_path):
+        rc, out = self._run([
+            "project-manifest",
+            "export",
+            str(PROJECT_MANIFEST),
+            str(tmp_path),
+            "--site-id",
+            "demo-site",
+            "--format",
+            "both",
+            "--layout",
+            "systemd",
+        ])
+        assert rc == 0
+        assert (tmp_path / "demo-site" / "systemd" / "datastreamd.service").exists()
+        assert (tmp_path / "demo-site" / "env" / "site.env").exists()
+        assert "systemd" in out
+
+    def test_project_manifest_export_kubernetes_layout(self, tmp_path):
+        rc, out = self._run([
+            "project-manifest",
+            "export",
+            str(PROJECT_MANIFEST),
+            str(tmp_path),
+            "--site-id",
+            "plant-a",
+            "--format",
+            "both",
+            "--layout",
+            "kubernetes",
+        ])
+        assert rc == 0
+        assert (tmp_path / "plant-a" / "kubernetes" / "deployment.yaml").exists()
+        assert (tmp_path / "plant-a" / "kubernetes" / "site-profile-configmap.yaml").exists()
+        assert "kubernetes" in out
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

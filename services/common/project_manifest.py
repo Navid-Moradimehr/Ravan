@@ -10,6 +10,8 @@ from services.common.site_profiles import load_site_profile, validate_site_profi
 
 
 VALID_BRIDGE_MODES = {"replicate", "fanout", "correlate", "rollup"}
+VALID_EXPORT_LAYOUTS = {"flat", "systemd", "kubernetes"}
+VALID_EXPORT_FORMATS = {"env", "yaml", "both"}
 
 
 @dataclass(frozen=True)
@@ -142,6 +144,243 @@ class ProjectManifest:
             ],
         }
 
+    def _site_bundle(self, site_id: str, env: dict[str, str]) -> dict[str, Any]:
+        source_dicts = [source.to_dict() for source in self.sources if source.site_id == site_id]
+        return {
+            "project_id": self.project_id,
+            "project_name": self.name,
+            "site_id": site_id,
+            "site_profile": str(self.site_profile_paths()[site_id]),
+            "env": env,
+            "sources": source_dicts,
+            "bridge_rules": [rule.to_dict() for rule in self.bridge_rules],
+            "correlation_groups": [group.to_dict() for group in self.correlation_groups],
+            "retention": self.retention.to_dict(),
+        }
+
+    @staticmethod
+    def _render_env(env: dict[str, str]) -> str:
+        return "\n".join(f"{key}={value}" for key, value in sorted(env.items())) + "\n"
+
+    @staticmethod
+    def _write_text(path: Path, content: str) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    def _render_site_profile_yaml(self, site_id: str) -> str:
+        profile = load_site_profile(self.site_profile_paths()[site_id])
+        return yaml.safe_dump(profile.to_dict(), sort_keys=False, allow_unicode=True)
+
+    def _render_bundle_yaml(self, site_id: str, env: dict[str, str]) -> str:
+        return yaml.safe_dump(self._site_bundle(site_id, env), sort_keys=False, allow_unicode=True)
+
+    def _render_systemd_unit(self, site_id: str) -> str:
+        site_root = f"/etc/datastream/{self.project_id}/{site_id}"
+        return "\n".join(
+            [
+                "[Unit]",
+                f"Description=Data Stream runtime for {self.name} ({site_id})",
+                "After=network-online.target",
+                "Wants=network-online.target",
+                "",
+                "[Service]",
+                "Type=simple",
+                "Restart=always",
+                "RestartSec=5",
+                f"EnvironmentFile={site_root}/env/site.env",
+                f"WorkingDirectory={site_root}",
+                f"ExecStart=/usr/bin/env datastreamd up --site-profile {site_root}/site-profile.yaml",
+                "",
+                "[Install]",
+                "WantedBy=multi-user.target",
+                "",
+            ]
+        )
+
+    def _render_systemd_readme(self, site_id: str) -> str:
+        return "\n".join(
+            [
+                f"# {self.name} - {site_id}",
+                "",
+                "This directory is ready to be copied to /etc/datastream/<project>/<site>.",
+                "",
+                "Install steps:",
+                "1. Copy the exported site directory to /etc/datastream/<project>/<site>.",
+                "2. Install systemd/datastreamd.service as a site-specific unit, for example /etc/systemd/system/datastreamd-<site_id>.service.",
+                "3. Reload systemd and enable the unit.",
+                "",
+                "Secrets and external credentials are intentionally left to the operator to provide.",
+                "",
+            ]
+        )
+
+    def _render_kubernetes_configmap(self, site_id: str, env: dict[str, str]) -> str:
+        payload = {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": f"datastream-{site_id}-config",
+                "labels": {
+                    "app.kubernetes.io/name": "datastream",
+                    "app.kubernetes.io/instance": site_id,
+                    "datastream/project": self.project_id,
+                },
+            },
+            "data": env,
+        }
+        return yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
+
+    def _render_kubernetes_site_profile_configmap(self, site_id: str) -> str:
+        profile = load_site_profile(self.site_profile_paths()[site_id])
+        payload = {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": f"datastream-{site_id}-site-profile",
+                "labels": {
+                    "app.kubernetes.io/name": "datastream",
+                    "app.kubernetes.io/instance": site_id,
+                    "datastream/project": self.project_id,
+                },
+            },
+            "data": {
+                "site-profile.yaml": yaml.safe_dump(profile.to_dict(), sort_keys=False, allow_unicode=True),
+            },
+        }
+        return yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
+
+    def _render_kubernetes_deployment(self, site_id: str) -> str:
+        payload = {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": f"datastream-{site_id}",
+                "labels": {
+                    "app.kubernetes.io/name": "datastream",
+                    "app.kubernetes.io/instance": site_id,
+                    "datastream/project": self.project_id,
+                },
+            },
+            "spec": {
+                "replicas": 1,
+                "selector": {
+                    "matchLabels": {
+                        "app.kubernetes.io/name": "datastream",
+                        "app.kubernetes.io/instance": site_id,
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app.kubernetes.io/name": "datastream",
+                            "app.kubernetes.io/instance": site_id,
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "datastreamd",
+                                "image": "datastream:latest",
+                                "imagePullPolicy": "IfNotPresent",
+                                "args": [
+                                    "up",
+                                    "--site-profile",
+                                    "/etc/datastream/site-profile.yaml",
+                                ],
+                                "envFrom": [
+                                    {"configMapRef": {"name": f"datastream-{site_id}-config"}},
+                                ],
+                                "volumeMounts": [
+                                    {
+                                        "name": "site-profile",
+                                        "mountPath": "/etc/datastream/site-profile.yaml",
+                                        "subPath": "site-profile.yaml",
+                                        "readOnly": True,
+                                    }
+                                ],
+                                "ports": [{"containerPort": 8080, "name": "http"}],
+                                "resources": {
+                                    "requests": {"cpu": "250m", "memory": "512Mi"},
+                                    "limits": {"cpu": "1000m", "memory": "1Gi"},
+                                },
+                            }
+                        ],
+                        "volumes": [
+                            {
+                                "name": "site-profile",
+                                "configMap": {"name": f"datastream-{site_id}-site-profile"},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+        return yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
+
+    def _render_kubernetes_service(self, site_id: str) -> str:
+        payload = {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": f"datastream-{site_id}",
+                "labels": {
+                    "app.kubernetes.io/name": "datastream",
+                    "app.kubernetes.io/instance": site_id,
+                    "datastream/project": self.project_id,
+                },
+            },
+            "spec": {
+                "type": "ClusterIP",
+                "selector": {
+                    "app.kubernetes.io/name": "datastream",
+                    "app.kubernetes.io/instance": site_id,
+                },
+                "ports": [{"name": "http", "port": 8080, "targetPort": "http"}],
+            },
+        }
+        return yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
+
+    def _render_kubernetes_readme(self, site_id: str) -> str:
+        return "\n".join(
+            [
+                f"# {self.name} - {site_id}",
+                "",
+                "This directory contains a Kubernetes starter bundle.",
+                "",
+                "Apply the config map, deployment, and service after replacing the image tag with your release build.",
+                "",
+                "Secrets are intentionally not bundled. Provide broker credentials, external APIs, and model endpoints via your cluster secret workflow.",
+                "",
+            ]
+        )
+
+    def _export_flat_site(self, base_dir: Path, site_id: str, env: dict[str, str], *, fmt: str, written: list[Path]) -> None:
+        bundle_base = base_dir / site_id
+        if fmt in {"env", "both"}:
+            written.append(self._write_text(bundle_base.with_suffix(".env"), self._render_env(env)))
+        if fmt in {"yaml", "both"}:
+            written.append(self._write_text(bundle_base.with_suffix(".yaml"), self._render_bundle_yaml(site_id, env)))
+
+    def _export_structured_site(self, base_dir: Path, site_id: str, env: dict[str, str], *, fmt: str, layout: str, written: list[Path]) -> None:
+        site_root = base_dir / site_id
+        site_profile_path = site_root / "site-profile.yaml"
+        bundle_path = site_root / "bundle.yaml"
+        env_path = site_root / "env" / "site.env"
+        written.append(self._write_text(site_profile_path, self._render_site_profile_yaml(site_id)))
+        written.append(self._write_text(bundle_path, self._render_bundle_yaml(site_id, env)))
+        if fmt in {"env", "both"}:
+            written.append(self._write_text(env_path, self._render_env(env)))
+        if layout == "systemd":
+            written.append(self._write_text(site_root / "systemd" / "datastreamd.service", self._render_systemd_unit(site_id)))
+            written.append(self._write_text(site_root / "systemd" / "README.md", self._render_systemd_readme(site_id)))
+        elif layout == "kubernetes":
+            written.append(self._write_text(site_root / "kubernetes" / "configmap.yaml", self._render_kubernetes_configmap(site_id, env)))
+            written.append(self._write_text(site_root / "kubernetes" / "site-profile-configmap.yaml", self._render_kubernetes_site_profile_configmap(site_id)))
+            written.append(self._write_text(site_root / "kubernetes" / "deployment.yaml", self._render_kubernetes_deployment(site_id)))
+            written.append(self._write_text(site_root / "kubernetes" / "service.yaml", self._render_kubernetes_service(site_id)))
+            written.append(self._write_text(site_root / "kubernetes" / "README.md", self._render_kubernetes_readme(site_id)))
+
     def lint(self) -> list[str]:
         issues = validate_project_manifest(self)
         site_ids = {site.site_id for site in self.sites}
@@ -189,41 +428,26 @@ class ProjectManifest:
         *,
         site_id: str | None = None,
         fmt: str = "both",
+        layout: str = "flat",
     ) -> list[Path]:
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
+        if fmt not in VALID_EXPORT_FORMATS:
+            raise ValueError(f"invalid export format: {fmt}")
+        if layout not in VALID_EXPORT_LAYOUTS:
+            raise ValueError(f"invalid export layout: {layout}")
         envs = self.to_site_envs()
         targets = [site_id] if site_id else list(envs.keys())
         written: list[Path] = []
-
-        def render_env(env: dict[str, str]) -> str:
-            return "\n".join(f"{key}={value}" for key, value in sorted(env.items())) + "\n"
 
         for sid in targets:
             if sid not in envs:
                 raise ValueError(f"site_id not found in manifest: {sid}")
             env = envs[sid]
-            site_profile = str(self.site_profile_paths()[sid])
-            bundle = {
-                "project_id": self.project_id,
-                "project_name": self.name,
-                "site_id": sid,
-                "site_profile": site_profile,
-                "env": env,
-                "sources": [source.to_dict() for source in self.sources if source.site_id == sid],
-                "bridge_rules": [rule.to_dict() for rule in self.bridge_rules],
-                "correlation_groups": [group.to_dict() for group in self.correlation_groups],
-                "retention": self.retention.to_dict(),
-            }
-            base = output_path / sid
-            if fmt in {"env", "both"}:
-                env_path = base.with_suffix(".env")
-                env_path.write_text(render_env(env), encoding="utf-8")
-                written.append(env_path)
-            if fmt in {"yaml", "both"}:
-                yaml_path = base.with_suffix(".yaml")
-                yaml_path.write_text(yaml.safe_dump(bundle, sort_keys=False, allow_unicode=True), encoding="utf-8")
-                written.append(yaml_path)
+            if layout == "flat":
+                self._export_flat_site(output_path, sid, env, fmt=fmt, written=written)
+            else:
+                self._export_structured_site(output_path, sid, env, fmt=fmt, layout=layout, written=written)
         return written
 
 

@@ -43,6 +43,9 @@
    - Added `datastreamctl project-manifest bundle` for per-site deployment env output.
    - Added `datastreamctl project-manifest release-gate` to validate the full manifest across all sites.
    - Added `datastreamctl project-manifest export` to write per-site `.env` and YAML bundles to disk.
+   - Added `--layout flat|systemd|kubernetes` so export can generate a deployment-ready directory tree for OS services or cluster rollouts.
+   - Systemd exports now include a unit file and operator README alongside the site profile and env bundle.
+   - Kubernetes exports now include a config map, site-profile config map, deployment, service, and README scaffold.
    - Added `datastreamctl project-manifest lint` to catch source/topic collisions and policy drift.
    - Added `datastreamd --project-manifest` and `--site-id` so runtime services can start from the company manifest and select a site bundle.
 

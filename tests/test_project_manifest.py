@@ -43,6 +43,34 @@ def test_manifest_export_bundles(tmp_path: Path):
     assert "site_id: demo-site" in yaml_path.read_text(encoding="utf-8")
 
 
+def test_manifest_export_systemd_layout(tmp_path: Path):
+    manifest = load_project_manifest(MANIFEST)
+    written = manifest.export_bundles(tmp_path, site_id="demo-site", fmt="both", layout="systemd")
+    site_root = tmp_path / "demo-site"
+    assert site_root.exists()
+    assert (site_root / "env" / "site.env").exists()
+    assert (site_root / "site-profile.yaml").exists()
+    assert (site_root / "bundle.yaml").exists()
+    assert (site_root / "systemd" / "datastreamd.service").exists()
+    assert (site_root / "systemd" / "README.md").exists()
+    assert any(path.name == "datastreamd.service" for path in written)
+
+
+def test_manifest_export_kubernetes_layout(tmp_path: Path):
+    manifest = load_project_manifest(MANIFEST)
+    written = manifest.export_bundles(tmp_path, site_id="plant-a", fmt="both", layout="kubernetes")
+    site_root = tmp_path / "plant-a"
+    assert site_root.exists()
+    assert (site_root / "env" / "site.env").exists()
+    assert (site_root / "site-profile.yaml").exists()
+    assert (site_root / "kubernetes" / "configmap.yaml").exists()
+    assert (site_root / "kubernetes" / "site-profile-configmap.yaml").exists()
+    assert (site_root / "kubernetes" / "deployment.yaml").exists()
+    assert (site_root / "kubernetes" / "service.yaml").exists()
+    assert (site_root / "kubernetes" / "README.md").exists()
+    assert any(path.name == "deployment.yaml" for path in written)
+
+
 def test_manifest_lint_flags_collisions():
     manifest = load_project_manifest(MANIFEST)
     issues = manifest.lint()

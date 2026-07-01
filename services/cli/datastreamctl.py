@@ -365,12 +365,18 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
         return 0 if not errors else 1
 
     if args.action == "export":
-        written = manifest.export_bundles(Path(args.output_dir), site_id=args.site_id, fmt=args.format)
+        written = manifest.export_bundles(
+            Path(args.output_dir),
+            site_id=args.site_id,
+            fmt=args.format,
+            layout=args.layout,
+        )
         payload = {
             "path": args.path,
             "output_dir": args.output_dir,
             "site_id": args.site_id,
             "format": args.format,
+            "layout": args.layout,
             "written": [str(path) for path in written],
             "errors": errors,
             "valid": not errors,
@@ -382,6 +388,7 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
             print("=" * 40)
             _print_row("output_dir", args.output_dir)
             _print_row("format", args.format)
+            _print_row("layout", args.layout)
             for path in written:
                 print(path)
             if errors:
@@ -542,6 +549,7 @@ def build_parser() -> argparse.ArgumentParser:
     project_export.add_argument("output_dir")
     project_export.add_argument("--site-id", default=None, help="Optional site to export")
     project_export.add_argument("--format", choices=["env", "yaml", "both"], default="both")
+    project_export.add_argument("--layout", choices=["flat", "systemd", "kubernetes"], default="flat")
     project_export.add_argument("--json", action="store_true")
     project_export.set_defaults(func=cmd_project_manifest)
     project_lint = project_sub.add_parser("lint", help="Lint the project manifest for collisions and policy drift")
