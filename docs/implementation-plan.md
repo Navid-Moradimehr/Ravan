@@ -34,3 +34,4 @@ Commit after each major vertical slice with conventional messages. Do not combin
 - Centralized event normalization in `services/common/normalize.py` and used it from both `services/edge_ingest/main.py` (`to_legacy_iot_event`) and `services/processor/runtime_processor.py` (`normalize_runtime_event`) without changing emitted payload semantics.
 - Added bounded runtime processor state controls (`RUNTIME_WINDOW_LIMIT`, `RUNTIME_DEVICE_MAX_IDLE_SECONDS`, `RUNTIME_MAX_ACTIVE_DEVICES`) to prevent unbounded in-memory growth during long-running operation.
 - See `docs/multi-site-rollout.md` for the production-hardening sequence that turns the current single-site install shape into a repeatable multi-site rollout.
+- See `docs/model-agent-roadmap.md` for the production model stack plan, including what is already implemented, what still needs hardening, and what future agent infrastructure should exist without shipping agents as release features.

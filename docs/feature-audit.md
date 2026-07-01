@@ -1,9 +1,13 @@
 # Feature Audit Report
 
-**Date**: 2026-06-29
+**Date**: 2026-07-01
 **Total Features**: 98
-**Implemented**: 98 (100%)
-**Status**: All planned features implemented. Platform ready for Phase 8 distribution.
+**Implemented**: Core platform and rollout scaffolding are broadly implemented
+**Status**: Strong local/open-source foundation, but not every advanced feature area is production-complete.
+
+This file records the broad feature surface that exists in the repo.
+For a stricter view of what is production-ready versus only foundational,
+see `docs/model-agent-roadmap.md` and `docs/multi-site-rollout.md`.
 
 ## Implemented Categories
 
@@ -118,7 +122,14 @@
 - Docker Compose for local development
 - Auto-scaling configuration in values.yaml
 
-## Remaining Gaps (0 features)
+## Remaining Gaps
 
-**All 98 planned features are now implemented.**
-**Platform is ready for Phase 8 distribution and open-source release.**
+The repo has wide feature coverage, but these areas still need additional implementation or hardening before they should be considered industry-standard production features:
+
+- embeddings and retrieval infrastructure
+- model registry and evaluation lifecycle
+- future diagnostic-agent infrastructure
+- future supervised action-agent infrastructure
+- production packaging and installer maturity
+- stronger security hardening for shared multi-user deployments
+- per-site production benchmarking on target database and model topologies
