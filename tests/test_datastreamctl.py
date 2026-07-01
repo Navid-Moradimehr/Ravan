@@ -195,6 +195,23 @@ class TestDatastreamctl:
         assert (tmp_path / "plant-a" / "kubernetes" / "kustomization.yaml").exists()
         assert "kubernetes" in out
 
+    def test_project_manifest_package_command(self, tmp_path):
+        rc, out = self._run([
+            "project-manifest",
+            "package",
+            str(PROJECT_MANIFEST),
+            str(tmp_path),
+            "--site-id",
+            "demo-site",
+            "--format",
+            "both",
+        ])
+        assert rc == 0
+        assert (tmp_path / "demo-site" / "flat" / "site.env").exists()
+        assert (tmp_path / "demo-site" / "systemd" / "install.sh").exists()
+        assert (tmp_path / "demo-site" / "kubernetes" / "helm" / "install.sh").exists()
+        assert "project package" in out
+
     def test_benchmark_deployment_pack_runs(self, tmp_path):
         csv_path = tmp_path / "mock.csv"
         csv_path.write_text(
@@ -225,6 +242,37 @@ class TestDatastreamctl:
         assert rc == 0
         assert "deployment pack benchmark" in out
         assert "export_file_count=" in out
+
+    def test_benchmark_deployment_pack_matrix_runs(self, tmp_path):
+        csv_path = tmp_path / "mock.csv"
+        csv_path.write_text(
+            "\n".join(
+                [
+                    "event_id,source_protocol,source_id,asset_id,tag,value,quality,unit,site,line,ts_source,schema_version,fault_type,scenario_id,ground_truth_severity,step",
+                    "evt-1,mqtt,site-a/mqtt/pump-1,Pump-1,Temperature,55.1,good,c,Factory-A,Line-1,2026-07-01T00:00:00Z,1,normal,mock-benchmark,normal,0",
+                    "evt-2,opcua,site-a/opcua/pump-2,Pump-2,Vibration,7.5,good,mm/s,Factory-A,Line-1,2026-07-01T00:00:01Z,1,degradation,mock-benchmark,normal,1",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        rc, out = self._run([
+            "benchmark",
+            "deployment-pack-matrix",
+            "--manifest",
+            str(PROJECT_MANIFEST),
+            "--csv",
+            str(csv_path),
+            "--site-ids",
+            "demo-site,plant-a",
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+        ])
+        assert rc == 0
+        assert "deployment pack benchmark matrix" in out
+        assert "demo-site" in out
+        assert "plant-a" in out
 
 
 if __name__ == "__main__":

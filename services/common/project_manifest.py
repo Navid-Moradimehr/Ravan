@@ -10,7 +10,7 @@ from services.common.site_profiles import load_site_profile, validate_site_profi
 
 
 VALID_BRIDGE_MODES = {"replicate", "fanout", "correlate", "rollup"}
-VALID_EXPORT_LAYOUTS = {"flat", "systemd", "kubernetes"}
+VALID_EXPORT_LAYOUTS = {"flat", "systemd", "kubernetes", "package"}
 VALID_EXPORT_FORMATS = {"env", "yaml", "both"}
 
 
@@ -431,7 +431,27 @@ class ProjectManifest:
                 "Example:",
                 "  helm upgrade --install datastream-demo-site ./k8s/helm --namespace datastream-demo-site -f kubernetes/helm/values.generated.yaml",
                 "",
+                "Run `kubernetes/helm/install.sh` to use the generated release and namespace defaults.",
+                "",
                 "Replace the generated image tag and provide secrets through your cluster secret workflow.",
+                "",
+            ]
+        )
+
+    def _render_kubernetes_helm_install(self, site_id: str) -> str:
+        release = f"datastream-{site_id}"
+        namespace = f"datastream-{site_id}"
+        return "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "set -euo pipefail",
+                "",
+                'ROOT_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"',
+                f'RELEASE_NAME="${{2:-{release}}}"',
+                f'NAMESPACE="${{3:-{namespace}}}"',
+                'VALUES_FILE="${4:-${ROOT_DIR}/values.generated.yaml}"',
+                "",
+                'helm upgrade --install "${RELEASE_NAME}" ./k8s/helm --namespace "${NAMESPACE}" -f "${VALUES_FILE}"',
                 "",
             ]
         )
@@ -485,6 +505,47 @@ class ProjectManifest:
             written.append(self._write_text(site_root / "kubernetes" / "README.md", self._render_kubernetes_readme(site_id)))
             written.append(self._write_text(site_root / "kubernetes" / "helm" / "values.generated.yaml", self._render_kubernetes_helm_values(site_id, env)))
             written.append(self._write_text(site_root / "kubernetes" / "helm" / "README.md", self._render_kubernetes_helm_readme(site_id)))
+            written.append(self._write_text(site_root / "kubernetes" / "helm" / "install.sh", self._render_kubernetes_helm_install(site_id)))
+
+    def _render_package_readme(self, site_id: str) -> str:
+        return "\n".join(
+            [
+                f"# Deployment package for {self.name} - {site_id}",
+                "",
+                "This directory contains all deployable outputs for one site:",
+                "",
+                "- `flat/` for quick inspection or CI artifacts",
+                "- `systemd/` for host-based installation",
+                "- `kubernetes/` for kustomize and Helm-based deployment",
+                "",
+                "The generated Helm wrapper uses site-specific release and namespace defaults.",
+                "",
+            ]
+        )
+
+    def _export_package_site(self, base_dir: Path, site_id: str, env: dict[str, str], *, fmt: str, written: list[Path]) -> None:
+        site_root = base_dir / site_id
+        written.append(self._write_text(site_root / "README.md", self._render_package_readme(site_id)))
+        if fmt in {"env", "both"}:
+            written.append(self._write_text(site_root / "flat" / "site.env", self._render_env(env)))
+        if fmt in {"yaml", "both"}:
+            written.append(self._write_text(site_root / "flat" / "bundle.yaml", self._render_bundle_yaml(site_id, env)))
+        written.append(self._write_text(site_root / "site-profile.yaml", self._render_site_profile_yaml(site_id)))
+        written.append(self._write_text(site_root / "bundle.yaml", self._render_bundle_yaml(site_id, env)))
+        written.append(self._write_text(site_root / "env" / "site.env", self._render_env(env)))
+        written.append(self._write_text(site_root / "systemd" / "datastreamd.service", self._render_systemd_unit(site_id)))
+        written.append(self._write_text(site_root / "systemd" / "README.md", self._render_systemd_readme(site_id)))
+        written.append(self._write_text(site_root / "systemd" / "install.sh", self._render_systemd_install(site_id)))
+        written.append(self._write_text(site_root / "systemd" / "uninstall.sh", self._render_systemd_uninstall(site_id)))
+        written.append(self._write_text(site_root / "kubernetes" / "configmap.yaml", self._render_kubernetes_configmap(site_id, env)))
+        written.append(self._write_text(site_root / "kubernetes" / "site-profile-configmap.yaml", self._render_kubernetes_site_profile_configmap(site_id)))
+        written.append(self._write_text(site_root / "kubernetes" / "deployment.yaml", self._render_kubernetes_deployment(site_id)))
+        written.append(self._write_text(site_root / "kubernetes" / "service.yaml", self._render_kubernetes_service(site_id)))
+        written.append(self._write_text(site_root / "kubernetes" / "kustomization.yaml", self._render_kubernetes_kustomization(site_id)))
+        written.append(self._write_text(site_root / "kubernetes" / "README.md", self._render_kubernetes_readme(site_id)))
+        written.append(self._write_text(site_root / "kubernetes" / "helm" / "values.generated.yaml", self._render_kubernetes_helm_values(site_id, env)))
+        written.append(self._write_text(site_root / "kubernetes" / "helm" / "README.md", self._render_kubernetes_helm_readme(site_id)))
+        written.append(self._write_text(site_root / "kubernetes" / "helm" / "install.sh", self._render_kubernetes_helm_install(site_id)))
 
     def lint(self) -> list[str]:
         issues = validate_project_manifest(self)
@@ -551,9 +612,20 @@ class ProjectManifest:
             env = envs[sid]
             if layout == "flat":
                 self._export_flat_site(output_path, sid, env, fmt=fmt, written=written)
-            else:
+            elif layout in {"systemd", "kubernetes"}:
                 self._export_structured_site(output_path, sid, env, fmt=fmt, layout=layout, written=written)
+            else:
+                self._export_package_site(output_path, sid, env, fmt=fmt, written=written)
         return written
+
+    def export_package(
+        self,
+        output_dir: Path | str,
+        *,
+        site_id: str | None = None,
+        fmt: str = "both",
+    ) -> list[Path]:
+        return self.export_bundles(output_dir, site_id=site_id, fmt=fmt, layout="package")
 
 
 def _load_tuple(items: Any, factory) -> tuple[Any, ...]:

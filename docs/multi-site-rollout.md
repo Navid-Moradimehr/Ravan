@@ -204,7 +204,9 @@ Operationally, the manifest is now useful in three ways:
 - `datastreamctl project-manifest export --layout systemd` generates a ready-to-install per-site tree for host-based deployments
 - `datastreamctl project-manifest export --layout kubernetes` generates a starter tree for cluster-based deployments, including `kustomization.yaml`
 - `datastreamctl project-manifest export --layout kubernetes` also generates `kubernetes/helm/values.generated.yaml` for the existing `k8s/helm` chart
+- `datastreamctl project-manifest package` emits a single combined site bundle with flat, systemd, and Kubernetes outputs
 - `datastreamctl benchmark deployment-pack` measures the export cost and replay throughput on the same mock industrial pack
+- `datastreamctl benchmark deployment-pack-matrix` compares multiple sites side by side
 - `datastreamctl project-manifest lint` catches duplicate topics and policy drift before release
 - `datastreamctl project-manifest release-gate` validates the entire fleet topology site by site
 - `datastreamd --project-manifest` can start the runtime for one selected site from the company contract
@@ -216,6 +218,7 @@ Recommended deployment pattern:
 - use `kubernetes` for multi-site cluster deployments and central services; apply with `kubectl apply -k`
 - use the generated Helm overlay from `kubernetes/helm/values.generated.yaml` when deploying with the repository chart
 - prefer `namespaceOverride` and `fullnameOverride` from the generated Helm values for site isolation
+- use the generated `kubernetes/helm/install.sh` wrapper to keep release names and namespaces aligned per site
 - keep secrets, broker credentials, and external model endpoints in the operator's secret store, not in the exported manifest
 
 Suggested SLOs for initial rollout:

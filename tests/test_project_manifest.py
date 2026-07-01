@@ -75,6 +75,19 @@ def test_manifest_export_kubernetes_layout(tmp_path: Path):
     assert any(path.name == "deployment.yaml" for path in written)
 
 
+def test_manifest_package_export(tmp_path: Path):
+    manifest = load_project_manifest(MANIFEST)
+    written = manifest.export_package(tmp_path, site_id="demo-site", fmt="both")
+    site_root = tmp_path / "demo-site"
+    assert site_root.exists()
+    assert (site_root / "flat" / "site.env").exists()
+    assert (site_root / "flat" / "bundle.yaml").exists()
+    assert (site_root / "systemd" / "install.sh").exists()
+    assert (site_root / "kubernetes" / "helm" / "install.sh").exists()
+    assert (site_root / "README.md").exists()
+    assert any(path.name == "site.env" for path in written)
+
+
 def test_manifest_lint_flags_collisions():
     manifest = load_project_manifest(MANIFEST)
     issues = manifest.lint()

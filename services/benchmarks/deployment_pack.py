@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import tempfile
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -90,6 +90,54 @@ def format_result(result: DeploymentPackBenchmarkResult) -> str:
             f"replay_serialized_bytes={result.replay_serialized_bytes}",
         ]
     )
+
+
+def run_matrix(
+    manifest_path: Path,
+    csv_path: Path,
+    *,
+    site_ids: list[str] | None = None,
+    target_events: int = 10_000,
+    batch_size: int = 256,
+    warmup_events: int = 0,
+) -> list[DeploymentPackBenchmarkResult]:
+    manifest = load_project_manifest(manifest_path)
+    selected_site_ids = site_ids or [site.site_id for site in manifest.sites]
+    results: list[DeploymentPackBenchmarkResult] = []
+    for sid in selected_site_ids:
+        results.append(
+            run_benchmark(
+                manifest_path,
+                csv_path,
+                site_id=sid,
+                target_events=target_events,
+                batch_size=batch_size,
+                warmup_events=warmup_events,
+            )
+        )
+    return results
+
+
+def format_matrix_result(results: list[DeploymentPackBenchmarkResult]) -> str:
+    lines = [
+        "site_id | export_files/sec | replay_events/sec | systemd_files | kubernetes_files",
+        "-" * 78,
+    ]
+    total_export = 0.0
+    total_replay = 0.0
+    for result in results:
+        total_export += result.export_files_per_second
+        total_replay += result.replay_events_per_second
+        lines.append(
+            f"{result.site_id} | {result.export_files_per_second} | {result.replay_events_per_second} | "
+            f"{result.systemd_file_count} | {result.kubernetes_file_count}"
+        )
+    if results:
+        lines.append("-" * 78)
+        lines.append(
+            f"avg | {round(total_export / len(results), 2)} | {round(total_replay / len(results), 2)} | - | -"
+        )
+    return "\n".join(lines)
 
 
 def build_parser() -> argparse.ArgumentParser:

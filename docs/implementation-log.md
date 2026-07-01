@@ -49,6 +49,8 @@
    - Kubernetes exports now include a Helm overlay at `kubernetes/helm/values.generated.yaml` plus operator notes for `k8s/helm`.
    - Helm templates now honor `namespaceOverride`, so generated site overlays can target site-specific namespaces.
    - Added `datastreamctl benchmark deployment-pack` to measure export generation plus mock industrial replay in one pass.
+   - Added `datastreamctl project-manifest package` for a combined flat/systemd/Kubernetes site bundle.
+   - Added `datastreamctl benchmark deployment-pack-matrix` for side-by-side site comparison.
    - Added `datastreamctl project-manifest lint` to catch source/topic collisions and policy drift.
    - Added `datastreamd --project-manifest` and `--site-id` so runtime services can start from the company manifest and select a site bundle.
 
@@ -65,6 +67,7 @@
   - manifest bundle and project release-gate commands validated across the sample fleet manifest
   - deployment-pack benchmark validates both `systemd` and Kubernetes export layouts plus mock mixed replay data
   - deployment-pack benchmark on `data/benchmarks/industrial_mixed_benchmark.csv`: export generation 714.56 files/sec, 0.0252 s elapsed, `systemd` layout 7 files, Kubernetes layout 11 files, mock replay 68,166.98 events/sec over 5,000 events and 20 batches
+  - deployment-pack matrix on `demo-site` and `plant-a`: export generation 760.83 files/sec average, mock replay 64,511.93 events/sec average, `systemd` layout 7 files per site, Kubernetes layout 12 files per site
 
 ## 2026-07-01 - Model and Agent Contract Layer
 
