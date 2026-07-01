@@ -15,6 +15,7 @@ from typing import Any, Callable, Iterator
 from confluent_kafka import Producer
 
 from services.edge_ingest.model import IndustrialEvent, to_json_bytes, utc_now
+from services.common.stream_scope import stream_partition_key
 
 
 @dataclass(frozen=True)
@@ -123,7 +124,7 @@ def replay(config: ReplayConfig) -> None:
             if config.timestamp_column and config.timestamp_column in row:
                 event_dict["ts_source"] = row[config.timestamp_column]
             payload = json.dumps(event_dict, separators=(",", ":")).encode("utf-8")
-            producer.produce(config.topic, key=str(event_dict.get("asset_id", "")).encode("utf-8"), value=payload)
+            producer.produce(config.topic, key=stream_partition_key(event_dict), value=payload)
             producer.poll(0)
             produced += 1
 

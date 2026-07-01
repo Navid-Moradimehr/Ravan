@@ -152,6 +152,29 @@ Every site should publish the same baseline operational signals:
 - broker health
 - UI/API health
 
+### Source Isolation
+
+Inside one site, the platform should keep each PLC, gateway, and sensor network separate at the transport and storage boundaries.
+
+Use these fields to identify a stream:
+
+- `site`
+- `line`
+- `source_protocol`
+- `source_id`
+- `asset_id`
+- `tag`
+
+Recommended behavior:
+
+- use the full stream identity for Kafka/Redpanda partition keys
+- store the raw historian rows with source-aware metadata intact
+- keep each PLC or gateway stream separate even when two sources report the same asset and tag
+- bridge streams only through explicit correlation, federation, or outbound bridge rules
+- aggregate up through the asset hierarchy only after storage, never by collapsing the source identity at ingest
+
+This keeps the platform safe for a full production line with multiple PLCs and sensors feeding the same asset model.
+
 Suggested SLOs for initial rollout:
 
 - ingest path availability: 99.5% per site

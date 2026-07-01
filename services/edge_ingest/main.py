@@ -24,6 +24,7 @@ from services.historian.client import insert_industrial_event, insert_industrial
 from services.common.normalize import to_legacy_iot_event
 from services.edge_ingest.modbus_rtu_client import ModbusRTUClient, scan_modbus_rtu_devices
 from services.edge_ingest.opcua_discovery import OPCUADiscoveryClient
+from services.common.stream_scope import stream_partition_key
 
 
 events_total = Counter("edge_ingest_events_total", "Validated industrial events", ["protocol"])
@@ -101,7 +102,7 @@ class EdgePublisher:
             dlq_total.labels(protocol=protocol).inc()
         else:
             assert event is not None
-            key = event.asset_id.encode("utf-8")
+            key = stream_partition_key(event)
             self._buffer.append((self.settings.normalized_topic, key, to_json_bytes(event)))
             self._buffer.append((self.settings.legacy_topic, key, to_json_bytes(to_legacy_iot_event(event))))
             self._historian_buffer.append(event.model_dump(mode="json"))

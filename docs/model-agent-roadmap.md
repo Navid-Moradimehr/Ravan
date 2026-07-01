@@ -104,6 +104,8 @@ Already present:
 - provider-neutral embedding client with deterministic fallback
 - structured semantic query planning and read-only SQL compilation
 - hybrid retrieval API that combines token, phrase, and embedding scoring
+- file-backed chunked retrieval index for manuals and long notes
+- stream identity model that keeps PLC/source streams separate before correlation
 
 Still needed:
 

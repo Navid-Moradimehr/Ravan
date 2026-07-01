@@ -26,6 +26,16 @@
    - Added `query_sql_readonly()` in `services/historian/client.py`.
    - The historian query endpoint now rejects non-read-only SQL before execution.
 
+5. **Stream identity and partitioning**
+   - Added `services/common/stream_scope.py` so ingest and replay paths partition Kafka by full stream identity instead of `asset_id` alone.
+   - Event transport now preserves `site`, `line`, `source_protocol`, `source_id`, `asset_id`, and `tag` as part of the stream key.
+   - This keeps multiple PLCs and sensors separable even when they report the same asset and tag names.
+
+6. **Persistent retrieval index and chunking**
+   - Added `services/common/text_chunking.py` and `services/common/retrieval_index.py` for file-backed chunked indexing of longer manuals and notes.
+   - Added API endpoints to rebuild and evaluate the persistent index.
+   - Repeated searches use a file-mtime cache so the index does not have to be re-parsed on every query.
+
 ### Verified
 
 - Focused contract tests for embeddings, semantic planning, hybrid retrieval, and route registration: 21 passed
@@ -34,6 +44,8 @@
   - semantic query plan + read-only SQL compilation: 17,458 ops/sec, 0.057 ms avg
   - hybrid search over mocked historian/assets/reports/scenarios: 4,792.7 ops/sec, 0.209 ms avg
   - top-hit verification: `alarm:compressor-1:motor_vibration:2026-07-01T00:05:00Z`
+  - stream key separation check: distinct PLC source IDs produce distinct Kafka keys while correlation groups stay aligned on site/asset/tag
+  - persistent retrieval index over 40 mock docs: build 1.79 ops/sec, 557.55 ms per build; repeated search 21.52 ops/sec, 46.474 ms avg; evaluation hit rate@5 = 1.0
 
 ## 2026-07-01 - Model and Agent Contract Layer
 

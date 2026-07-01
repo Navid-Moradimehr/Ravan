@@ -7,7 +7,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from services.common.query_plan import build_query_plan
-from services.common.retrieval import build_retrieval_catalog, search_retrieval_corpus
+from services.common.retrieval import (
+    build_persistent_retrieval_index,
+    build_retrieval_catalog,
+    evaluate_persistent_retrieval_index,
+    search_retrieval_corpus,
+)
+from services.common.retrieval_index import RetrievalEvaluationCase
 from services.common.semantic_model import load_semantic_model
 from services.common.sql_compiler import compile_readonly_sql
 from services.historian.client import query_sql_readonly
@@ -34,6 +40,28 @@ class HybridSearchRequest(BaseModel):
     max_results: int = Field(default=5, ge=1, le=25)
     asset_config: str = "config/assets.yaml"
     use_embeddings: bool = True
+
+
+class BuildIndexRequest(BaseModel):
+    table: str = "industrial_events"
+    limit: int = Field(default=25, ge=1, le=1000)
+    asset_config: str = "config/assets.yaml"
+    index_path: str = "data/retrieval/index.jsonl"
+    overwrite: bool = True
+
+
+class EvaluationCaseModel(BaseModel):
+    query: str = Field(..., min_length=1, max_length=2000)
+    expected_doc_ids: list[str] = Field(default_factory=list)
+    relevant_sources: list[str] = Field(default_factory=list)
+
+
+class EvaluateIndexRequest(BaseModel):
+    cases: list[EvaluationCaseModel] = Field(default_factory=list)
+    table: str = "industrial_events"
+    limit: int = Field(default=25, ge=1, le=1000)
+    asset_config: str = "config/assets.yaml"
+    index_path: str = "data/retrieval/index.jsonl"
 
 
 @router.get("/api/v1/search/catalog")
@@ -105,6 +133,41 @@ async def post_hybrid(req: HybridSearchRequest) -> dict[str, Any]:
             asset_config=Path(req.asset_config),
             max_results=req.max_results,
             use_embeddings=req.use_embeddings,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post("/api/v1/search/index/rebuild")
+async def post_index_rebuild(req: BuildIndexRequest) -> dict[str, Any]:
+    try:
+        return build_persistent_retrieval_index(
+            index_path=Path(req.index_path),
+            table=req.table,
+            limit=req.limit,
+            asset_config=Path(req.asset_config),
+            overwrite=req.overwrite,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post("/api/v1/search/index/evaluate")
+async def post_index_evaluate(req: EvaluateIndexRequest) -> dict[str, Any]:
+    try:
+        cases = [
+            RetrievalEvaluationCase(
+                query=case.query,
+                expected_doc_ids=tuple(case.expected_doc_ids),
+                relevant_sources=tuple(case.relevant_sources),
+            )
+            for case in req.cases
+        ]
+        return evaluate_persistent_retrieval_index(
+            cases=cases,
+            index_path=Path(req.index_path),
+            limit=req.limit,
+            asset_config=Path(req.asset_config),
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc))

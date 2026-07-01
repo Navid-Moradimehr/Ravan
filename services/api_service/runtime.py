@@ -6,6 +6,8 @@ from typing import Any
 
 import httpx
 
+from services.common.stream_scope import stream_partition_key
+
 try:
     from assets.model import load_hierarchy, hierarchy_to_tree
 except ImportError:
@@ -75,7 +77,7 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     except Exception:
         pass
 
-    key = event_model.asset_id.encode("utf-8")
+    key = stream_partition_key(event_model)
     try:
         _publish_kafka(brokers, raw_topic, key, to_json_bytes(event_dict))
         _publish_kafka(brokers, normalized_topic, key, to_json_bytes(event_model))

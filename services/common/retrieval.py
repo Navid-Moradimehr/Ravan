@@ -11,6 +11,7 @@ from services.common.embeddings import build_embedding_client
 from services.assets.model import hierarchy_to_tree, load_hierarchy
 from services.historian.client import query_alarms, query_recent_events, query_trend
 from services.scenarios.engine import list_scenarios
+from services.common.retrieval_index import RetrievalEvaluationCase, RetrievalIndex, evaluate_retrieval_index
 
 
 STOPWORDS = {
@@ -374,6 +375,43 @@ def build_retrieval_catalog(*, asset_config: Path | str = Path("config/assets.ya
         "notes": [
             "This is a deterministic retrieval boundary, not a governed BI semantic layer.",
             "Hybrid search combines token overlap, phrase match, and embeddings when available.",
+            "Persistent chunked indexing is available for long manuals and notes.",
             "Use it for read-only context assembly and future agent tooling.",
         ],
     }
+
+
+def build_persistent_retrieval_index(
+    *,
+    index_path: Path | str = Path("data/retrieval/index.jsonl"),
+    table: str = "industrial_events",
+    limit: int = 25,
+    asset_config: Path | str = Path("config/assets.yaml"),
+    overwrite: bool = True,
+) -> dict[str, Any]:
+    documents = [
+        document.to_dict()
+        for document in build_retrieval_documents(table=table, limit=limit, asset_config=asset_config)
+    ]
+    index = RetrievalIndex(index_path=index_path)
+    indexed = index.rebuild_from_retrieval_documents(documents, overwrite=overwrite)
+    return {
+        "index_path": str(Path(index_path)),
+        "documents_indexed": len(indexed),
+        "chunks_indexed": len(indexed),
+        "embedding_backend": index.client.backend_info().to_dict(),
+    }
+
+
+def evaluate_persistent_retrieval_index(
+    *,
+    cases: list[RetrievalEvaluationCase],
+    index_path: Path | str = Path("data/retrieval/index.jsonl"),
+    limit: int = 25,
+    asset_config: Path | str = Path("config/assets.yaml"),
+) -> dict[str, Any]:
+    index = RetrievalIndex(index_path=index_path)
+    if not index.load():
+        build_persistent_retrieval_index(index_path=index_path, limit=limit, asset_config=asset_config)
+    result = evaluate_retrieval_index(index, cases)
+    return result.to_dict()
