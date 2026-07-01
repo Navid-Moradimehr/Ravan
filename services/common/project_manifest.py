@@ -207,10 +207,53 @@ class ProjectManifest:
                 "",
                 "Install steps:",
                 "1. Copy the exported site directory to /etc/datastream/<project>/<site>.",
-                "2. Install systemd/datastreamd.service as a site-specific unit, for example /etc/systemd/system/datastreamd-<site_id>.service.",
+                "2. Run systemd/install.sh on the target host as root or with sudo.",
                 "3. Reload systemd and enable the unit.",
                 "",
                 "Secrets and external credentials are intentionally left to the operator to provide.",
+                "",
+            ]
+        )
+
+    def _render_systemd_install(self, site_id: str) -> str:
+        unit_name = f"datastreamd-{site_id}.service"
+        return "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "set -euo pipefail",
+                "",
+                'SOURCE_DIR="${1:-$(pwd)}"',
+                'TARGET_DIR="${2:-/etc/datastream/' + f"{self.project_id}/{site_id}" + '}"',
+                'UNIT_NAME="${3:-' + unit_name + '}"',
+                'SERVICE_FILE="${4:-/etc/systemd/system/${UNIT_NAME}}"',
+                "",
+                'install -d -m 0755 "${TARGET_DIR}"',
+                'install -d -m 0755 "${TARGET_DIR}/env"',
+                'install -d -m 0755 "${TARGET_DIR}/systemd"',
+                'install -m 0644 "${SOURCE_DIR}/site-profile.yaml" "${TARGET_DIR}/site-profile.yaml"',
+                'install -m 0644 "${SOURCE_DIR}/bundle.yaml" "${TARGET_DIR}/bundle.yaml"',
+                'install -m 0644 "${SOURCE_DIR}/env/site.env" "${TARGET_DIR}/env/site.env"',
+                'install -m 0644 "${SOURCE_DIR}/systemd/datastreamd.service" "${SERVICE_FILE}"',
+                "systemctl daemon-reload",
+                'systemctl enable "${UNIT_NAME}"',
+                'echo "Installed ${UNIT_NAME} using ${TARGET_DIR}"',
+                "",
+            ]
+        )
+
+    def _render_systemd_uninstall(self, site_id: str) -> str:
+        unit_name = f"datastreamd-{site_id}.service"
+        return "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "set -euo pipefail",
+                "",
+                'UNIT_NAME="${1:-' + unit_name + '}"',
+                'systemctl disable "${UNIT_NAME}" || true',
+                'rm -f "/etc/systemd/system/${UNIT_NAME}"',
+                'rm -rf "/etc/datastream/' + f"{self.project_id}/{site_id}" + '"',
+                "systemctl daemon-reload",
+                'echo "Removed ${UNIT_NAME}"',
                 "",
             ]
         )
@@ -348,12 +391,31 @@ class ProjectManifest:
                 "",
                 "This directory contains a Kubernetes starter bundle.",
                 "",
-                "Apply the config map, deployment, and service after replacing the image tag with your release build.",
+                "Run `kubectl apply -k .` after replacing the image tag with your release build.",
                 "",
                 "Secrets are intentionally not bundled. Provide broker credentials, external APIs, and model endpoints via your cluster secret workflow.",
                 "",
             ]
         )
+
+    def _render_kubernetes_kustomization(self, site_id: str) -> str:
+        payload = {
+            "apiVersion": "kustomize.config.k8s.io/v1beta1",
+            "kind": "Kustomization",
+            "namespace": "datastream",
+            "resources": [
+                "configmap.yaml",
+                "site-profile-configmap.yaml",
+                "deployment.yaml",
+                "service.yaml",
+            ],
+            "commonLabels": {
+                "app.kubernetes.io/name": "datastream",
+                "app.kubernetes.io/instance": site_id,
+                "datastream/project": self.project_id,
+            },
+        }
+        return yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
 
     def _export_flat_site(self, base_dir: Path, site_id: str, env: dict[str, str], *, fmt: str, written: list[Path]) -> None:
         bundle_base = base_dir / site_id
@@ -374,11 +436,14 @@ class ProjectManifest:
         if layout == "systemd":
             written.append(self._write_text(site_root / "systemd" / "datastreamd.service", self._render_systemd_unit(site_id)))
             written.append(self._write_text(site_root / "systemd" / "README.md", self._render_systemd_readme(site_id)))
+            written.append(self._write_text(site_root / "systemd" / "install.sh", self._render_systemd_install(site_id)))
+            written.append(self._write_text(site_root / "systemd" / "uninstall.sh", self._render_systemd_uninstall(site_id)))
         elif layout == "kubernetes":
             written.append(self._write_text(site_root / "kubernetes" / "configmap.yaml", self._render_kubernetes_configmap(site_id, env)))
             written.append(self._write_text(site_root / "kubernetes" / "site-profile-configmap.yaml", self._render_kubernetes_site_profile_configmap(site_id)))
             written.append(self._write_text(site_root / "kubernetes" / "deployment.yaml", self._render_kubernetes_deployment(site_id)))
             written.append(self._write_text(site_root / "kubernetes" / "service.yaml", self._render_kubernetes_service(site_id)))
+            written.append(self._write_text(site_root / "kubernetes" / "kustomization.yaml", self._render_kubernetes_kustomization(site_id)))
             written.append(self._write_text(site_root / "kubernetes" / "README.md", self._render_kubernetes_readme(site_id)))
 
     def lint(self) -> list[str]:

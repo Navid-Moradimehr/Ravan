@@ -202,7 +202,7 @@ Operationally, the manifest is now useful in three ways:
 - `datastreamctl project-manifest bundle` prints per-site environment bundles for deployment automation
 - `datastreamctl project-manifest export` writes deployable `.env` and YAML bundles to disk
 - `datastreamctl project-manifest export --layout systemd` generates a ready-to-install per-site tree for host-based deployments
-- `datastreamctl project-manifest export --layout kubernetes` generates a starter tree for cluster-based deployments
+- `datastreamctl project-manifest export --layout kubernetes` generates a starter tree for cluster-based deployments, including `kustomization.yaml`
 - `datastreamctl project-manifest lint` catches duplicate topics and policy drift before release
 - `datastreamctl project-manifest release-gate` validates the entire fleet topology site by site
 - `datastreamd --project-manifest` can start the runtime for one selected site from the company contract
@@ -211,7 +211,7 @@ Recommended deployment pattern:
 
 - use `flat` for CI artifacts and manual inspection
 - use `systemd` for plant-local or edge nodes that run on managed Linux hosts
-- use `kubernetes` for multi-site cluster deployments and central services
+- use `kubernetes` for multi-site cluster deployments and central services; apply with `kubectl apply -k`
 - keep secrets, broker credentials, and external model endpoints in the operator's secret store, not in the exported manifest
 
 Suggested SLOs for initial rollout:

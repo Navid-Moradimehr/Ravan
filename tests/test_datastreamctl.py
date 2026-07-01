@@ -172,6 +172,7 @@ class TestDatastreamctl:
         ])
         assert rc == 0
         assert (tmp_path / "demo-site" / "systemd" / "datastreamd.service").exists()
+        assert (tmp_path / "demo-site" / "systemd" / "install.sh").exists()
         assert (tmp_path / "demo-site" / "env" / "site.env").exists()
         assert "systemd" in out
 
@@ -191,6 +192,7 @@ class TestDatastreamctl:
         assert rc == 0
         assert (tmp_path / "plant-a" / "kubernetes" / "deployment.yaml").exists()
         assert (tmp_path / "plant-a" / "kubernetes" / "site-profile-configmap.yaml").exists()
+        assert (tmp_path / "plant-a" / "kubernetes" / "kustomization.yaml").exists()
         assert "kubernetes" in out
 
 

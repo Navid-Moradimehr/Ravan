@@ -53,6 +53,8 @@ def test_manifest_export_systemd_layout(tmp_path: Path):
     assert (site_root / "bundle.yaml").exists()
     assert (site_root / "systemd" / "datastreamd.service").exists()
     assert (site_root / "systemd" / "README.md").exists()
+    assert (site_root / "systemd" / "install.sh").exists()
+    assert (site_root / "systemd" / "uninstall.sh").exists()
     assert any(path.name == "datastreamd.service" for path in written)
 
 
@@ -67,6 +69,7 @@ def test_manifest_export_kubernetes_layout(tmp_path: Path):
     assert (site_root / "kubernetes" / "site-profile-configmap.yaml").exists()
     assert (site_root / "kubernetes" / "deployment.yaml").exists()
     assert (site_root / "kubernetes" / "service.yaml").exists()
+    assert (site_root / "kubernetes" / "kustomization.yaml").exists()
     assert (site_root / "kubernetes" / "README.md").exists()
     assert any(path.name == "deployment.yaml" for path in written)
 
