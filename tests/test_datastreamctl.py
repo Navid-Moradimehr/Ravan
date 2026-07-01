@@ -138,6 +138,25 @@ class TestDatastreamctl:
         assert rc == 0
         assert "project release gate" in out
 
+    def test_project_manifest_export_runs(self, tmp_path):
+        rc, out = self._run(["project-manifest", "export", str(PROJECT_MANIFEST), str(tmp_path), "--site-id", "demo-site", "--format", "both"])
+        assert rc == 0
+        assert (tmp_path / "demo-site.env").exists()
+        assert (tmp_path / "demo-site.yaml").exists()
+        assert "project export" in out
+
+    def test_project_manifest_lint_runs(self):
+        rc, out = self._run(["project-manifest", "lint", str(PROJECT_MANIFEST)])
+        assert rc == 0
+        assert "project lint" in out
+
+    def test_project_manifest_export_writes_files(self, tmp_path):
+        rc, out = self._run(["project-manifest", "export", str(PROJECT_MANIFEST), str(tmp_path), "--site-id", "demo-site", "--format", "both"])
+        assert rc == 0
+        assert (tmp_path / "demo-site.env").exists()
+        assert (tmp_path / "demo-site.yaml").exists()
+        assert "project export" in out
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

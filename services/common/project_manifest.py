@@ -142,6 +142,90 @@ class ProjectManifest:
             ],
         }
 
+    def lint(self) -> list[str]:
+        issues = validate_project_manifest(self)
+        site_ids = {site.site_id for site in self.sites}
+        topic_to_sources: dict[str, list[str]] = {}
+        bridge_signatures: set[tuple[str, str, tuple[str, ...], tuple[str, ...], str]] = set()
+
+        for source in self.sources:
+            if source.topic:
+                topic_to_sources.setdefault(source.topic, []).append(source.source_id)
+
+        for topic, source_ids in topic_to_sources.items():
+            if len(source_ids) > 1:
+                issues.append(f"topic collision: {topic} used by {source_ids}")
+
+        for rule in self.bridge_rules:
+            signature = (rule.mode, rule.name, rule.from_sources, rule.to_sources, rule.topic_template)
+            if signature in bridge_signatures:
+                issues.append(f"duplicate bridge rule signature: {rule.name}")
+            bridge_signatures.add(signature)
+
+        for group in self.correlation_groups:
+            if len(set(group.members)) != len(group.members):
+                issues.append(f"correlation group {group.name}: duplicate member entries")
+            if len(group.members) > 1 and group.strategy == "site_asset_tag":
+                grouped_sites = {source.site_id for source in self.sources if source.source_id in group.members}
+                if len(grouped_sites) > 1:
+                    issues.append(f"correlation group {group.name}: spans multiple sites {sorted(grouped_sites)}")
+
+        for source in self.sources:
+            if source.site_id and source.site_id not in site_ids:
+                issues.append(f"source {source.source_id}: site_id {source.site_id} not defined in sites")
+
+        for site in self.sites:
+            profile = load_site_profile(site.profile_path)
+            if profile.backups.retention_days != self.retention.backup_days:
+                issues.append(
+                    f"retention mismatch for {site.site_id}: site backups.retention_days={profile.backups.retention_days} "
+                    f"project retention.backup_days={self.retention.backup_days}"
+                )
+        return issues
+
+    def export_bundles(
+        self,
+        output_dir: Path | str,
+        *,
+        site_id: str | None = None,
+        fmt: str = "both",
+    ) -> list[Path]:
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        envs = self.to_site_envs()
+        targets = [site_id] if site_id else list(envs.keys())
+        written: list[Path] = []
+
+        def render_env(env: dict[str, str]) -> str:
+            return "\n".join(f"{key}={value}" for key, value in sorted(env.items())) + "\n"
+
+        for sid in targets:
+            if sid not in envs:
+                raise ValueError(f"site_id not found in manifest: {sid}")
+            env = envs[sid]
+            site_profile = str(self.site_profile_paths()[sid])
+            bundle = {
+                "project_id": self.project_id,
+                "project_name": self.name,
+                "site_id": sid,
+                "site_profile": site_profile,
+                "env": env,
+                "sources": [source.to_dict() for source in self.sources if source.site_id == sid],
+                "bridge_rules": [rule.to_dict() for rule in self.bridge_rules],
+                "correlation_groups": [group.to_dict() for group in self.correlation_groups],
+                "retention": self.retention.to_dict(),
+            }
+            base = output_path / sid
+            if fmt in {"env", "both"}:
+                env_path = base.with_suffix(".env")
+                env_path.write_text(render_env(env), encoding="utf-8")
+                written.append(env_path)
+            if fmt in {"yaml", "both"}:
+                yaml_path = base.with_suffix(".yaml")
+                yaml_path.write_text(yaml.safe_dump(bundle, sort_keys=False, allow_unicode=True), encoding="utf-8")
+                written.append(yaml_path)
+        return written
+
 
 def _load_tuple(items: Any, factory) -> tuple[Any, ...]:
     if not items:

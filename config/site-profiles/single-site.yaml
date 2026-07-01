@@ -21,7 +21,7 @@ runtime:
 backups:
   directory: backups/demo-site
   schedule: daily
-  retention_days: 14
+  retention_days: 30
   restore_test_database: stream_engine_restore_demo
 
 federation:

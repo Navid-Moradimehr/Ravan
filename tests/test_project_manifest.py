@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from services.common.project_manifest import load_project_manifest, validate_project_manifest
@@ -28,3 +29,33 @@ def test_manifest_exports_site_envs():
     assert "demo-site" in envs
     assert envs["demo-site"]["DATASTREAM_PROJECT_ID"] == "demo-industrial-fleet"
     assert envs["plant-a"]["SITE_ID"] == "plant-a"
+
+
+def test_manifest_export_bundles(tmp_path: Path):
+    manifest = load_project_manifest(MANIFEST)
+    written = manifest.export_bundles(tmp_path, site_id="demo-site", fmt="both")
+    assert len(written) == 2
+    env_path = tmp_path / "demo-site.env"
+    yaml_path = tmp_path / "demo-site.yaml"
+    assert env_path.exists()
+    assert yaml_path.exists()
+    assert "DATASTREAM_PROJECT_ID=demo-industrial-fleet" in env_path.read_text(encoding="utf-8")
+    assert "site_id: demo-site" in yaml_path.read_text(encoding="utf-8")
+
+
+def test_manifest_lint_flags_collisions():
+    manifest = load_project_manifest(MANIFEST)
+    issues = manifest.lint()
+    assert issues == []
+
+
+def test_manifest_lint_detects_topic_collision():
+    manifest = load_project_manifest(MANIFEST)
+    colliding = replace(
+        manifest,
+        sources=manifest.sources + (
+            replace(manifest.sources[0], source_id="duplicate-source", topic=manifest.sources[0].topic),
+        ),
+    )
+    issues = colliding.lint()
+    assert any("topic collision" in issue for issue in issues)

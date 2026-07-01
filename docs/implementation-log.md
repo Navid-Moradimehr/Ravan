@@ -42,6 +42,8 @@
    - Added CLI support for `datastreamctl project-manifest show|validate|sites`.
    - Added `datastreamctl project-manifest bundle` for per-site deployment env output.
    - Added `datastreamctl project-manifest release-gate` to validate the full manifest across all sites.
+   - Added `datastreamctl project-manifest export` to write per-site `.env` and YAML bundles to disk.
+   - Added `datastreamctl project-manifest lint` to catch source/topic collisions and policy drift.
    - Added `datastreamd --project-manifest` and `--site-id` so runtime services can start from the company manifest and select a site bundle.
 
 ### Verified

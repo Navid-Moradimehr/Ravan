@@ -200,6 +200,8 @@ The repo now includes `config/project-manifest.yaml` as a concrete starting poin
 Operationally, the manifest is now useful in three ways:
 
 - `datastreamctl project-manifest bundle` prints per-site environment bundles for deployment automation
+- `datastreamctl project-manifest export` writes deployable `.env` and YAML bundles to disk
+- `datastreamctl project-manifest lint` catches duplicate topics and policy drift before release
 - `datastreamctl project-manifest release-gate` validates the entire fleet topology site by site
 - `datastreamd --project-manifest` can start the runtime for one selected site from the company contract
 

@@ -12,6 +12,7 @@ import json
 import os
 import sys
 from typing import Any
+from pathlib import Path
 
 from services.common.project_manifest import load_project_manifest, validate_project_manifest
 from services.common.site_profiles import load_site_profile, validate_site_profile
@@ -363,6 +364,50 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
                     print(f"{site['site_id']:<22}{site['site_profile']}")
         return 0 if not errors else 1
 
+    if args.action == "export":
+        written = manifest.export_bundles(Path(args.output_dir), site_id=args.site_id, fmt=args.format)
+        payload = {
+            "path": args.path,
+            "output_dir": args.output_dir,
+            "site_id": args.site_id,
+            "format": args.format,
+            "written": [str(path) for path in written],
+            "errors": errors,
+            "valid": not errors,
+        }
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("project export")
+            print("=" * 40)
+            _print_row("output_dir", args.output_dir)
+            _print_row("format", args.format)
+            for path in written:
+                print(path)
+            if errors:
+                for err in errors:
+                    print(f"ERROR  {err}")
+        return 0 if not errors else 1
+
+    if args.action == "lint":
+        issues = manifest.lint()
+        passed = not issues
+        payload = {
+            "path": args.path,
+            "issues": issues,
+            "valid": passed,
+        }
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("project lint")
+            print("=" * 40)
+            _print_row("path", args.path)
+            _print_row("valid", "yes" if passed else "no")
+            for issue in issues:
+                print(f"ISSUE  {issue}")
+        return 0 if passed else 2
+
     if args.action == "release-gate":
         checks: list[dict[str, Any]] = []
         for site in manifest.sites:
@@ -492,6 +537,17 @@ def build_parser() -> argparse.ArgumentParser:
     project_bundle.add_argument("--site-id", default=None, help="Optional site to print")
     project_bundle.add_argument("--json", action="store_true")
     project_bundle.set_defaults(func=cmd_project_manifest)
+    project_export = project_sub.add_parser("export", help="Export per-site bundles to disk")
+    project_export.add_argument("path")
+    project_export.add_argument("output_dir")
+    project_export.add_argument("--site-id", default=None, help="Optional site to export")
+    project_export.add_argument("--format", choices=["env", "yaml", "both"], default="both")
+    project_export.add_argument("--json", action="store_true")
+    project_export.set_defaults(func=cmd_project_manifest)
+    project_lint = project_sub.add_parser("lint", help="Lint the project manifest for collisions and policy drift")
+    project_lint.add_argument("path")
+    project_lint.add_argument("--json", action="store_true")
+    project_lint.set_defaults(func=cmd_project_manifest)
     project_release = project_sub.add_parser("release-gate", help="Run release-gate checks for all sites in a project manifest")
     project_release.add_argument("path")
     project_release.add_argument("--api-base", default=DEFAULT_API_BASE)
