@@ -21,6 +21,7 @@ from services.ai_gateway.providers import (
     build_fallback_summary,
     build_industrial_prompt,
 )
+from services.common.structured_output import validate_industrial_summary
 
 
 settings = Settings()
@@ -297,13 +298,23 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
     prompt = build_industrial_prompt(batch[: settings.llm_max_batch_size])
 
     started = time.monotonic()
+    content: str | None = None
     try:
         content = await llm_client.summarize(prompt, settings.llm_timeout_seconds)
+        valid, errors, _payload = validate_industrial_summary(content)
+        if not valid:
+            fallback_reason = "; ".join(errors)
+            if not settings.llm_allow_fallback:
+                service_state["last_error"] = f"LLM output validation failed: {fallback_reason}"
+                asyncio.create_task(_broadcast_telemetry())
+                return
+            content = build_fallback_summary(batch, f"output_validation_failed: {fallback_reason}")
+            service_state["last_error"] = f"LLM fallback active: output validation failed: {fallback_reason}"
+            asyncio.create_task(_broadcast_telemetry())
     except Exception as exc:
         if not settings.llm_allow_fallback:
             service_state["last_error"] = str(exc)
             asyncio.create_task(_broadcast_telemetry())
-            llm_latency.observe(time.monotonic() - started)
             return
         fallback_reason = f"{type(exc).__name__}: {exc}"
         content = build_fallback_summary(batch, fallback_reason)
@@ -311,6 +322,9 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
         asyncio.create_task(_broadcast_telemetry())
     finally:
         llm_latency.observe(time.monotonic() - started)
+
+    if content is None:
+        return
 
     enriched_payload = {
         "source": "ai-gateway",

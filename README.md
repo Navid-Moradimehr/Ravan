@@ -31,6 +31,7 @@ the remaining application surface without changing the public API.
 - Processing internals: shared scoring module used by both processing paths
 - CDC: PostgreSQL plus Debezium Kafka Connect
 - AI: provider-neutral FastAPI gateway for OpenAI-compatible and open-weight model backends
+- AI contracts: model registry, prompt registry, structured output validation, and read-only tool/context packages for future diagnostic agents
 - Observability: Prometheus and Grafana
 - UI: Next.js, TypeScript, Tailwind CSS, shadcn/ui
 - UI observability: live charts for throughput, AI latency, protocol mix, severity mix, and Grafana health
@@ -124,6 +125,7 @@ against realistic industrial batches without depending on a live model server.
 - `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
 - `docs/multi-site-rollout.md` defines the production-hardening plan for multi-site industrial deployment.
 - `docs/model-agent-roadmap.md` defines the production model stack plan, including LLM roles, future agent infrastructure, and production gaps.
+- `services/api_service/routers/modeling.py` exposes the read-only model, prompt, tool, and context contract surface.
 - `config/site-profiles/` contains example site profile contracts for `single-site`, `plant-local`, and `federated` rollout shapes.
 - `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
 - `docs/benchmark-results.md` includes the latest local benchmark numbers for the mixed replay path and the AI gateway provider abstraction.

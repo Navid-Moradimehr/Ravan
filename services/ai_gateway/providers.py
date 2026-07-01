@@ -8,6 +8,8 @@ from typing import Any
 
 import httpx
 
+from services.common.prompt_registry import build_industrial_prompt as render_industrial_prompt
+
 
 @dataclass(frozen=True)
 class LLMRequestSpec:
@@ -143,11 +145,7 @@ class LLMProviderClient:
 
 
 def build_industrial_prompt(batch: list[dict[str, Any]]) -> str:
-    return (
-        "Summarize this processed industrial IoT batch. Identify critical devices, "
-        "probable causes, and operator actions. Return concise JSON.\n\n"
-        f"{json.dumps(batch, separators=(',', ':'))}"
-    )
+    return render_industrial_prompt(batch)
 
 
 def build_fallback_summary(batch: list[dict[str, Any]], error: str) -> str:
@@ -157,12 +155,28 @@ def build_fallback_summary(batch: list[dict[str, Any]], error: str) -> str:
     return json.dumps(
         {
             "mode": "deterministic_fallback",
+            "status": "ok",
             "reason": error,
             "batch_size": len(batch),
             "critical_count": len(critical),
             "warning_count": len(warning),
-            "devices": devices[:10],
-            "operator_action": "Inspect critical devices first; verify temperature, vibration, and pressure thresholds.",
+            "critical_devices": devices[:10],
+            "warning_devices": [event.get("device_id", "unknown") for event in warning][:10],
+            "probable_causes": [
+                "threshold breach",
+                "sensor drift",
+                "process instability",
+            ],
+            "recommended_actions": [
+                "Inspect critical devices first",
+                "Verify temperature, vibration, and pressure thresholds",
+            ],
+            "severity_counts": {
+                "critical": len(critical),
+                "warning": len(warning),
+                "normal": max(len(batch) - len(critical) - len(warning), 0),
+            },
+            "summary": "Deterministic fallback summary generated because the model output was not usable.",
         },
         separators=(",", ":"),
     )

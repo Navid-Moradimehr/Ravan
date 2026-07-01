@@ -395,12 +395,14 @@ app = FastAPI(title="Local Stream Engine API", version="0.2.0", lifespan=lifespa
 from services.api_service.routers.historian import router as historian_router
 from services.api_service.routers.operations import router as operations_router
 from services.api_service.routers.design import router as design_router
+from services.api_service.routers.modeling import router as modeling_router
 from services.api_service.routers.external import router as external_router
 from services.api_service.routers.support import router as support_router
 
 app.include_router(historian_router)
 app.include_router(operations_router)
 app.include_router(design_router)
+app.include_router(modeling_router)
 app.include_router(external_router)
 app.include_router(support_router)
 from services.api_service.routers.historian import ingest_batch, ingest_event

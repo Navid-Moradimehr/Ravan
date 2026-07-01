@@ -126,10 +126,18 @@ see `docs/model-agent-roadmap.md` and `docs/multi-site-rollout.md`.
 
 The repo has wide feature coverage, but these areas still need additional implementation or hardening before they should be considered industry-standard production features:
 
-- embeddings and retrieval infrastructure
-- model registry and evaluation lifecycle
-- future diagnostic-agent infrastructure
-- future supervised action-agent infrastructure
+- embeddings and retrieval backend
+- model evaluation lifecycle and promotion workflow
+- future diagnostic-agent runtime
+- future supervised action-agent runtime
 - production packaging and installer maturity
 - stronger security hardening for shared multi-user deployments
 - per-site production benchmarking on target database and model topologies
+
+The following foundation already exists and should be treated as infrastructure, not a finished agent product:
+
+- model registry and role-based model config
+- prompt/version registry
+- structured response validation
+- read-only tool schemas
+- read-only context package assembly

@@ -1,5 +1,32 @@
 # Implementation Log
 
+## 2026-07-01 - Model and Agent Contract Layer
+
+### Added
+
+1. **Model registry and prompt/version contracts**
+   - Added `services/common/modeling.py` with role-based model bindings for summarization, embeddings, retrieval, and deferred agent roles.
+   - Added `services/common/prompt_registry.py` with versioned prompt templates.
+   - Added `services/common/structured_output.py` to validate structured AI responses before they are accepted by the gateway.
+
+2. **Read-only agent infrastructure**
+   - Added `services/common/agent_tools.py` with a read-only tool catalog and context package builder.
+   - Added `services/api_service/routers/modeling.py` to expose the contract surface over the API.
+   - The platform still does not ship a diagnostic agent or action agent. It now only exposes the infrastructure needed for users to integrate their own later.
+
+3. **AI gateway hardening**
+   - The AI gateway now validates model output and falls back to deterministic summaries if the response is not usable.
+   - Summaries are still provider-neutral and compatible with open-weight or OpenAI-compatible backends.
+
+### Verified
+
+- Targeted contract and gateway tests: 13 passed
+- `python -m compileall services tests`: passed
+- AI gateway mock benchmark:
+  - `openai_compat`: 256 events, 8 batches, 69,230.35 events/sec, avg prompt 9,434.2 bytes
+  - `ollama`: 256 events, 8 batches, 68,095.97 events/sec, avg prompt 9,434.2 bytes
+- Mixed replay benchmark: 5,000 events at 47,677.9 events/sec
+
 ## 2026-06-28 - Phase 7 Complete + Quick Wins
 
 ### WebSocket Streaming (Phase 7)

@@ -93,12 +93,25 @@ Scope:
 
 Status:
 
-- not implemented
+- partially implemented as a service boundary
+
+Already present:
+
+- model registry entries for embeddings and retrieval roles
+- prompt registry for structured model inputs
+- read-only context package endpoint for historian, alarms, assets, reports, and scenarios
+
+Still needed:
+
+- embedding/indexing pipeline
+- vector store or equivalent retrieval backend
+- chunking strategy for manuals and historical notes
+- retrieval evaluation harness
 
 Release requirement:
 
-- add configuration and service boundaries now
-- actual retrieval features can ship incrementally
+- keep the boundary stable now
+- ship the indexing and retrieval backend incrementally
 
 ### Layer 4: LLM Summarization
 
@@ -117,7 +130,7 @@ Scope:
 
 Status:
 
-- implemented
+- implemented and hardened
 
 Already present:
 
@@ -126,6 +139,8 @@ Already present:
 - batching
 - deterministic fallback
 - metrics and benchmarks
+- prompt/version registry
+- structured response validation
 
 Still needed:
 
@@ -151,7 +166,7 @@ Scope:
 
 Status:
 
-- not implemented as a feature
+- infrastructure implemented, agent not shipped
 
 Release requirement:
 
@@ -164,6 +179,13 @@ Infrastructure that should exist before release:
 - prompt-safe structured outputs
 - auditable request/response logging
 - per-site model config
+
+Already present:
+
+- read-only tool catalog
+- read-only context package assembly endpoint
+- model role registry
+- prompt registry for future diagnostic agent prompts
 
 ### Layer 6: Supervised Action Agents
 
@@ -192,6 +214,11 @@ These are the model-related features that are meaningfully present now:
 - deterministic LLM fallback
 - AI gateway telemetry and latency metrics
 - live LM Studio validation path
+- model registry and role-based model config
+- prompt/version registry
+- structured output validation
+- read-only tool schemas for future agents
+- read-only context assembly endpoint
 - site-profile-aware runtime rollout
 - backup/restore and release-gate harness
 - deterministic analytics and streaming core
@@ -216,22 +243,18 @@ Why these are not "done":
 
 ### For LLM/Model Infrastructure
 
-- model registry with role-based model selection
-- embedding model configuration
-- retrieval service for historian/events/docs
-- prompt/version registry
-- structured response validation
-- model evaluation harness per task
-- per-site model capability matrix
+- embedding indexer and retrieval backend
+- retrieval evaluation harness
+- per-task model evaluation and promotion workflow
+- vector store or equivalent semantic search backend
+- per-site model capability matrix and deployment automation
 
 ### For Future Agent Infrastructure
 
-- read-only tool registry
-- tool input/output schemas
 - audited tool execution logs
-- model context builder for retrieved plant data
 - policy layer for allowed tools per site/user role
 - sandbox boundary for future action integrations
+- supervised action workflow governance
 
 ### For Industrial ML
 
