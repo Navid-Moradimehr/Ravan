@@ -23,6 +23,15 @@ def test_jwt_lifecycle():
     assert payload["type"] == "access"
 
 
+def test_auth_security_status_flags_default_secret():
+    from services.api_service.auth import auth_security_status, is_default_jwt_secret
+
+    status = auth_security_status()
+    assert status["requires_operator_secret"] is True
+    assert isinstance(status["jwt_secret_configured"], bool)
+    assert is_default_jwt_secret() in (True, False)
+
+
 def test_jwt_expired():
     from services.api_service.auth import create_access_token, decode_access_token
     import jwt

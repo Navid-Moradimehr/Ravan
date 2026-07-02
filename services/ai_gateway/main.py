@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from confluent_kafka import Consumer, Producer
+from confluent_kafka import Consumer, Producer, TopicPartition
 from fastapi import FastAPI
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.responses import Response
@@ -260,13 +260,14 @@ async def consume_loop() -> None:
             "bootstrap.servers": settings.redpanda_brokers,
             "group.id": "ai-gateway",
             "auto.offset.reset": "latest",
-            "enable.auto.commit": True,
+            "enable.auto.commit": False,
+            "enable.auto.offset.store": False,
         }
     )
     producer = Producer({"bootstrap.servers": settings.redpanda_brokers, "client.id": "ai-gateway"})
     consumer.subscribe([settings.processed_topic])
 
-    batch: list[dict[str, Any]] = []
+    batch: list[tuple[str, int, int, dict[str, Any]]] = []
     deadline = time.monotonic() + settings.llm_batch_seconds
 
     try:
@@ -274,12 +275,21 @@ async def consume_loop() -> None:
             message = consumer.poll(0.25)
             if message and not message.error():
                 consumed_events.inc()
-                batch.append(json.loads(message.value().decode("utf-8")))
+                batch.append((message.topic(), message.partition(), message.offset(), json.loads(message.value().decode("utf-8"))))
 
             ready_by_size = len(batch) >= settings.llm_max_batch_size
             ready_by_time = batch and time.monotonic() >= deadline
             if ready_by_size or ready_by_time:
-                await enrich_batch(batch, producer)
+                success = await enrich_batch(batch, producer)
+                if success:
+                    try:
+                        consumer.commit(
+                            offsets=[TopicPartition(topic, partition, offset + 1) for topic, partition, offset, _ in batch],
+                            asynchronous=False,
+                        )
+                    except Exception as exc:
+                        service_state["last_error"] = f"offset commit failed: {exc}"
+                        asyncio.create_task(_broadcast_telemetry())
                 batch = []
                 deadline = time.monotonic() + settings.llm_batch_seconds
 
@@ -289,13 +299,14 @@ async def consume_loop() -> None:
         producer.flush(5)
 
 
-async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
+async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], producer: Producer) -> bool:
     batch_size_gauge.set(len(batch))
+    payloads = [_batch_payload(item) for item in batch]
     for severity in ("normal", "warning", "critical"):
-        count = sum(1 for event in batch if event.get("severity") == severity)
+        count = sum(1 for event in payloads if event.get("severity") == severity)
         if count:
             batch_severity_total.labels(severity=severity).inc(count)
-    prompt = build_industrial_prompt(batch[: settings.llm_max_batch_size])
+    prompt = build_industrial_prompt(payloads[: settings.llm_max_batch_size])
 
     started = time.monotonic()
     content: str | None = None
@@ -307,33 +318,33 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
             if not settings.llm_allow_fallback:
                 service_state["last_error"] = f"LLM output validation failed: {fallback_reason}"
                 asyncio.create_task(_broadcast_telemetry())
-                return
-            content = build_fallback_summary(batch, f"output_validation_failed: {fallback_reason}")
+                return False
+            content = build_fallback_summary(payloads, f"output_validation_failed: {fallback_reason}")
             service_state["last_error"] = f"LLM fallback active: output validation failed: {fallback_reason}"
             asyncio.create_task(_broadcast_telemetry())
     except Exception as exc:
         if not settings.llm_allow_fallback:
             service_state["last_error"] = str(exc)
             asyncio.create_task(_broadcast_telemetry())
-            return
+            return False
         fallback_reason = f"{type(exc).__name__}: {exc}"
-        content = build_fallback_summary(batch, fallback_reason)
+        content = build_fallback_summary(payloads, fallback_reason)
         service_state["last_error"] = f"LLM fallback active: {fallback_reason}"
         asyncio.create_task(_broadcast_telemetry())
     finally:
         llm_latency.observe(time.monotonic() - started)
 
     if content is None:
-        return
+        return False
 
     enriched_payload = {
         "source": "ai-gateway",
         "provider": settings.llm_provider,
         "model": settings.llm_model_id,
         "endpoint": settings.llm_endpoint_url,
-        "batch_size": len(batch),
+        "batch_size": len(payloads),
         "summary": content,
-        "events": batch,
+        "events": payloads,
         "latency_seconds": round(time.monotonic() - started, 3),
     }
     producer.produce(settings.ai_enriched_topic, value=json.dumps(enriched_payload).encode("utf-8"))
@@ -341,6 +352,17 @@ async def enrich_batch(batch: list[dict[str, Any]], producer: Producer) -> None:
     enriched_events.inc()
     last_success_epoch.set(time.time())
     asyncio.create_task(_broadcast_telemetry())
+    return True
+
+
+def _batch_payload(item: Any) -> dict[str, Any]:
+    if isinstance(item, tuple) and len(item) == 4:
+        return item[3]
+    if isinstance(item, dict):
+        return item
+    if hasattr(item, "model_dump"):
+        return item.model_dump(mode="json")
+    return dict(item)
 
 if __name__ == "__main__":
     import uvicorn

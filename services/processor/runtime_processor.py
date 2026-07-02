@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from statistics import mean
 from typing import Any
 
-from confluent_kafka import Consumer, Producer
+from confluent_kafka import Consumer, Producer, TopicPartition
 from services.analytics.baseline import BaselineDetector
 from services.common.normalize import normalize_runtime_event
 from services.historian.client import insert_processed_event, insert_processed_events
@@ -63,6 +63,7 @@ def main() -> None:
     windows: dict[str, deque[dict[str, Any]]] = {}
     window_last_seen: dict[str, float] = {}
     processed_buffer: list[dict[str, Any]] = []
+    processed_offsets: list[tuple[str, int, int]] = []
     last_db_flush = time.monotonic()
 
     def flush_processed_buffer(force: bool = False) -> None:
@@ -74,16 +75,29 @@ def main() -> None:
             return
 
         batch = processed_buffer[:]
+        offsets = processed_offsets[:]
         processed_buffer.clear()
+        processed_offsets.clear()
+        write_failed = False
         try:
             insert_processed_events(batch)
         except Exception as exc:  # pragma: no cover - logged failure path
             logger.warning("historian processed-event batch write failed: %s", exc)
+            write_failed = True
             for event in batch:
                 try:
                     insert_processed_event(event)
                 except Exception as inner_exc:
                     logger.warning("historian processed-event fallback write failed: %s", inner_exc)
+                    write_failed = True
+        if not write_failed and offsets:
+            try:
+                consumer.commit(
+                    offsets=[TopicPartition(topic, partition, offset + 1) for topic, partition, offset in offsets],
+                    asynchronous=False,
+                )
+            except Exception as exc:  # pragma: no cover - coordinator/runtime failure path
+                logger.warning("processor offset commit failed: %s", exc)
         last_db_flush = time.monotonic()
 
     def stop(_signum: int, _frame: object) -> None:
@@ -98,7 +112,8 @@ def main() -> None:
             "bootstrap.servers": brokers,
             "group.id": "runtime-iot-processor",
             "auto.offset.reset": "earliest",
-            "enable.auto.commit": True,
+            "enable.auto.commit": False,
+            "enable.auto.offset.store": False,
         }
     )
     producer = Producer({"bootstrap.servers": brokers, "client.id": "runtime-iot-processor"})
@@ -140,6 +155,7 @@ def main() -> None:
             producer.produce(output_topic, key=event["device_id"].encode("utf-8"), value=json.dumps(event).encode("utf-8"))
             producer.poll(0)
             processed_buffer.append(event)
+            processed_offsets.append((message.topic(), message.partition(), message.offset()))
             flush_processed_buffer()
             processed += 1
 

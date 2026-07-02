@@ -1,5 +1,47 @@
 # Implementation Log
 
+## 2026-07-02 - Runtime Hardening Pass
+
+### Changed
+
+1. **Historian query guardrail**
+   - Constrained recent-event table lookups to the known historian tables: `industrial_events`, `processed_events`, `ai_enriched`, and `dead_letter_events`.
+   - This removes accidental exposure to arbitrary table names on the read path.
+
+2. **Auth and CORS defaults**
+   - Added a runtime check for the default JWT secret so operators can see when the deployment still uses an unsafe placeholder.
+   - Replaced wildcard CORS with a local-origin allowlist by default, with an override through `DATASTREAM_CORS_ALLOW_ORIGINS`.
+
+3. **Kafka producer and consumer safety**
+   - Cached Kafka producers on the API runtime path so repeated publishes do not create a new producer for every event.
+   - Disabled auto-commit in the processor and AI gateway consumers and committed offsets only after successful batch work.
+
+4. **Implementation tracking**
+   - Added an Obsidian vault graph note for the hardening pass so the implementation path and runtime dependencies stay visible during release work.
+
+### Verified
+
+- `python -m compileall services tests`: passed
+- `uv run pytest -q tests/test_auth.py tests/test_historian_query_guardrails.py tests/test_api_route_splits.py tests/test_processor_normalization.py tests/test_ai_gateway_providers.py tests/test_datastreamctl.py tests/test_project_manifest.py`: 56 passed
+- `uv run python -m services.cli.datastreamctl benchmark deployment-pack --events 10000 --batch-size 256`
+  - export generation: 660.06 files/sec
+  - mixed replay: 61,037.32 events/sec
+  - `systemd` layout: 7 files
+  - Kubernetes layout: 12 files
+- `uv run python -m services.cli.datastreamctl benchmark deployment-pack-matrix --events 10000 --batch-size 256`
+  - `demo-site`: 638.42 export files/sec, 60,757.77 replay events/sec
+  - `plant-a`: 668.20 export files/sec, 66,550.60 replay events/sec
+  - average: 653.31 export files/sec, 63,654.18 replay events/sec
+- `uv run python scripts/benchmark_mixed_replay.py --events 10000 --batch-size 256`
+  - 10,000 events
+  - 54,779.87 events/sec
+  - 40 batches
+
+### Notes
+
+- The benchmark numbers are stable for the local mock pack and validate that the runtime guardrails did not introduce a measurable regression in the hot path.
+- Real TimescaleDB and broker deployments should still be benchmarked on the target industrial network before production sizing.
+
 ## 2026-07-01 - Provider-Neutral Semantic Search And Query Planning
 
 ### Added

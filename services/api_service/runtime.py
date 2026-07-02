@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from typing import Any
+from functools import lru_cache
 
 import httpx
 
@@ -88,11 +89,16 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
 
 
 def _publish_kafka(brokers: str, topic: str, key: bytes, value: bytes) -> None:
-    from confluent_kafka import Producer
-
-    producer = Producer({"bootstrap.servers": brokers, "client.id": "api-ingest"})
+    producer = _get_producer(brokers)
     producer.produce(topic, key=key, value=value)
     producer.flush(5)
+
+
+@lru_cache(maxsize=4)
+def _get_producer(brokers: str):
+    from confluent_kafka import Producer
+
+    return Producer({"bootstrap.servers": brokers, "client.id": "api-ingest"})
 
 
 def _to_legacy_iot_event(event: Any) -> dict[str, Any]:

@@ -137,6 +137,13 @@ TIMESCALE_API_BASE = os.getenv("TIMESCALE_API_BASE", "http://localhost:8010")
 WS_HEARTBEAT_INTERVAL = 15.0  # seconds
 
 
+def _parse_cors_origins(raw: str | None) -> list[str]:
+    if raw is None:
+        raw = os.getenv("DATASTREAM_CORS_ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return origins
+
+
 class WebhookConfig(BaseModel):
     url: str
     events: list[str] = Field(default_factory=lambda: ["alarm", "anomaly"])
@@ -414,7 +421,7 @@ from services.api_service.ops_runtime import _render_topic
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_parse_cors_origins(None),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -510,13 +517,17 @@ async def health() -> HealthResponse:
     """Health check with service dependency status."""
     import time
     start = time.time()
+    try:
+        from services.api_service.auth import auth_security_status
+    except ImportError:
+        from auth import auth_security_status  # type: ignore
     services = {
         "historian": True,  # Would check actual DB connectivity
         "kafka": True,
         "ai_gateway": True,
     }
     uptime = int(time.time() - start + 1)
-    return HealthResponse(status="ok", version="1.0.0", uptime_seconds=uptime, services=services)
+    return HealthResponse(status="ok", version="1.0.0", uptime_seconds=uptime, services={**services, "auth": auth_security_status()["jwt_secret_configured"]})
 
 
 @app.post("/api/v1/webhooks")

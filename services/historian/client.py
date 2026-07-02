@@ -47,6 +47,7 @@ WRITE_MAX_RETRIES = int(os.getenv("HISTORIAN_WRITE_MAX_RETRIES", "3"))
 WRITE_BACKOFF_SECONDS = tuple(
     float(x) for x in os.getenv("HISTORIAN_WRITE_BACKOFF_SECONDS", "0.2,0.6,1.8").split(",")
 )
+ALLOWED_QUERY_TABLES = {"industrial_events", "processed_events", "ai_enriched", "dead_letter_events"}
 
 
 def _connection_string() -> str:
@@ -347,6 +348,8 @@ def insert_dead_letter(event: dict[str, Any]) -> None:
 
 
 def query_recent_events(table: str, limit: int = 100) -> list[dict[str, Any]]:
+    if table not in ALLOWED_QUERY_TABLES:
+        raise ValueError(f"unsupported table: {table}")
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(

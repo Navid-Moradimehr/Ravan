@@ -7,6 +7,32 @@
 - **Broker**: Redpanda (Kafka-compatible)
 - **Historian**: TimescaleDB
 
+## Latest Hardening Run
+
+- **Date**: 2026-07-02
+- **Scope**: historian query guardrails, auth defaults, Kafka producer caching, manual consumer commits, and vault tracking
+
+### Targeted Regression Checks
+
+| Check | Result |
+|-------|--------|
+| `python -m compileall services tests` | passed |
+| Focused unit/regression tests | 56 passed |
+| Historian table allowlist | passed |
+| JWT default-secret visibility | passed |
+| Kafka producer cache | passed |
+| Manual consumer offset commit | passed |
+
+### Latest Mock Benchmarks
+
+| Benchmark | Value |
+|-----------|-------|
+| Deployment pack export rate | 660.06 files/sec |
+| Deployment pack replay rate | 61,037.32 events/sec |
+| Deployment pack matrix average export rate | 653.31 files/sec |
+| Deployment pack matrix average replay rate | 63,654.18 events/sec |
+| Mixed replay throughput | 54,779.87 events/sec |
+
 ## Test Suite Results
 
 | Test Category | Tests | Status |
@@ -54,13 +80,13 @@ Latest local run on the current codebase:
 
 | Metric | Value |
 |--------|-------|
-| Events | 100,000 |
+| Events | 10,000 |
 | Invalid events | 0 |
-| Batches | 391 |
+| Batches | 40 |
 | Batch size | 256 |
-| Elapsed | 1.6770s |
-| Throughput | 59,628.62 events/sec |
-| Serialized bytes | 40,112,500 |
+| Elapsed | 0.1825s |
+| Throughput | 54,779.87 events/sec |
+| Serialized bytes | 4,011,250 |
 
 Batch-size sweep on the same pack:
 
@@ -172,12 +198,13 @@ Interpretation:
 
 1. **Full pipeline throughput of 125K events/sec** is excellent for a Python-based single-node validation stack
 2. **Mock generation is I/O bound** at ~1,800/sec due to sleep-based rate limiting; processing is CPU-bound at 125K+/sec
-3. **Mixed replay throughput is ~59K-64K events/sec** on the current benchmark pack, with 256 still a sensible default batch size
+3. **Mixed replay throughput stays in the ~55K-64K events/sec band** on the current benchmark pack, with 256 still a sensible default batch size
 4. **AI gateway provider plumbing is fast enough that mock transport overhead stays below 1s for 100K events**
 5. **The site-profile soak passed on single-site, plant-local, and federated profiles, with backup/restore drills green**
 6. **WebSocket streaming successfully eliminated all HTTP polling** in the UI
 7. **The targeted refactor verification slice passed 33 tests** with no regressions
 8. **Memory footprint is efficient**: ~0.38 KB per event
+9. **The runtime hardening pass kept the benchmark path in the same operating band** while adding safer defaults for self-hosted industrial rollout
 
 ## Bottlenecks Identified
 

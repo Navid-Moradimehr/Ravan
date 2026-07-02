@@ -29,7 +29,8 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
+DEFAULT_JWT_SECRET = "change-me-in-production"
+JWT_SECRET = os.getenv("JWT_SECRET", DEFAULT_JWT_SECRET)
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "480"))
 
@@ -69,6 +70,19 @@ def create_access_token(user_id: str, role: str, tenant_id: str | None = None) -
 
 def decode_access_token(token: str) -> dict[str, Any]:
     return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+
+
+def is_default_jwt_secret() -> bool:
+    return JWT_SECRET == DEFAULT_JWT_SECRET
+
+
+def auth_security_status() -> dict[str, Any]:
+    return {
+        "jwt_secret_configured": not is_default_jwt_secret(),
+        "jwt_algorithm": JWT_ALGORITHM,
+        "jwt_expire_minutes": JWT_EXPIRE_MINUTES,
+        "requires_operator_secret": True,
+    }
 
 
 # ---------------------------------------------------------------------------
