@@ -235,26 +235,19 @@ services:
       - ../services/processor:/opt/processor:ro
 
   flink-job:
-    image: flink:1.20.0-scala_2.12-java17
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.flink-job
     depends_on:
       - jobmanager
       - taskmanager
       - redpanda
-    command:
-      - bash
-      - -lc
-      - >
-        flink run
-        -py /opt/stream/services/processor/iot_anomaly_job.py
-        -pyfs /opt/stream
     environment:
       REDPANDA_BROKERS: redpanda:9092
       IOT_TOPIC: iot.raw
       PROCESSED_TOPIC: iot.processed
       FLINK_PARALLELISM: ${FLINK_PARALLELISM:-4}
       FLINK_CHECKPOINT_INTERVAL_MS: ${FLINK_CHECKPOINT_INTERVAL_MS:-10000}
-    volumes:
-      - ..:/opt/stream:ro
 
   prometheus:
     image: prom/prometheus:v3.0.1

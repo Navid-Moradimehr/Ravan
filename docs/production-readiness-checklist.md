@@ -30,6 +30,8 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Site-profile benchmark matrix exists for per-site acceptance runs.
 - Site-profile benchmark calibration reports exist for per-site sizing recommendations.
 - CGR gap report command exists for comparing repo measurements against the public CGR streaming claim.
+- Dedicated Flink runtime benchmark path exists so the distributed processor contract is measured separately from the Python fallback path.
+- Dedicated Flink job image now exists for the compose deployment path.
 - Dataset conversion workflow exists for AI4I, C-MAPSS, and generic industrial CSV slices.
 - Failure isolation between sites, sources, and correlation groups is enforced by manifest validation.
 - Synthetic and replay datasets are available for regression tests.
@@ -51,6 +53,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 
 - Per-site production benchmarking on the actual target broker and historian topology.
 - Live benchmark calibration using the target industrial network.
+- Repeatability checks over several benchmark sessions to separate regression noise from actual performance loss.
 - Model evaluation lifecycle and promotion workflow.
 - Diagnostic-agent runtime.
 - Supervised action-agent runtime.
@@ -72,6 +75,14 @@ These are the changes that matter most before calling the platform production-re
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish the diagnostic-agent and supervised action-agent runtime paths.
 5. Keep adding target-site broker/historian p99 probes so the CGR comparison eventually covers real plant latency, not only local replay latency.
+6. Treat benchmark session deltas as first-class evidence. A single local run can move 1-12 percent on the same machine, so use repeated runs and median/percentile tracking before calling a change a real regression.
+
+## Session Delta Guidance
+
+- When a new session is slower by less than about 5 percent, treat it as noise until you repeat the run.
+- When the slowdown is in the 5-15 percent range, inspect CPU contention, memory pressure, and benchmark mix changes.
+- When a slowdown is above 15 percent, treat it as a likely regression and bisect the last code or environment change.
+- When reporting improvements, always include both the absolute numbers and the percentage delta versus the previous recorded session.
 ## Real-World Simulator Benchmark Plan
 
 ### Goals
