@@ -44,6 +44,7 @@ graph TD
 - real-world simulator benchmark runner for mock and mixed replay cases
 - bearer-token enforcement for mutating API requests with baseline security headers
 - regression tests for shared-deployment auth and headers
+- site-profile benchmark matrix for per-site acceptance runs
 
 ## Risks Being Addressed
 
@@ -55,6 +56,7 @@ graph TD
 - ambiguous source/site assignments in the project manifest
 - invisible lag on historian query and stream delivery paths
 - missing runnable benchmark matrix for repeatable real-world simulation cases
+- missing per-site acceptance benchmark matrix
 - unauthenticated mutating API requests in shared deployments
 
 ## Verification
@@ -76,3 +78,7 @@ graph TD
 - `benchmark_mixed_replay.py --events 10000 --batch-size 256`
   - 58,548.76 events/sec
 - focused regression slice after observability + site-boundary hardening: 23 passed
+- `site-profile-matrix --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1`
+  - demo-site: 44,795.24 events/sec, passed
+  - plant-a: 59,253.75 events/sec, passed
+  - overall: passed

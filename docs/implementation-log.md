@@ -40,6 +40,11 @@
    - Added baseline security headers to all API responses.
    - Added regression tests for unauthorized and authorized mutating requests plus security headers on health responses.
 
+10. **Site-profile benchmark matrix**
+   - Added `services/benchmarks/site_profile_matrix.py` to run the real-world simulator per site profile and report per-site acceptance status.
+   - Added `datastreamctl benchmark site-profile-matrix` and a script wrapper so site-by-site reports can be generated from the CLI.
+   - The matrix keeps per-site reporting separate from the raw simulator suite, which makes rollout acceptance easier to audit.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
@@ -61,6 +66,10 @@
   - `mock-normal`: 12,181.75 events/sec, 5 batches, 0 invalid events
   - `industrial-benchmark`: 54,303.57 events/sec, 5 batches, 0 invalid events
   - average: 33,242.66 events/sec
+- `uv run python -m services.cli.datastreamctl benchmark site-profile-matrix --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1`
+  - `demo-site`: 44,795.24 events/sec, passed, threshold 500.0
+  - `plant-a`: 59,253.75 events/sec, passed, threshold 750.0
+  - overall: passed
 
 ### Notes
 

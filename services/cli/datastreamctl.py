@@ -23,6 +23,8 @@ from services.benchmarks.deployment_pack import run_benchmark as run_deployment_
 from services.benchmarks.deployment_pack import run_matrix as run_deployment_pack_matrix
 from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
 from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
+from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
+from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
 from services.historian.backup import create_backup, get_walg_status, list_backups, restore_backup
 
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
@@ -592,6 +594,40 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("=" * 40)
             print(format_real_world_simulator_result(result))
         return 0
+    if args.action == "site-profile-matrix":
+        site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
+        result = run_site_profile_matrix(
+            Path(args.manifest),
+            Path(args.csv),
+            site_ids=site_ids,
+            events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            min_average_events_per_second=args.min_average_events_per_second,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "passed": result.passed,
+                    "runs": [
+                        {
+                            "site_id": item.site_id,
+                            "deployment_mode": item.deployment_mode,
+                            "profile_path": item.profile_path,
+                            "average_events_per_second": item.average_events_per_second,
+                            "passed": item.passed,
+                            "detail": item.detail,
+                        }
+                        for item in result.runs
+                    ],
+                },
+                indent=2,
+            ))
+        else:
+            print("site profile benchmark matrix")
+            print("=" * 40)
+            print(format_site_profile_matrix_result(result))
+        return 0 if result.passed else 2
     raise ValueError(f"unknown benchmark action: {args.action}")
 
 
@@ -722,6 +758,16 @@ def build_parser() -> argparse.ArgumentParser:
     real_world_simulator.add_argument("--cases", default=None, help="Comma-separated cases: mock-normal,mock-drift,mock-spike,industrial-benchmark")
     real_world_simulator.add_argument("--json", action="store_true")
     real_world_simulator.set_defaults(func=cmd_benchmark)
+    site_profile_matrix = benchmark_sub.add_parser("site-profile-matrix", help="Benchmark real-world simulator runs per site profile")
+    site_profile_matrix.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
+    site_profile_matrix.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    site_profile_matrix.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites in the manifest")
+    site_profile_matrix.add_argument("--events", type=int, default=10_000)
+    site_profile_matrix.add_argument("--batch-size", type=int, default=256)
+    site_profile_matrix.add_argument("--warmup-events", type=int, default=0)
+    site_profile_matrix.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    site_profile_matrix.add_argument("--json", action="store_true")
+    site_profile_matrix.set_defaults(func=cmd_benchmark)
     return parser
 
 

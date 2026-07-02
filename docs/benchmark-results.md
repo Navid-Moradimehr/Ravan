@@ -49,6 +49,22 @@ Latest local run on the current codebase:
 | industrial-benchmark | data/benchmarks/industrial_mixed_benchmark.csv | mixed | 54,303.57 | 5 | 0 |
 | **Average** | - | - | **33,242.66** | - | - |
 
+### Site-Profile Benchmark Matrix
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl benchmark site-profile-matrix --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1
+```
+
+Latest local run on the current codebase:
+
+| Site | Mode | Avg Events/sec | Threshold | Result |
+|------|------|----------------|-----------|--------|
+| demo-site | single-site | 44,795.24 | 500.0 | passed |
+| plant-a | plant-local | 59,253.75 | 750.0 | passed |
+| **Overall** | - | - | - | passed |
+
 ## Test Suite Results
 
 | Test Category | Tests | Status |
