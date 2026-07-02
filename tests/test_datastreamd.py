@@ -15,7 +15,7 @@ from services.cli import datastreamd as d
 class TestSupervisorSpecs:
     def test_specs_cover_core_services(self):
         names = {s.name for s in d.SERVICE_SPECS}
-        assert {"api", "ai", "edge", "processor", "mock"} <= names
+        assert {"api", "ai", "edge", "processor", "flink-job", "mock"} <= names
 
     def test_each_spec_has_module_and_description(self):
         for spec in d.SERVICE_SPECS:
@@ -35,6 +35,11 @@ class TestSupervisorSpecs:
             assert order.index("api") < order.index("testdep")
         finally:
             d.SPEC_BY_NAME.pop("testdep", None)
+
+    def test_runtime_mode_service_selection(self):
+        assert d._services_for_runtime_mode("python-fallback") == ["api", "ai", "edge", "processor", "mock"]
+        assert d._services_for_runtime_mode("flink-local") == ["api", "ai", "edge", "flink-job", "mock"]
+        assert d._services_for_runtime_mode("flink-production") == ["api", "ai", "edge", "flink-job"]
 
     def test_resolve_order_dedupes(self):
         order = d._resolve_order(["api", "ai", "api"])
@@ -65,7 +70,7 @@ class TestSupervisorLifecycle:
         out = buf.getvalue()
         assert rc == 0
         assert "datastreamd managed services" in out
-        for name in ("api", "ai", "edge", "processor", "mock"):
+        for name in ("api", "ai", "edge", "processor", "flink-job", "mock"):
             assert name in out
 
     def test_status_reports_runtime_mode_for_site_profile(self, tmp_path):
@@ -76,6 +81,41 @@ class TestSupervisorLifecycle:
         out = buf.getvalue()
         assert rc == 0
         assert "runtime_mode=python-fallback" in out
+
+    def test_up_uses_flink_job_for_federated_profile(self, monkeypatch, tmp_path):
+        profile = Path(__file__).resolve().parents[1] / "config" / "site-profiles" / "federated.yaml"
+        started: list[str] = []
+
+        monkeypatch.setattr(d, "PID_DIR", tmp_path)
+        monkeypatch.setattr(d, "PID_FILE", tmp_path / "processes.json")
+        monkeypatch.setattr(d, "_load_records", lambda: {})
+        monkeypatch.setattr(d, "_save_records", lambda records: None)
+        monkeypatch.setattr(d, "_is_alive", lambda rec: False)
+        monkeypatch.setattr(
+            d,
+            "_start_one",
+            lambda spec, extra_env=None, profile_meta=None: started.append(spec.name) or d.ProcRecord(
+                name=spec.name,
+                pid=len(started),
+                module=spec.module,
+                started_at=time.time(),
+                health_url=spec.health_url,
+                site_profile=(profile_meta or {}).get("site_profile", ""),
+                site_id=(profile_meta or {}).get("site_id", ""),
+                deployment_mode=(profile_meta or {}).get("deployment_mode", ""),
+                runtime_mode=(profile_meta or {}).get("runtime_mode", ""),
+                project_manifest=(profile_meta or {}).get("project_manifest", ""),
+                project_id=(profile_meta or {}).get("project_id", ""),
+            ),
+        )
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = d.main(["up", "--site-profile", str(profile)])
+
+        assert rc == 0
+        assert "flink-job" in started
+        assert "processor" not in started
 
     def test_down_with_nothing_running_is_clean(self, monkeypatch, tmp_path):
         monkeypatch.setattr(d, "PID_DIR", tmp_path)
