@@ -677,7 +677,7 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     event_id = str(_uuid.uuid4())
     if dlq is not None:
         try:
-            _publish_kafka(brokers, dlq_topic, str(payload.get("source_id", "api")).encode(), to_json_bytes(dlq))
+            _publish_kafka_fresh(brokers, dlq_topic, str(payload.get("source_id", "api")).encode(), to_json_bytes(dlq))
         except Exception:
             pass
         try:
@@ -704,6 +704,13 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
 
 
 def _publish_kafka(brokers: str, topic: str, key: bytes, value: bytes) -> None:
+    from confluent_kafka import Producer
+    producer = Producer({"bootstrap.servers": brokers, "client.id": "api-ingest"})
+    producer.produce(topic, key=key, value=value)
+    producer.flush(5)
+
+
+def _publish_kafka_fresh(brokers: str, topic: str, key: bytes, value: bytes) -> None:
     from confluent_kafka import Producer
     producer = Producer({"bootstrap.servers": brokers, "client.id": "api-ingest"})
     producer.produce(topic, key=key, value=value)

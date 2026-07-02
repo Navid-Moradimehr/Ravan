@@ -81,7 +81,7 @@ def map_row_to_event(row: dict[str, str], mapping: dict[str, str]) -> dict[str, 
         "unit": "",
         "site": "demo-site",
         "line": "line-01",
-        "ts_source": utc_now(),
+        "ts_source": "",
         "schema_version": 1,
         "replay_offset_ms": 0,
         "replay_source": "time_travel",
@@ -100,6 +100,8 @@ def map_row_to_event(row: dict[str, str], mapping: dict[str, str]) -> dict[str, 
                 event[event_field] = 0
         else:
             event[event_field] = raw
+    if not event["ts_source"]:
+        event["ts_source"] = utc_now()
     return event
 
 

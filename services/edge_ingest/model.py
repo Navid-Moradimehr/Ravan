@@ -72,5 +72,5 @@ def validate_event(payload: dict[str, Any]) -> tuple[IndustrialEvent | None, Dea
 
 def to_json_bytes(payload: BaseModel | dict[str, Any]) -> bytes:
     if isinstance(payload, BaseModel):
-        return json.dumps(payload.model_dump(mode="json"), separators=(",", ":")).encode("utf-8")
+        return payload.model_dump_json(exclude_none=False, by_alias=False).encode("utf-8")
     return json.dumps(payload, separators=(",", ":")).encode("utf-8")
