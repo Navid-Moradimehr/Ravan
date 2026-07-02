@@ -8,6 +8,7 @@
 This file records the broad feature surface that exists in the repo.
 For a stricter view of what is production-ready versus only foundational,
 see `docs/model-agent-roadmap.md` and `docs/multi-site-rollout.md`.
+For the current complete/incomplete production checklist, see `docs/production-readiness-checklist.md`.
 
 ## Implemented Categories
 
