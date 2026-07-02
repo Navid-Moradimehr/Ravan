@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any
 
 
@@ -19,7 +19,12 @@ class StreamScope:
 
 
 def derive_stream_scope(event: dict[str, Any] | Any) -> StreamScope:
-    data = event.model_dump(mode="json") if hasattr(event, "model_dump") else dict(event)
+    if hasattr(event, "model_dump"):
+        data = event.model_dump(mode="json")
+    elif is_dataclass(event):
+        data = asdict(event)
+    else:
+        data = dict(event)
     return StreamScope(
         site=str(data.get("site") or data.get("site_id") or "demo-site"),
         line=str(data.get("line") or data.get("line_id") or "line-01"),
@@ -50,4 +55,3 @@ def stream_partition_key(event: dict[str, Any] | Any) -> bytes:
 def correlation_group_key(event: dict[str, Any] | Any) -> str:
     scope = derive_stream_scope(event)
     return "|".join([scope.project_id, scope.site, scope.asset_id, scope.tag])
-

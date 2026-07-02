@@ -61,11 +61,12 @@ def main() -> None:
 
 def enrich_event(raw: str) -> str:
     import json
-    from datetime import datetime, timezone
 
-    event = json.loads(raw)
-    temperature = float(event.get("temperature_c", 0))
-    vibration = float(event.get("vibration_mm_s", 0))
+    from services.common.runtime_event import RuntimeEventRecord
+
+    event = RuntimeEventRecord.from_raw_mapping(json.loads(raw))
+    temperature = float(event.temperature_c)
+    vibration = float(event.vibration_mm_s)
     anomaly_score = score_event(
         event,
         temperature_avg=temperature,
@@ -73,10 +74,14 @@ def enrich_event(raw: str) -> str:
         detector=None,
     )
 
-    event["processed_at"] = datetime.now(timezone.utc).isoformat()
-    event["anomaly_score"] = anomaly_score
-    event["severity"] = severity_for(anomaly_score)
-    return json.dumps(event, separators=(",", ":"))
+    event.mark_processed(
+        window_size=1,
+        temperature_avg_c=round(temperature, 2),
+        vibration_avg_mm_s=round(vibration, 2),
+        anomaly_score=anomaly_score,
+        severity=severity_for(anomaly_score),
+    )
+    return json.dumps(event.to_dict(), separators=(",", ":"))
 
 
 if __name__ == "__main__":

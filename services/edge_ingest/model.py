@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict, is_dataclass
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -71,6 +72,11 @@ def validate_event(payload: dict[str, Any]) -> tuple[IndustrialEvent | None, Dea
 
 
 def to_json_bytes(payload: BaseModel | dict[str, Any]) -> bytes:
+    to_dict = getattr(payload, "to_dict", None)
+    if callable(to_dict):
+        return json.dumps(to_dict(), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    if is_dataclass(payload):
+        return json.dumps(asdict(payload), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     if isinstance(payload, BaseModel):
         return payload.model_dump_json(exclude_none=False, by_alias=False).encode("utf-8")
     return json.dumps(payload, separators=(",", ":")).encode("utf-8")

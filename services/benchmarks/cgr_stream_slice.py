@@ -2,16 +2,11 @@ from __future__ import annotations
 
 import argparse
 import time
-from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from itertools import cycle
 from pathlib import Path
-from statistics import mean
-from typing import Any
 
-from services.common.normalize import normalize_runtime_event
-from services.common.stream_scope import stream_partition_key
+from services.common.runtime_event import RollingWindowState, RuntimeEventRecord
 from services.datasets.replayer import map_row_to_event, read_csv_rows
 from services.edge_ingest.model import to_json_bytes, validate_event
 from services.processor.scoring import score_event, severity_for
@@ -126,9 +121,9 @@ def run_benchmark(
     processed_bytes = 0
     batch_count = 0
     latencies_ms: list[float] = []
-    windows: dict[str, deque[dict[str, Any]]] = {}
+    windows: dict[str, RollingWindowState] = {}
     mapping_validation_ms: list[float] = []
-    normalization_ms: list[float] = []
+    record_build_ms: list[float] = []
     partitioning_window_scoring_ms: list[float] = []
     serialization_ms: list[float] = []
 
@@ -148,32 +143,31 @@ def run_benchmark(
 
         stage_started = time.perf_counter()
         raw_payload = to_json_bytes(mapped)
-        normalized = normalize_runtime_event(event.model_dump(mode="json"))
-        normalization_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
+        runtime_event = RuntimeEventRecord.from_industrial_event(event)
+        record_build_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
 
         stage_started = time.perf_counter()
-        _ = stream_partition_key(event)
+        _ = runtime_event.partition_key()
 
-        device_window = windows.get(normalized["device_id"])
+        device_window = windows.get(runtime_event.device_id)
         if device_window is None:
-            device_window = deque(maxlen=window_limit)
-            windows[normalized["device_id"]] = device_window
+            device_window = RollingWindowState(maxlen=window_limit)
+            windows[runtime_event.device_id] = device_window
 
-        device_window.append(normalized)
-        temperature_avg = mean(float(item["temperature_c"]) for item in device_window)
-        vibration_avg = mean(float(item["vibration_mm_s"]) for item in device_window)
-        anomaly_score = score_event(normalized, temperature_avg, vibration_avg, detector=None)
-        processed = dict(normalized)
-        processed["processed_at"] = datetime.now(timezone.utc).isoformat()
-        processed["window_size"] = len(device_window)
-        processed["temperature_avg_c"] = round(temperature_avg, 2)
-        processed["vibration_avg_mm_s"] = round(vibration_avg, 2)
-        processed["anomaly_score"] = anomaly_score
-        processed["severity"] = severity_for(anomaly_score)
+        temperature_avg, vibration_avg, window_size = device_window.append(runtime_event)
+        anomaly_score = score_event(runtime_event, temperature_avg, vibration_avg, detector=None)
+        runtime_event.mark_processed(
+            window_size=window_size,
+            temperature_avg_c=round(temperature_avg, 2),
+            vibration_avg_mm_s=round(vibration_avg, 2),
+            anomaly_score=anomaly_score,
+            severity=severity_for(anomaly_score),
+        )
+        processed = runtime_event.to_dict()
         partitioning_window_scoring_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
 
         stage_started = time.perf_counter()
-        normalized_payload = to_json_bytes(normalized)
+        normalized_payload = to_json_bytes(runtime_event)
         processed_payload = to_json_bytes(processed)
         serialization_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
 
@@ -181,7 +175,7 @@ def run_benchmark(
             events += 1
             latencies_ms.append((time.perf_counter() - started) * 1000.0)
             mapping_validation_ms.append(mapping_validation_elapsed_ms)
-            normalization_ms.append(normalization_elapsed_ms)
+            record_build_ms.append(record_build_elapsed_ms)
             partitioning_window_scoring_ms.append(partitioning_window_scoring_elapsed_ms)
             serialization_ms.append(serialization_elapsed_ms)
             raw_bytes += len(raw_payload)
@@ -213,7 +207,7 @@ def run_benchmark(
         latency_max_ms=round(max(latencies_ms), 4) if latencies_ms else 0.0,
         stage_breakdown=(
             _stage_result("mapping_validation", mapping_validation_ms),
-            _stage_result("normalization", normalization_ms),
+            _stage_result("record_build", record_build_ms),
             _stage_result("partitioning_window_scoring", partitioning_window_scoring_ms),
             _stage_result("serialization", serialization_ms),
         ),

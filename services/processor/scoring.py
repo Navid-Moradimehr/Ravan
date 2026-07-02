@@ -3,6 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 
+def _event_value(event: Any, field: str, default: Any = 0) -> Any:
+    if hasattr(event, "get"):
+        return event.get(field, default)
+    return getattr(event, field, default)
+
+
 def severity_for(score: float) -> str:
     if score >= 0.8:
         return "critical"
@@ -20,9 +26,9 @@ def score_event(
     """Shared anomaly score used by the runtime processor and Flink job."""
 
     score = 0.0
-    temp = float(event.get("temperature_c", 0))
-    vib = float(event.get("vibration_mm_s", 0))
-    press = float(event.get("pressure_bar", 0))
+    temp = float(_event_value(event, "temperature_c", 0))
+    vib = float(_event_value(event, "vibration_mm_s", 0))
+    press = float(_event_value(event, "pressure_bar", 0))
 
     if temp >= 65:
         score += 0.35
@@ -41,7 +47,7 @@ def score_event(
 
         tag = str(event.get("tag", "")).strip()
         if tag and tag not in ("temperature_c", "vibration_mm_s", "pressure_bar"):
-            tag_result = detector.update(tag, float(event.get("value", 0)))
+            tag_result = detector.update(tag, float(_event_value(event, "value", 0)))
             max_anomaly = max(max_anomaly, float(tag_result.get("anomaly_score", 0)))
 
         score += min(max_anomaly / 100.0, 0.3)

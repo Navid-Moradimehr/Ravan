@@ -5,15 +5,11 @@ import json
 import os
 import signal
 import time
-from collections import deque
-from datetime import datetime, timezone
-from statistics import mean
-from typing import Any
 
 from confluent_kafka import Consumer, Producer, TopicPartition
-from services.analytics.baseline import BaselineDetector
 from services.common.normalize import normalize_runtime_event
 from services.common.runtime_metrics import set_consumer_lag
+from services.common.runtime_event import RollingWindowState, RuntimeEventRecord
 from services.historian.client import insert_processed_event, insert_processed_events
 from services.processor.scoring import score_event, severity_for
 
@@ -23,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _prune_windows(
-    windows: dict[str, deque[dict[str, Any]]],
+    windows: dict[str, RollingWindowState],
     last_seen: dict[str, float],
     max_devices: int,
     max_idle_seconds: int,
@@ -60,10 +56,9 @@ def main() -> None:
     max_idle_seconds = int(os.getenv("RUNTIME_DEVICE_MAX_IDLE_SECONDS", "0"))
     max_devices = int(os.getenv("RUNTIME_MAX_ACTIVE_DEVICES", "0"))
     running = True
-    detector = BaselineDetector()
-    windows: dict[str, deque[dict[str, Any]]] = {}
+    windows: dict[str, RollingWindowState] = {}
     window_last_seen: dict[str, float] = {}
-    processed_buffer: list[dict[str, Any]] = []
+    processed_buffer: list[dict[str, object]] = []
     processed_offsets: list[tuple[str, int, int]] = []
     last_db_flush = time.monotonic()
 
@@ -138,30 +133,34 @@ def main() -> None:
             except Exception:
                 pass
 
-            event = normalize_runtime_event(json.loads(message.value().decode("utf-8")))
-            device_id = event["device_id"]
+            raw_event = json.loads(message.value().decode("utf-8"))
+            event = RuntimeEventRecord.from_raw_mapping(raw_event)
+            device_id = event.device_id
             now_ts = time.time()
             device_window = windows.get(device_id)
             if device_window is None:
-                device_window = deque(maxlen=window_limit)
+                device_window = RollingWindowState(maxlen=window_limit)
                 windows[device_id] = device_window
 
             window_last_seen[device_id] = now_ts
-            device_window.append(event)
-
-            temperature_avg = mean(float(item["temperature_c"]) for item in device_window)
-            vibration_avg = mean(float(item["vibration_mm_s"]) for item in device_window)
+            temperature_avg, vibration_avg, window_size = device_window.append(event)
             anomaly_score = score_event(event, temperature_avg, vibration_avg)
-            event["processed_at"] = datetime.now(timezone.utc).isoformat()
-            event["window_size"] = len(device_window)
-            event["temperature_avg_c"] = round(temperature_avg, 2)
-            event["vibration_avg_mm_s"] = round(vibration_avg, 2)
-            event["anomaly_score"] = anomaly_score
-            event["severity"] = severity_for(anomaly_score)
+            event.mark_processed(
+                window_size=window_size,
+                temperature_avg_c=round(temperature_avg, 2),
+                vibration_avg_mm_s=round(vibration_avg, 2),
+                anomaly_score=anomaly_score,
+                severity=severity_for(anomaly_score),
+            )
+            processed_event = event.to_dict()
 
-            producer.produce(output_topic, key=event["device_id"].encode("utf-8"), value=json.dumps(event).encode("utf-8"))
+            producer.produce(
+                output_topic,
+                key=event.partition_key(),
+                value=json.dumps(processed_event).encode("utf-8"),
+            )
             producer.poll(0)
-            processed_buffer.append(event)
+            processed_buffer.append(processed_event)
             processed_offsets.append((message.topic(), message.partition(), message.offset()))
             flush_processed_buffer()
             processed += 1
