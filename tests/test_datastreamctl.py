@@ -528,6 +528,19 @@ class TestDatastreamctl:
                 latency_p95_ms=0.02,
                 latency_p99_ms=0.03,
                 latency_max_ms=0.04,
+                stage_breakdown=(
+                    SimpleNamespace(
+                        name="mapping_validation",
+                        operations=12,
+                        elapsed_seconds=0.01,
+                        events_per_second=1200.0,
+                        avg_ms=0.5,
+                        latency_p50_ms=0.4,
+                        latency_p95_ms=0.6,
+                        latency_p99_ms=0.7,
+                        latency_max_ms=0.8,
+                    ),
+                ),
             ),
         )
         rc, out = self._run([
@@ -544,6 +557,7 @@ class TestDatastreamctl:
         assert "cgr stream slice benchmark" in out
         assert "events_per_second=" in out
         assert "serialized_bytes=" in out
+        assert "mapping_validation" in out
 
 
 if __name__ == "__main__":

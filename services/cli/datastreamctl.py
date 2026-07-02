@@ -962,6 +962,20 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                     "latency_p95_ms": result.latency_p95_ms,
                     "latency_p99_ms": result.latency_p99_ms,
                     "latency_max_ms": result.latency_max_ms,
+                    "stage_breakdown": [
+                        {
+                            "name": stage.name,
+                            "operations": stage.operations,
+                            "elapsed_seconds": stage.elapsed_seconds,
+                            "events_per_second": stage.events_per_second,
+                            "avg_ms": stage.avg_ms,
+                            "latency_p50_ms": stage.latency_p50_ms,
+                            "latency_p95_ms": stage.latency_p95_ms,
+                            "latency_p99_ms": stage.latency_p99_ms,
+                            "latency_max_ms": stage.latency_max_ms,
+                        }
+                        for stage in result.stage_breakdown
+                    ],
                 },
                 indent=2,
             ))

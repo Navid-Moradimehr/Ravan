@@ -37,6 +37,19 @@ DEFAULT_MAPPING: dict[str, str] = {
 
 
 @dataclass(frozen=True)
+class StageBenchmarkResult:
+    name: str
+    operations: int
+    elapsed_seconds: float
+    events_per_second: float
+    avg_ms: float
+    latency_p50_ms: float
+    latency_p95_ms: float
+    latency_p99_ms: float
+    latency_max_ms: float
+
+
+@dataclass(frozen=True)
 class StreamingSliceBenchmarkResult:
     csv_path: str
     events: int
@@ -54,6 +67,7 @@ class StreamingSliceBenchmarkResult:
     latency_p95_ms: float
     latency_p99_ms: float
     latency_max_ms: float
+    stage_breakdown: tuple[StageBenchmarkResult, ...] = ()
 
 
 def _load_rows(csv_path: Path) -> list[dict[str, str]]:
@@ -77,6 +91,25 @@ def _percentile(values: list[float], percentile: float) -> float:
     return round(value, 4)
 
 
+def _stage_result(name: str, durations_ms: list[float]) -> StageBenchmarkResult:
+    operations = len(durations_ms)
+    total_ms = sum(durations_ms)
+    elapsed_seconds = round(total_ms / 1000.0, 6)
+    events_per_second = round(operations / elapsed_seconds, 2) if elapsed_seconds > 0 else 0.0
+    avg_ms = round(total_ms / operations, 4) if operations else 0.0
+    return StageBenchmarkResult(
+        name=name,
+        operations=operations,
+        elapsed_seconds=elapsed_seconds,
+        events_per_second=events_per_second,
+        avg_ms=avg_ms,
+        latency_p50_ms=_percentile(durations_ms, 50.0),
+        latency_p95_ms=_percentile(durations_ms, 95.0),
+        latency_p99_ms=_percentile(durations_ms, 99.0),
+        latency_max_ms=round(max(durations_ms), 4) if durations_ms else 0.0,
+    )
+
+
 def run_benchmark(
     csv_path: Path,
     target_events: int = 100_000,
@@ -94,6 +127,10 @@ def run_benchmark(
     batch_count = 0
     latencies_ms: list[float] = []
     windows: dict[str, deque[dict[str, Any]]] = {}
+    mapping_validation_ms: list[float] = []
+    normalization_ms: list[float] = []
+    partitioning_window_scoring_ms: list[float] = []
+    serialization_ms: list[float] = []
 
     start = time.perf_counter()
     rows_iter = cycle(rows)
@@ -101,15 +138,21 @@ def run_benchmark(
     for index in range(total_iterations):
         row = next(rows_iter)
         started = time.perf_counter()
+        stage_started = started
         mapped = map_row_to_event(row, DEFAULT_MAPPING)
         event, dlq = validate_event(mapped)
+        mapping_validation_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
         if event is None or dlq is not None:
             invalid_events += 1
             continue
 
+        stage_started = time.perf_counter()
         raw_payload = to_json_bytes(mapped)
         normalized = normalize_runtime_event(event.model_dump(mode="json"))
-        key = stream_partition_key(event)
+        normalization_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
+
+        stage_started = time.perf_counter()
+        _ = stream_partition_key(event)
 
         device_window = windows.get(normalized["device_id"])
         if device_window is None:
@@ -127,12 +170,20 @@ def run_benchmark(
         processed["vibration_avg_mm_s"] = round(vibration_avg, 2)
         processed["anomaly_score"] = anomaly_score
         processed["severity"] = severity_for(anomaly_score)
+        partitioning_window_scoring_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
+
+        stage_started = time.perf_counter()
         normalized_payload = to_json_bytes(normalized)
         processed_payload = to_json_bytes(processed)
+        serialization_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
 
         if index >= warmup_events:
             events += 1
             latencies_ms.append((time.perf_counter() - started) * 1000.0)
+            mapping_validation_ms.append(mapping_validation_elapsed_ms)
+            normalization_ms.append(normalization_elapsed_ms)
+            partitioning_window_scoring_ms.append(partitioning_window_scoring_elapsed_ms)
+            serialization_ms.append(serialization_elapsed_ms)
             raw_bytes += len(raw_payload)
             normalized_bytes += len(normalized_payload)
             processed_bytes += len(processed_payload)
@@ -160,30 +211,48 @@ def run_benchmark(
         latency_p95_ms=_percentile(latencies_ms, 95.0),
         latency_p99_ms=_percentile(latencies_ms, 99.0),
         latency_max_ms=round(max(latencies_ms), 4) if latencies_ms else 0.0,
+        stage_breakdown=(
+            _stage_result("mapping_validation", mapping_validation_ms),
+            _stage_result("normalization", normalization_ms),
+            _stage_result("partitioning_window_scoring", partitioning_window_scoring_ms),
+            _stage_result("serialization", serialization_ms),
+        ),
     )
 
 
 def format_result(result: StreamingSliceBenchmarkResult) -> str:
-    return "\n".join(
-        [
-            f"csv={result.csv_path}",
-            f"events={result.events}",
-            f"invalid_events={result.invalid_events}",
-            f"batches={result.batches}",
-            f"batch_size={result.batch_size}",
-            f"window_limit={result.window_limit}",
-            f"elapsed_seconds={result.elapsed_seconds}",
-            f"events_per_second={result.events_per_second}",
-            f"serialized_bytes={result.serialized_bytes}",
-            f"raw_bytes={result.raw_bytes}",
-            f"normalized_bytes={result.normalized_bytes}",
-            f"processed_bytes={result.processed_bytes}",
-            f"latency_p50_ms={result.latency_p50_ms}",
-            f"latency_p95_ms={result.latency_p95_ms}",
-            f"latency_p99_ms={result.latency_p99_ms}",
-            f"latency_max_ms={result.latency_max_ms}",
-        ]
-    )
+    lines = [
+        f"csv={result.csv_path}",
+        f"events={result.events}",
+        f"invalid_events={result.invalid_events}",
+        f"batches={result.batches}",
+        f"batch_size={result.batch_size}",
+        f"window_limit={result.window_limit}",
+        f"elapsed_seconds={result.elapsed_seconds}",
+        f"events_per_second={result.events_per_second}",
+        f"serialized_bytes={result.serialized_bytes}",
+        f"raw_bytes={result.raw_bytes}",
+        f"normalized_bytes={result.normalized_bytes}",
+        f"processed_bytes={result.processed_bytes}",
+        f"latency_p50_ms={result.latency_p50_ms}",
+        f"latency_p95_ms={result.latency_p95_ms}",
+        f"latency_p99_ms={result.latency_p99_ms}",
+        f"latency_max_ms={result.latency_max_ms}",
+    ]
+    if result.stage_breakdown:
+        lines.extend(
+            [
+                "",
+                "stage | ops | avg_ms | p50_ms | p95_ms | p99_ms | max_ms | ops/sec",
+                "-" * 110,
+            ]
+        )
+        for stage in result.stage_breakdown:
+            lines.append(
+                f"{stage.name} | {stage.operations} | {stage.avg_ms} | {stage.latency_p50_ms} | "
+                f"{stage.latency_p95_ms} | {stage.latency_p99_ms} | {stage.latency_max_ms} | {stage.events_per_second}"
+            )
+    return "\n".join(lines)
 
 
 def build_parser() -> argparse.ArgumentParser:
