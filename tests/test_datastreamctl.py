@@ -430,6 +430,21 @@ class TestDatastreamctl:
                     serialized_bytes=512,
                     latency_p99_ms=0.12,
                 ),
+                cgr_stream_slice=SimpleNamespace(
+                    csv_path=str(csv_path),
+                    events=12,
+                    invalid_events=0,
+                    batches=3,
+                    batch_size=4,
+                    window_limit=25,
+                    elapsed_seconds=0.2,
+                    events_per_second=58_548.76,
+                    serialized_bytes=768,
+                    raw_bytes=256,
+                    normalized_bytes=256,
+                    processed_bytes=256,
+                    latency_p99_ms=0.22,
+                ),
                 real_world_simulator=SimpleNamespace(
                     average_events_per_second=33_242.66,
                     average_latency_p99_ms=0.09,
@@ -478,8 +493,57 @@ class TestDatastreamctl:
         assert rc == 0
         assert "cgr gap report" in out
         assert "mixed_replay" in out
+        assert "cgr_stream_slice" in out
         assert "gap_x" in out
         assert "latency metric" in out
+
+    def test_benchmark_cgr_stream_slice_runs(self, monkeypatch, tmp_path):
+        csv_path = tmp_path / "mock.csv"
+        csv_path.write_text(
+            "\n".join(
+                [
+                    "event_id,source_protocol,source_id,asset_id,tag,value,quality,unit,site,line,ts_source,schema_version,fault_type,scenario_id,ground_truth_severity,step",
+                    "evt-1,mqtt,site-a/mqtt/pump-1,Pump-1,Temperature,55.1,good,c,Factory-A,Line-1,2026-07-01T00:00:00Z,1,normal,mock-benchmark,normal,0",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            ctl,
+            "run_cgr_stream_slice_benchmark",
+            lambda *args, **kwargs: SimpleNamespace(
+                csv_path=str(csv_path),
+                events=12,
+                invalid_events=0,
+                batches=3,
+                batch_size=4,
+                window_limit=25,
+                elapsed_seconds=0.1,
+                events_per_second=120.0,
+                serialized_bytes=512,
+                raw_bytes=128,
+                normalized_bytes=192,
+                processed_bytes=192,
+                latency_p50_ms=0.01,
+                latency_p95_ms=0.02,
+                latency_p99_ms=0.03,
+                latency_max_ms=0.04,
+            ),
+        )
+        rc, out = self._run([
+            "benchmark",
+            "cgr-stream-slice",
+            "--csv",
+            str(csv_path),
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+        ])
+        assert rc == 0
+        assert "cgr stream slice benchmark" in out
+        assert "events_per_second=" in out
+        assert "serialized_bytes=" in out
 
 
 if __name__ == "__main__":

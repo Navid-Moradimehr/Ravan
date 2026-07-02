@@ -23,6 +23,8 @@ from services.benchmarks.deployment_pack import run_benchmark as run_deployment_
 from services.benchmarks.deployment_pack import run_matrix as run_deployment_pack_matrix
 from services.benchmarks.cgr_gap import format_result as format_cgr_gap_result
 from services.benchmarks.cgr_gap import run_report as run_cgr_gap_report
+from services.benchmarks.cgr_stream_slice import format_result as format_cgr_stream_slice_result
+from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
 from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
 from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
 from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
@@ -855,6 +857,21 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                         "events_per_second": result.mixed_replay.events_per_second,
                         "serialized_bytes": result.mixed_replay.serialized_bytes,
                     },
+                    "cgr_stream_slice": {
+                        "csv_path": result.cgr_stream_slice.csv_path,
+                        "events": result.cgr_stream_slice.events,
+                        "invalid_events": result.cgr_stream_slice.invalid_events,
+                        "batches": result.cgr_stream_slice.batches,
+                        "batch_size": result.cgr_stream_slice.batch_size,
+                        "window_limit": result.cgr_stream_slice.window_limit,
+                        "elapsed_seconds": result.cgr_stream_slice.elapsed_seconds,
+                        "events_per_second": result.cgr_stream_slice.events_per_second,
+                        "serialized_bytes": result.cgr_stream_slice.serialized_bytes,
+                        "raw_bytes": result.cgr_stream_slice.raw_bytes,
+                        "normalized_bytes": result.cgr_stream_slice.normalized_bytes,
+                        "processed_bytes": result.cgr_stream_slice.processed_bytes,
+                        "latency_p99_ms": result.cgr_stream_slice.latency_p99_ms,
+                    },
                     "real_world_simulator": {
                         "average_events_per_second": result.real_world_simulator.average_events_per_second,
                         "cases": [
@@ -917,6 +934,41 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("cgr gap report")
             print("=" * 40)
             print(format_cgr_gap_result(result))
+        return 0
+    if args.action == "cgr-stream-slice":
+        result = run_cgr_stream_slice_benchmark(
+            Path(args.csv),
+            target_events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            window_limit=args.window_limit,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "csv_path": result.csv_path,
+                    "events": result.events,
+                    "invalid_events": result.invalid_events,
+                    "batches": result.batches,
+                    "batch_size": result.batch_size,
+                    "window_limit": result.window_limit,
+                    "elapsed_seconds": result.elapsed_seconds,
+                    "events_per_second": result.events_per_second,
+                    "serialized_bytes": result.serialized_bytes,
+                    "raw_bytes": result.raw_bytes,
+                    "normalized_bytes": result.normalized_bytes,
+                    "processed_bytes": result.processed_bytes,
+                    "latency_p50_ms": result.latency_p50_ms,
+                    "latency_p95_ms": result.latency_p95_ms,
+                    "latency_p99_ms": result.latency_p99_ms,
+                    "latency_max_ms": result.latency_max_ms,
+                },
+                indent=2,
+            ))
+        else:
+            print("cgr stream slice benchmark")
+            print("=" * 40)
+            print(format_cgr_stream_slice_result(result))
         return 0
     raise ValueError(f"unknown benchmark action: {args.action}")
 
@@ -1097,6 +1149,14 @@ def build_parser() -> argparse.ArgumentParser:
     cgr_gap_report.add_argument("--documented-full-pipeline-events-per-second", type=float, default=125_830.0)
     cgr_gap_report.add_argument("--json", action="store_true")
     cgr_gap_report.set_defaults(func=cmd_benchmark)
+    cgr_stream_slice = benchmark_sub.add_parser("cgr-stream-slice", help="Benchmark the isolated stream-processing slice used for CGR-style comparisons")
+    cgr_stream_slice.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    cgr_stream_slice.add_argument("--events", type=int, default=10_000)
+    cgr_stream_slice.add_argument("--batch-size", type=int, default=256)
+    cgr_stream_slice.add_argument("--warmup-events", type=int, default=0)
+    cgr_stream_slice.add_argument("--window-limit", type=int, default=25)
+    cgr_stream_slice.add_argument("--json", action="store_true")
+    cgr_stream_slice.set_defaults(func=cmd_benchmark)
     return parser
 
 

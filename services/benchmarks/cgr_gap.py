@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from services.benchmarks.cgr_stream_slice import StreamingSliceBenchmarkResult
+from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
 from services.benchmarks.mixed_replay import BenchmarkResult as MixedReplayResult
 from services.benchmarks.mixed_replay import run_benchmark as run_mixed_replay_benchmark
 from services.benchmarks.real_world_simulator import RealWorldSimulatorResult
@@ -46,6 +48,7 @@ class CgrGapReport:
     documented_full_pipeline_events_per_second: float
     documented_full_pipeline_note: str
     mixed_replay: MixedReplayResult
+    cgr_stream_slice: StreamingSliceBenchmarkResult
     real_world_simulator: RealWorldSimulatorResult
     site_profile_matrix: SiteProfileMatrixResult
     metrics: tuple[GapMetric, ...]
@@ -105,6 +108,12 @@ def run_report(
         batch_size=batch_size,
         warmup_events=warmup_events,
     )
+    cgr_stream_slice = run_cgr_stream_slice_benchmark(
+        baseline_csv,
+        target_events=events,
+        batch_size=batch_size,
+        warmup_events=warmup_events,
+    )
     real_world_simulator = run_real_world_simulator_suite(
         baseline_csv=baseline_csv,
         events=events,
@@ -133,6 +142,11 @@ def run_report(
             "current replay path over the mixed industrial pack",
         ),
         _gap_metric(
+            "cgr_stream_slice",
+            cgr_stream_slice.events_per_second,
+            "isolated stream-processing slice: validate -> normalize -> window -> score -> serialize",
+        ),
+        _gap_metric(
             "real_world_average",
             real_world_simulator.average_events_per_second,
             "average across the simulated real-world benchmark cases",
@@ -148,6 +162,16 @@ def run_report(
             if cgr_target_p99_ms > 0
             else 0.0,
             note="current replay path over the mixed industrial pack",
+        ),
+        LatencyMetric(
+            label="cgr_stream_slice",
+            observed_p99_ms=cgr_stream_slice.latency_p99_ms,
+            target_p99_ms=cgr_target_p99_ms,
+            gap_ms=round(cgr_target_p99_ms - cgr_stream_slice.latency_p99_ms, 4),
+            gap_percent=round((1.0 - (cgr_stream_slice.latency_p99_ms / cgr_target_p99_ms)) * 100.0, 2)
+            if cgr_target_p99_ms > 0
+            else 0.0,
+            note="isolated stream-processing slice",
         ),
         LatencyMetric(
             label="real_world_average",
@@ -214,6 +238,7 @@ def run_report(
         documented_full_pipeline_events_per_second=documented_full_pipeline_events_per_second,
         documented_full_pipeline_note="latest documented full-pipeline benchmark reference from the repo",
         mixed_replay=mixed_replay,
+        cgr_stream_slice=cgr_stream_slice,
         real_world_simulator=real_world_simulator,
         site_profile_matrix=site_profile_matrix,
         metrics=tuple(metrics),
@@ -231,6 +256,7 @@ def format_result(result: CgrGapReport) -> str:
         f"documented_full_pipeline_events_per_second={result.documented_full_pipeline_events_per_second}",
         f"documented_full_pipeline_note={result.documented_full_pipeline_note}",
         f"mixed_replay_events_per_second={result.mixed_replay.events_per_second}",
+        f"cgr_stream_slice_events_per_second={result.cgr_stream_slice.events_per_second}",
         f"real_world_average_events_per_second={result.real_world_simulator.average_events_per_second}",
         f"site_profile_matrix_passed={str(result.site_profile_matrix.passed).lower()}",
         f"latency_note={result.latency_note}",
