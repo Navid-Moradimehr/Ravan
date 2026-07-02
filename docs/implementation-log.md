@@ -57,6 +57,10 @@
    - Added `services/benchmarks/site_profile_calibration.py` and `datastreamctl benchmark site-profile-calibration` to convert site-profile benchmark runs into sizing recommendations.
    - The calibration report surfaces observed throughput, acceptance thresholds, headroom, and a recommended minimum throughput floor per site.
 
+14. **Real-world PLC and sensor simulation sources**
+   - Added `docs/real-world-plc-sensor-simulation.md` to catalog public ICS datasets and protocol simulators that can stand in for real plant traffic when customer hardware is unavailable.
+   - The catalog separates high-fidelity ICS traces, process/fault datasets, and protocol simulators so benchmark traffic can be assembled from realistic building blocks.
+
 ### Verified
 
 - `python -m compileall services tests`: passed

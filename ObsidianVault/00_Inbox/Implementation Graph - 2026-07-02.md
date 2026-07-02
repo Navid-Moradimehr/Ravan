@@ -92,3 +92,4 @@ graph TD
   - demo-site: observed 52,786.52 events/sec, threshold 500.0, recommended minimum 42,229.22, batch 256
   - plant-a: observed 47,759.79 events/sec, threshold 750.0, recommended minimum 38,207.83, batch 256
   - overall: passed
+- added a public simulation source catalog covering ICS datasets, process datasets, and protocol simulators for benchmark traffic generation

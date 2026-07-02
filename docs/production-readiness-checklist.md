@@ -129,3 +129,4 @@ These are the changes that matter most before calling the platform production-re
 - site-sizing recommendation
 - rollout readiness summary
 - combined release-gate and benchmark acceptance report
+- [real-world PLC and sensor simulation sources](real-world-plc-sensor-simulation.md)
