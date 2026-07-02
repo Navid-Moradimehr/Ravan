@@ -29,6 +29,8 @@ graph TD
 - [services/processor/runtime_processor.py](../../services/processor/runtime_processor.py)
 - [services/ai_gateway/main.py](../../services/ai_gateway/main.py)
 - [services/common/project_manifest.py](../../services/common/project_manifest.py)
+- [services/benchmarks/cgr_stream_slice.py](../../services/benchmarks/cgr_stream_slice.py)
+- [services/benchmarks/cgr_gap.py](../../services/benchmarks/cgr_gap.py)
 
 ## Completed
 
@@ -47,6 +49,7 @@ graph TD
 - site-profile benchmark matrix for per-site acceptance runs
 - project-manifest rollout acceptance command that combines release-gate and benchmark checks
 - CGR gap report command that compares local benchmark numbers to the public CGR streaming claim
+- isolated CGR-style stream slice benchmark and gap report integration
 
 ## Risks Being Addressed
 
@@ -100,8 +103,10 @@ graph TD
 - datastream-import now converts AI4I, C-MAPSS, and generic CSV slices into the benchmark replay format
 - `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
   - documented full pipeline reference: 125,830.00 events/sec
-  - mixed replay: 68,213.38 events/sec, p99 0.0267 ms
-  - real-world simulator average: 68,074.51 events/sec, p99 0.0264 ms
-  - site-profile average: 69,440.10 events/sec, p99 0.0311 ms
-  - site-profile best latency run: demo-site at 0.0269 ms p99
-- the latest optimization pass stayed inside benchmark variance; the next meaningful gain will need a stack-level redesign rather than another small patch
+  - mixed replay: 66,100.01 events/sec, p99 0.0395 ms
+  - isolated CGR-style stream slice: 15,723.62 events/sec, p99 0.1414 ms
+  - real-world simulator average: 67,103.99 events/sec, p99 0.0355 ms
+  - site-profile average: 68,065.64 events/sec, p99 0.0364 ms
+  - site-profile best latency run: demo-site at 0.0347 ms p99
+- the isolated stream slice confirmed the heavier cost sits in validation, normalization, windowing, scoring, and serialization rather than the host machine alone
+- the latest optimization pass stayed inside benchmark variance for replay, but the isolated slice shows the stack itself is the dominant bottleneck

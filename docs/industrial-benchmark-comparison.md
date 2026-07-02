@@ -8,6 +8,7 @@ This report summarizes the current benchmark state of the platform and compares 
 
 - Full pipeline: `125,830 events/sec`
 - Mixed replay: `58,548.76 events/sec`
+- Isolated CGR-style stream slice: `15,723.62 events/sec`
 - AI gateway provider path:
   - OpenAI-compatible mock transport: `162,812.89 events/sec`
   - Ollama mock transport: `144,191.18 events/sec`
@@ -68,14 +69,16 @@ The public CGR Stream page claims `2M msg/sec` and `P99 < 80ms` for its streamin
 Against that reference, the current repo numbers are:
 
 - documented full pipeline: `125,830 events/sec`, about `15.9x` below the CGR claim
-- mixed replay: `65,938.49 events/sec`, about `30.3x` below the CGR claim
-- site-profile best run: `68,636.43 events/sec`, about `29.1x` below the CGR claim
+- mixed replay: `66,100.01 events/sec`, about `30.3x` below the CGR claim
+- isolated CGR-style stream slice: `15,723.62 events/sec`, about `127.2x` below the CGR claim
+- site-profile best run: `68,223.51 events/sec`, about `29.3x` below the CGR claim
 
 What this means in practice:
 
 - the platform is currently strong for local validation, rollout gating, and pilot-sized industrial deployments
 - it is not yet at broker-tier streaming throughput parity with CGR Stream
 - local replay p99 is now measured and sits in the ~0.02-0.03 ms band on the current benchmark pack
+- the isolated stream slice shows the heavier cost is in validation, normalization, rolling windowing, scoring, and serialization rather than the raw CSV replay loop
 - the remaining latency gap is target-site broker/historian p99 on real plant hardware, which still needs separate validation
 - the new `cgr-gap-report` command now makes both throughput and replay-latency gaps explicit and repeatable on the local benchmark pack
 - the latest optimization pass did not materially change throughput; the small movement is consistent with benchmark variance, so the next jump needs a stack change rather than another minor patch

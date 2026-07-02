@@ -114,25 +114,28 @@ Latest local run on the current codebase:
 | Metric | Events/sec | Gap x | Gap events/sec | Gap % |
 |--------|------------|-------|----------------|-------|
 | documented_full_pipeline | 125,830.00 | 15.89 | 1,874,170.00 | 93.71 |
-| mixed_replay | 68,213.38 | 29.32 | 1,931,786.62 | 96.59 |
-| real_world_average | 68,074.51 | 29.38 | 1,931,925.49 | 96.60 |
-| site_profile_average | 69,440.10 | 28.80 | 1,930,559.90 | 96.53 |
-| site_profile_best:demo-site | 70,850.59 | 28.23 | 1,929,149.41 | 96.46 |
+| mixed_replay | 66,100.01 | 30.26 | 1,933,899.99 | 96.69 |
+| cgr_stream_slice | 15,723.62 | 127.20 | 1,984,276.38 | 99.21 |
+| real_world_average | 67,103.99 | 29.80 | 1,932,896.01 | 96.64 |
+| site_profile_average | 68,065.64 | 29.38 | 1,931,934.36 | 96.60 |
+| site_profile_best:demo-site | 68,223.51 | 29.32 | 1,931,776.49 | 96.59 |
 
 Latency metrics from the same run:
 
 | Metric | P99 ms | Gap ms | Gap % |
 |--------|--------|--------|-------|
-| mixed_replay | 0.0267 | 79.9733 | 99.97 |
-| real_world_average | 0.0264 | 79.9736 | 99.97 |
-| site_profile_average | 0.0311 | 79.9689 | 99.96 |
-| site_profile_best:demo-site | 0.0269 | 79.9731 | 99.97 |
+| mixed_replay | 0.0395 | 79.9605 | 99.95 |
+| cgr_stream_slice | 0.1414 | 79.8586 | 99.82 |
+| real_world_average | 0.0355 | 79.9645 | 99.96 |
+| site_profile_average | 0.0364 | 79.9636 | 99.95 |
+| site_profile_best:demo-site | 0.0347 | 79.9653 | 99.96 |
 
 Notes:
 
 - The command is now part of the CLI and is useful for tracking the practical gap to the public CGR Stream claim.
 - This report now measures replay p99 latency, but it still does not measure real target-site broker/historian latency.
-- The latest session stayed in the same performance band as the prior run; the observed changes are within benchmark variance, not a material throughput win.
+- The isolated `cgr_stream_slice` benchmark shows the connector + validation + normalization + rolling window + scoring path is materially slower than the pure replay path, so the gap is coming from the software stack rather than just the host machine.
+- The latest session stayed in the same performance band as the prior run for the replay path; the observed movement is within benchmark variance, not a material throughput win.
 - The documented full-pipeline number is the latest recorded repo benchmark reference and should still be remeasured on a target broker/historian topology before sizing.
 
 ## Test Suite Results

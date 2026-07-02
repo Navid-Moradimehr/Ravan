@@ -72,12 +72,20 @@
    - Added `services/benchmarks/cgr_gap.py`, `datastreamctl benchmark cgr-gap-report`, and `scripts/benchmark_cgr_gap_report.py` to compare local benchmark output against the public CGR Stream claim.
    - Updated the benchmark and readiness docs with a current 10k-event comparison run:
      - documented full pipeline reference: 125,830.00 events/sec
-     - mixed replay: 68,213.38 events/sec with 0.0267 ms p99
-     - real-world simulator average: 68,074.51 events/sec with 0.0264 ms p99
-     - site-profile average: 69,440.10 events/sec with 0.0311 ms p99
-     - site-profile best latency run: demo-site at 0.0269 ms p99
+     - mixed replay: 66,100.01 events/sec with 0.0395 ms p99
+     - isolated CGR-style stream slice: 15,723.62 events/sec with 0.1414 ms p99
+     - real-world simulator average: 67,103.99 events/sec with 0.0355 ms p99
+     - site-profile average: 68,065.64 events/sec with 0.0364 ms p99
+     - site-profile best latency run: demo-site at 0.0347 ms p99
    - The report now measures replay p99 latency directly while still leaving real target-site broker/historian latency for hardware validation.
    - The latest optimization pass did not produce a material throughput gain; the observed movement is within benchmark variance, which points to stack redesign rather than another incremental patch.
+
+18. **Isolated CGR-style stream slice benchmark**
+   - Added `services/benchmarks/cgr_stream_slice.py`, `datastreamctl benchmark cgr-stream-slice`, and a CLI test to measure the specific connector + validation + normalization + rolling-window + scoring path in isolation.
+   - Added the slice to `cgr-gap-report` so the report now shows the isolated stream-processing throughput next to the broader replay and rollout numbers.
+   - Latest local run on the current codebase:
+     - isolated slice: 15,723.62 events/sec with 0.1414 ms p99
+   - This confirmed the main performance cost is in the software path itself, not just host hardware or the raw replay loop.
 
 ### Verified
 
