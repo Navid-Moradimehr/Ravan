@@ -25,6 +25,8 @@ from services.benchmarks.cgr_gap import format_result as format_cgr_gap_result
 from services.benchmarks.cgr_gap import run_report as run_cgr_gap_report
 from services.benchmarks.cgr_stream_slice import format_result as format_cgr_stream_slice_result
 from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
+from services.benchmarks.end_to_end_pipeline import format_result as format_end_to_end_pipeline_result
+from services.benchmarks.end_to_end_pipeline import run_benchmark as run_end_to_end_pipeline_benchmark
 from services.benchmarks.flink_runtime_slice import format_result as format_flink_runtime_slice_result
 from services.benchmarks.flink_runtime_slice import run_benchmark as run_flink_runtime_slice_benchmark
 from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
@@ -889,6 +891,34 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                         "processed_bytes": result.flink_runtime_slice.processed_bytes,
                         "latency_p99_ms": result.flink_runtime_slice.latency_p99_ms,
                     },
+                    "end_to_end_json": {
+                        "csv_path": result.end_to_end_json.csv_path,
+                        "wire_format": result.end_to_end_json.wire_format,
+                        "events": result.end_to_end_json.events,
+                        "invalid_events": result.end_to_end_json.invalid_events,
+                        "batches": result.end_to_end_json.batches,
+                        "batch_size": result.end_to_end_json.batch_size,
+                        "window_limit": result.end_to_end_json.window_limit,
+                        "elapsed_seconds": result.end_to_end_json.elapsed_seconds,
+                        "events_per_second": result.end_to_end_json.events_per_second,
+                        "payload_bytes": result.end_to_end_json.payload_bytes,
+                        "roundtrip_bytes": result.end_to_end_json.roundtrip_bytes,
+                        "latency_p99_ms": result.end_to_end_json.latency_p99_ms,
+                    },
+                    "end_to_end_msgpack": {
+                        "csv_path": result.end_to_end_msgpack.csv_path,
+                        "wire_format": result.end_to_end_msgpack.wire_format,
+                        "events": result.end_to_end_msgpack.events,
+                        "invalid_events": result.end_to_end_msgpack.invalid_events,
+                        "batches": result.end_to_end_msgpack.batches,
+                        "batch_size": result.end_to_end_msgpack.batch_size,
+                        "window_limit": result.end_to_end_msgpack.window_limit,
+                        "elapsed_seconds": result.end_to_end_msgpack.elapsed_seconds,
+                        "events_per_second": result.end_to_end_msgpack.events_per_second,
+                        "payload_bytes": result.end_to_end_msgpack.payload_bytes,
+                        "roundtrip_bytes": result.end_to_end_msgpack.roundtrip_bytes,
+                        "latency_p99_ms": result.end_to_end_msgpack.latency_p99_ms,
+                    },
                     "real_world_simulator": {
                         "average_events_per_second": result.real_world_simulator.average_events_per_second,
                         "cases": [
@@ -1049,6 +1079,55 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("flink runtime slice benchmark")
             print("=" * 40)
             print(format_flink_runtime_slice_result(result))
+        return 0
+    if args.action == "end-to-end-pipeline":
+        result = run_end_to_end_pipeline_benchmark(
+            Path(args.csv),
+            target_events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            window_limit=args.window_limit,
+            wire_format=args.wire_format,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "csv_path": result.csv_path,
+                    "wire_format": result.wire_format,
+                    "events": result.events,
+                    "invalid_events": result.invalid_events,
+                    "batches": result.batches,
+                    "batch_size": result.batch_size,
+                    "window_limit": result.window_limit,
+                    "elapsed_seconds": result.elapsed_seconds,
+                    "events_per_second": result.events_per_second,
+                    "payload_bytes": result.payload_bytes,
+                    "roundtrip_bytes": result.roundtrip_bytes,
+                    "latency_p50_ms": result.latency_p50_ms,
+                    "latency_p95_ms": result.latency_p95_ms,
+                    "latency_p99_ms": result.latency_p99_ms,
+                    "latency_max_ms": result.latency_max_ms,
+                    "stage_breakdown": [
+                        {
+                            "name": stage.name,
+                            "operations": stage.operations,
+                            "elapsed_seconds": stage.elapsed_seconds,
+                            "events_per_second": stage.events_per_second,
+                            "avg_ms": stage.avg_ms,
+                            "latency_p50_ms": stage.latency_p50_ms,
+                            "latency_p95_ms": stage.latency_p95_ms,
+                            "latency_p99_ms": stage.latency_p99_ms,
+                            "latency_max_ms": stage.latency_max_ms,
+                        }
+                        for stage in result.stage_breakdown
+                    ],
+                },
+                indent=2,
+            ))
+        else:
+            print("end to end pipeline benchmark")
+            print("=" * 40)
+            print(format_end_to_end_pipeline_result(result))
         return 0
     raise ValueError(f"unknown benchmark action: {args.action}")
 
@@ -1245,6 +1324,15 @@ def build_parser() -> argparse.ArgumentParser:
     flink_runtime_slice.add_argument("--window-limit", type=int, default=25)
     flink_runtime_slice.add_argument("--json", action="store_true")
     flink_runtime_slice.set_defaults(func=cmd_benchmark)
+    end_to_end_pipeline = benchmark_sub.add_parser("end-to-end-pipeline", help="Benchmark the end-to-end pipeline with selectable wire format")
+    end_to_end_pipeline.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    end_to_end_pipeline.add_argument("--events", type=int, default=10_000)
+    end_to_end_pipeline.add_argument("--batch-size", type=int, default=256)
+    end_to_end_pipeline.add_argument("--warmup-events", type=int, default=0)
+    end_to_end_pipeline.add_argument("--window-limit", type=int, default=25)
+    end_to_end_pipeline.add_argument("--wire-format", choices=("json", "msgpack"), default="json")
+    end_to_end_pipeline.add_argument("--json", action="store_true")
+    end_to_end_pipeline.set_defaults(func=cmd_benchmark)
     return parser
 
 

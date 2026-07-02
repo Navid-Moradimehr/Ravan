@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import json
-from dataclasses import asdict, is_dataclass
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-try:
-    import orjson
-except ImportError:  # pragma: no cover - optional fast path
-    orjson = None
+from services.common.wire_format import deserialize_payload as deserialize_wire_payload
+from services.common.wire_format import serialize_payload as serialize_wire_payload
 
 
 Protocol = Literal[
@@ -76,14 +73,15 @@ def validate_event(payload: dict[str, Any]) -> tuple[IndustrialEvent | None, Dea
         )
 
 
+def to_wire_bytes(payload: BaseModel | dict[str, Any], wire_format: str | None = None) -> bytes:
+    if wire_format is None:
+        wire_format = os.getenv("DATASTREAM_WIRE_FORMAT", "json")
+    return serialize_wire_payload(payload, wire_format=wire_format)
+
+
 def to_json_bytes(payload: BaseModel | dict[str, Any]) -> bytes:
-    to_dict = getattr(payload, "to_dict", None)
-    if callable(to_dict):
-        payload = to_dict()
-    if is_dataclass(payload):
-        payload = asdict(payload)
-    if isinstance(payload, BaseModel):
-        payload = payload.model_dump(mode="python", exclude_none=False, by_alias=False)
-    if orjson is not None:
-        return orjson.dumps(payload)
-    return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return to_wire_bytes(payload)
+
+
+def from_wire_bytes(data: bytes, wire_format: str | None = None) -> Any:
+    return deserialize_wire_payload(data, wire_format=wire_format)

@@ -39,6 +39,8 @@ The right path is to improve the same kinds of bottlenecks CGR is likely tuning:
 - add a real end-to-end Kafka/Flink/historian benchmark
 - tune broker partitions, batching, compression, and checkpointing
 - separate real-time streaming from BI/OLAP workloads
+- keep MsgPack or another binary wire contract optional until the benchmark proves it beats JSON on the target host
+- consider a compiled hot path if Python object handling remains the dominant cost after serialization tuning
 
 ## Spark Policy
 
@@ -63,4 +65,3 @@ The platform should therefore expose:
 - optional BI materialization guidance
 
 Users who already operate Spark can plug it in themselves without forcing every installation to carry a Spark runtime.
-

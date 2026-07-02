@@ -7,6 +7,8 @@ from typing import Iterable
 
 from services.benchmarks.cgr_stream_slice import StreamingSliceBenchmarkResult
 from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
+from services.benchmarks.end_to_end_pipeline import EndToEndPipelineBenchmarkResult
+from services.benchmarks.end_to_end_pipeline import run_benchmark as run_end_to_end_pipeline_benchmark
 from services.benchmarks.flink_runtime_slice import FlinkRuntimeSliceBenchmarkResult
 from services.benchmarks.flink_runtime_slice import run_benchmark as run_flink_runtime_slice_benchmark
 from services.benchmarks.mixed_replay import BenchmarkResult as MixedReplayResult
@@ -52,6 +54,8 @@ class CgrGapReport:
     mixed_replay: MixedReplayResult
     cgr_stream_slice: StreamingSliceBenchmarkResult
     flink_runtime_slice: FlinkRuntimeSliceBenchmarkResult
+    end_to_end_json: EndToEndPipelineBenchmarkResult
+    end_to_end_msgpack: EndToEndPipelineBenchmarkResult
     real_world_simulator: RealWorldSimulatorResult
     site_profile_matrix: SiteProfileMatrixResult
     metrics: tuple[GapMetric, ...]
@@ -123,6 +127,20 @@ def run_report(
         batch_size=batch_size,
         warmup_events=warmup_events,
     )
+    end_to_end_json = run_end_to_end_pipeline_benchmark(
+        baseline_csv,
+        target_events=events,
+        batch_size=batch_size,
+        warmup_events=warmup_events,
+        wire_format="json",
+    )
+    end_to_end_msgpack = run_end_to_end_pipeline_benchmark(
+        baseline_csv,
+        target_events=events,
+        batch_size=batch_size,
+        warmup_events=warmup_events,
+        wire_format="msgpack",
+    )
     real_world_simulator = run_real_world_simulator_suite(
         baseline_csv=baseline_csv,
         events=events,
@@ -161,6 +179,16 @@ def run_report(
             "keyed-state Flink contract: validate -> normalize -> key -> state -> score -> serialize",
         ),
         _gap_metric(
+            "end_to_end_json",
+            end_to_end_json.events_per_second,
+            "end-to-end pipeline using JSON wire format",
+        ),
+        _gap_metric(
+            "end_to_end_msgpack",
+            end_to_end_msgpack.events_per_second,
+            "end-to-end pipeline using MsgPack wire format",
+        ),
+        _gap_metric(
             "real_world_average",
             real_world_simulator.average_events_per_second,
             "average across the simulated real-world benchmark cases",
@@ -196,6 +224,26 @@ def run_report(
             if cgr_target_p99_ms > 0
             else 0.0,
             note="keyed-state Flink contract",
+        ),
+        LatencyMetric(
+            label="end_to_end_json",
+            observed_p99_ms=end_to_end_json.latency_p99_ms,
+            target_p99_ms=cgr_target_p99_ms,
+            gap_ms=round(cgr_target_p99_ms - end_to_end_json.latency_p99_ms, 4),
+            gap_percent=round((1.0 - (end_to_end_json.latency_p99_ms / cgr_target_p99_ms)) * 100.0, 2)
+            if cgr_target_p99_ms > 0
+            else 0.0,
+            note="end-to-end pipeline using JSON wire format",
+        ),
+        LatencyMetric(
+            label="end_to_end_msgpack",
+            observed_p99_ms=end_to_end_msgpack.latency_p99_ms,
+            target_p99_ms=cgr_target_p99_ms,
+            gap_ms=round(cgr_target_p99_ms - end_to_end_msgpack.latency_p99_ms, 4),
+            gap_percent=round((1.0 - (end_to_end_msgpack.latency_p99_ms / cgr_target_p99_ms)) * 100.0, 2)
+            if cgr_target_p99_ms > 0
+            else 0.0,
+            note="end-to-end pipeline using MsgPack wire format",
         ),
         LatencyMetric(
             label="real_world_average",
@@ -264,6 +312,8 @@ def run_report(
         mixed_replay=mixed_replay,
         cgr_stream_slice=cgr_stream_slice,
         flink_runtime_slice=flink_runtime_slice,
+        end_to_end_json=end_to_end_json,
+        end_to_end_msgpack=end_to_end_msgpack,
         real_world_simulator=real_world_simulator,
         site_profile_matrix=site_profile_matrix,
         metrics=tuple(metrics),
@@ -273,6 +323,8 @@ def run_report(
 
 
 def format_result(result: CgrGapReport) -> str:
+    end_to_end_json = getattr(result, "end_to_end_json", None)
+    end_to_end_msgpack = getattr(result, "end_to_end_msgpack", None)
     lines = [
         "cgr gap report",
         "=" * 40,
@@ -290,6 +342,9 @@ def format_result(result: CgrGapReport) -> str:
         "metric | observed_events/sec | gap_x | gap_events/sec | gap_percent | note",
         "-" * 100,
     ]
+    if end_to_end_json is not None and end_to_end_msgpack is not None:
+        lines.insert(9, f"end_to_end_json_events_per_second={end_to_end_json.events_per_second}")
+        lines.insert(10, f"end_to_end_msgpack_events_per_second={end_to_end_msgpack.events_per_second}")
     for metric in result.metrics:
         lines.append(
             f"{metric.label} | {metric.observed_events_per_second} | {metric.gap_multiplier} | "

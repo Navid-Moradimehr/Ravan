@@ -60,6 +60,8 @@ graph TD
 - keyed Flink benchmark now reuses the shared rolling-window state contract instead of list-plus-pop state
 - typed-tuple keyed state added to the Flink job to remove string parsing overhead
 - CGR streaming vs BI comparison note added, with Spark marked as optional for offline ETL and lakehouse workloads
+- optional MsgPack wire-format support added for the industrial event contract
+- end-to-end pipeline benchmark added for JSON vs MsgPack comparison
 
 ## Risks Being Addressed
 
@@ -76,6 +78,7 @@ graph TD
 - unauthenticated mutating API requests in shared deployments
 - benchmark session variance not tracked as a first-class signal
 - unclear Spark integration boundary for open-source industrial rollout
+- binary wire contract not yet proven faster than JSON on the local Python path
 
 ## Verification
 
@@ -85,6 +88,7 @@ graph TD
 - CGR gap report verified against the current local benchmark pack
 - replay p99 latency probes added to the mixed replay and simulator benchmark paths
 - keyed-window runtime benchmarks rerun after the state-shape optimization
+- end-to-end wire-format benchmark rerun for JSON and MsgPack
 
 ## Latest Results
 
@@ -132,6 +136,16 @@ graph TD
   - real-world simulator average: 67,690.83 events/sec, p99 0.0313 ms
   - site-profile average: 67,358.66 events/sec, p99 0.0297 ms
   - site-profile best latency run: plant-a at 0.0275 ms p99
+- `benchmark end-to-end-pipeline --wire-format json`
+  - 36,842.39 events/sec, 0.0454 ms p99, 6,243,000 payload bytes
+- `benchmark end-to-end-pipeline --wire-format msgpack`
+  - 35,424.11 events/sec, 0.0466 ms p99, 5,649,375 payload bytes
+- `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
+  - cgr_stream_slice: 40,438.38 events/sec, 0.0403 ms p99
+  - flink_runtime_slice: 46,302.88 events/sec, 0.0342 ms p99
+  - end_to_end_json: 46,654.19 events/sec, 0.0271 ms p99
+  - end_to_end_msgpack: 43,249.47 events/sec, 0.0284 ms p99
+  - mixed_replay: 74,903.62 events/sec, 0.0193 ms p99
 - the internal record migration was compatible with the existing tests and benchmark commands
 - the isolated stream slice improved materially after the migration
 - `benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0`
@@ -140,3 +154,5 @@ graph TD
   - partitioning + rolling window + scoring: 161,477.85 ops/sec
   - serialization: 63,204.73 ops/sec
 - the bottleneck moved from rolling-window math to record packing and serialization after the migration
+- MsgPack reduced payload size but did not beat JSON throughput on this host, so the next throughput step should focus on a compiled hot path rather than only changing the codec
+- the latest gap-report rerun on the same host moved noticeably slower, reinforcing that single-machine benchmark sessions still have meaningful variance

@@ -19,21 +19,38 @@
 
 - `python -m compileall services tests`: passed
 - `uv run pytest -q tests/test_datastreamctl.py tests/test_mixed_replay_benchmark.py tests/test_real_world_simulator_benchmark.py tests/test_site_profile_matrix_benchmark.py tests/test_deployment_pack_benchmark.py`: 38 passed
+- `uv run pytest -q tests/test_wire_format.py tests/test_end_to_end_pipeline_benchmark.py tests/test_datastreamctl.py`: 37 passed
 - `uv run python -m services.cli.datastreamctl benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0`
   - 50,882.38 events/sec
   - 0.0297 ms p99
 - `uv run python -m services.cli.datastreamctl benchmark flink-runtime-slice --events 10000 --batch-size 256 --warmup-events 0`
   - 49,823.25 events/sec
   - 0.0279 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark end-to-end-pipeline --events 10000 --batch-size 256 --warmup-events 0 --wire-format json`
+  - 36,842.39 events/sec
+  - 0.0454 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark end-to-end-pipeline --events 10000 --batch-size 256 --warmup-events 0 --wire-format msgpack`
+  - 35,424.11 events/sec
+  - 0.0466 ms p99
 - `uv run python -m services.cli.datastreamctl benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
   - `cgr_stream_slice`: 50,048.47 events/sec, 0.0530 ms p99
   - `flink_runtime_slice`: 51,126.34 events/sec, 0.0552 ms p99
+  - `end_to_end_json`: 46,654.19 events/sec, 0.0271 ms p99
+  - `end_to_end_msgpack`: 43,249.47 events/sec, 0.0284 ms p99
   - `mixed_replay`: 92,994.10 events/sec, 0.0257 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
+  - `cgr_stream_slice`: 40,438.38 events/sec, 0.0403 ms p99
+  - `flink_runtime_slice`: 46,302.88 events/sec, 0.0342 ms p99
+  - `end_to_end_json`: 46,654.19 events/sec, 0.0271 ms p99
+  - `end_to_end_msgpack`: 43,249.47 events/sec, 0.0284 ms p99
+  - `mixed_replay`: 74,903.62 events/sec, 0.0193 ms p99
 
 ### Notes
 
 - The keyed-window runtime path now shares the same rolling-sum behavior as the fallback processor, so future throughput work should focus more on serialization format, broker topology, and sink behavior.
 - The Flink slice p99 moved in the right direction on the standalone benchmark, but the gap-report run still shows session variance, so repeated runs should be used before calling a regression or win.
+- MsgPack reduced payload size but did not beat JSON throughput in the current Python end-to-end benchmark, which suggests the next throughput step should be a compiled hot path rather than more Python-only tuning.
+- The latest gap-report rerun on the same development host moved significantly slower, which reinforces that single-machine benchmark sessions still have meaningful variance.
 
 ## 2026-07-02 - Runtime Hardening Pass
 

@@ -33,6 +33,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Dedicated Flink runtime benchmark path exists so the distributed processor contract is measured separately from the Python fallback path.
 - Dedicated Flink job image now exists for the compose deployment path.
 - Flink keyed-window state now uses the shared rolling-window contract instead of the slower list-and-pop benchmark shape.
+- Optional MsgPack wire-format support now exists for the industrial event contract.
 - Dataset conversion workflow exists for AI4I, C-MAPSS, and generic industrial CSV slices.
 - Failure isolation between sites, sources, and correlation groups is enforced by manifest validation.
 - Synthetic and replay datasets are available for regression tests.
@@ -79,6 +80,7 @@ These are the changes that matter most before calling the platform production-re
 5. Keep adding target-site broker/historian p99 probes so the CGR comparison eventually covers real plant latency, not only local replay latency.
 6. Treat benchmark session deltas as first-class evidence. A single local run can move 1-12 percent on the same machine, so use repeated runs and median/percentile tracking before calling a change a real regression.
 7. Keep the streaming hot path on Flink and reserve Spark for optional offline ETL and lakehouse jobs.
+8. Treat the wire format as a lever, not a cure-all. If JSON remains faster in Python on the target host, move the hot path into a compiled runtime before forcing binary serialization everywhere.
 
 ## Session Delta Guidance
 

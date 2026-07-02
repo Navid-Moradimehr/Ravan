@@ -637,6 +637,68 @@ class TestDatastreamctl:
         assert "serialized_bytes=" in out
         assert "keyed_state_enrichment" in out
 
+    def test_benchmark_end_to_end_pipeline_runs(self, monkeypatch, tmp_path):
+        csv_path = tmp_path / "mock.csv"
+        csv_path.write_text(
+            "\n".join(
+                [
+                    "event_id,source_protocol,source_id,asset_id,tag,value,quality,unit,site,line,ts_source,schema_version,fault_type,scenario_id,ground_truth_severity,step",
+                    "evt-1,mqtt,site-a/mqtt/pump-1,Pump-1,Temperature,55.1,good,c,Factory-A,Line-1,2026-07-01T00:00:00Z,1,normal,mock-benchmark,normal,0",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            ctl,
+            "run_end_to_end_pipeline_benchmark",
+            lambda *args, **kwargs: SimpleNamespace(
+                csv_path=str(csv_path),
+                wire_format="msgpack",
+                events=12,
+                invalid_events=0,
+                batches=3,
+                batch_size=4,
+                window_limit=25,
+                elapsed_seconds=0.1,
+                events_per_second=120.0,
+                payload_bytes=512,
+                roundtrip_bytes=512,
+                latency_p50_ms=0.01,
+                latency_p95_ms=0.02,
+                latency_p99_ms=0.03,
+                latency_max_ms=0.04,
+                stage_breakdown=(
+                    SimpleNamespace(
+                        name="wire_roundtrip",
+                        operations=12,
+                        elapsed_seconds=0.01,
+                        events_per_second=1200.0,
+                        avg_ms=0.5,
+                        latency_p50_ms=0.4,
+                        latency_p95_ms=0.6,
+                        latency_p99_ms=0.7,
+                        latency_max_ms=0.8,
+                    ),
+                ),
+            ),
+        )
+        rc, out = self._run([
+            "benchmark",
+            "end-to-end-pipeline",
+            "--csv",
+            str(csv_path),
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+            "--wire-format",
+            "msgpack",
+        ])
+        assert rc == 0
+        assert "end to end pipeline benchmark" in out
+        assert "wire_format=" in out
+        assert "wire_roundtrip" in out
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

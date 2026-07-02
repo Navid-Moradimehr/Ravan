@@ -203,6 +203,69 @@ Interpretation:
 - the local benchmark still sits far below the public CGR target, so the remaining gap is mostly topology, serialization, broker, and sink behavior rather than rolling-window math
 - the new numbers should be treated as a better baseline, not as a production comparison
 
+### End-To-End Wire Benchmarks
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl benchmark end-to-end-pipeline --events 10000 --batch-size 256 --warmup-events 0 --wire-format json
+uv run python -m services.cli.datastreamctl benchmark end-to-end-pipeline --events 10000 --batch-size 256 --warmup-events 0 --wire-format msgpack
+```
+
+Latest local run on the current codebase:
+
+| Wire format | Throughput | p99 | Payload bytes | Roundtrip bytes |
+|-------------|------------|-----|---------------|-----------------|
+| JSON | 36,842.39 events/sec | 0.0454 ms | 6,243,000 | 6,243,000 |
+| MsgPack | 35,424.11 events/sec | 0.0466 ms | 5,649,375 | 5,649,375 |
+
+Interpretation:
+
+- MsgPack reduced payload size by about `9.5%` on this sample
+- the throughput gain did not materialize in the current Python benchmark, which means the dominant cost is still Python object work around the codec, not the serialization format alone
+- the strongest next throughput candidate is a compiled hot path for the processor and wire handling, not another Python-only micro-optimization
+
+### Latest Rerun After Binary-Contract Work
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1
+```
+
+Latest local rerun on the current codebase:
+
+| Metric | Events/sec | Gap x | Gap events/sec | Gap % |
+|--------|------------|-------|----------------|-------|
+| documented_full_pipeline | 125,830.00 | 15.89 | 1,874,170.00 | 93.71 |
+| mixed_replay | 74,903.62 | 26.70 | 1,925,096.38 | 96.25 |
+| cgr_stream_slice | 40,438.38 | 49.46 | 1,959,561.62 | 97.98 |
+| flink_runtime_slice | 46,302.88 | 43.19 | 1,953,697.12 | 97.68 |
+| end_to_end_json | 46,654.19 | 42.87 | 1,953,345.81 | 97.67 |
+| end_to_end_msgpack | 43,249.47 | 46.24 | 1,956,750.53 | 97.84 |
+| real_world_average | 76,573.82 | 26.12 | 1,923,426.18 | 96.17 |
+| site_profile_average | 83,078.53 | 24.07 | 1,916,921.47 | 95.85 |
+| site_profile_best:plant-a | 90,791.99 | 22.03 | 1,909,208.01 | 95.46 |
+
+Latency metrics from the same rerun:
+
+| Metric | P99 ms | Gap ms | Gap % |
+|--------|--------|--------|-------|
+| mixed_replay | 0.0193 | 79.9807 | 99.98 |
+| cgr_stream_slice | 0.0403 | 79.9597 | 99.95 |
+| flink_runtime_slice | 0.0342 | 79.9658 | 99.96 |
+| end_to_end_json | 0.0271 | 79.9729 | 99.97 |
+| end_to_end_msgpack | 0.0284 | 79.9716 | 99.96 |
+| real_world_average | 0.0339 | 79.9661 | 99.96 |
+| site_profile_average | 0.0222 | 79.9778 | 99.97 |
+| site_profile_best:plant-a | 0.0155 | 79.9845 | 99.98 |
+
+Interpretation:
+
+- the rerun is slower than the earlier session, which is consistent with host/load variance on a single development machine
+- JSON remained slightly faster than MsgPack in the Python end-to-end path even though MsgPack moved fewer bytes
+- the next performance step should not be another Python serialization tweak; it should be a compiled runtime for the hot path and a real distributed benchmark on the target topology
+
 ### CGR Stream Slice Breakdown
 
 Command:
@@ -252,6 +315,7 @@ The current refactor pass changed the runtime shape of the platform:
 - historian writes are batched in the edge ingest and runtime processor paths
 - the distributed Flink job now uses keyed state plus checkpointing while preserving the same processed-event contract
 - the distributed Flink job now stores window samples as typed tuples instead of string-encoded samples
+- MsgPack wire-format support now exists as an optional binary contract, but the local Python end-to-end benchmark still shows that JSON is faster on this host while MsgPack produces smaller payloads
 - the service Dockerfiles now copy the full `services/` tree so imports resolve in containers
 - a local mixed-protocol benchmark pack was added at `data/benchmarks/industrial_mixed_benchmark.csv`
 
