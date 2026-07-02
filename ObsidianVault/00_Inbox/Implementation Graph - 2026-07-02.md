@@ -38,6 +38,9 @@ graph TD
 - Kafka producer reuse on API publish path
 - manual offset commit after successful processor and AI gateway batch work
 - implementation tracking note linked to current hardening pass
+- Prometheus-style metrics for historian query latency, broker consumer lag, and WebSocket delivery lag
+- explicit site boundary enforcement for manifest sources
+- length-safe default JWT placeholder and auth health strength reporting
 
 ## Risks Being Addressed
 
@@ -46,6 +49,8 @@ graph TD
 - wide-open CORS and weak auth defaults
 - query table names not constrained to known historian tables
 - deployment generation mixed into manifest modeling
+- ambiguous source/site assignments in the project manifest
+- invisible lag on historian query and stream delivery paths
 
 ## Verification
 
@@ -56,12 +61,13 @@ graph TD
 ## Latest Results
 
 - `python -m compileall services tests`: passed
-- focused regression tests: 56 passed
+- focused regression tests: 23 passed
 - `datastreamctl benchmark deployment-pack --events 10000 --batch-size 256`
-  - export generation: 660.06 files/sec
-  - replay: 61,037.32 events/sec
+  - export generation: 728.91 files/sec
+  - replay: 64,775.69 events/sec
 - `datastreamctl benchmark deployment-pack-matrix --events 10000 --batch-size 256`
-  - average export generation: 653.31 files/sec
-  - average replay: 63,654.18 events/sec
+  - average export generation: 718.80 files/sec
+  - average replay: 61,813.35 events/sec
 - `benchmark_mixed_replay.py --events 10000 --batch-size 256`
-  - 54,779.87 events/sec
+  - 58,548.76 events/sec
+- focused regression slice after observability + site-boundary hardening: 23 passed

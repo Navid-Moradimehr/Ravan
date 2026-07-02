@@ -12,6 +12,7 @@ import psycopg2
 from psycopg2.extras import Json, RealDictCursor, execute_values
 
 from services.common.sql_compiler import validate_readonly_sql
+from services.common.runtime_metrics import observe_historian_query
 
 
 logger = logging.getLogger(__name__)
@@ -350,32 +351,41 @@ def insert_dead_letter(event: dict[str, Any]) -> None:
 def query_recent_events(table: str, limit: int = 100) -> list[dict[str, Any]]:
     if table not in ALLOWED_QUERY_TABLES:
         raise ValueError(f"unsupported table: {table}")
+    start = time.monotonic()
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 f"SELECT * FROM {table} ORDER BY time DESC LIMIT %s",
                 (limit,),
             )
-            return [dict(row) for row in cur.fetchall()]
+            rows = [dict(row) for row in cur.fetchall()]
+    observe_historian_query(table, "recent_events", time.monotonic() - start, len(rows))
+    return rows
 
 
 
 
 def query_sql(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
+    start = time.monotonic()
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(sql, params)
-            return [dict(row) for row in cur.fetchall()]
+            rows = [dict(row) for row in cur.fetchall()]
+    observe_historian_query("sql", "readwrite", time.monotonic() - start, len(rows))
+    return rows
 
 
 def query_sql_readonly(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
     safety = validate_readonly_sql(sql)
     if not safety.allowed:
         raise ValueError(safety.reason or "readonly sql rejected")
+    start = time.monotonic()
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(sql, params)
-            return [dict(row) for row in cur.fetchall()]
+            rows = [dict(row) for row in cur.fetchall()]
+    observe_historian_query("sql", "readonly", time.monotonic() - start, len(rows))
+    return rows
 
 
 
@@ -388,6 +398,7 @@ def query_tables() -> list[str]:
 
 
 def query_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]:
+    start = time.monotonic()
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
@@ -400,8 +411,11 @@ def query_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]
                 """,
                 (asset_id, tag, hours),
             )
-            return [dict(row) for row in cur.fetchall()]
+            rows = [dict(row) for row in cur.fetchall()]
+    observe_historian_query("industrial_events", "trend", time.monotonic() - start, len(rows))
+    return rows
 def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
+    start = time.monotonic()
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
@@ -415,7 +429,7 @@ def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
                 (limit,),
             )
             rows = cur.fetchall()
-            return [
+            result = [
                 {
                     "time": row["time"],
                     "asset_id": row["asset_id"],
@@ -427,6 +441,8 @@ def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
                 }
                 for row in rows
             ]
+    observe_historian_query("processed_events", "alarms", time.monotonic() - start, len(result))
+    return result
 
 
 # Data retention and compression policies

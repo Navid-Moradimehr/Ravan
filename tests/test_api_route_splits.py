@@ -6,6 +6,7 @@ def test_split_domain_routes_registered():
 
     routes = {route.path for route in api_main.app.routes}
     expected = {
+        "/metrics",
         "/api/v1/pipelines",
         "/api/v1/pipelines/{topology_id}",
         "/api/v1/schemas",

@@ -20,11 +20,14 @@ Packaging and installer work is intentionally excluded from the current scope.
 ### Platform foundations
 
 - RBAC, audit logging, authentication, and user-management foundations exist.
+- JWT default placeholder is length-safe and auth status reports secret strength.
 - Site-aware project manifest and rollout scaffolding exist.
 - Open-weight and OpenAI-compatible model gateway abstraction exists.
 - Read-only agent infrastructure exists as a foundation.
 - Local and site-oriented benchmark harnesses exist.
 - Synthetic and replay datasets are available for regression tests.
+- Observability now includes historian query latency, result sizing, broker consumer lag, and WebSocket delivery lag metrics.
+- Every manifest source is explicitly attached to a site boundary.
 
 ### Operational tooling
 
@@ -61,9 +64,7 @@ These are the changes that matter most before calling the platform production-re
 3. Validate vendor connectors against real PLC and sensor traffic.
 4. Add model evaluation and promotion lifecycle controls.
 5. Finish the diagnostic-agent and supervised action-agent runtime paths.
-6. Expand observability around broker lag, historian latency, and WebSocket delivery delay.
-7. Tighten failure isolation between sites, sources, and correlation groups.
-8. Build an acceptance suite for multi-branch rollout verification.
+6. Build an acceptance suite for multi-branch rollout verification.
 
 ## Real-World Simulator Benchmark Plan
 
@@ -124,4 +125,3 @@ These are the changes that matter most before calling the platform production-re
 - regression notes
 - site-sizing recommendation
 - rollout readiness summary
-

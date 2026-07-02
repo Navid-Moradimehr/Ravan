@@ -31,6 +31,13 @@ def test_manifest_exports_site_envs():
     assert envs["plant-a"]["SITE_ID"] == "plant-a"
 
 
+def test_manifest_source_site_map():
+    manifest = load_project_manifest(MANIFEST)
+    site_map = manifest.source_site_map()
+    assert site_map["plc-01-pump-temp"] == "demo-site"
+    assert site_map["line-a-pump-vibration"] == "plant-a"
+
+
 def test_manifest_export_bundles(tmp_path: Path):
     manifest = load_project_manifest(MANIFEST)
     written = manifest.export_bundles(tmp_path, site_id="demo-site", fmt="both")
@@ -104,3 +111,15 @@ def test_manifest_lint_detects_topic_collision():
     )
     issues = colliding.lint()
     assert any("topic collision" in issue for issue in issues)
+
+
+def test_validate_project_manifest_requires_source_site_id():
+    manifest = load_project_manifest(MANIFEST)
+    broken = replace(
+        manifest,
+        sources=manifest.sources + (
+            replace(manifest.sources[0], source_id="floating-source", site_id=""),
+        ),
+    )
+    errors = validate_project_manifest(broken)
+    assert any("site_id is required" in error for error in errors)

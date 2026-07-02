@@ -13,6 +13,7 @@ from typing import Any
 from confluent_kafka import Consumer, Producer, TopicPartition
 from services.analytics.baseline import BaselineDetector
 from services.common.normalize import normalize_runtime_event
+from services.common.runtime_metrics import set_consumer_lag
 from services.historian.client import insert_processed_event, insert_processed_events
 from services.processor.scoring import score_event, severity_for
 
@@ -130,6 +131,12 @@ def main() -> None:
             if message.error():
                 logger.warning("consumer_error=%s", message.error())
                 continue
+            try:
+                low, high = consumer.get_watermark_offsets(TopicPartition(message.topic(), message.partition()), cached=True)
+                if high >= 0:
+                    set_consumer_lag("processor", message.topic(), message.partition(), high - (message.offset() + 1))
+            except Exception:
+                pass
 
             event = normalize_runtime_event(json.loads(message.value().decode("utf-8")))
             device_id = event["device_id"]

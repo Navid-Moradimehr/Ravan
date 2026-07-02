@@ -22,6 +22,7 @@ from services.ai_gateway.providers import (
     build_industrial_prompt,
 )
 from services.common.structured_output import validate_industrial_summary
+from services.common.runtime_metrics import set_consumer_lag
 
 
 settings = Settings()
@@ -276,6 +277,12 @@ async def consume_loop() -> None:
             if message and not message.error():
                 consumed_events.inc()
                 batch.append((message.topic(), message.partition(), message.offset(), json.loads(message.value().decode("utf-8"))))
+                try:
+                    low, high = consumer.get_watermark_offsets(TopicPartition(message.topic(), message.partition()), cached=True)
+                    if high >= 0:
+                        set_consumer_lag("ai_gateway", message.topic(), message.partition(), high - (message.offset() + 1))
+                except Exception:
+                    pass
 
             ready_by_size = len(batch) >= settings.llm_max_batch_size
             ready_by_time = batch and time.monotonic() >= deadline

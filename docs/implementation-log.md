@@ -19,22 +19,33 @@
 4. **Implementation tracking**
    - Added an Obsidian vault graph note for the hardening pass so the implementation path and runtime dependencies stay visible during release work.
 
+5. **Observability expansion**
+   - Added shared runtime metrics for historian query latency, query result sizing, Kafka consumer lag, and WebSocket delivery lag.
+   - Exposed a Prometheus metrics endpoint on the API service.
+
+6. **Explicit site boundaries**
+   - Every manifest source now requires a site assignment, and the manifest lint path uses a site map to keep multi-site source ownership explicit.
+
+7. **JWT default hardening**
+   - Replaced the short default JWT placeholder with a length-safe non-production secret so local auth tests no longer exercise an obviously weak key.
+   - Added `jwt_secret_strong_enough` to the auth status payload.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
 - `uv run pytest -q tests/test_auth.py tests/test_historian_query_guardrails.py tests/test_api_route_splits.py tests/test_processor_normalization.py tests/test_ai_gateway_providers.py tests/test_datastreamctl.py tests/test_project_manifest.py`: 56 passed
 - `uv run python -m services.cli.datastreamctl benchmark deployment-pack --events 10000 --batch-size 256`
-  - export generation: 660.06 files/sec
-  - mixed replay: 61,037.32 events/sec
+  - export generation: 728.91 files/sec
+  - mixed replay: 64,775.69 events/sec
   - `systemd` layout: 7 files
   - Kubernetes layout: 12 files
 - `uv run python -m services.cli.datastreamctl benchmark deployment-pack-matrix --events 10000 --batch-size 256`
-  - `demo-site`: 638.42 export files/sec, 60,757.77 replay events/sec
-  - `plant-a`: 668.20 export files/sec, 66,550.60 replay events/sec
-  - average: 653.31 export files/sec, 63,654.18 replay events/sec
+  - `demo-site`: 693.36 export files/sec, 60,535.22 replay events/sec
+  - `plant-a`: 744.24 export files/sec, 63,091.48 replay events/sec
+  - average: 718.80 export files/sec, 61,813.35 replay events/sec
 - `uv run python scripts/benchmark_mixed_replay.py --events 10000 --batch-size 256`
   - 10,000 events
-  - 54,779.87 events/sec
+  - 58,548.76 events/sec
   - 40 batches
 
 ### Notes

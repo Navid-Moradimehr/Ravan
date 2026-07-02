@@ -17,7 +17,7 @@
 | Check | Result |
 |-------|--------|
 | `python -m compileall services tests` | passed |
-| Focused unit/regression tests | 56 passed |
+| Focused unit/regression tests | 23 passed |
 | Historian table allowlist | passed |
 | JWT default-secret visibility | passed |
 | Kafka producer cache | passed |
@@ -27,11 +27,11 @@
 
 | Benchmark | Value |
 |-----------|-------|
-| Deployment pack export rate | 660.06 files/sec |
-| Deployment pack replay rate | 61,037.32 events/sec |
-| Deployment pack matrix average export rate | 653.31 files/sec |
-| Deployment pack matrix average replay rate | 63,654.18 events/sec |
-| Mixed replay throughput | 54,779.87 events/sec |
+| Deployment pack export rate | 728.91 files/sec |
+| Deployment pack replay rate | 64,775.69 events/sec |
+| Deployment pack matrix average export rate | 718.80 files/sec |
+| Deployment pack matrix average replay rate | 61,813.35 events/sec |
+| Mixed replay throughput | 58,548.76 events/sec |
 
 ## Test Suite Results
 

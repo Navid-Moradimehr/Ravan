@@ -29,7 +29,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-DEFAULT_JWT_SECRET = "change-me-in-production"
+DEFAULT_JWT_SECRET = "change-me-in-production-please-set-a-long-secret"
 JWT_SECRET = os.getenv("JWT_SECRET", DEFAULT_JWT_SECRET)
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "480"))
@@ -76,9 +76,14 @@ def is_default_jwt_secret() -> bool:
     return JWT_SECRET == DEFAULT_JWT_SECRET
 
 
+def is_jwt_secret_strong_enough() -> bool:
+    return len(JWT_SECRET) >= 32
+
+
 def auth_security_status() -> dict[str, Any]:
     return {
         "jwt_secret_configured": not is_default_jwt_secret(),
+        "jwt_secret_strong_enough": is_jwt_secret_strong_enough(),
         "jwt_algorithm": JWT_ALGORITHM,
         "jwt_expire_minutes": JWT_EXPIRE_MINUTES,
         "requires_operator_secret": True,

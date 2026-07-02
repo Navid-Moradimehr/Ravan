@@ -15,11 +15,14 @@ Packaging and installer work is intentionally not part of this phase.
 - WebSocket live UI updates
 - real-time preview and replay tooling
 - RBAC, audit logging, authentication, and user-management foundations
+- JWT default placeholder is length-safe and auth status reports secret strength
 - site-aware project manifest and rollout scaffolding
 - model gateway abstraction for open-weight and OpenAI-compatible backends
 - read-only agent infrastructure
 - local and site-oriented benchmark harnesses
 - synthetic and replay datasets for regression tests
+- expanded observability for historian query latency, broker lag, and WebSocket delivery lag
+- every manifest source is explicitly attached to a site boundary
 
 ## Incomplete
 
@@ -46,9 +49,8 @@ Packaging and installer work is intentionally not part of this phase.
 3. Validate vendor connectors against real PLC and sensor traffic.
 4. Add model evaluation and promotion lifecycle controls.
 5. Finish diagnostic-agent and supervised action-agent runtime paths.
-6. Expand observability around broker lag, historian latency, and WebSocket delivery delay.
-7. Tighten failure isolation between sites, sources, and correlation groups.
-8. Build an acceptance suite for multi-branch rollout verification.
+6. Tighten failure isolation between sites, sources, and correlation groups.
+7. Build an acceptance suite for multi-branch rollout verification.
 
 ## Real-World Simulator Benchmark Plan
 
@@ -63,4 +65,3 @@ Packaging and installer work is intentionally not part of this phase.
 
 - [Repo checklist](../../docs/production-readiness-checklist.md)
 - [Implementation graph](Implementation Graph - 2026-07-02.md)
-

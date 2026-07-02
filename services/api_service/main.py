@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi import Depends
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 
 def _prune_legacy_routes() -> None:
@@ -114,6 +115,7 @@ except ImportError:
         query_trend,
         query_recent_events as query_historian_events,
     )
+from services.common.runtime_metrics import observe_websocket_batch_delivery
 try:
     from assets.model import load_hierarchy, hierarchy_to_tree
 except ImportError:
@@ -245,6 +247,7 @@ async def _alarm_broadcaster():
             data = query_alarms(50)
             if data != last_data:
                 last_data = data
+                observe_websocket_batch_delivery("alarms", data)
                 await alarm_manager.broadcast({"type": "update", "alarms": data})
         except Exception:
             pass
@@ -261,6 +264,7 @@ async def _event_broadcaster():
                 data = query_historian_events(table, 100)
                 if data != last_data.get(table):
                     last_data[table] = data
+                    observe_websocket_batch_delivery(f"historian:{table}", data)
                     await event_manager.broadcast({"type": "update", "table": table, "events": data})
             except Exception:
                 pass
@@ -428,6 +432,11 @@ app.add_middleware(
 )
 
 
+@app.get("/metrics")
+async def metrics() -> Response:
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 # TLS info endpoint (defined after app creation)
 @app.get("/.well-known/tls-info")
 async def tls_info() -> dict[str, Any]:
@@ -449,6 +458,7 @@ async def websocket_alarms(websocket: WebSocket):
     try:
         # Send initial data
         data = query_alarms(50)
+        observe_websocket_batch_delivery("alarms", data)
         await websocket.send_json({"type": "init", "alarms": data})
         while True:
             # Wait for client messages (ping/ack/subscribe)
@@ -476,6 +486,7 @@ async def websocket_events(websocket: WebSocket):
         # Send initial data for all tables
         for table in ["industrial_events", "processed_events", "ai_enriched"]:
             data = query_historian_events(table, 100)
+            observe_websocket_batch_delivery(f"historian:{table}", data)
             await websocket.send_json({"type": "init", "table": table, "events": data})
         while True:
             msg = await websocket.receive_text()
@@ -527,7 +538,17 @@ async def health() -> HealthResponse:
         "ai_gateway": True,
     }
     uptime = int(time.time() - start + 1)
-    return HealthResponse(status="ok", version="1.0.0", uptime_seconds=uptime, services={**services, "auth": auth_security_status()["jwt_secret_configured"]})
+    auth_status = auth_security_status()
+    return HealthResponse(
+        status="ok",
+        version="1.0.0",
+        uptime_seconds=uptime,
+        services={
+            **services,
+            "auth": auth_status["jwt_secret_configured"],
+            "auth_strong": auth_status["jwt_secret_strong_enough"],
+        },
+    )
 
 
 @app.post("/api/v1/webhooks")

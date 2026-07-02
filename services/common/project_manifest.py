@@ -105,6 +105,9 @@ class ProjectManifest:
     def site_profile_paths(self) -> dict[str, Path]:
         return {site.site_id: Path(site.profile_path) for site in self.sites}
 
+    def source_site_map(self) -> dict[str, str]:
+        return {source.source_id: source.site_id for source in self.sources if source.site_id}
+
     def to_site_envs(self) -> dict[str, dict[str, str]]:
         envs: dict[str, dict[str, str]] = {}
         for site in self.sites:
@@ -550,6 +553,7 @@ class ProjectManifest:
     def lint(self) -> list[str]:
         issues = validate_project_manifest(self)
         site_ids = {site.site_id for site in self.sites}
+        source_site_map = self.source_site_map()
         topic_to_sources: dict[str, list[str]] = {}
         bridge_signatures: set[tuple[str, str, tuple[str, ...], tuple[str, ...], str]] = set()
 
@@ -571,7 +575,7 @@ class ProjectManifest:
             if len(set(group.members)) != len(group.members):
                 issues.append(f"correlation group {group.name}: duplicate member entries")
             if len(group.members) > 1 and group.strategy == "site_asset_tag":
-                grouped_sites = {source.site_id for source in self.sources if source.source_id in group.members}
+                grouped_sites = {source_site_map.get(member, "") for member in group.members if source_site_map.get(member, "")}
                 if len(grouped_sites) > 1:
                     issues.append(f"correlation group {group.name}: spans multiple sites {sorted(grouped_sites)}")
 
@@ -752,6 +756,8 @@ def validate_project_manifest(manifest: ProjectManifest) -> list[str]:
     for source in manifest.sources:
         if not source.source_id:
             errors.append("source.source_id is required")
+        if not source.site_id:
+            errors.append(f"source {source.source_id or '?'}: site_id is required")
         if source.site_id and source.site_id not in site_ids:
             errors.append(f"source {source.source_id}: unknown site_id {source.site_id}")
         if not source.source_protocol:
