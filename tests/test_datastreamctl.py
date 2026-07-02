@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 from contextlib import redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -137,6 +138,66 @@ class TestDatastreamctl:
         rc, out = self._run(["project-manifest", "release-gate", str(PROJECT_MANIFEST), "--skip-network"])
         assert rc == 0
         assert "project release gate" in out
+
+    def test_project_manifest_rollout_acceptance_runs(self, monkeypatch):
+        monkeypatch.setattr(
+            ctl,
+            "_run_release_gate_for_profile",
+            lambda profile_path, **kwargs: {
+                "profile_id": Path(profile_path).stem,
+                "site_id": Path(profile_path).stem,
+                "deployment_mode": "single-site",
+                "checks": [{"name": "site profile valid", "ok": True, "detail": "ok"}],
+                "backup_drill": None,
+                "passed": True,
+            },
+        )
+        monkeypatch.setattr(
+            ctl,
+            "run_site_profile_matrix",
+            lambda *args, **kwargs: SimpleNamespace(
+                passed=True,
+                runs=(
+                    SimpleNamespace(
+                        site_id="demo-site",
+                        deployment_mode="single-site",
+                        profile_path=str(SITE_PROFILE),
+                        average_events_per_second=5_000.0,
+                        passed=True,
+                        detail="threshold=1 avg=5000 invalid_events_ok=True",
+                    ),
+                    SimpleNamespace(
+                        site_id="plant-a",
+                        deployment_mode="plant-local",
+                        profile_path=str(REPO_ROOT / "config" / "site-profiles" / "plant-local.yaml"),
+                        average_events_per_second=6_000.0,
+                        passed=True,
+                        detail="threshold=1 avg=6000 invalid_events_ok=True",
+                    ),
+                ),
+            ),
+        )
+        rc, out = self._run([
+            "project-manifest",
+            "rollout-acceptance",
+            str(PROJECT_MANIFEST),
+            "--skip-network",
+            "--skip-backup",
+            "--csv",
+            str(REPO_ROOT / "data" / "benchmarks" / "industrial_mixed_benchmark.csv"),
+            "--site-ids",
+            "demo-site,plant-a",
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+            "--min-average-events-per-second",
+            "1",
+        ])
+        assert rc == 0
+        assert "project rollout acceptance" in out
+        assert "demo-site" in out
+        assert "plant-a" in out
 
     def test_project_manifest_export_runs(self, tmp_path):
         rc, out = self._run(["project-manifest", "export", str(PROJECT_MANIFEST), str(tmp_path), "--site-id", "demo-site", "--format", "both"])

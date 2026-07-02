@@ -22,6 +22,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - RBAC, audit logging, authentication, and user-management foundations exist.
 - JWT default placeholder is length-safe and auth status reports secret strength.
 - Site-aware project manifest and rollout scaffolding exist.
+- Project-manifest rollout acceptance command exists for combined release-gate and benchmark checks.
 - Open-weight and OpenAI-compatible model gateway abstraction exists.
 - Read-only agent infrastructure exists as a foundation.
 - Local and site-oriented benchmark harnesses exist.
@@ -65,7 +66,7 @@ These are the changes that matter most before calling the platform production-re
 2. Validate vendor connectors against real PLC and sensor traffic.
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish the diagnostic-agent and supervised action-agent runtime paths.
-5. Build an acceptance suite for multi-branch rollout verification.
+5. Tighten failure isolation between sites, sources, and correlation groups.
 
 ## Real-World Simulator Benchmark Plan
 
@@ -85,6 +86,7 @@ These are the changes that matter most before calling the platform production-re
 - NASA C-MAPSS
 - bearing degradation datasets
 - SWaT / WADI style telemetry
+- project-manifest rollout acceptance command output
 
 ### Benchmark scenarios
 
@@ -126,3 +128,4 @@ These are the changes that matter most before calling the platform production-re
 - regression notes
 - site-sizing recommendation
 - rollout readiness summary
+- combined release-gate and benchmark acceptance report

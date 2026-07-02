@@ -318,6 +318,7 @@ Implemented in the repo now:
 
 - a formal site profile schema with example `single-site`, `plant-local`, and `federated` YAMLs
 - `datastreamctl` commands for profile validation, backup drills, and release-gate checks
+- `datastreamctl project-manifest rollout-acceptance` for combined release-gate and benchmark acceptance
 - `datastreamd --site-profile` so runtime services can start from a site contract
 - Helm profile overlays for `single-site`, `plant-local`, and `federated`
 - a live soak harness at `scripts/site-profile-soak.ps1`
@@ -337,6 +338,7 @@ What still needs to be finished for a true multi-site production rollout:
 - installable packages for Windows and Linux
 - site-by-site benchmark reports
 - central aggregation design, if the company wants fleet-wide reporting
+- real target broker and historian sizing on the plant network
 
 ## Recommended Next Step
 

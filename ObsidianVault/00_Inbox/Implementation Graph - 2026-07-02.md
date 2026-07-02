@@ -45,6 +45,7 @@ graph TD
 - bearer-token enforcement for mutating API requests with baseline security headers
 - regression tests for shared-deployment auth and headers
 - site-profile benchmark matrix for per-site acceptance runs
+- project-manifest rollout acceptance command that combines release-gate and benchmark checks
 
 ## Risks Being Addressed
 
@@ -81,4 +82,8 @@ graph TD
 - `site-profile-matrix --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1`
   - demo-site: 44,795.24 events/sec, passed
   - plant-a: 59,253.75 events/sec, passed
+  - overall: passed
+- `project-manifest rollout-acceptance config/project-manifest.yaml --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1 --skip-network --skip-backup`
+  - demo-site: release-gate passed, benchmark passed at 55,807.17 events/sec
+  - plant-a: release-gate passed, benchmark passed at 59,548.10 events/sec
   - overall: passed

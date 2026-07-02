@@ -23,6 +23,10 @@
 | Kafka producer cache | passed |
 | Manual consumer offset commit | passed |
 
+Additional focused CLI regression slice:
+
+- `uv run pytest -q tests/test_datastreamctl.py tests/test_site_profile_matrix_benchmark.py`: 31 passed
+
 ### Latest Mock Benchmarks
 
 | Benchmark | Value |
@@ -63,6 +67,22 @@ Latest local run on the current codebase:
 |------|------|----------------|-----------|--------|
 | demo-site | single-site | 44,795.24 | 500.0 | passed |
 | plant-a | plant-local | 59,253.75 | 750.0 | passed |
+| **Overall** | - | - | - | passed |
+
+### Project Rollout Acceptance
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl project-manifest rollout-acceptance config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1 --skip-network --skip-backup
+```
+
+Latest local run on the current codebase:
+
+| Site | Release Gate | Avg Events/sec | Threshold | Result |
+|------|--------------|----------------|-----------|--------|
+| demo-site | passed | 55,807.17 | 500.0 | passed |
+| plant-a | passed | 59,548.10 | 750.0 | passed |
 | **Overall** | - | - | - | passed |
 
 ## Test Suite Results

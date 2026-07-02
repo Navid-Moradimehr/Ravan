@@ -140,6 +140,98 @@ def _run_release_gate_for_profile(
     return payload
 
 
+def _run_rollout_acceptance_for_manifest(
+    manifest_path: str,
+    *,
+    api_base: str,
+    ai_base: str,
+    csv_path: str,
+    site_ids: list[str] | None = None,
+    events: int = 10_000,
+    batch_size: int = 256,
+    warmup_events: int = 0,
+    min_average_events_per_second: float = 1000.0,
+    backup_dir: str | None = None,
+    restore_db: str | None = None,
+    skip_network: bool = False,
+    skip_backup: bool = False,
+) -> dict[str, Any]:
+    manifest = load_project_manifest(manifest_path)
+    manifest_errors = validate_project_manifest(manifest)
+    selected_ids = site_ids if site_ids is not None else [site.site_id for site in manifest.sites]
+
+    benchmark_matrix = run_site_profile_matrix(
+        Path(manifest_path),
+        Path(csv_path),
+        site_ids=selected_ids,
+        events=events,
+        batch_size=batch_size,
+        warmup_events=warmup_events,
+        min_average_events_per_second=min_average_events_per_second,
+    )
+    benchmark_by_site = {run.site_id: run for run in benchmark_matrix.runs}
+
+    sites: list[dict[str, Any]] = []
+    for site in manifest.sites:
+        if site.site_id not in selected_ids:
+            continue
+        release_gate = _run_release_gate_for_profile(
+            site.profile_path,
+            api_base=api_base,
+            ai_base=ai_base,
+            backup_dir=backup_dir,
+            restore_db=restore_db,
+            skip_network=skip_network,
+            skip_backup=skip_backup,
+        )
+        benchmark = benchmark_by_site.get(site.site_id)
+        benchmark_payload = None
+        benchmark_passed = False
+        if benchmark is not None:
+            benchmark_payload = {
+                "site_id": benchmark.site_id,
+                "deployment_mode": benchmark.deployment_mode,
+                "profile_path": benchmark.profile_path,
+                "average_events_per_second": benchmark.average_events_per_second,
+                "passed": benchmark.passed,
+                "detail": benchmark.detail,
+            }
+            benchmark_passed = benchmark.passed
+        sites.append(
+            {
+                "site_id": site.site_id,
+                "profile_path": site.profile_path,
+                "release_gate": release_gate,
+                "benchmark": benchmark_payload,
+                "passed": release_gate["passed"] and benchmark_passed,
+            }
+        )
+
+    passed = not manifest_errors and benchmark_matrix.passed and all(item["passed"] for item in sites)
+    return {
+        "project_id": manifest.project_id,
+        "name": manifest.name,
+        "manifest_errors": manifest_errors,
+        "baseline_csv": csv_path,
+        "benchmark_matrix": {
+            "passed": benchmark_matrix.passed,
+            "runs": [
+                {
+                    "site_id": run.site_id,
+                    "deployment_mode": run.deployment_mode,
+                    "profile_path": run.profile_path,
+                    "average_events_per_second": run.average_events_per_second,
+                    "passed": run.passed,
+                    "detail": run.detail,
+                }
+                for run in benchmark_matrix.runs
+            ],
+        },
+        "sites": sites,
+        "passed": passed,
+    }
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     api_base = args.api_base
     ai_base = args.ai_base
@@ -490,11 +582,59 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
                 print(f"{mark:<6}{item['site_id']:<22}{item['profile_path']}")
                 for check in item["checks"]:
                     inner_mark = "OK" if check["ok"] else "FAIL"
-                    print(f"{'':6}{inner_mark:<6}{check['name']:<22}{check['detail']}")
+                    print(f"{'':6}{inner_mark:<6}{check['name']:<22} {check['detail']}")
             if errors:
                 for err in errors:
                     print(f"ERROR  {err}")
         return 0 if passed else 2
+
+    if args.action == "rollout-acceptance":
+        site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
+        payload = _run_rollout_acceptance_for_manifest(
+            args.path,
+            api_base=args.api_base,
+            ai_base=args.ai_base,
+            csv_path=args.csv,
+            site_ids=site_ids,
+            events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            min_average_events_per_second=args.min_average_events_per_second,
+            backup_dir=args.backup_dir,
+            restore_db=args.restore_db,
+            skip_network=args.skip_network,
+            skip_backup=args.skip_backup,
+        )
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("project rollout acceptance")
+            print("=" * 40)
+            _print_row("project_id", payload["project_id"])
+            _print_row("name", payload["name"])
+            _print_row("benchmark_csv", payload["baseline_csv"])
+            for item in payload["sites"]:
+                mark = "OK" if item["passed"] else "FAIL"
+                print(f"{mark:<6}{item['site_id']:<22}{item['profile_path']}")
+                release_gate = item["release_gate"]
+                release_mark = "OK" if release_gate["passed"] else "FAIL"
+                print(f"{'':6}{release_mark:<6}release-gate")
+                for check in release_gate["checks"]:
+                    inner_mark = "OK" if check["ok"] else "FAIL"
+                    print(f"{'':12}{inner_mark:<6}{check['name']:<22} {check['detail']}")
+                benchmark = item["benchmark"]
+                if benchmark is None:
+                    print(f"{'':6}FAIL  benchmark unavailable")
+                else:
+                    benchmark_mark = "OK" if benchmark["passed"] else "FAIL"
+                    print(
+                        f"{'':6}{benchmark_mark:<6}benchmark avg={benchmark['average_events_per_second']:.2f} "
+                        f"threshold={args.min_average_events_per_second}"
+                    )
+                    print(f"{'':12}{benchmark['detail']}")
+            for err in payload["manifest_errors"]:
+                print(f"ERROR  {err}")
+        return 0 if payload["passed"] else 2
 
     if args.json:
         print(json.dumps(payload, indent=2))
@@ -729,6 +869,22 @@ def build_parser() -> argparse.ArgumentParser:
     project_release.add_argument("--skip-backup", action="store_true")
     project_release.add_argument("--json", action="store_true")
     project_release.set_defaults(func=cmd_project_manifest)
+    project_rollout = project_sub.add_parser("rollout-acceptance", help="Run release-gate and benchmark acceptance for all sites in a project manifest")
+    project_rollout.add_argument("path")
+    project_rollout.add_argument("--api-base", default=DEFAULT_API_BASE)
+    project_rollout.add_argument("--ai-base", default=DEFAULT_AI_BASE)
+    project_rollout.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    project_rollout.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites in the manifest")
+    project_rollout.add_argument("--events", type=int, default=10_000)
+    project_rollout.add_argument("--batch-size", type=int, default=256)
+    project_rollout.add_argument("--warmup-events", type=int, default=0)
+    project_rollout.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    project_rollout.add_argument("--backup-dir", default=None)
+    project_rollout.add_argument("--restore-db", default=None)
+    project_rollout.add_argument("--skip-network", action="store_true")
+    project_rollout.add_argument("--skip-backup", action="store_true")
+    project_rollout.add_argument("--json", action="store_true")
+    project_rollout.set_defaults(func=cmd_project_manifest)
 
     benchmark = sub.add_parser("benchmark", help="Run performance benchmarks")
     benchmark_sub = benchmark.add_subparsers(dest="action", required=True)

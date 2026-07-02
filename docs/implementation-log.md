@@ -45,6 +45,10 @@
    - Added `datastreamctl benchmark site-profile-matrix` and a script wrapper so site-by-site reports can be generated from the CLI.
    - The matrix keeps per-site reporting separate from the raw simulator suite, which makes rollout acceptance easier to audit.
 
+11. **Project rollout acceptance gate**
+   - Added `datastreamctl project-manifest rollout-acceptance` to combine per-site release-gate checks with per-site benchmark acceptance in one operator-facing command.
+   - The new gate reuses the existing site release checks and real-world simulator matrix so the rollout summary stays deterministic and local-first.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
@@ -70,6 +74,12 @@
   - `demo-site`: 44,795.24 events/sec, passed, threshold 500.0
   - `plant-a`: 59,253.75 events/sec, passed, threshold 750.0
   - overall: passed
+- `uv run python -m services.cli.datastreamctl project-manifest rollout-acceptance config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1 --skip-network --skip-backup`
+  - `demo-site`: release-gate passed, benchmark passed at 55,807.17 events/sec
+  - `plant-a`: release-gate passed, benchmark passed at 59,548.10 events/sec
+  - overall: passed
+- `uv run pytest -q tests/test_datastreamctl.py tests/test_site_profile_matrix_benchmark.py`
+  - 31 passed
 
 ### Notes
 

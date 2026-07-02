@@ -17,6 +17,7 @@ Packaging and installer work is intentionally not part of this phase.
 - RBAC, audit logging, authentication, and user-management foundations
 - JWT default placeholder is length-safe and auth status reports secret strength
 - site-aware project manifest and rollout scaffolding
+- project-manifest rollout acceptance command for combined release-gate and benchmark checks
 - model gateway abstraction for open-weight and OpenAI-compatible backends
 - read-only agent infrastructure
 - local and site-oriented benchmark harnesses
@@ -51,7 +52,6 @@ Packaging and installer work is intentionally not part of this phase.
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish diagnostic-agent and supervised action-agent runtime paths.
 5. Tighten failure isolation between sites, sources, and correlation groups.
-6. Build an acceptance suite for multi-branch rollout verification.
 
 ## Real-World Simulator Benchmark Plan
 
@@ -60,7 +60,7 @@ Packaging and installer work is intentionally not part of this phase.
 - near-real datasets
 - local broker/historian validation
 - target-site replay and soak tests
-- threshold-based acceptance reports
+- combined release-gate and benchmark acceptance reports
 
 ## Links
 
