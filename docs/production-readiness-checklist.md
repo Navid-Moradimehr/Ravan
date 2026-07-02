@@ -32,6 +32,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - CGR gap report command exists for comparing repo measurements against the public CGR streaming claim.
 - Dedicated Flink runtime benchmark path exists so the distributed processor contract is measured separately from the Python fallback path.
 - Dedicated Flink job image now exists for the compose deployment path.
+- Flink keyed-window state now uses the shared rolling-window contract instead of the slower list-and-pop benchmark shape.
 - Dataset conversion workflow exists for AI4I, C-MAPSS, and generic industrial CSV slices.
 - Failure isolation between sites, sources, and correlation groups is enforced by manifest validation.
 - Synthetic and replay datasets are available for regression tests.
@@ -65,6 +66,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Embeddings and retrieval backend are present as a direction, but still need production validation.
 - Read-only agent tooling is infrastructure, not a finished agent product.
 - Prompt/model registries are infrastructure, not a governance workflow yet.
+- Spark support is intentionally optional and should remain a user-managed integration for batch/lakehouse workloads, not a core streaming dependency.
 
 ## Necessary Changes
 
@@ -76,6 +78,7 @@ These are the changes that matter most before calling the platform production-re
 4. Finish the diagnostic-agent and supervised action-agent runtime paths.
 5. Keep adding target-site broker/historian p99 probes so the CGR comparison eventually covers real plant latency, not only local replay latency.
 6. Treat benchmark session deltas as first-class evidence. A single local run can move 1-12 percent on the same machine, so use repeated runs and median/percentile tracking before calling a change a real regression.
+7. Keep the streaming hot path on Flink and reserve Spark for optional offline ETL and lakehouse jobs.
 
 ## Session Delta Guidance
 

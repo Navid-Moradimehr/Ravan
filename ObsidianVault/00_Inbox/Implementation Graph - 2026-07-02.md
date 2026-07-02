@@ -57,6 +57,9 @@ graph TD
 - distributed Flink processor wired as a keyed-state job with checkpointing while preserving the Python fallback path
 - API admin/config endpoints moved out of `services/api_service/main.py` into `services/api_service/routers/admin.py`
 - dedicated Flink deployment image added for compose-based distributed runtime runs
+- keyed Flink benchmark now reuses the shared rolling-window state contract instead of list-plus-pop state
+- typed-tuple keyed state added to the Flink job to remove string parsing overhead
+- CGR streaming vs BI comparison note added, with Spark marked as optional for offline ETL and lakehouse workloads
 
 ## Risks Being Addressed
 
@@ -71,6 +74,8 @@ graph TD
 - missing per-site acceptance benchmark matrix
 - missing first-class CGR gap report
 - unauthenticated mutating API requests in shared deployments
+- benchmark session variance not tracked as a first-class signal
+- unclear Spark integration boundary for open-source industrial rollout
 
 ## Verification
 
@@ -79,11 +84,23 @@ graph TD
 - vault notes updated with results and decisions
 - CGR gap report verified against the current local benchmark pack
 - replay p99 latency probes added to the mixed replay and simulator benchmark paths
+- keyed-window runtime benchmarks rerun after the state-shape optimization
 
 ## Latest Results
 
 - `python -m compileall services tests`: passed
 - focused regression tests: 23 passed
+- `uv run pytest -q tests/test_datastreamctl.py tests/test_mixed_replay_benchmark.py tests/test_real_world_simulator_benchmark.py tests/test_site_profile_matrix_benchmark.py tests/test_deployment_pack_benchmark.py`: 38 passed
+- `benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0`
+  - 50,882.38 events/sec
+  - 0.0297 ms p99
+- `benchmark flink-runtime-slice --events 10000 --batch-size 256 --warmup-events 0`
+  - 49,823.25 events/sec
+  - 0.0279 ms p99
+- `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
+  - cgr_stream_slice: 50,048.47 events/sec, 0.0530 ms p99
+  - flink_runtime_slice: 51,126.34 events/sec, 0.0552 ms p99
+  - mixed_replay: 92,994.10 events/sec, 0.0257 ms p99
 - `datastreamctl benchmark deployment-pack --events 10000 --batch-size 256`
   - export generation: 728.91 files/sec
   - replay: 64,775.69 events/sec

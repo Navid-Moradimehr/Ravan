@@ -52,7 +52,7 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
 
     def open(self, runtime_context) -> None:  # type: ignore[override]
         self._sample_state = runtime_context.get_list_state(
-            ListStateDescriptor("industrial_window_samples", Types.STRING())
+            ListStateDescriptor("industrial_window_samples", Types.TUPLE([Types.FLOAT(), Types.FLOAT()]))
         )
         self._temperature_sum_state = runtime_context.get_state(
             ValueStateDescriptor("industrial_temperature_sum", Types.FLOAT())
@@ -68,14 +68,14 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
         temperature_sum = float(self._temperature_sum_state.value() or 0.0)
         vibration_sum = float(self._vibration_sum_state.value() or 0.0)
 
-        current_sample = f"{event.temperature_c}:{event.vibration_mm_s}"
+        current_sample = (event.temperature_c, event.vibration_mm_s)
         samples.append(current_sample)
         temperature_sum += event.temperature_c
         vibration_sum += event.vibration_mm_s
 
         if len(samples) > self.window_limit:
             evicted = samples.pop(0)
-            temperature_str, vibration_str = evicted.split(":", 1)
+            temperature_str, vibration_str = evicted
             temperature_sum -= float(temperature_str)
             vibration_sum -= float(vibration_str)
 

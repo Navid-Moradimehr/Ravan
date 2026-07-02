@@ -1,5 +1,40 @@
 # Implementation Log
 
+## 2026-07-02 - Flink Window-State Alignment and CGR/Spark Policy
+
+### Changed
+
+1. **Flink keyed-window optimization**
+   - Switched `services/benchmarks/flink_runtime_slice.py` to reuse the shared rolling-window state contract instead of a list-plus-pop implementation.
+   - Updated `services/processor/iot_anomaly_job.py` to store window samples as typed tuples in keyed list state instead of string-encoded samples.
+
+2. **Architecture notes**
+   - Added `docs/cgr-streaming-bi-comparison-and-spark-policy.md` to separate CGR streaming/BI expectations from this platform's open-source, self-hosted scope.
+   - Documented the Spark decision as optional integration for offline ETL and lakehouse workloads, not the core streaming path.
+
+3. **Readiness and benchmark notes**
+   - Updated the production-readiness checklist and benchmark results to reflect the new keyed-window baseline and the need for repeated session tracking.
+
+### Verified
+
+- `python -m compileall services tests`: passed
+- `uv run pytest -q tests/test_datastreamctl.py tests/test_mixed_replay_benchmark.py tests/test_real_world_simulator_benchmark.py tests/test_site_profile_matrix_benchmark.py tests/test_deployment_pack_benchmark.py`: 38 passed
+- `uv run python -m services.cli.datastreamctl benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0`
+  - 50,882.38 events/sec
+  - 0.0297 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark flink-runtime-slice --events 10000 --batch-size 256 --warmup-events 0`
+  - 49,823.25 events/sec
+  - 0.0279 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
+  - `cgr_stream_slice`: 50,048.47 events/sec, 0.0530 ms p99
+  - `flink_runtime_slice`: 51,126.34 events/sec, 0.0552 ms p99
+  - `mixed_replay`: 92,994.10 events/sec, 0.0257 ms p99
+
+### Notes
+
+- The keyed-window runtime path now shares the same rolling-sum behavior as the fallback processor, so future throughput work should focus more on serialization format, broker topology, and sink behavior.
+- The Flink slice p99 moved in the right direction on the standalone benchmark, but the gap-report run still shows session variance, so repeated runs should be used before calling a regression or win.
+
 ## 2026-07-02 - Runtime Hardening Pass
 
 ### Changed

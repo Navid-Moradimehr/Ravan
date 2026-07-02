@@ -181,6 +181,28 @@ Notes:
 - This session shows run-to-run variance: the CGR slice improved a little, while the Flink slice slowed down relative to the previous session. That is not enough to call a structural regression yet, but it does mean the new Flink deployment path should be re-benchmarked under fixed host load before any claim of improvement.
 - The documented full-pipeline number is the latest recorded repo benchmark reference and should still be remeasured on a target broker/historian topology before sizing.
 
+### Post-Optimization Slice Benchmarks
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0
+uv run python -m services.cli.datastreamctl benchmark flink-runtime-slice --events 10000 --batch-size 256 --warmup-events 0
+```
+
+Latest local run on the current codebase after switching the keyed Flink path to the shared rolling-window state contract:
+
+| Benchmark | Throughput | Delta vs previous recorded session | p99 | Delta vs previous recorded session |
+|-----------|------------|------------------------------------|-----|------------------------------------|
+| CGR stream slice | 50,882.38 events/sec | +1.0% | 0.0297 ms | -12.1% |
+| Flink runtime slice | 49,823.25 events/sec | -0.9% | 0.0279 ms | -23.4% |
+
+Interpretation:
+
+- the Flink path no longer pays the old list-pop overhead
+- the local benchmark still sits far below the public CGR target, so the remaining gap is mostly topology, serialization, broker, and sink behavior rather than rolling-window math
+- the new numbers should be treated as a better baseline, not as a production comparison
+
 ### CGR Stream Slice Breakdown
 
 Command:
@@ -229,6 +251,7 @@ The current refactor pass changed the runtime shape of the platform:
 - shared payload enrichment now lives in `services/processor/runtime_pipeline.py`
 - historian writes are batched in the edge ingest and runtime processor paths
 - the distributed Flink job now uses keyed state plus checkpointing while preserving the same processed-event contract
+- the distributed Flink job now stores window samples as typed tuples instead of string-encoded samples
 - the service Dockerfiles now copy the full `services/` tree so imports resolve in containers
 - a local mixed-protocol benchmark pack was added at `data/benchmarks/industrial_mixed_benchmark.csv`
 

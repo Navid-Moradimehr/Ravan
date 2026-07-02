@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from itertools import cycle
 from pathlib import Path
 
-from services.common.runtime_event import RuntimeEventRecord
+from services.common.runtime_event import RollingWindowState, RuntimeEventRecord
 from services.datasets.replayer import map_row_to_event, read_csv_rows
 from services.edge_ingest.model import to_json_bytes, validate_event
 from services.processor.runtime_pipeline import build_runtime_event_payload
@@ -121,7 +121,7 @@ def run_benchmark(
     processed_bytes = 0
     batch_count = 0
     latencies_ms: list[float] = []
-    keyed_state: dict[str, dict[str, object]] = {}
+    keyed_state: dict[str, RollingWindowState] = {}
     mapping_validation_ms: list[float] = []
     record_build_ms: list[float] = []
     keyed_state_ms: list[float] = []
@@ -149,29 +149,12 @@ def run_benchmark(
 
         stage_started = time.perf_counter()
         key = runtime_event.asset_id
-        state = keyed_state.get(key)
-        if state is None:
-            state = {"samples": [], "temperature_sum": 0.0, "vibration_sum": 0.0}
-            keyed_state[key] = state
+        window = keyed_state.get(key)
+        if window is None:
+            window = RollingWindowState(maxlen=window_limit)
+            keyed_state[key] = window
 
-        samples = state["samples"]
-        temperature_sum = float(state["temperature_sum"])
-        vibration_sum = float(state["vibration_sum"])
-
-        samples.append((runtime_event.temperature_c, runtime_event.vibration_mm_s))
-        temperature_sum += runtime_event.temperature_c
-        vibration_sum += runtime_event.vibration_mm_s
-
-        if len(samples) > window_limit:
-            evicted_temperature, evicted_vibration = samples.pop(0)
-            temperature_sum -= evicted_temperature
-            vibration_sum -= evicted_vibration
-
-        state["temperature_sum"] = temperature_sum
-        state["vibration_sum"] = vibration_sum
-        window_size = len(samples)
-        temperature_avg = temperature_sum / window_size if window_size else 0.0
-        vibration_avg = vibration_sum / window_size if window_size else 0.0
+        temperature_avg, vibration_avg, window_size = window.append(runtime_event)
         processed = build_runtime_event_payload(
             runtime_event,
             temperature_avg_c=temperature_avg,
