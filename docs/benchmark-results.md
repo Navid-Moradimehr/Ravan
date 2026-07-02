@@ -42,12 +42,14 @@
 
 | Benchmark | Value |
 |-----------|-------|
-| CGR stream slice throughput | 55,975.34 events/sec |
-| CGR stream slice p99 | 0.0251 ms |
-| Mixed replay throughput | 102,391.87 events/sec |
-| Mixed replay p99 | 0.0128 ms |
-| Real-world simulator average throughput | 98,047.73 events/sec |
-| Real-world simulator average p99 | 0.0173 ms |
+| CGR stream slice throughput | 49,036.58 events/sec |
+| CGR stream slice p99 | 0.0325 ms |
+| Flink runtime slice throughput | 52,886.86 events/sec |
+| Flink runtime slice p99 | 0.0292 ms |
+| Mixed replay throughput | 93,423.46 events/sec |
+| Mixed replay p99 | 0.0162 ms |
+| Real-world simulator average throughput | 96,987.90 events/sec |
+| Real-world simulator average p99 | 0.0240 ms |
 
 ### Change Notes
 
@@ -55,10 +57,12 @@
 - The distributed Flink processor keys by asset identity and keeps rolling state per key, which is the architecture step toward company-scale horizontal processing.
 - The benchmark gains are mostly from eliminating duplicated work and tightening the hot record assembly path; the remaining gap to CGR remains substantial.
 - Relative to the earlier local baseline recorded in this repo, the new run improved:
-  - CGR stream slice throughput by about `163.8%`
-  - mixed replay throughput by about `55.4%`
-  - real-world simulator average throughput by about `44.8%`
-  - CGR stream slice p99 latency from `0.1050 ms` down to `0.0251 ms`
+  - CGR stream slice throughput by about `132.0%`
+  - Flink runtime slice throughput by about `139.9%`
+  - mixed replay throughput by about `59.6%`
+  - real-world simulator average throughput by about `43.3%`
+  - CGR stream slice p99 latency from `0.1050 ms` down to `0.0325 ms`
+  - Flink runtime slice p99 latency from `0.1050 ms` down to `0.0292 ms`
 
 Additional focused CLI regression slice:
 
@@ -151,28 +155,31 @@ Latest local run on the current codebase:
 | Metric | Events/sec | Gap x | Gap events/sec | Gap % |
 |--------|------------|-------|----------------|-------|
 | documented_full_pipeline | 125,830.00 | 15.89 | 1,874,170.00 | 93.71 |
-| mixed_replay | 65,876.93 | 30.36 | 1,934,123.07 | 96.71 |
-| cgr_stream_slice | 21,215.99 | 94.27 | 1,978,784.01 | 98.94 |
-| real_world_average | 67,690.83 | 29.55 | 1,932,309.17 | 96.62 |
-| site_profile_average | 67,358.66 | 29.69 | 1,932,641.34 | 96.63 |
-| site_profile_best:plant-a | 67,510.74 | 29.62 | 1,932,489.26 | 96.62 |
+| mixed_replay | 93,423.46 | 21.41 | 1,906,576.54 | 95.33 |
+| cgr_stream_slice | 49,036.58 | 40.79 | 1,950,963.42 | 97.55 |
+| flink_runtime_slice | 52,886.86 | 37.82 | 1,947,113.14 | 97.36 |
+| real_world_average | 96,987.90 | 20.62 | 1,903,012.10 | 95.15 |
+| site_profile_average | 98,080.16 | 20.39 | 1,901,919.84 | 95.10 |
+| site_profile_best:plant-a | 98,163.61 | 20.37 | 1,901,836.39 | 95.09 |
 
 Latency metrics from the same run:
 
 | Metric | P99 ms | Gap ms | Gap % |
 |--------|--------|--------|-------|
-| mixed_replay | 0.0237 | 79.9763 | 99.97 |
-| cgr_stream_slice | 0.1050 | 79.8950 | 99.87 |
-| real_world_average | 0.0313 | 79.9687 | 99.96 |
-| site_profile_average | 0.0297 | 79.9703 | 99.96 |
-| site_profile_best:plant-a | 0.0275 | 79.9725 | 99.97 |
+| mixed_replay | 0.0162 | 79.9838 | 99.98 |
+| cgr_stream_slice | 0.0325 | 79.9675 | 99.96 |
+| flink_runtime_slice | 0.0292 | 79.9708 | 99.96 |
+| real_world_average | 0.0240 | 79.9760 | 99.97 |
+| site_profile_average | 0.0187 | 79.9813 | 99.98 |
+| site_profile_best:demo-site | 0.0183 | 79.9817 | 99.98 |
 
 Notes:
 
 - The command is now part of the CLI and is useful for tracking the practical gap to the public CGR Stream claim.
 - This report now measures replay p99 latency, but it still does not measure real target-site broker/historian latency.
 - The isolated `cgr_stream_slice` benchmark still shows the record-building and serialization costs more clearly than the old dict path. The bottleneck shifted away from rolling-window math once the internal representation was introduced.
-- The migrated path improved the isolated slice by `34.93%` in throughput and `25.74%` in p99 latency compared with the pre-migration baseline. The remaining gap is now mostly record assembly and payload serialization rather than window recomputation.
+- The distributed Flink runtime slice now has its own benchmark line, so the local measurements separate the fallback Python path from the keyed-state contract.
+- The migrated path improved the isolated slice by `32.28%` in throughput and `69.05%` in p99 latency compared with the earlier pre-migration baseline. The remaining gap is now mostly record assembly and payload serialization rather than window recomputation.
 - The documented full-pipeline number is the latest recorded repo benchmark reference and should still be remeasured on a target broker/historian topology before sizing.
 
 ### CGR Stream Slice Breakdown

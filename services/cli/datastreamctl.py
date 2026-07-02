@@ -25,6 +25,8 @@ from services.benchmarks.cgr_gap import format_result as format_cgr_gap_result
 from services.benchmarks.cgr_gap import run_report as run_cgr_gap_report
 from services.benchmarks.cgr_stream_slice import format_result as format_cgr_stream_slice_result
 from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
+from services.benchmarks.flink_runtime_slice import format_result as format_flink_runtime_slice_result
+from services.benchmarks.flink_runtime_slice import run_benchmark as run_flink_runtime_slice_benchmark
 from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
 from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
 from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
@@ -872,6 +874,21 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                         "processed_bytes": result.cgr_stream_slice.processed_bytes,
                         "latency_p99_ms": result.cgr_stream_slice.latency_p99_ms,
                     },
+                    "flink_runtime_slice": {
+                        "csv_path": result.flink_runtime_slice.csv_path,
+                        "events": result.flink_runtime_slice.events,
+                        "invalid_events": result.flink_runtime_slice.invalid_events,
+                        "batches": result.flink_runtime_slice.batches,
+                        "batch_size": result.flink_runtime_slice.batch_size,
+                        "window_limit": result.flink_runtime_slice.window_limit,
+                        "elapsed_seconds": result.flink_runtime_slice.elapsed_seconds,
+                        "events_per_second": result.flink_runtime_slice.events_per_second,
+                        "serialized_bytes": result.flink_runtime_slice.serialized_bytes,
+                        "raw_bytes": result.flink_runtime_slice.raw_bytes,
+                        "normalized_bytes": result.flink_runtime_slice.normalized_bytes,
+                        "processed_bytes": result.flink_runtime_slice.processed_bytes,
+                        "latency_p99_ms": result.flink_runtime_slice.latency_p99_ms,
+                    },
                     "real_world_simulator": {
                         "average_events_per_second": result.real_world_simulator.average_events_per_second,
                         "cases": [
@@ -983,6 +1000,55 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("cgr stream slice benchmark")
             print("=" * 40)
             print(format_cgr_stream_slice_result(result))
+        return 0
+    if args.action == "flink-runtime-slice":
+        result = run_flink_runtime_slice_benchmark(
+            Path(args.csv),
+            target_events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            window_limit=args.window_limit,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "csv_path": result.csv_path,
+                    "events": result.events,
+                    "invalid_events": result.invalid_events,
+                    "batches": result.batches,
+                    "batch_size": result.batch_size,
+                    "window_limit": result.window_limit,
+                    "elapsed_seconds": result.elapsed_seconds,
+                    "events_per_second": result.events_per_second,
+                    "serialized_bytes": result.serialized_bytes,
+                    "raw_bytes": result.raw_bytes,
+                    "normalized_bytes": result.normalized_bytes,
+                    "processed_bytes": result.processed_bytes,
+                    "latency_p50_ms": result.latency_p50_ms,
+                    "latency_p95_ms": result.latency_p95_ms,
+                    "latency_p99_ms": result.latency_p99_ms,
+                    "latency_max_ms": result.latency_max_ms,
+                    "stage_breakdown": [
+                        {
+                            "name": stage.name,
+                            "operations": stage.operations,
+                            "elapsed_seconds": stage.elapsed_seconds,
+                            "events_per_second": stage.events_per_second,
+                            "avg_ms": stage.avg_ms,
+                            "latency_p50_ms": stage.latency_p50_ms,
+                            "latency_p95_ms": stage.latency_p95_ms,
+                            "latency_p99_ms": stage.latency_p99_ms,
+                            "latency_max_ms": stage.latency_max_ms,
+                        }
+                        for stage in result.stage_breakdown
+                    ],
+                },
+                indent=2,
+            ))
+        else:
+            print("flink runtime slice benchmark")
+            print("=" * 40)
+            print(format_flink_runtime_slice_result(result))
         return 0
     raise ValueError(f"unknown benchmark action: {args.action}")
 
@@ -1171,6 +1237,14 @@ def build_parser() -> argparse.ArgumentParser:
     cgr_stream_slice.add_argument("--window-limit", type=int, default=25)
     cgr_stream_slice.add_argument("--json", action="store_true")
     cgr_stream_slice.set_defaults(func=cmd_benchmark)
+    flink_runtime_slice = benchmark_sub.add_parser("flink-runtime-slice", help="Benchmark the keyed-state Flink runtime contract")
+    flink_runtime_slice.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    flink_runtime_slice.add_argument("--events", type=int, default=10_000)
+    flink_runtime_slice.add_argument("--batch-size", type=int, default=256)
+    flink_runtime_slice.add_argument("--warmup-events", type=int, default=0)
+    flink_runtime_slice.add_argument("--window-limit", type=int, default=25)
+    flink_runtime_slice.add_argument("--json", action="store_true")
+    flink_runtime_slice.set_defaults(func=cmd_benchmark)
     return parser
 
 

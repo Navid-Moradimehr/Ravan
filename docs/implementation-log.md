@@ -104,9 +104,10 @@
    - Updated the architecture notes to reflect that the Python processor is now the fallback path and the distributed Flink job is the horizontal-scaling path.
    - Verified the refactor with `python -m compileall services tests` and 51 focused regression tests.
    - Re-ran the local benchmark pack after the refactor:
-     - CGR stream slice: 55,975.34 events/sec, p99 0.0251 ms
-     - mixed replay: 102,391.87 events/sec, p99 0.0128 ms
-     - real-world simulator average: 98,047.73 events/sec, p99 0.0173 ms
+     - CGR stream slice: 49,036.58 events/sec, p99 0.0325 ms
+     - Flink runtime slice: 52,886.86 events/sec, p99 0.0292 ms
+     - mixed replay: 93,423.46 events/sec, p99 0.0162 ms
+     - real-world simulator average: 96,987.90 events/sec, p99 0.0240 ms
    - The benchmark lift is mostly from eliminating duplicate enrichment logic and keeping the runtime payload assembly on the shared path.
 
 ### Verified
