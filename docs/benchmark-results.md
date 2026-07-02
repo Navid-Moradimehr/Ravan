@@ -23,6 +23,43 @@
 | Kafka producer cache | passed |
 | Manual consumer offset commit | passed |
 
+## Distributed Runtime Alignment Run
+
+- **Date**: 2026-07-02
+- **Scope**: shared runtime enrichment contract, keyed-state Flink job, and compose-level distributed processor wiring
+
+### Targeted Regression Checks
+
+| Check | Result |
+|-------|--------|
+| `python -m compileall services tests` | passed |
+| Focused unit/regression tests | 51 passed |
+| Shared runtime enrichment contract | passed |
+| Python fallback processor compatibility | passed |
+| Flink job compile path | passed |
+
+### Latest Benchmark Runs
+
+| Benchmark | Value |
+|-----------|-------|
+| CGR stream slice throughput | 55,975.34 events/sec |
+| CGR stream slice p99 | 0.0251 ms |
+| Mixed replay throughput | 102,391.87 events/sec |
+| Mixed replay p99 | 0.0128 ms |
+| Real-world simulator average throughput | 98,047.73 events/sec |
+| Real-world simulator average p99 | 0.0173 ms |
+
+### Change Notes
+
+- The isolated stream slice now uses the shared runtime enrichment helper instead of duplicate in-line scoring and payload assembly.
+- The distributed Flink processor keys by asset identity and keeps rolling state per key, which is the architecture step toward company-scale horizontal processing.
+- The benchmark gains are mostly from eliminating duplicated work and tightening the hot record assembly path; the remaining gap to CGR remains substantial.
+- Relative to the earlier local baseline recorded in this repo, the new run improved:
+  - CGR stream slice throughput by about `163.8%`
+  - mixed replay throughput by about `55.4%`
+  - real-world simulator average throughput by about `44.8%`
+  - CGR stream slice p99 latency from `0.1050 ms` down to `0.0251 ms`
+
 Additional focused CLI regression slice:
 
 - `uv run pytest -q tests/test_project_manifest.py tests/test_datastreamctl.py`: 43 passed
@@ -183,7 +220,9 @@ Interpretation:
 The current refactor pass changed the runtime shape of the platform:
 
 - shared anomaly scoring now lives in `services/processor/scoring.py`
+- shared payload enrichment now lives in `services/processor/runtime_pipeline.py`
 - historian writes are batched in the edge ingest and runtime processor paths
+- the distributed Flink job now uses keyed state plus checkpointing while preserving the same processed-event contract
 - the service Dockerfiles now copy the full `services/` tree so imports resolve in containers
 - a local mixed-protocol benchmark pack was added at `data/benchmarks/industrial_mixed_benchmark.csv`
 

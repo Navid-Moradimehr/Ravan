@@ -97,6 +97,18 @@
      - serialization: 63,204.73 ops/sec
    - This showed the bottleneck moved from rolling-window math to record packing and serialization after the internal representation migration.
 
+20. **Distributed Flink runtime alignment**
+   - Extracted the shared runtime enrichment contract into `services/processor/runtime_pipeline.py` so the Python fallback processor and the Flink job finalize payloads in the same way.
+   - Reworked `services/processor/iot_anomaly_job.py` into a keyed-state Flink job with rolling sample state, keyed partitioning by asset identity, and checkpointing enabled.
+   - Added a `docker compose` `flink-job` service that submits the job to the local Flink cluster with the repository mounted read-only.
+   - Updated the architecture notes to reflect that the Python processor is now the fallback path and the distributed Flink job is the horizontal-scaling path.
+   - Verified the refactor with `python -m compileall services tests` and 51 focused regression tests.
+   - Re-ran the local benchmark pack after the refactor:
+     - CGR stream slice: 55,975.34 events/sec, p99 0.0251 ms
+     - mixed replay: 102,391.87 events/sec, p99 0.0128 ms
+     - real-world simulator average: 98,047.73 events/sec, p99 0.0173 ms
+   - The benchmark lift is mostly from eliminating duplicate enrichment logic and keeping the runtime payload assembly on the shared path.
+
 ### Verified
 
 - `python -m compileall services tests`: passed

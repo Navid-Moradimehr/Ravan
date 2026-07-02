@@ -9,7 +9,7 @@ from pathlib import Path
 from services.common.runtime_event import RollingWindowState, RuntimeEventRecord
 from services.datasets.replayer import map_row_to_event, read_csv_rows
 from services.edge_ingest.model import to_json_bytes, validate_event
-from services.processor.scoring import score_event, severity_for
+from services.processor.runtime_pipeline import build_runtime_event_payload
 
 
 DEFAULT_MAPPING: dict[str, str] = {
@@ -155,15 +155,12 @@ def run_benchmark(
             windows[runtime_event.device_id] = device_window
 
         temperature_avg, vibration_avg, window_size = device_window.append(runtime_event)
-        anomaly_score = score_event(runtime_event, temperature_avg, vibration_avg, detector=None)
-        runtime_event.mark_processed(
+        processed = build_runtime_event_payload(
+            runtime_event,
+            temperature_avg_c=temperature_avg,
+            vibration_avg_mm_s=vibration_avg,
             window_size=window_size,
-            temperature_avg_c=round(temperature_avg, 2),
-            vibration_avg_mm_s=round(vibration_avg, 2),
-            anomaly_score=anomaly_score,
-            severity=severity_for(anomaly_score),
         )
-        processed = runtime_event.to_dict()
         partitioning_window_scoring_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
 
         stage_started = time.perf_counter()

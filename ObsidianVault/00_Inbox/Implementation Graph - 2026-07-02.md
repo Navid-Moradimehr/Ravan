@@ -13,6 +13,8 @@ graph TD
   D[Edge Ingest] --> E[Redpanda]
   E --> F[Processor]
   F --> B
+  E --> L[Flink Job / Keyed State]
+  L --> B
   E --> G[AI Gateway]
   G --> B
   H[Project Manifest] --> I[Systemd Export]
@@ -51,6 +53,8 @@ graph TD
 - CGR gap report command that compares local benchmark numbers to the public CGR streaming claim
 - isolated CGR-style stream slice benchmark and gap report integration
 - CGR stream slice microbenchmark decomposition for validation, normalization, partitioning/window/scoring, and serialization
+- shared runtime enrichment contract extracted into `services/processor/runtime_pipeline.py`
+- distributed Flink processor wired as a keyed-state job with checkpointing while preserving the Python fallback path
 
 ## Risks Being Addressed
 

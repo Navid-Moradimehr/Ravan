@@ -16,7 +16,8 @@ Modbus TCP simulator --+                                           |
 
 The edge layer now batches historian writes instead of inserting each event
 individually on the ingest hot path. The processor and Flink job also share
-the same scoring logic so severity labels stay aligned across execution paths.
+the same enrichment contract so severity labels stay aligned across execution
+paths and the distributed Flink runtime can emit the same output shape.
 
 ## Envelope
 
@@ -42,6 +43,7 @@ Shared normalization behavior note:
 
 - `services/common/normalize.py` is used by both edge ingestion and runtime processing to map inbound events into the processor compatibility shape.
 - `services/processor/scoring.py` is the shared scoring contract for the runtime processor and Flink job.
+- `services/processor/runtime_pipeline.py` applies the shared runtime enrichment and serialized payload contract used by both execution paths.
 
 
 ## Dataset Replay Path
@@ -53,6 +55,11 @@ External datasets can be injected into the pipeline via the dataset replayer:
 
 
 This allows real-world benchmark data (e.g., AI4I 2020, NASA C-MAPSS) to flow through the same normalization, processing, and enrichment stages as live protocol data.
+
+Distributed runtime note:
+
+- The host-run Python processor remains the lightweight fallback for local development and direct benchmark work.
+- The Flink job in `services/processor/iot_anomaly_job.py` keys the stream by asset identity, maintains rolling state per key, and checkpoints state so the processor can be scaled horizontally in a real deployment.
 ## Runbook
 
 ```powershell

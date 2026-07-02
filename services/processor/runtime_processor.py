@@ -12,7 +12,8 @@ from services.common.runtime_metrics import set_consumer_lag
 from services.common.runtime_event import RollingWindowState, RuntimeEventRecord
 from services.edge_ingest.model import to_json_bytes
 from services.historian.client import insert_processed_event, insert_processed_events
-from services.processor.scoring import score_event, severity_for
+from services.processor.runtime_pipeline import build_runtime_event_payload
+from services.processor.scoring import score_event
 
 PRUNE_EVERY_N_MESSAGES = 128
 
@@ -145,15 +146,12 @@ def main() -> None:
 
             window_last_seen[device_id] = now_ts
             temperature_avg, vibration_avg, window_size = device_window.append(event)
-            anomaly_score = score_event(event, temperature_avg, vibration_avg)
-            event.mark_processed(
+            processed_event = build_runtime_event_payload(
+                event,
+                temperature_avg_c=temperature_avg,
+                vibration_avg_mm_s=vibration_avg,
                 window_size=window_size,
-                temperature_avg_c=round(temperature_avg, 2),
-                vibration_avg_mm_s=round(vibration_avg, 2),
-                anomaly_score=anomaly_score,
-                severity=severity_for(anomaly_score),
             )
-            processed_event = event.to_dict()
 
             producer.produce(
                 output_topic,

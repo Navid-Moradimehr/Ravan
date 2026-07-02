@@ -15,9 +15,9 @@ PostgreSQL orders --> Debezium CDC --> Redpanda topics
 Prometheus scrapes broker, edge, and AI metrics; Grafana and the web dashboard expose operational views.
 ```
 
-The ingest path now batches historian writes and the runtime processor and Flink
-job share a single scoring module, which reduces duplicate logic and lowers
-write amplification on the historian path.
+The ingest path now batches historian writes and the runtime processor and
+distributed Flink job share the same enrichment contract, which reduces
+duplicate logic and keeps severity output aligned across runtimes.
 
 The API service is being split into domain routers with shared runtime helpers
 so historian ingestion, asset views, and scenario endpoints are separated from
@@ -27,8 +27,8 @@ the remaining application surface without changing the public API.
 
 - Streaming: Redpanda, Redpanda Console, Schema Registry-compatible API
 - Industrial edge: local OPC UA, MQTT, and Modbus TCP simulators plus normalized edge ingest
-- Processing: Apache Flink / PyFlink plus the runtime Python processor
-- Processing internals: shared scoring module used by both processing paths
+- Processing: Apache Flink / PyFlink plus the runtime Python processor fallback
+- Processing internals: shared enrichment contract used by both processing paths
 - CDC: PostgreSQL plus Debezium Kafka Connect
 - AI: provider-neutral FastAPI gateway for OpenAI-compatible and open-weight model backends
 - AI contracts: model registry, prompt registry, structured output validation, and read-only tool/context packages for future diagnostic agents
@@ -76,7 +76,7 @@ datastreamd logs api -n 50
 datastreamd down
 ```
 
-`datastreamd` manages Python services only; run `docker compose` first for Redpanda, Postgres/TimescaleDB, and Grafana.
+`datastreamd` manages the Python service surface only; run `docker compose` first for Redpanda, Postgres/TimescaleDB, and Grafana. The distributed Flink processor is available through the compose `flink-job` service.
 
 See `docs/phase8-distribution.md` for the full distribution plan.
 
@@ -96,6 +96,8 @@ powershell -ExecutionPolicy Bypass -File scripts/site-profile-soak.ps1 -SiteProf
 ```
 
 The edge path publishes raw protocol payloads to `industrial.raw`, validated envelopes to `industrial.normalized`, compatibility events to `iot.raw`, and invalid records to `industrial.dlq`.
+
+When you want the distributed stream processor instead of the host-run Python fallback, start the Flink cluster services plus the `flink-job` compose service. The job uses keyed state, checkpointing, and the same runtime enrichment contract as the Python processor.
 
 Run the mixed replay benchmark pack:
 
