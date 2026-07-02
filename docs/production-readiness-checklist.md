@@ -42,6 +42,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Backup and restore tooling exists.
 - Metrics and observability paths exist.
 - Documentation exists for rollout, benchmark, and testing workflows.
+- Industrial benchmark comparison report exists for readiness interpretation.
 
 ## Incomplete
 

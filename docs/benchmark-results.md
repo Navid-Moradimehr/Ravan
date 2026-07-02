@@ -274,6 +274,8 @@ Interpretation:
 8. **Memory footprint is efficient**: ~0.38 KB per event
 9. **The runtime hardening pass kept the benchmark path in the same operating band** while adding safer defaults for self-hosted industrial rollout
 
+For a direct industrial-readiness interpretation and comparison against similar tool classes, see [industrial-benchmark-comparison.md](industrial-benchmark-comparison.md).
+
 ## Bottlenecks Identified
 
 1. **Mock generation rate**: Sleep-based timing limits to ~1,800/sec. For higher throughput, use batch generation or remove sleep delays.

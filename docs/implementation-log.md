@@ -65,6 +65,9 @@
    - Added `services/datasets/benchmark_converter.py` and `datastream-import convert` so AI4I, C-MAPSS, and generic CSV sources can be normalized into the platform's benchmark replay format.
    - Added CLI tests for AI4I and generic conversion paths so the importer can stage realistic benchmark packs without requiring physical PLCs or sensors.
 
+16. **Industrial benchmark comparison report**
+   - Added `docs/industrial-benchmark-comparison.md` to summarize the measured scores, compare them to broader industrial tool classes, and state the current readiness verdict.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
