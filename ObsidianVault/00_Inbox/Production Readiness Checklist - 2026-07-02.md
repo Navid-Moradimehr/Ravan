@@ -27,6 +27,7 @@ Packaging and installer work is intentionally not part of this phase.
 - site-profile benchmark calibration reports for per-site sizing recommendations
 - CGR gap report command for comparing local measurements against the public CGR streaming claim
 - Docker-backed historian write validation for the local replay path
+- JSON hot-path simplification for the default serializer path
 - dataset conversion workflow for AI4I, C-MAPSS, and generic industrial CSV slices
 - synthetic and replay datasets for regression tests
 - expanded observability for historian query latency, broker lag, and WebSocket delivery lag

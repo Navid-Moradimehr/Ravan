@@ -80,7 +80,7 @@ def to_wire_bytes(payload: BaseModel | dict[str, Any], wire_format: str | None =
 
 
 def to_json_bytes(payload: BaseModel | dict[str, Any]) -> bytes:
-    return to_wire_bytes(payload)
+    return serialize_wire_payload(payload, wire_format="json")
 
 
 def from_wire_bytes(data: bytes, wire_format: str | None = None) -> Any:

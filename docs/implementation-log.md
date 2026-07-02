@@ -1,13 +1,13 @@
 # Implementation Log
 
-## 2026-07-02 - Hot-Path Cleanup And Live Historian Write
+## 2026-07-02 - JSON Hot-Path Simplification And Live Historian Write
 
 ### Changed
 
-1. **Runtime simplification**
-   - Removed the Rust wire-serialization experiment and the extra runtime switch that gated it.
-   - Kept the Python/orjson/msgpack path as the default because it is faster for this code shape on the current host.
-   - Kept the benchmark conclusions in the docs, but removed the dead code path from the runtime.
+1. **JSON hot-path simplification**
+   - Changed `to_json_bytes()` to serialize JSON directly instead of routing through the environment-driven wire selector.
+   - Removed repeated per-event wire-format resolution from the hot JSON path.
+   - This keeps the default behavior explicit and trims a small but measurable amount of overhead.
 
 2. **Live historian validation**
    - Bootstrapped the missing `processed_events` table in the Docker-backed Postgres service.
@@ -15,16 +15,24 @@
 
 ### Verified
 
-- `uv run pytest -q tests/test_wire_format.py tests/test_end_to_end_pipeline_benchmark.py tests/test_datastreamctl.py -k "benchmark_cgr_gap_report_runs or benchmark_flink_runtime_slice_runs or benchmark_end_to_end_pipeline_runs"`: 3 passed
+- `python -m compileall services tests`: passed
+- `uv run pytest -q tests/test_wire_format.py tests/test_edge_model.py tests/test_processor_normalization.py tests/test_end_to_end_pipeline_benchmark.py tests/test_datastreamctl.py -k "benchmark_cgr_gap_report_runs or benchmark_flink_runtime_slice_runs or benchmark_end_to_end_pipeline_runs"`: 3 passed
+- `uv run python -m services.cli.datastreamctl benchmark end-to-end-pipeline --events 10000 --batch-size 256 --warmup-events 0 --wire-format json`
+  - 47,280.12 events/sec, 0.0289 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0`
+  - 54,425.26 events/sec, 0.0301 ms p99
 - `uv run python -m services.cli.datastreamctl benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
-  - default-path rerun: mixed_replay 77,864.58 events/sec, cgr_stream_slice 38,567.06 events/sec, flink_runtime_slice 43,648.20 events/sec
+  - mixed_replay 98,387.82 events/sec
+  - cgr_stream_slice 54,425.26 events/sec
+  - flink_runtime_slice 55,180.42 events/sec
+  - end_to_end_json 47,280.12 events/sec
 - `uv run python scripts/benchmark_mixed_replay.py --events 10000 --batch-size 256 --warmup-events 0 --live-db`
   - 10,069.22 events/sec
   - live DB write rate: 11,483.29 events/sec
 
 ### Notes
 
-- the same-host comparison showed the Rust wire-serialization bridge is not a net win for this repository, so it has been removed
+- the JSON hot-path simplification improved the current local benchmarks without adding extra moving parts
 - the live historian benchmark validates the Docker-backed DB path, but target industrial-network sizing is still outstanding
 
 ## 2026-07-02 - Flink Window-State Alignment and CGR/Spark Policy

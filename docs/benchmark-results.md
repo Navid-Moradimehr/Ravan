@@ -225,6 +225,39 @@ Interpretation:
 - the throughput gain did not materialize in the current Python benchmark, which means the dominant cost is still Python object work around the codec, not the serialization format alone
 - the strongest next throughput candidate is a compiled hot path for the processor and wire handling, not another Python-only micro-optimization
 
+## JSON Hot-Path Simplification Run
+
+- **Date**: 2026-07-02
+- **Scope**: remove the JSON env-resolution indirection from `to_json_bytes` and remeasure the local benchmarks
+
+### Targeted Regression Checks
+
+| Check | Result |
+|-------|--------|
+| `python -m compileall services tests` | passed |
+| Focused unit/regression tests | 3 passed |
+
+### Latest Benchmark Runs
+
+| Benchmark | Value |
+|-----------|-------|
+| End-to-end JSON throughput | 47,280.12 events/sec |
+| End-to-end JSON p99 | 0.0289 ms |
+| CGR stream slice throughput | 54,425.26 events/sec |
+| CGR stream slice p99 | 0.0301 ms |
+| Mixed replay throughput | 98,387.82 events/sec |
+| Mixed replay p99 | 0.0148 ms |
+| Flink runtime slice throughput | 55,180.42 events/sec |
+| Flink runtime slice p99 | 0.0264 ms |
+| Real-world simulator average throughput | 96,435.94 events/sec |
+| Real-world simulator average p99 | 0.0185 ms |
+
+### Change Notes
+
+- `to_json_bytes()` now serializes JSON directly instead of going through the environment-driven wire selector.
+- This removed repeated per-event wire-format resolution from the hottest non-benchmark paths.
+- The improvement is real on this host and shows up in the current replay and CGR-slice numbers.
+
 ### Latest Rerun After Binary-Contract Work
 
 Command:

@@ -63,6 +63,7 @@ graph TD
 - optional MsgPack wire-format support added for the industrial event contract
 - end-to-end pipeline benchmark added for JSON vs MsgPack comparison
 - Docker-backed historian write validation now has a successful live benchmark result after bootstrapping the missing `processed_events` table
+- JSON hot-path simplification removed repeated wire-format resolution from `to_json_bytes`
 
 ## Risks Being Addressed
 
@@ -79,7 +80,6 @@ graph TD
 - unauthenticated mutating API requests in shared deployments
 - benchmark session variance not tracked as a first-class signal
 - unclear Spark integration boundary for open-source industrial rollout
-- binary wire contract not yet proven faster than JSON on the local Python path
 
 ## Verification
 
