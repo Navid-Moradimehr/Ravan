@@ -41,6 +41,7 @@ graph TD
 - Prometheus-style metrics for historian query latency, broker consumer lag, and WebSocket delivery lag
 - explicit site boundary enforcement for manifest sources
 - length-safe default JWT placeholder and auth health strength reporting
+- real-world simulator benchmark runner for mock and mixed replay cases
 
 ## Risks Being Addressed
 
@@ -51,6 +52,7 @@ graph TD
 - deployment generation mixed into manifest modeling
 - ambiguous source/site assignments in the project manifest
 - invisible lag on historian query and stream delivery paths
+- missing runnable benchmark matrix for repeatable real-world simulation cases
 
 ## Verification
 

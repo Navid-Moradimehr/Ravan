@@ -30,6 +30,11 @@
    - Replaced the short default JWT placeholder with a length-safe non-production secret so local auth tests no longer exercise an obviously weak key.
    - Added `jwt_secret_strong_enough` to the auth status payload.
 
+8. **Real-world simulator benchmark runner**
+   - Added `services/benchmarks/real_world_simulator.py` to run repeatable mock and mixed industrial replay cases through the same replay pipeline.
+   - Added `datastreamctl benchmark real-world-simulator` and a script wrapper so the suite can be executed from the CLI.
+   - The runner reuses generated scenario CSVs and the existing mixed replay path so the simulated cases stay close to production ingest shape.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
@@ -47,6 +52,10 @@
   - 10,000 events
   - 58,548.76 events/sec
   - 40 batches
+- `uv run python -m services.cli.datastreamctl benchmark real-world-simulator --events 20 --batch-size 4 --cases mock-normal,industrial-benchmark`
+  - `mock-normal`: 12,181.75 events/sec, 5 batches, 0 invalid events
+  - `industrial-benchmark`: 54,303.57 events/sec, 5 batches, 0 invalid events
+  - average: 33,242.66 events/sec
 
 ### Notes
 

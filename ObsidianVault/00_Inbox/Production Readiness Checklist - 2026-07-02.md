@@ -20,6 +20,7 @@ Packaging and installer work is intentionally not part of this phase.
 - model gateway abstraction for open-weight and OpenAI-compatible backends
 - read-only agent infrastructure
 - local and site-oriented benchmark harnesses
+- real-world simulator benchmark runner for mock and mixed industrial replay cases
 - synthetic and replay datasets for regression tests
 - expanded observability for historian query latency, broker lag, and WebSocket delivery lag
 - every manifest source is explicitly attached to a site boundary

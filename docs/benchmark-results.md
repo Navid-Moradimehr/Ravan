@@ -33,6 +33,22 @@
 | Deployment pack matrix average replay rate | 61,813.35 events/sec |
 | Mixed replay throughput | 58,548.76 events/sec |
 
+### Real-World Simulator Benchmark
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl benchmark real-world-simulator --events 20 --batch-size 4 --cases mock-normal,industrial-benchmark
+```
+
+Latest local run on the current codebase:
+
+| Case | Source | Scenario | Events/sec | Batches | Invalid events |
+|------|--------|----------|------------|---------|----------------|
+| mock-normal | mock-generator | normal | 12,181.75 | 5 | 0 |
+| industrial-benchmark | data/benchmarks/industrial_mixed_benchmark.csv | mixed | 54,303.57 | 5 | 0 |
+| **Average** | - | - | **33,242.66** | - | - |
+
 ## Test Suite Results
 
 | Test Category | Tests | Status |

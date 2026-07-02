@@ -21,6 +21,8 @@ from services.benchmarks.deployment_pack import format_result as format_deployme
 from services.benchmarks.deployment_pack import format_matrix_result as format_deployment_pack_matrix_result
 from services.benchmarks.deployment_pack import run_benchmark as run_deployment_pack_benchmark
 from services.benchmarks.deployment_pack import run_matrix as run_deployment_pack_matrix
+from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
+from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
 from services.historian.backup import create_backup, get_walg_status, list_backups, restore_backup
 
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
@@ -555,6 +557,41 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("=" * 40)
             print(format_deployment_pack_matrix_result(result))
         return 0
+    if args.action == "real-world-simulator":
+        case_ids = [part.strip() for part in args.cases.split(",") if part.strip()] if args.cases else None
+        result = run_real_world_simulator_suite(
+            baseline_csv=Path(args.csv),
+            events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            cases=case_ids,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "cases": [
+                        {
+                            "case_id": item.case_id,
+                            "source": item.source,
+                            "scenario": item.scenario,
+                            "events": item.events,
+                            "invalid_events": item.invalid_events,
+                            "batches": item.batches,
+                            "elapsed_seconds": item.elapsed_seconds,
+                            "events_per_second": item.events_per_second,
+                            "serialized_bytes": item.serialized_bytes,
+                        }
+                        for item in result.cases
+                    ],
+                    "average_events_per_second": result.average_events_per_second,
+                },
+                indent=2,
+            ))
+        else:
+            print("real-world simulator benchmark")
+            print("=" * 40)
+            print(format_real_world_simulator_result(result))
+        return 0
     raise ValueError(f"unknown benchmark action: {args.action}")
 
 
@@ -677,6 +714,14 @@ def build_parser() -> argparse.ArgumentParser:
     deployment_pack_matrix.add_argument("--warmup-events", type=int, default=0)
     deployment_pack_matrix.add_argument("--json", action="store_true")
     deployment_pack_matrix.set_defaults(func=cmd_benchmark)
+    real_world_simulator = benchmark_sub.add_parser("real-world-simulator", help="Benchmark simulated real-world industrial scenarios")
+    real_world_simulator.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    real_world_simulator.add_argument("--events", type=int, default=10_000)
+    real_world_simulator.add_argument("--batch-size", type=int, default=256)
+    real_world_simulator.add_argument("--warmup-events", type=int, default=0)
+    real_world_simulator.add_argument("--cases", default=None, help="Comma-separated cases: mock-normal,mock-drift,mock-spike,industrial-benchmark")
+    real_world_simulator.add_argument("--json", action="store_true")
+    real_world_simulator.set_defaults(func=cmd_benchmark)
     return parser
 
 
