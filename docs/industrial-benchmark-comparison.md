@@ -75,8 +75,9 @@ What this means in practice:
 
 - the platform is currently strong for local validation, rollout gating, and pilot-sized industrial deployments
 - it is not yet at broker-tier streaming throughput parity with CGR Stream
-- latency parity is still unknown because the current benchmark suite does not capture end-to-end p99 timing
-- the new `cgr-gap-report` command now makes this gap explicit and repeatable on the local benchmark pack
+- local replay p99 is now measured and sits in the ~0.02-0.03 ms band on the current benchmark pack
+- the remaining latency gap is target-site broker/historian p99 on real plant hardware, which still needs separate validation
+- the new `cgr-gap-report` command now makes both throughput and replay-latency gaps explicit and repeatable on the local benchmark pack
 
 ## Is It Good Enough For Industrial Usage?
 

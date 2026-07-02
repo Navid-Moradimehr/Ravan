@@ -114,15 +114,24 @@ Latest local run on the current codebase:
 | Metric | Events/sec | Gap x | Gap events/sec | Gap % |
 |--------|------------|-------|----------------|-------|
 | documented_full_pipeline | 125,830.00 | 15.89 | 1,874,170.00 | 93.71 |
-| mixed_replay | 65,938.49 | 30.33 | 1,934,061.51 | 96.70 |
-| real_world_average | 68,477.85 | 29.21 | 1,931,522.15 | 96.58 |
-| site_profile_average | 67,636.95 | 29.57 | 1,932,363.05 | 96.62 |
-| site_profile_best:plant-a | 68,636.43 | 29.14 | 1,931,363.57 | 96.57 |
+| mixed_replay | 68,606.16 | 29.15 | 1,931,393.84 | 96.57 |
+| real_world_average | 68,236.68 | 29.31 | 1,931,763.32 | 96.59 |
+| site_profile_average | 65,729.12 | 30.43 | 1,934,270.88 | 96.71 |
+| site_profile_best:demo-site | 66,018.87 | 30.29 | 1,933,981.13 | 96.70 |
+
+Latency metrics from the same run:
+
+| Metric | P99 ms | Gap ms | Gap % |
+|--------|--------|--------|-------|
+| mixed_replay | 0.0211 | 79.9789 | 99.97 |
+| real_world_average | 0.0205 | 79.9795 | 99.97 |
+| site_profile_average | 0.0285 | 79.9715 | 99.96 |
+| site_profile_best:plant-a | 0.0268 | 79.9732 | 99.97 |
 
 Notes:
 
 - The command is now part of the CLI and is useful for tracking the practical gap to the public CGR Stream claim.
-- This report does not yet measure end-to-end p99 latency, so it should be treated as a throughput comparison plus a latency-gap reminder.
+- This report now measures replay p99 latency, but it still does not measure real target-site broker/historian latency.
 - The documented full-pipeline number is the latest recorded repo benchmark reference and should still be remeasured on a target broker/historian topology before sizing.
 
 ## Test Suite Results

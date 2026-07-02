@@ -55,7 +55,7 @@ Packaging and installer work is intentionally not part of this phase.
 2. Validate vendor connectors against real PLC and sensor traffic.
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish diagnostic-agent and supervised action-agent runtime paths.
-5. Add end-to-end p99 timing probes to the benchmark suite so the CGR comparison includes latency, not only throughput.
+5. Keep adding target-site broker/historian p99 probes so the CGR comparison eventually covers real plant latency, not only local replay latency.
 
 ## Real-World Simulator Benchmark Plan
 
@@ -66,6 +66,7 @@ Packaging and installer work is intentionally not part of this phase.
 - target-site replay and soak tests
 - combined release-gate and benchmark acceptance reports
 - CGR gap report and gap ratios for local benchmark packs
+- replay p99 latency probes for the local benchmark stack
 
 ## Links
 

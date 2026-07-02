@@ -71,7 +71,7 @@ These are the changes that matter most before calling the platform production-re
 2. Validate vendor connectors against real PLC and sensor traffic.
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish the diagnostic-agent and supervised action-agent runtime paths.
-5. Add end-to-end p99 latency probes for the benchmark stack so the CGR comparison includes latency, not only throughput.
+5. Keep adding target-site broker/historian p99 probes so the CGR comparison eventually covers real plant latency, not only local replay latency.
 ## Real-World Simulator Benchmark Plan
 
 ### Goals

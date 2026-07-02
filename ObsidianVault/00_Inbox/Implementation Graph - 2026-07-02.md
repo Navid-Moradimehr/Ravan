@@ -68,6 +68,7 @@ graph TD
 - focused benchmark runs
 - vault notes updated with results and decisions
 - CGR gap report verified against the current local benchmark pack
+- replay p99 latency probes added to the mixed replay and simulator benchmark paths
 
 ## Latest Results
 
@@ -99,7 +100,7 @@ graph TD
 - datastream-import now converts AI4I, C-MAPSS, and generic CSV slices into the benchmark replay format
 - `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
   - documented full pipeline reference: 125,830.00 events/sec
-  - mixed replay: 65,938.49 events/sec
-  - real-world simulator average: 68,477.85 events/sec
-  - site-profile best run: 68,636.43 events/sec
-  - latency remains unmeasured in the current suite, so the report now states that gap explicitly
+  - mixed replay: 68,606.16 events/sec, p99 0.0211 ms
+  - real-world simulator average: 68,236.68 events/sec, p99 0.0205 ms
+  - site-profile average: 65,729.12 events/sec, p99 0.0285 ms
+  - site-profile best latency run: plant-a at 0.0268 ms p99
