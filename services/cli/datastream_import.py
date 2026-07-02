@@ -266,6 +266,30 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 2
 
 
+def cmd_convert(args: argparse.Namespace) -> int:
+    input_path = Path(args.input)
+    output_path = Path(args.output)
+    if not input_path.exists():
+        print(f"file not found: {input_path}")
+        return 1
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from services.datasets.benchmark_converter import convert_dataset
+
+    result = convert_dataset(
+        input_path,
+        output_path,
+        preset=args.preset,
+        site_id=args.site_id,
+        line=args.line,
+        source_prefix=args.source_prefix,
+    )
+    print(
+        f"converted preset={result.preset} input={result.input_path} output={result.output_path} "
+        f"rows_read={result.rows_read} events_written={result.events_written}"
+    )
+    return 0
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     print("datastream-import status")
     print("=" * 64)
@@ -314,6 +338,15 @@ def build_parser() -> argparse.ArgumentParser:
     val.add_argument("path")
     val.add_argument("--format", default="ai4i", choices=["ai4i"])
     val.set_defaults(func=cmd_validate)
+
+    convert = sub.add_parser("convert", help="Convert a dataset to the benchmark CSV format")
+    convert.add_argument("input")
+    convert.add_argument("output")
+    convert.add_argument("--preset", choices=["ai4i", "cmapss", "generic"], default="ai4i")
+    convert.add_argument("--site-id", default="demo-site")
+    convert.add_argument("--line", default="line-01")
+    convert.add_argument("--source-prefix", default="dataset")
+    convert.set_defaults(func=cmd_convert)
 
     status = sub.add_parser("status", help="Show which datasets are staged locally")
     status.add_argument("--json", action="store_true")

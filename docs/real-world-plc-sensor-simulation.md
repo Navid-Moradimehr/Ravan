@@ -62,4 +62,11 @@ These are the easiest way to generate live traffic that looks like PLC and senso
 
 ## Recommended Next Step
 
-Add small transformation scripts that convert selected dataset slices into the repo's benchmark CSV format, then run the same benchmark/calibration commands against those slices to create a realistic baseline.
+Use `datastream-import convert` to normalize selected dataset slices into the repo's benchmark CSV format, then run the same benchmark/calibration commands against those slices to create a realistic baseline.
+
+Suggested order:
+
+1. Convert AI4I slices first because they are small and easy to validate.
+2. Convert C-MAPSS next for degradation-heavy runs.
+3. Convert generic SWaT/WADI-like CSV exports after the preset mapping is stable.
+4. Feed the normalized CSVs into `benchmark real-world-simulator`, `site-profile-matrix`, and `site-profile-calibration`.

@@ -93,3 +93,4 @@ graph TD
   - plant-a: observed 47,759.79 events/sec, threshold 750.0, recommended minimum 38,207.83, batch 256
   - overall: passed
 - added a public simulation source catalog covering ICS datasets, process datasets, and protocol simulators for benchmark traffic generation
+- datastream-import now converts AI4I, C-MAPSS, and generic CSV slices into the benchmark replay format

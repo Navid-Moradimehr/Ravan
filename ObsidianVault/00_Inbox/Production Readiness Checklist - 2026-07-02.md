@@ -25,6 +25,7 @@ Packaging and installer work is intentionally not part of this phase.
 - real-world simulator benchmark runner for mock and mixed industrial replay cases
 - site-profile benchmark matrix for per-site acceptance runs
 - site-profile benchmark calibration reports for per-site sizing recommendations
+- dataset conversion workflow for AI4I, C-MAPSS, and generic industrial CSV slices
 - synthetic and replay datasets for regression tests
 - expanded observability for historian query latency, broker lag, and WebSocket delivery lag
 - every manifest source is explicitly attached to a site boundary

@@ -61,6 +61,10 @@
    - Added `docs/real-world-plc-sensor-simulation.md` to catalog public ICS datasets and protocol simulators that can stand in for real plant traffic when customer hardware is unavailable.
    - The catalog separates high-fidelity ICS traces, process/fault datasets, and protocol simulators so benchmark traffic can be assembled from realistic building blocks.
 
+15. **Dataset conversion workflow**
+   - Added `services/datasets/benchmark_converter.py` and `datastream-import convert` so AI4I, C-MAPSS, and generic CSV sources can be normalized into the platform's benchmark replay format.
+   - Added CLI tests for AI4I and generic conversion paths so the importer can stage realistic benchmark packs without requiring physical PLCs or sensors.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
@@ -94,6 +98,12 @@
   - 43 passed
 - `uv run pytest -q tests/test_project_manifest.py tests/test_datastreamctl.py tests/test_site_profile_calibration_benchmark.py`
   - 45 passed
+- `uv run pytest -q tests/test_datastream_import.py tests/test_datastream_import_datasets.py`
+  - 16 passed
+- `uv run pytest -q tests/test_datastream_import.py`
+  - 13 passed
+- `uv run pytest -q tests/test_datastream_import.py tests/test_datastream_import_datasets.py tests/test_datastreamctl.py tests/test_project_manifest.py tests/test_site_profile_calibration_benchmark.py`
+  - 62 passed
 
 ### Notes
 

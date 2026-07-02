@@ -377,6 +377,24 @@ For the public release, include three testing packs:
 4. add replay profiles such as `fast`, `real-time`, and `stress`
 5. add evaluation reports per dataset run
 
+## Dataset Conversion Workflow
+
+Use the new import converter to normalize source datasets into the platform's benchmark CSV format:
+
+```bash
+datastream-import convert path\to\ai4i.csv data\benchmarks\ai4i-normalized.csv --preset ai4i --site-id demo-site --line line-01 --source-prefix ai4i
+datastream-import convert path\to\cmapss.csv data\benchmarks\cmapss-normalized.csv --preset cmapss --site-id plant-a --line line-01 --source-prefix cmapss
+datastream-import convert path\to\industrial.csv data\benchmarks\industrial-normalized.csv --preset generic --site-id plant-a
+```
+
+Recommended usage:
+
+- `ai4i` for quick predictive-maintenance validation
+- `cmapss` for run-to-failure degradation curves
+- `generic` for SWaT/WADI-style exports, historian snapshots, and custom plant CSVs
+
+The converter preserves site, line, source, and scenario boundaries so the benchmark and rollout gates can reuse the same acceptance flow.
+
 ## Practical Recommendation
 
 If only a few datasets are going to be supported first, start with:
