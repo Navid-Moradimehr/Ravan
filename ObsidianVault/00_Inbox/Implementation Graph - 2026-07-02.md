@@ -104,16 +104,16 @@ graph TD
 - datastream-import now converts AI4I, C-MAPSS, and generic CSV slices into the benchmark replay format
 - `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
   - documented full pipeline reference: 125,830.00 events/sec
-  - mixed replay: 66,100.01 events/sec, p99 0.0395 ms
-  - isolated CGR-style stream slice: 15,723.62 events/sec, p99 0.1414 ms
-  - real-world simulator average: 67,103.99 events/sec, p99 0.0355 ms
-  - site-profile average: 68,065.64 events/sec, p99 0.0364 ms
-  - site-profile best latency run: demo-site at 0.0347 ms p99
-- the isolated stream slice confirmed the heavier cost sits in validation, normalization, windowing, scoring, and serialization rather than the host machine alone
-- the latest optimization pass stayed inside benchmark variance for replay, but the isolated slice shows the stack itself is the dominant bottleneck
+  - mixed replay: 65,279.18 events/sec, p99 0.0247 ms
+  - isolated CGR-style stream slice: 21,991.56 events/sec, p99 0.0670 ms
+  - real-world simulator average: 68,040.74 events/sec, p99 0.0254 ms
+  - site-profile average: 70,201.29 events/sec, p99 0.0229 ms
+  - site-profile best latency run: demo-site at 0.0200 ms p99
+- the internal record migration was compatible with the existing tests and benchmark commands
+- the isolated stream slice improved materially after the migration and serialization cleanup
 - `benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0`
-  - mapping + validation: 139,238.92 ops/sec
-  - normalization: 116,649.36 ops/sec
-  - partitioning + rolling window + scoring: 29,970.54 ops/sec
-  - serialization: 91,859.42 ops/sec
-- the rolling window + stream routing + scoring path is the dominant cost inside the isolated slice
+  - mapping + validation: 139,361.17 ops/sec
+  - record build: 61,788.66 ops/sec
+  - partitioning + rolling window + scoring: 160,426.09 ops/sec
+  - serialization: 63,833.73 ops/sec
+- the bottleneck moved from rolling-window math to record packing and serialization after the migration

@@ -72,13 +72,13 @@
    - Added `services/benchmarks/cgr_gap.py`, `datastreamctl benchmark cgr-gap-report`, and `scripts/benchmark_cgr_gap_report.py` to compare local benchmark output against the public CGR Stream claim.
    - Updated the benchmark and readiness docs with a current 10k-event comparison run:
      - documented full pipeline reference: 125,830.00 events/sec
-     - mixed replay: 66,100.01 events/sec with 0.0395 ms p99
-     - isolated CGR-style stream slice: 15,723.62 events/sec with 0.1414 ms p99
-     - real-world simulator average: 67,103.99 events/sec with 0.0355 ms p99
-     - site-profile average: 68,065.64 events/sec with 0.0364 ms p99
-     - site-profile best latency run: demo-site at 0.0347 ms p99
+     - mixed replay: 65,279.18 events/sec with 0.0247 ms p99
+     - isolated CGR-style stream slice: 21,991.56 events/sec with 0.0670 ms p99
+     - real-world simulator average: 68,040.74 events/sec with 0.0254 ms p99
+     - site-profile average: 70,201.29 events/sec with 0.0229 ms p99
+     - site-profile best latency run: demo-site at 0.0200 ms p99
    - The report now measures replay p99 latency directly while still leaving real target-site broker/historian latency for hardware validation.
-   - The latest optimization pass did not produce a material throughput gain; the observed movement is within benchmark variance, which points to stack redesign rather than another incremental patch.
+   - The latest optimization pass improved the isolated stream slice materially once the internal record migration and serialization cleanup landed.
 
 18. **Isolated CGR-style stream slice benchmark**
    - Added `services/benchmarks/cgr_stream_slice.py`, `datastreamctl benchmark cgr-stream-slice`, and a CLI test to measure the specific connector + validation + normalization + rolling-window + scoring path in isolation.
@@ -91,11 +91,11 @@
    - Extended `services/benchmarks/cgr_stream_slice.py` to measure mapping/validation, normalization, partitioning+windowing+scoring, and serialization separately.
    - Added stage breakdown output to `datastreamctl benchmark cgr-stream-slice` and the CLI JSON path so operators can see which part dominates on their workload.
    - Latest local run on the current codebase:
-     - mapping + validation: 139,238.92 ops/sec
-     - normalization: 116,649.36 ops/sec
-     - partitioning + rolling window + scoring: 29,970.54 ops/sec
-     - serialization: 91,859.42 ops/sec
-   - This showed the rolling window + stream routing + scoring path is the primary bottleneck inside the isolated slice.
+     - mapping + validation: 139,361.17 ops/sec
+     - record build: 61,788.66 ops/sec
+     - partitioning + rolling window + scoring: 160,426.09 ops/sec
+     - serialization: 63,833.73 ops/sec
+   - This showed the bottleneck moved from rolling-window math to record packing and serialization after the internal representation migration.
 
 ### Verified
 

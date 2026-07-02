@@ -114,28 +114,28 @@ Latest local run on the current codebase:
 | Metric | Events/sec | Gap x | Gap events/sec | Gap % |
 |--------|------------|-------|----------------|-------|
 | documented_full_pipeline | 125,830.00 | 15.89 | 1,874,170.00 | 93.71 |
-| mixed_replay | 66,100.01 | 30.26 | 1,933,899.99 | 96.69 |
-| cgr_stream_slice | 15,723.62 | 127.20 | 1,984,276.38 | 99.21 |
-| real_world_average | 67,103.99 | 29.80 | 1,932,896.01 | 96.64 |
-| site_profile_average | 68,065.64 | 29.38 | 1,931,934.36 | 96.60 |
-| site_profile_best:demo-site | 68,223.51 | 29.32 | 1,931,776.49 | 96.59 |
+| mixed_replay | 65,279.18 | 30.64 | 1,934,720.82 | 96.74 |
+| cgr_stream_slice | 21,991.56 | 90.94 | 1,978,008.44 | 98.90 |
+| real_world_average | 68,040.74 | 29.39 | 1,931,959.26 | 96.60 |
+| site_profile_average | 70,201.29 | 28.49 | 1,929,798.71 | 96.49 |
+| site_profile_best:demo-site | 70,489.06 | 28.37 | 1,929,510.94 | 96.48 |
 
 Latency metrics from the same run:
 
 | Metric | P99 ms | Gap ms | Gap % |
 |--------|--------|--------|-------|
-| mixed_replay | 0.0395 | 79.9605 | 99.95 |
-| cgr_stream_slice | 0.1414 | 79.8586 | 99.82 |
-| real_world_average | 0.0355 | 79.9645 | 99.96 |
-| site_profile_average | 0.0364 | 79.9636 | 99.95 |
-| site_profile_best:demo-site | 0.0347 | 79.9653 | 99.96 |
+| mixed_replay | 0.0247 | 79.9753 | 99.97 |
+| cgr_stream_slice | 0.0670 | 79.9330 | 99.92 |
+| real_world_average | 0.0254 | 79.9746 | 99.97 |
+| site_profile_average | 0.0229 | 79.9771 | 99.97 |
+| site_profile_best:demo-site | 0.0200 | 79.9800 | 99.98 |
 
 Notes:
 
 - The command is now part of the CLI and is useful for tracking the practical gap to the public CGR Stream claim.
 - This report now measures replay p99 latency, but it still does not measure real target-site broker/historian latency.
-- The isolated `cgr_stream_slice` benchmark shows the connector + validation + normalization + rolling window + scoring path is materially slower than the pure replay path, so the gap is coming from the software stack rather than just the host machine.
-- The latest session stayed in the same performance band as the prior run for the replay path; the observed movement is within benchmark variance, not a material throughput win.
+- The isolated `cgr_stream_slice` benchmark now shows the record-building and serialization costs more clearly than the old dict path. The bottleneck shifted away from rolling-window math once the internal representation was introduced.
+- The latest session improved the isolated slice materially, so the migration is paying off. The remaining gap is now mostly record assembly and payload serialization rather than window recomputation.
 - The documented full-pipeline number is the latest recorded repo benchmark reference and should still be remeasured on a target broker/historian topology before sizing.
 
 ### CGR Stream Slice Breakdown
@@ -150,17 +150,17 @@ Latest local run on the current codebase:
 
 | Stage | Ops | Avg ms | P50 ms | P95 ms | P99 ms | Max ms | Ops/sec |
 |-------|-----|--------|--------|--------|--------|--------|---------|
-| mapping_validation | 10,000 | 0.0072 | 0.0066 | 0.0096 | 0.0160 | 0.3135 | 139,238.92 |
-| normalization | 10,000 | 0.0086 | 0.0080 | 0.0112 | 0.0189 | 0.3095 | 116,649.36 |
-| partitioning_window_scoring | 10,000 | 0.0334 | 0.0320 | 0.0434 | 0.0538 | 0.8415 | 29,970.54 |
-| serialization | 10,000 | 0.0109 | 0.0104 | 0.0143 | 0.0208 | 0.0928 | 91,859.42 |
+| mapping_validation | 10,000 | 0.0072 | 0.0067 | 0.0093 | 0.0125 | 0.2765 | 139,361.17 |
+| record_build | 10,000 | 0.0162 | 0.0156 | 0.0199 | 0.0249 | 0.3574 | 61,788.66 |
+| partitioning_window_scoring | 10,000 | 0.0062 | 0.0058 | 0.0080 | 0.0104 | 0.3143 | 160,426.09 |
+| serialization | 10,000 | 0.0157 | 0.0151 | 0.0194 | 0.0239 | 0.1570 | 63,833.73 |
 
 Interpretation:
 
-- the rolling window, stream-key derivation, and scoring slice is the dominant cost
-- validation and normalization are not the main bottleneck on this dataset
-- serialization is meaningful but still below the windowing/scoring cost
-- if the next optimization effort is about raw throughput, this is the stage that deserves the first redesign pass
+- record build and serialization are now the main costs in the migrated path
+- the rolling window and scoring logic is no longer the dominant slice after the internal record migration
+- validation is still not the main bottleneck on this dataset
+- if the next optimization effort is about raw throughput, record packing and payload encoding deserve the first redesign pass
 
 ## Test Suite Results
 
