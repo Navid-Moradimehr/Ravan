@@ -8,9 +8,7 @@ import json
 from contextlib import asynccontextmanager
 from typing import Any
 
-import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi import Depends
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 
@@ -78,6 +76,16 @@ def _prune_legacy_routes() -> None:
         "/api/v1/reports/generate/{template_id}",
         "/api/v1/reports",
         "/api/v1/reports/schedule/{template_id}",
+        "/api/v1/webhooks",
+        "/api/v1/webhooks/{hook_id}",
+        "/api/v1/webhooks/test/{hook_id}",
+        "/api/v1/notifications",
+        "/api/v1/annotations",
+        "/api/v1/annotations/{annotation_id}",
+        "/api/v1/users",
+        "/api/v1/users/{user_id}",
+        "/api/v1/auth/login",
+        "/api/v1/audit-logs",
     }
     app.router.routes = [
         route
@@ -148,50 +156,6 @@ def _parse_cors_origins(raw: str | None) -> list[str]:
         raw = os.getenv("DATASTREAM_CORS_ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
     return origins
-
-
-class WebhookConfig(BaseModel):
-    url: str
-    events: list[str] = Field(default_factory=lambda: ["alarm", "anomaly"])
-    headers: dict[str, str] = Field(default_factory=dict)
-
-class OutboundBridgeConfig(BaseModel):
-    mqtt_host: str | None = None
-    mqtt_port: int = 1883
-    mqtt_use_tls: bool = False
-    mqtt_topic_template: str = "industrial/{{asset_id}}/{{tag}}"
-    amqp_url: str | None = None
-    amqp_exchange: str = "industrial.events"
-    amqp_routing_key: str = "{{asset_id}}.{{tag}}"
-
-
-class NotificationConfig(BaseModel):
-    email: str | None = None
-    webhook_url: str | None = None
-    slack_webhook: str | None = None
-    teams_webhook: str | None = None
-    events: list[str] = Field(default_factory=lambda: ["alarm", "anomaly"])
-
-
-# External REST API models
-class EventIngestRequest(BaseModel):
-    source_protocol: str = "api"
-    source_id: str
-    asset_id: str
-    tag: str
-    value: float
-    quality: str = "good"
-    unit: str = ""
-    site: str = "default"
-    line: str = "line-01"
-    ts_source: str | None = None
-
-class KPIQueryRequest(BaseModel):
-    kpi_name: str
-    asset_id: str | None = None
-    tag: str | None = None
-    start_time: str | None = None
-    end_time: str | None = None
 
 class HealthResponse(BaseModel):
     status: str
@@ -322,61 +286,6 @@ def get_tls_context() -> ssl.SSLContext | None:
     return None
 
 
-webhook_registry: dict[str, WebhookConfig] = {}
-notification_registry: dict[str, NotificationConfig] = {}
-
-
-WEBHOOK_STORE_PATH = os.getenv("WEBHOOK_STORE_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "webhooks.json"))
-NOTIFICATION_STORE_PATH = os.getenv("NOTIFICATION_STORE_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "notifications.json"))
-
-
-def _persist_registry(path: str, data: dict[str, Any]) -> None:
-    try:
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2)
-    except Exception:
-        pass
-
-
-def _load_registry(path: str) -> dict[str, Any]:
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:
-        return {}
-
-
-def _persist_webhooks() -> None:
-    _persist_registry(WEBHOOK_STORE_PATH, {k: v.model_dump() for k, v in webhook_registry.items()})
-
-
-def _persist_notifications() -> None:
-    _persist_registry(NOTIFICATION_STORE_PATH, {k: v.model_dump() for k, v in notification_registry.items()})
-
-
-def _hydrate_webhooks() -> None:
-    raw = _load_registry(WEBHOOK_STORE_PATH)
-    for hook_id, cfg in raw.items():
-        try:
-            webhook_registry[hook_id] = WebhookConfig(**cfg)
-        except Exception:
-            pass
-
-
-def _hydrate_notifications() -> None:
-    raw = _load_registry(NOTIFICATION_STORE_PATH)
-    for notif_id, cfg in raw.items():
-        try:
-            notification_registry[notif_id] = NotificationConfig(**cfg)
-        except Exception:
-            pass
-
-
-_hydrate_webhooks()
-_hydrate_notifications()
-
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     tasks = [
@@ -415,6 +324,7 @@ from services.api_service.routers.search import router as search_router
 from services.api_service.routers.retrieval import router as retrieval_router
 from services.api_service.routers.external import router as external_router
 from services.api_service.routers.support import router as support_router
+from services.api_service.routers.admin import router as admin_router
 
 app.include_router(historian_router)
 app.include_router(operations_router)
@@ -424,6 +334,7 @@ app.include_router(search_router)
 app.include_router(retrieval_router)
 app.include_router(external_router)
 app.include_router(support_router)
+app.include_router(admin_router)
 from services.api_service.routers.historian import ingest_batch, ingest_event
 from services.api_service.ops_runtime import _render_topic
 
@@ -579,267 +490,6 @@ async def health() -> HealthResponse:
     )
 
 
-@app.post("/api/v1/webhooks")
-async def register_webhook(config: WebhookConfig) -> dict[str, str]:
-    import uuid
-    hook_id = str(uuid.uuid4())[:8]
-    webhook_registry[hook_id] = config
-    _persist_webhooks()
-    return {"id": hook_id, "status": "registered"}
-
-
-@app.get("/api/v1/webhooks")
-async def list_webhooks() -> dict[str, Any]:
-    return {"webhooks": {k: v.model_dump() for k, v in webhook_registry.items()}}
-
-
-@app.delete("/api/v1/webhooks/{hook_id}")
-async def delete_webhook(hook_id: str) -> dict[str, str]:
-    if hook_id not in webhook_registry:
-        raise HTTPException(status_code=404, detail="Webhook not found")
-    del webhook_registry[hook_id]
-    _persist_webhooks()
-    return {"status": "deleted"}
-
-
-@app.post("/api/v1/notifications")
-async def register_notification(config: NotificationConfig) -> dict[str, str]:
-    import uuid
-    notif_id = str(uuid.uuid4())[:8]
-    notification_registry[notif_id] = config
-    _persist_notifications()
-    return {"id": notif_id, "status": "registered"}
-
-
-@app.get("/api/v1/notifications")
-async def list_notifications() -> dict[str, Any]:
-    return {"notifications": {k: v.model_dump() for k, v in notification_registry.items()}}
-
-
-@app.post("/api/v1/webhooks/test/{hook_id}")
-async def test_webhook(hook_id: str) -> dict[str, str]:
-    if hook_id not in webhook_registry:
-        raise HTTPException(status_code=404, detail="Webhook not found")
-    config = webhook_registry[hook_id]
-    payload = {
-        "event": "test",
-        "message": "Webhook test from Local Stream Engine",
-        "timestamp": "2024-01-01T00:00:00Z",
-    }
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.post(config.url, json=payload, headers=config.headers, timeout=10.0)
-            return {"status": "sent", "http_status": resp.status_code}
-        except Exception as e:
-            return {"status": "failed", "error": str(e)}
-
-
-def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
-    import uuid as _uuid
-
-    # The edge model package is referenced two ways depending on layout:
-    # - dev/repo root: services.edge_ingest.model
-    # - flattened Docker image: edge_ingest.model
-    try:
-        from services.edge_ingest.model import validate_event, to_json_bytes, utc_now  # type: ignore
-    except Exception:
-        from edge_ingest.model import validate_event, to_json_bytes, utc_now  # type: ignore
-    try:
-        from services.historian.client import insert_industrial_event  # type: ignore
-    except Exception:
-        from historian.client import insert_industrial_event  # type: ignore
-    try:
-        from services.historian.client import insert_dead_letter  # type: ignore
-    except Exception:
-        from historian.client import insert_dead_letter  # type: ignore
-
-    brokers = os.getenv("REDPANDA_BROKERS", "localhost:19092")
-    normalized_topic = os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized")
-    raw_topic = os.getenv("INDUSTRIAL_RAW_TOPIC", "industrial.raw")
-    legacy_topic = os.getenv("IOT_TOPIC", "iot.raw")
-    dlq_topic = os.getenv("INDUSTRIAL_DLQ_TOPIC", "industrial.dlq")
-
-    payload = {
-        "event_id": str(_uuid.uuid4()),
-        "source_protocol": event.get("source_protocol", "api"),
-        "source_id": event.get("source_id", ""),
-        "asset_id": event.get("asset_id", ""),
-        "tag": event.get("tag", ""),
-        "value": event.get("value", 0),
-        "quality": event.get("quality", "good"),
-        "unit": event.get("unit", ""),
-        "site": event.get("site", "demo-site"),
-        "line": event.get("line", "line-01"),
-        "ts_source": event.get("ts_source") or utc_now(),
-    }
-
-    validated, dlq = validate_event(payload)
-    event_id = str(_uuid.uuid4())
-    if dlq is not None:
-        try:
-            _publish_kafka_fresh(brokers, dlq_topic, str(payload.get("source_id", "api")).encode(), to_json_bytes(dlq))
-        except Exception:
-            pass
-        try:
-            insert_dead_letter({**dlq.model_dump(mode="json"), "origin": "api"})
-        except Exception:
-            pass
-        return {"status": "rejected", "event_id": dlq.event_id, "reason": "validation_failed"}
-
-    assert validated is not None
-    event_dict = validated.model_dump(mode="json")
-    try:
-        insert_industrial_event(event_dict)
-    except Exception:
-        pass
-
-    key = validated.asset_id.encode("utf-8")
-    try:
-        _publish_kafka(brokers, raw_topic, key, to_json_bytes(event_dict))
-        _publish_kafka(brokers, normalized_topic, key, to_json_bytes(validated))
-        _publish_kafka(brokers, legacy_topic, key, to_json_bytes(_to_legacy_iot_event(validated)))
-    except Exception as e:
-        return {"status": "stored_only", "event_id": event_id, "warning": f"kafka_publish_failed: {e}"}
-    return {"status": "ingested", "event_id": event_id}
-
-
-def _publish_kafka(brokers: str, topic: str, key: bytes, value: bytes) -> None:
-    from confluent_kafka import Producer
-    producer = Producer({"bootstrap.servers": brokers, "client.id": "api-ingest"})
-    producer.produce(topic, key=key, value=value)
-    producer.flush(5)
-
-
-def _publish_kafka_fresh(brokers: str, topic: str, key: bytes, value: bytes) -> None:
-    from confluent_kafka import Producer
-    producer = Producer({"bootstrap.servers": brokers, "client.id": "api-ingest"})
-    producer.produce(topic, key=key, value=value)
-    producer.flush(5)
-
-
-def _to_legacy_iot_event(event: Any) -> dict[str, Any]:
-    """Local fallback for the legacy transform (no hard import dependency)."""
-    try:
-        from common.normalize import to_legacy_iot_event
-        return to_legacy_iot_event(event)
-    except Exception:
-        d = event.model_dump(mode="json") if hasattr(event, "model_dump") else dict(event)
-        return {
-            "event_id": d.get("event_id"),
-            "device_id": d.get("asset_id", "unknown-asset"),
-            "site_id": d.get("site", "demo-site"),
-            "timestamp": d.get("ts_source"),
-            "source_protocol": d.get("source_protocol", "unknown"),
-            "quality": d.get("quality", "unknown"),
-            "schema_version": d.get("schema_version", 1),
-            "temperature_c": 0.0,
-            "vibration_mm_s": 0.0,
-            "pressure_bar": 0.0,
-        }
-
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=API_PORT)
-
-# Collaboration endpoints
-@app.get("/api/v1/annotations")
-async def list_annotations(target_type: str | None = None, target_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
-    from api_service.collaboration import collaboration_store
-    return collaboration_store.list_annotations(target_type, target_id, limit)
-
-@app.post("/api/v1/annotations")
-async def create_annotation(req: dict[str, Any]) -> dict[str, str]:
-    from api_service.collaboration import collaboration_store
-    ann = collaboration_store.add_annotation(
-        target_type=req.get("target_type", "event"),
-        target_id=req.get("target_id", ""),
-        user_id=req.get("user_id", "anonymous"),
-        username=req.get("username", "Anonymous"),
-        text=req.get("text", ""),
-        tags=req.get("tags", []),
-    )
-    return {"status": "created", "annotation_id": ann.annotation_id}
-
-@app.delete("/api/v1/annotations/{annotation_id}")
-async def delete_annotation(annotation_id: str) -> dict[str, str]:
-    from api_service.collaboration import collaboration_store
-    collaboration_store.delete_annotation(annotation_id)
-    return {"status": "deleted"}
-
-try:
-    from rbac import Role, Permission
-except ImportError:
-    from services.api_service.rbac import Role, Permission  # type: ignore
-try:
-    from auth import require_permission
-except ImportError:
-    from services.api_service.auth import require_permission  # type: ignore
-
-class CreateUserRequest(BaseModel):
-    user_id: str
-    username: str
-    role: str
-    email: str | None = None
-    password: str | None = None
-
-class AuthRequest(BaseModel):
-    username: str
-    password: str
-
-@app.post("/api/v1/users")
-async def create_user_endpoint(
-    req: CreateUserRequest,
-    _admin: Any = Depends(require_permission(Permission.ADMIN)),
-) -> dict[str, Any]:
-    """Create a new user (admin only)."""
-    from auth import create_user, hash_password
-    from rbac import Role
-    role = Role(req.role)
-    user = create_user(req.user_id, req.username, role, req.email, req.password)
-    return user.to_dict()
-
-@app.get("/api/v1/users/{user_id}")
-async def get_user_endpoint(
-    user_id: str,
-    _admin: Any = Depends(require_permission(Permission.ADMIN)),
-) -> dict[str, Any]:
-    """Get a user by ID (admin only)."""
-    from auth import get_user
-    user = get_user(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user.to_dict()
-
-@app.post("/api/v1/auth/login")
-async def login(req: AuthRequest) -> dict[str, Any]:
-    """Authenticate and return a JWT access token."""
-    from auth import authenticate_user, create_access_token
-    from auth import audit_log
-    user = authenticate_user(req.username, req.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    audit_log.log(user.user_id, "login", "auth")
-    token = create_access_token(user.user_id, user.role.value)
-    return {"token": token, "user": user.to_dict()}
-
-@app.get("/api/v1/audit-logs")
-async def get_audit_logs(
-    limit: int = 100,
-    _admin: Any = Depends(require_permission(Permission.ADMIN)),
-) -> list[dict[str, Any]]:
-    """List audit logs (admin only)."""
-    from auth import audit_log
-    return audit_log.get_logs(limit)
-
-
-try:
-    from rbac import Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission
-except ImportError:
-    from services.api_service.rbac import (  # type: ignore
-        Role, Permission, User, AuditLog, audit_log, create_user, get_user, authenticate_user, require_permission,
-    )
-from fastapi import Depends
-
-
-_prune_legacy_routes()

@@ -110,6 +110,15 @@
      - real-world simulator average: 96,987.90 events/sec, p99 0.0240 ms
    - The benchmark lift is mostly from eliminating duplicate enrichment logic and keeping the runtime payload assembly on the shared path.
 
+21. **API admin split and deployment cleanup**
+   - Moved webhook, notification, annotation, user, login, and audit endpoints out of `services/api_service/main.py` into `services/api_service/routers/admin.py`.
+   - Kept the app bootstrap focused on middleware, health, metrics, websocket streams, and router composition.
+   - Added a dedicated Flink deployment image at `docker/Dockerfile.flink-job` and switched compose to build it instead of relying on the stock image plus live source mount.
+   - Ran the current session benchmarks again and recorded the run-to-run variance explicitly:
+     - CGR stream slice improved by about `2.7%` versus the previous session
+     - Flink runtime slice regressed by about `4.9%` versus the previous session
+   - The current evidence says this is session variance, not a proven architecture regression, because the CGR and Flink slices moved in opposite directions under the same general host conditions.
+
 ### Verified
 
 - `python -m compileall services tests`: passed

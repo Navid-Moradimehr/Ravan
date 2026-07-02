@@ -55,6 +55,8 @@ graph TD
 - CGR stream slice microbenchmark decomposition for validation, normalization, partitioning/window/scoring, and serialization
 - shared runtime enrichment contract extracted into `services/processor/runtime_pipeline.py`
 - distributed Flink processor wired as a keyed-state job with checkpointing while preserving the Python fallback path
+- API admin/config endpoints moved out of `services/api_service/main.py` into `services/api_service/routers/admin.py`
+- dedicated Flink deployment image added for compose-based distributed runtime runs
 
 ## Risks Being Addressed
 

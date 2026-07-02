@@ -42,10 +42,10 @@
 
 | Benchmark | Value |
 |-----------|-------|
-| CGR stream slice throughput | 49,036.58 events/sec |
-| CGR stream slice p99 | 0.0325 ms |
-| Flink runtime slice throughput | 52,886.86 events/sec |
-| Flink runtime slice p99 | 0.0292 ms |
+| CGR stream slice throughput | 50,364.08 events/sec |
+| CGR stream slice p99 | 0.0338 ms |
+| Flink runtime slice throughput | 50,276.67 events/sec |
+| Flink runtime slice p99 | 0.0364 ms |
 | Mixed replay throughput | 93,423.46 events/sec |
 | Mixed replay p99 | 0.0162 ms |
 | Real-world simulator average throughput | 96,987.90 events/sec |
@@ -57,12 +57,11 @@
 - The distributed Flink processor keys by asset identity and keeps rolling state per key, which is the architecture step toward company-scale horizontal processing.
 - The benchmark gains are mostly from eliminating duplicated work and tightening the hot record assembly path; the remaining gap to CGR remains substantial.
 - Relative to the earlier local baseline recorded in this repo, the new run improved:
-  - CGR stream slice throughput by about `132.0%`
-  - Flink runtime slice throughput by about `139.9%`
-  - mixed replay throughput by about `59.6%`
-  - real-world simulator average throughput by about `43.3%`
-  - CGR stream slice p99 latency from `0.1050 ms` down to `0.0325 ms`
-  - Flink runtime slice p99 latency from `0.1050 ms` down to `0.0292 ms`
+  - CGR stream slice throughput by about `2.7%` versus the previous session
+  - Flink runtime slice throughput changed by about `-4.9%` versus the previous session
+  - CGR stream slice p99 changed by about `+3.98%` versus the previous session
+  - Flink runtime slice p99 changed by about `+24.2%` versus the previous session
+- The mixed replay and real-world simulator baselines were not rerun in this session, so the last recorded numbers remain the reference point for those paths.
 
 Additional focused CLI regression slice:
 
@@ -156,8 +155,8 @@ Latest local run on the current codebase:
 |--------|------------|-------|----------------|-------|
 | documented_full_pipeline | 125,830.00 | 15.89 | 1,874,170.00 | 93.71 |
 | mixed_replay | 93,423.46 | 21.41 | 1,906,576.54 | 95.33 |
-| cgr_stream_slice | 49,036.58 | 40.79 | 1,950,963.42 | 97.55 |
-| flink_runtime_slice | 52,886.86 | 37.82 | 1,947,113.14 | 97.36 |
+| cgr_stream_slice | 50,364.08 | 39.71 | 1,949,635.92 | 97.48 |
+| flink_runtime_slice | 50,276.67 | 39.78 | 1,949,723.33 | 97.49 |
 | real_world_average | 96,987.90 | 20.62 | 1,903,012.10 | 95.15 |
 | site_profile_average | 98,080.16 | 20.39 | 1,901,919.84 | 95.10 |
 | site_profile_best:plant-a | 98,163.61 | 20.37 | 1,901,836.39 | 95.09 |
@@ -167,8 +166,8 @@ Latency metrics from the same run:
 | Metric | P99 ms | Gap ms | Gap % |
 |--------|--------|--------|-------|
 | mixed_replay | 0.0162 | 79.9838 | 99.98 |
-| cgr_stream_slice | 0.0325 | 79.9675 | 99.96 |
-| flink_runtime_slice | 0.0292 | 79.9708 | 99.96 |
+| cgr_stream_slice | 0.0338 | 79.9662 | 99.96 |
+| flink_runtime_slice | 0.0364 | 79.9636 | 99.95 |
 | real_world_average | 0.0240 | 79.9760 | 99.97 |
 | site_profile_average | 0.0187 | 79.9813 | 99.98 |
 | site_profile_best:demo-site | 0.0183 | 79.9817 | 99.98 |
@@ -179,7 +178,7 @@ Notes:
 - This report now measures replay p99 latency, but it still does not measure real target-site broker/historian latency.
 - The isolated `cgr_stream_slice` benchmark still shows the record-building and serialization costs more clearly than the old dict path. The bottleneck shifted away from rolling-window math once the internal representation was introduced.
 - The distributed Flink runtime slice now has its own benchmark line, so the local measurements separate the fallback Python path from the keyed-state contract.
-- The migrated path improved the isolated slice by `32.28%` in throughput and `69.05%` in p99 latency compared with the earlier pre-migration baseline. The remaining gap is now mostly record assembly and payload serialization rather than window recomputation.
+- This session shows run-to-run variance: the CGR slice improved a little, while the Flink slice slowed down relative to the previous session. That is not enough to call a structural regression yet, but it does mean the new Flink deployment path should be re-benchmarked under fixed host load before any claim of improvement.
 - The documented full-pipeline number is the latest recorded repo benchmark reference and should still be remeasured on a target broker/historian topology before sizing.
 
 ### CGR Stream Slice Breakdown
