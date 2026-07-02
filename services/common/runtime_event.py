@@ -20,6 +20,39 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _build_record_from_mapping(event: dict[str, Any]) -> "RuntimeEventRecord":
+    get = event.get
+    tag = str(get("tag", ""))
+    value = _to_float(get("value", 0))
+    record = RuntimeEventRecord(
+        event_id=str(get("event_id", "")),
+        source_protocol=str(get("source_protocol", "unknown")),
+        source_id=str(get("source_id", get("asset_id", "unknown-source"))),
+        asset_id=str(get("asset_id", "unknown-asset")),
+        tag=tag,
+        value=value,
+        quality=str(get("quality", "good")),
+        unit=str(get("unit", "") or ""),
+        site_id=str(get("site", get("site_id", "demo-site"))),
+        line=str(get("line", get("line_id", "line-01"))),
+        schema_version=_to_int(get("schema_version", 1), 1),
+        timestamp=str(get("ts_source") or get("ts_ingest") or ""),
+        device_id=str(get("asset_id", get("device_id", "unknown-asset"))),
+        project_id=str(get("project_id", get("site", get("site_id", ""))) or ""),
+        fault_type=str(get("fault_type", "normal")),
+        scenario_id=str(get("scenario_id", "sc-000")),
+        ground_truth_severity=str(get("ground_truth_severity", "normal")),
+    )
+    legacy_field = _legacy_field_for_tag(tag)
+    if legacy_field == "temperature_c":
+        record.temperature_c = value
+    elif legacy_field == "vibration_mm_s":
+        record.vibration_mm_s = value
+    elif legacy_field == "pressure_bar":
+        record.pressure_bar = value
+    return record
+
+
 @dataclass(slots=True)
 class RuntimeEventRecord:
     event_id: str
@@ -69,57 +102,18 @@ class RuntimeEventRecord:
 
     @classmethod
     def from_raw_mapping(cls, event: dict[str, Any]) -> "RuntimeEventRecord":
-        tag = str(event.get("tag", ""))
-        value = _to_float(event.get("value", 0))
-        record = cls(
-            event_id=str(event.get("event_id", "")),
-            source_protocol=str(event.get("source_protocol", "unknown")),
-            source_id=str(event.get("source_id", event.get("asset_id", "unknown-source"))),
-            asset_id=str(event.get("asset_id", "unknown-asset")),
-            tag=tag,
-            value=value,
-            quality=str(event.get("quality", "good")),
-            unit=str(event.get("unit", "") or ""),
-            site_id=str(event.get("site", event.get("site_id", "demo-site"))),
-            line=str(event.get("line", event.get("line_id", "line-01"))),
-            schema_version=_to_int(event.get("schema_version", 1), 1),
-            timestamp=str(event.get("ts_source") or event.get("ts_ingest") or ""),
-            device_id=str(event.get("asset_id", event.get("device_id", "unknown-asset"))),
-            project_id=str(event.get("project_id", event.get("site", event.get("site_id", ""))) or ""),
-            fault_type=str(event.get("fault_type", "normal")),
-            scenario_id=str(event.get("scenario_id", "sc-000")),
-            ground_truth_severity=str(event.get("ground_truth_severity", "normal")),
-        )
-        legacy_field = _legacy_field_for_tag(tag)
-        if legacy_field == "temperature_c":
-            record.temperature_c = value
-        elif legacy_field == "vibration_mm_s":
-            record.vibration_mm_s = value
-        elif legacy_field == "pressure_bar":
-            record.pressure_bar = value
-        return record
+        return _build_record_from_mapping(event)
 
     @classmethod
     def from_industrial_event(cls, event: Any) -> "RuntimeEventRecord":
-        raw = {
-            "event_id": getattr(event, "event_id", ""),
-            "source_protocol": getattr(event, "source_protocol", "unknown"),
-            "source_id": getattr(event, "source_id", getattr(event, "asset_id", "unknown-source")),
-            "asset_id": getattr(event, "asset_id", "unknown-asset"),
-            "tag": getattr(event, "tag", ""),
-            "value": getattr(event, "value", 0),
-            "quality": getattr(event, "quality", "good"),
-            "unit": getattr(event, "unit", ""),
-            "site": getattr(event, "site", "demo-site"),
-            "line": getattr(event, "line", "line-01"),
-            "schema_version": getattr(event, "schema_version", 1),
-            "ts_source": getattr(event, "ts_source", ""),
-            "project_id": getattr(event, "project_id", ""),
-            "fault_type": getattr(event, "fault_type", "normal"),
-            "scenario_id": getattr(event, "scenario_id", "sc-000"),
-            "ground_truth_severity": getattr(event, "ground_truth_severity", "normal"),
-        }
-        return cls.from_raw_mapping(raw)
+        if isinstance(event, dict):
+            return _build_record_from_mapping(event)
+        data = getattr(event, "__dict__", None)
+        if isinstance(data, dict) and data:
+            return _build_record_from_mapping(data)
+        if hasattr(event, "model_dump"):
+            return _build_record_from_mapping(event.model_dump(mode="python"))
+        return _build_record_from_mapping(dict(event))
 
     def partition_key(self) -> bytes:
         return self._partition_key_cache
