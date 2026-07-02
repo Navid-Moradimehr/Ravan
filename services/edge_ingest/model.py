@@ -8,6 +8,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+try:
+    import orjson
+except ImportError:  # pragma: no cover - optional fast path
+    orjson = None
+
 
 Protocol = Literal[
     "opcua",
@@ -74,9 +79,11 @@ def validate_event(payload: dict[str, Any]) -> tuple[IndustrialEvent | None, Dea
 def to_json_bytes(payload: BaseModel | dict[str, Any]) -> bytes:
     to_dict = getattr(payload, "to_dict", None)
     if callable(to_dict):
-        return json.dumps(to_dict(), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        payload = to_dict()
     if is_dataclass(payload):
-        return json.dumps(asdict(payload), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        payload = asdict(payload)
     if isinstance(payload, BaseModel):
-        return payload.model_dump_json(exclude_none=False, by_alias=False).encode("utf-8")
-    return json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        payload = payload.model_dump(mode="python", exclude_none=False, by_alias=False)
+    if orjson is not None:
+        return orjson.dumps(payload)
+    return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

@@ -10,6 +10,7 @@ from confluent_kafka import Consumer, Producer, TopicPartition
 from services.common.normalize import normalize_runtime_event
 from services.common.runtime_metrics import set_consumer_lag
 from services.common.runtime_event import RollingWindowState, RuntimeEventRecord
+from services.edge_ingest.model import to_json_bytes
 from services.historian.client import insert_processed_event, insert_processed_events
 from services.processor.scoring import score_event, severity_for
 
@@ -157,7 +158,7 @@ def main() -> None:
             producer.produce(
                 output_topic,
                 key=event.partition_key(),
-                value=json.dumps(processed_event).encode("utf-8"),
+                value=to_json_bytes(processed_event),
             )
             producer.poll(0)
             processed_buffer.append(processed_event)
