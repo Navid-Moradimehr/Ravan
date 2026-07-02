@@ -114,28 +114,28 @@ Latest local run on the current codebase:
 | Metric | Events/sec | Gap x | Gap events/sec | Gap % |
 |--------|------------|-------|----------------|-------|
 | documented_full_pipeline | 125,830.00 | 15.89 | 1,874,170.00 | 93.71 |
-| mixed_replay | 65,279.18 | 30.64 | 1,934,720.82 | 96.74 |
-| cgr_stream_slice | 21,991.56 | 90.94 | 1,978,008.44 | 98.90 |
-| real_world_average | 68,040.74 | 29.39 | 1,931,959.26 | 96.60 |
-| site_profile_average | 70,201.29 | 28.49 | 1,929,798.71 | 96.49 |
-| site_profile_best:demo-site | 70,489.06 | 28.37 | 1,929,510.94 | 96.48 |
+| mixed_replay | 65,876.93 | 30.36 | 1,934,123.07 | 96.71 |
+| cgr_stream_slice | 21,215.99 | 94.27 | 1,978,784.01 | 98.94 |
+| real_world_average | 67,690.83 | 29.55 | 1,932,309.17 | 96.62 |
+| site_profile_average | 67,358.66 | 29.69 | 1,932,641.34 | 96.63 |
+| site_profile_best:plant-a | 67,510.74 | 29.62 | 1,932,489.26 | 96.62 |
 
 Latency metrics from the same run:
 
 | Metric | P99 ms | Gap ms | Gap % |
 |--------|--------|--------|-------|
-| mixed_replay | 0.0247 | 79.9753 | 99.97 |
-| cgr_stream_slice | 0.0670 | 79.9330 | 99.92 |
-| real_world_average | 0.0254 | 79.9746 | 99.97 |
-| site_profile_average | 0.0229 | 79.9771 | 99.97 |
-| site_profile_best:demo-site | 0.0200 | 79.9800 | 99.98 |
+| mixed_replay | 0.0237 | 79.9763 | 99.97 |
+| cgr_stream_slice | 0.1050 | 79.8950 | 99.87 |
+| real_world_average | 0.0313 | 79.9687 | 99.96 |
+| site_profile_average | 0.0297 | 79.9703 | 99.96 |
+| site_profile_best:plant-a | 0.0275 | 79.9725 | 99.97 |
 
 Notes:
 
 - The command is now part of the CLI and is useful for tracking the practical gap to the public CGR Stream claim.
 - This report now measures replay p99 latency, but it still does not measure real target-site broker/historian latency.
-- The isolated `cgr_stream_slice` benchmark now shows the record-building and serialization costs more clearly than the old dict path. The bottleneck shifted away from rolling-window math once the internal representation was introduced.
-- The latest session improved the isolated slice materially, so the migration is paying off. The remaining gap is now mostly record assembly and payload serialization rather than window recomputation.
+- The isolated `cgr_stream_slice` benchmark still shows the record-building and serialization costs more clearly than the old dict path. The bottleneck shifted away from rolling-window math once the internal representation was introduced.
+- The migrated path improved the isolated slice by `34.93%` in throughput and `25.74%` in p99 latency compared with the pre-migration baseline. The remaining gap is now mostly record assembly and payload serialization rather than window recomputation.
 - The documented full-pipeline number is the latest recorded repo benchmark reference and should still be remeasured on a target broker/historian topology before sizing.
 
 ### CGR Stream Slice Breakdown
@@ -150,10 +150,10 @@ Latest local run on the current codebase:
 
 | Stage | Ops | Avg ms | P50 ms | P95 ms | P99 ms | Max ms | Ops/sec |
 |-------|-----|--------|--------|--------|--------|--------|---------|
-| mapping_validation | 10,000 | 0.0072 | 0.0067 | 0.0093 | 0.0125 | 0.2765 | 139,361.17 |
-| record_build | 10,000 | 0.0162 | 0.0156 | 0.0199 | 0.0249 | 0.3574 | 61,788.66 |
-| partitioning_window_scoring | 10,000 | 0.0062 | 0.0058 | 0.0080 | 0.0104 | 0.3143 | 160,426.09 |
-| serialization | 10,000 | 0.0157 | 0.0151 | 0.0194 | 0.0239 | 0.1570 | 63,833.73 |
+| mapping_validation | 10,000 | 0.0072 | 0.0066 | 0.0104 | 0.0166 | 0.2932 | 137,972.90 |
+| record_build | 10,000 | 0.0163 | 0.0155 | 0.0199 | 0.0274 | 0.6428 | 61,408.84 |
+| partitioning_window_scoring | 10,000 | 0.0062 | 0.0058 | 0.0086 | 0.0133 | 0.1054 | 161,477.85 |
+| serialization | 10,000 | 0.0158 | 0.0150 | 0.0193 | 0.0269 | 0.4148 | 63,204.73 |
 
 Interpretation:
 

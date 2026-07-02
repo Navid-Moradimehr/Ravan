@@ -104,16 +104,16 @@ graph TD
 - datastream-import now converts AI4I, C-MAPSS, and generic CSV slices into the benchmark replay format
 - `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
   - documented full pipeline reference: 125,830.00 events/sec
-  - mixed replay: 65,279.18 events/sec, p99 0.0247 ms
-  - isolated CGR-style stream slice: 21,991.56 events/sec, p99 0.0670 ms
-  - real-world simulator average: 68,040.74 events/sec, p99 0.0254 ms
-  - site-profile average: 70,201.29 events/sec, p99 0.0229 ms
-  - site-profile best latency run: demo-site at 0.0200 ms p99
+  - mixed replay: 65,876.93 events/sec, p99 0.0237 ms
+  - isolated CGR-style stream slice: 21,215.99 events/sec, p99 0.1050 ms
+  - real-world simulator average: 67,690.83 events/sec, p99 0.0313 ms
+  - site-profile average: 67,358.66 events/sec, p99 0.0297 ms
+  - site-profile best latency run: plant-a at 0.0275 ms p99
 - the internal record migration was compatible with the existing tests and benchmark commands
-- the isolated stream slice improved materially after the migration and serialization cleanup
+- the isolated stream slice improved materially after the migration
 - `benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0`
-  - mapping + validation: 139,361.17 ops/sec
-  - record build: 61,788.66 ops/sec
-  - partitioning + rolling window + scoring: 160,426.09 ops/sec
-  - serialization: 63,833.73 ops/sec
+  - mapping + validation: 137,972.90 ops/sec
+  - record build: 61,408.84 ops/sec
+  - partitioning + rolling window + scoring: 161,477.85 ops/sec
+  - serialization: 63,204.73 ops/sec
 - the bottleneck moved from rolling-window math to record packing and serialization after the migration

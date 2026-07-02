@@ -7,8 +7,8 @@ This report summarizes the current benchmark state of the platform and compares 
 ### Hot-path runtime
 
 - Full pipeline: `125,830 events/sec`
-- Mixed replay: `65,279.18 events/sec`
-- Isolated CGR-style stream slice: `21,991.56 events/sec`
+- Mixed replay: `65,876.93 events/sec`
+- Isolated CGR-style stream slice: `21,215.99 events/sec`
 - AI gateway provider path:
   - OpenAI-compatible mock transport: `162,812.89 events/sec`
   - Ollama mock transport: `144,191.18 events/sec`
@@ -18,12 +18,12 @@ This report summarizes the current benchmark state of the platform and compares 
 
 ### CGR slice decomposition
 
-- mapping + validation: `139,361.17 ops/sec`
-- record build: `61,788.66 ops/sec`
-- partitioning + rolling window + scoring: `160,426.09 ops/sec`
-- serialization: `63,833.73 ops/sec`
+- mapping + validation: `137,972.90 ops/sec`
+- record build: `61,408.84 ops/sec`
+- partitioning + rolling window + scoring: `161,477.85 ops/sec`
+- serialization: `63,204.73 ops/sec`
 
-The stage-level split shows the platform is not dominated by Pydantic validation alone. After the internal record migration, the remaining cost shifted to record assembly and payload encoding, which is exactly where the next optimization pass should focus.
+The stage-level split shows the platform is not dominated by Pydantic validation alone. After the internal record migration, the remaining cost shifted to record assembly and payload encoding, which is where the next optimization pass should focus.
 
 ### Rollout and acceptance
 
@@ -78,9 +78,9 @@ The public CGR Stream page claims `2M msg/sec` and `P99 < 80ms` for its streamin
 Against that reference, the current repo numbers are:
 
 - documented full pipeline: `125,830 events/sec`, about `15.9x` below the CGR claim
-- mixed replay: `65,279.18 events/sec`, about `30.6x` below the CGR claim
-- isolated CGR-style stream slice: `21,991.56 events/sec`, about `90.9x` below the CGR claim
-- site-profile best run: `70,489.06 events/sec`, about `28.4x` below the CGR claim
+- mixed replay: `65,876.93 events/sec`, about `30.4x` below the CGR claim
+- isolated CGR-style stream slice: `21,215.99 events/sec`, about `94.3x` below the CGR claim
+- site-profile best run: `67,510.74 events/sec`, about `29.6x` below the CGR claim
 
 What this means in practice:
 
@@ -91,7 +91,7 @@ What this means in practice:
 - the stage-level split now shows the biggest cost is in record build and serialization rather than windowing itself
 - the remaining latency gap is target-site broker/historian p99 on real plant hardware, which still needs separate validation
 - the new `cgr-gap-report` command now makes both throughput and replay-latency gaps explicit and repeatable on the local benchmark pack
-- the latest optimization pass did materially improve the isolated slice, so the next jump should target record packing and encoding before considering a deeper backend rewrite
+- the latest optimization pass materially improved the isolated slice by `34.93%` over the pre-migration baseline, so the next jump should target record packing and encoding before considering a deeper backend rewrite
 
 ## Is It Good Enough For Industrial Usage?
 
