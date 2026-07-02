@@ -24,10 +24,10 @@ Packaging and installer work is intentionally not part of this phase.
 - synthetic and replay datasets for regression tests
 - expanded observability for historian query latency, broker lag, and WebSocket delivery lag
 - every manifest source is explicitly attached to a site boundary
+- mutating API requests require a bearer token by default and the API emits baseline security headers
 
 ## Incomplete
 
-- stronger security hardening for shared multi-user deployments
 - per-site production benchmarking on target broker and historian topology
 - live benchmark calibration on the target industrial network
 - model evaluation lifecycle and promotion workflow
@@ -45,13 +45,12 @@ Packaging and installer work is intentionally not part of this phase.
 
 ## Necessary Changes
 
-1. Harden security defaults for multi-user deployments.
-2. Complete target-site sizing benchmarks on real broker and historian instances.
-3. Validate vendor connectors against real PLC and sensor traffic.
-4. Add model evaluation and promotion lifecycle controls.
-5. Finish diagnostic-agent and supervised action-agent runtime paths.
-6. Tighten failure isolation between sites, sources, and correlation groups.
-7. Build an acceptance suite for multi-branch rollout verification.
+1. Complete target-site sizing benchmarks on real broker and historian instances.
+2. Validate vendor connectors against real PLC and sensor traffic.
+3. Add model evaluation and promotion lifecycle controls.
+4. Finish diagnostic-agent and supervised action-agent runtime paths.
+5. Tighten failure isolation between sites, sources, and correlation groups.
+6. Build an acceptance suite for multi-branch rollout verification.
 
 ## Real-World Simulator Benchmark Plan
 

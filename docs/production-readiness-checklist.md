@@ -29,6 +29,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Synthetic and replay datasets are available for regression tests.
 - Observability now includes historian query latency, result sizing, broker consumer lag, and WebSocket delivery lag metrics.
 - Every manifest source is explicitly attached to a site boundary.
+- Mutating API requests now require a bearer token by default, and the API adds baseline security headers.
 
 ### Operational tooling
 
@@ -41,7 +42,6 @@ Packaging and installer work is intentionally excluded from the current scope.
 
 ### Must still be hardened
 
-- Stronger security hardening for shared multi-user deployments.
 - Per-site production benchmarking on the actual target broker and historian topology.
 - Live benchmark calibration using the target industrial network.
 - Model evaluation lifecycle and promotion workflow.
@@ -60,12 +60,11 @@ Packaging and installer work is intentionally excluded from the current scope.
 
 These are the changes that matter most before calling the platform production-ready for industrial self-hosting.
 
-1. Harden security defaults for multi-user deployments.
-2. Complete target-site sizing benchmarks on real broker and historian instances.
-3. Validate vendor connectors against real PLC and sensor traffic.
-4. Add model evaluation and promotion lifecycle controls.
-5. Finish the diagnostic-agent and supervised action-agent runtime paths.
-6. Build an acceptance suite for multi-branch rollout verification.
+1. Complete target-site sizing benchmarks on real broker and historian instances.
+2. Validate vendor connectors against real PLC and sensor traffic.
+3. Add model evaluation and promotion lifecycle controls.
+4. Finish the diagnostic-agent and supervised action-agent runtime paths.
+5. Build an acceptance suite for multi-branch rollout verification.
 
 ## Real-World Simulator Benchmark Plan
 

@@ -87,7 +87,7 @@ def _prune_legacy_routes() -> None:
             and getattr(getattr(route, "endpoint", None), "__module__", None) == __name__
         )
     ]
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import ORJSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -116,6 +116,10 @@ except ImportError:
         query_recent_events as query_historian_events,
     )
 from services.common.runtime_metrics import observe_websocket_batch_delivery
+try:
+    from auth import decode_access_token  # type: ignore
+except ImportError:
+    from services.api_service.auth import decode_access_token
 try:
     from assets.model import load_hierarchy, hierarchy_to_tree
 except ImportError:
@@ -430,6 +434,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _security_middleware(request: Request, call_next):
+    path = request.url.path
+    method = request.method.upper()
+    if method in {"POST", "PUT", "PATCH", "DELETE"} and path not in {"/api/v1/auth/login"} and not path.startswith(("/docs", "/redoc", "/openapi.json", "/health", "/metrics", "/.well-known")):
+        auth_header = request.headers.get("authorization", "")
+        if not auth_header.lower().startswith("bearer "):
+            return JSONResponse(status_code=401, content={"detail": "Missing bearer token"})
+        token = auth_header.split(" ", 1)[1].strip()
+        try:
+            request.state.auth_payload = decode_access_token(token)
+        except Exception:
+            return JSONResponse(status_code=401, content={"detail": "Invalid bearer token"})
+
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    if request.url.scheme == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 
 @app.get("/metrics")

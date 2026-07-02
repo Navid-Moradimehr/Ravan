@@ -42,6 +42,8 @@ graph TD
 - explicit site boundary enforcement for manifest sources
 - length-safe default JWT placeholder and auth health strength reporting
 - real-world simulator benchmark runner for mock and mixed replay cases
+- bearer-token enforcement for mutating API requests with baseline security headers
+- regression tests for shared-deployment auth and headers
 
 ## Risks Being Addressed
 
@@ -53,6 +55,7 @@ graph TD
 - ambiguous source/site assignments in the project manifest
 - invisible lag on historian query and stream delivery paths
 - missing runnable benchmark matrix for repeatable real-world simulation cases
+- unauthenticated mutating API requests in shared deployments
 
 ## Verification
 

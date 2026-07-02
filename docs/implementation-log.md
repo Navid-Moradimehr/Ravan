@@ -35,6 +35,11 @@
    - Added `datastreamctl benchmark real-world-simulator` and a script wrapper so the suite can be executed from the CLI.
    - The runner reuses generated scenario CSVs and the existing mixed replay path so the simulated cases stay close to production ingest shape.
 
+9. **Shared-deployment request security**
+   - Added an API middleware that requires a bearer token for mutating requests by default, with explicit login/docs/health/metrics exemptions.
+   - Added baseline security headers to all API responses.
+   - Added regression tests for unauthorized and authorized mutating requests plus security headers on health responses.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
