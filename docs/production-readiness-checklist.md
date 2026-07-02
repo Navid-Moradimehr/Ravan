@@ -28,6 +28,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Local and site-oriented benchmark harnesses exist.
 - Real-world simulator benchmark runner now exists for mock and mixed industrial replay cases.
 - Site-profile benchmark matrix exists for per-site acceptance runs.
+- Site-profile benchmark calibration reports exist for per-site sizing recommendations.
 - Failure isolation between sites, sources, and correlation groups is enforced by manifest validation.
 - Synthetic and replay datasets are available for regression tests.
 - Observability now includes historian query latency, result sizing, broker consumer lag, and WebSocket delivery lag metrics.

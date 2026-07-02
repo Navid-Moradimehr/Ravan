@@ -85,6 +85,22 @@ Latest local run on the current codebase:
 | plant-a | passed | 55,973.26 | 750.0 | passed |
 | **Overall** | - | - | - | passed |
 
+### Site-Profile Calibration
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl benchmark site-profile-calibration --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1
+```
+
+Latest local run on the current codebase:
+
+| Site | Mode | Observed Avg Events/sec | Threshold | Headroom | Recommended Min | Recommended Batch |
+|------|------|-------------------------|-----------|----------|-----------------|-------------------|
+| demo-site | single-site | 52,786.52 | 500.0 | 52,286.52 | 42,229.22 | 256 |
+| plant-a | plant-local | 47,759.79 | 750.0 | 47,009.79 | 38,207.83 | 256 |
+| **Overall** | - | - | - | - | - | passed |
+
 ## Test Suite Results
 
 | Test Category | Tests | Status |

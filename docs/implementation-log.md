@@ -53,6 +53,10 @@
    - Tightened project-manifest validation so source topics must carry a site boundary, cross-site bridge rules require explicit topic templates, and cross-site correlation groups require explicit strategy markers.
    - This makes leakage between sites, sources, and correlation groups easier to catch before rollout acceptance.
 
+13. **Site benchmark calibration**
+   - Added `services/benchmarks/site_profile_calibration.py` and `datastreamctl benchmark site-profile-calibration` to convert site-profile benchmark runs into sizing recommendations.
+   - The calibration report surfaces observed throughput, acceptance thresholds, headroom, and a recommended minimum throughput floor per site.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
@@ -84,6 +88,8 @@
   - overall: passed
 - `uv run pytest -q tests/test_project_manifest.py tests/test_datastreamctl.py`
   - 43 passed
+- `uv run pytest -q tests/test_project_manifest.py tests/test_datastreamctl.py tests/test_site_profile_calibration_benchmark.py`
+  - 45 passed
 
 ### Notes
 

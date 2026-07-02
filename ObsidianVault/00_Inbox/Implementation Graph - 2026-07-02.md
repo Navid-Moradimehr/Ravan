@@ -88,3 +88,7 @@ graph TD
   - plant-a: release-gate passed, benchmark passed at 55,973.26 events/sec
   - overall: passed
 - manifest validation now enforces site boundary markers in source topics and explicit cross-site bridge/correlation strategies
+- `benchmark site-profile-calibration --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1`
+  - demo-site: observed 52,786.52 events/sec, threshold 500.0, recommended minimum 42,229.22, batch 256
+  - plant-a: observed 47,759.79 events/sec, threshold 750.0, recommended minimum 38,207.83, batch 256
+  - overall: passed

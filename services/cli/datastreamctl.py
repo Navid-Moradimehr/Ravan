@@ -23,6 +23,8 @@ from services.benchmarks.deployment_pack import run_benchmark as run_deployment_
 from services.benchmarks.deployment_pack import run_matrix as run_deployment_pack_matrix
 from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
 from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
+from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
+from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
 from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
 from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
 from services.historian.backup import create_backup, get_walg_status, list_backups, restore_backup
@@ -768,6 +770,58 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("=" * 40)
             print(format_site_profile_matrix_result(result))
         return 0 if result.passed else 2
+    if args.action == "site-profile-calibration":
+        site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
+        result = run_site_profile_calibration(
+            Path(args.manifest),
+            Path(args.csv),
+            site_ids=site_ids,
+            events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            min_average_events_per_second=args.min_average_events_per_second,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "passed": result.passed,
+                    "benchmark": {
+                        "passed": result.benchmark.passed,
+                        "runs": [
+                            {
+                                "site_id": item.site_id,
+                                "deployment_mode": item.deployment_mode,
+                                "profile_path": item.profile_path,
+                                "average_events_per_second": item.average_events_per_second,
+                                "passed": item.passed,
+                                "detail": item.detail,
+                            }
+                            for item in result.benchmark.runs
+                        ],
+                    },
+                    "runs": [
+                        {
+                            "site_id": item.site_id,
+                            "deployment_mode": item.deployment_mode,
+                            "profile_path": item.profile_path,
+                            "observed_average_events_per_second": item.observed_average_events_per_second,
+                            "acceptance_threshold": item.acceptance_threshold,
+                            "headroom_events_per_second": item.headroom_events_per_second,
+                            "headroom_ratio": item.headroom_ratio,
+                            "recommended_min_average_events_per_second": item.recommended_min_average_events_per_second,
+                            "recommended_batch_size": item.recommended_batch_size,
+                            "passed": item.passed,
+                        }
+                        for item in result.runs
+                    ],
+                },
+                indent=2,
+            ))
+        else:
+            print("site profile calibration")
+            print("=" * 40)
+            print(format_site_profile_calibration_result(result))
+        return 0 if result.passed else 2
     raise ValueError(f"unknown benchmark action: {args.action}")
 
 
@@ -924,6 +978,16 @@ def build_parser() -> argparse.ArgumentParser:
     site_profile_matrix.add_argument("--min-average-events-per-second", type=float, default=1000.0)
     site_profile_matrix.add_argument("--json", action="store_true")
     site_profile_matrix.set_defaults(func=cmd_benchmark)
+    site_profile_calibration = benchmark_sub.add_parser("site-profile-calibration", help="Calibrate per-site benchmark thresholds from the mixed replay pack")
+    site_profile_calibration.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
+    site_profile_calibration.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    site_profile_calibration.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites in the manifest")
+    site_profile_calibration.add_argument("--events", type=int, default=10_000)
+    site_profile_calibration.add_argument("--batch-size", type=int, default=256)
+    site_profile_calibration.add_argument("--warmup-events", type=int, default=0)
+    site_profile_calibration.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    site_profile_calibration.add_argument("--json", action="store_true")
+    site_profile_calibration.set_defaults(func=cmd_benchmark)
     return parser
 
 
