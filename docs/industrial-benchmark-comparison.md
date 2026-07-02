@@ -78,6 +78,7 @@ What this means in practice:
 - local replay p99 is now measured and sits in the ~0.02-0.03 ms band on the current benchmark pack
 - the remaining latency gap is target-site broker/historian p99 on real plant hardware, which still needs separate validation
 - the new `cgr-gap-report` command now makes both throughput and replay-latency gaps explicit and repeatable on the local benchmark pack
+- the latest optimization pass did not materially change throughput; the small movement is consistent with benchmark variance, so the next jump needs a stack change rather than another minor patch
 
 ## Is It Good Enough For Industrial Usage?
 

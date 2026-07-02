@@ -72,12 +72,12 @@
    - Added `services/benchmarks/cgr_gap.py`, `datastreamctl benchmark cgr-gap-report`, and `scripts/benchmark_cgr_gap_report.py` to compare local benchmark output against the public CGR Stream claim.
    - Updated the benchmark and readiness docs with a current 10k-event comparison run:
      - documented full pipeline reference: 125,830.00 events/sec
-     - mixed replay: 68,606.16 events/sec with 0.0211 ms p99
-     - real-world simulator average: 68,236.68 events/sec with 0.0205 ms p99
-     - site-profile average: 65,729.12 events/sec with 0.0285 ms p99
-     - site-profile best latency run: plant-a at 0.0268 ms p99
+     - mixed replay: 68,213.38 events/sec with 0.0267 ms p99
+     - real-world simulator average: 68,074.51 events/sec with 0.0264 ms p99
+     - site-profile average: 69,440.10 events/sec with 0.0311 ms p99
+     - site-profile best latency run: demo-site at 0.0269 ms p99
    - The report now measures replay p99 latency directly while still leaving real target-site broker/historian latency for hardware validation.
-   - Session delta versus the previous CGR-gap run is small and mostly attributable to benchmark variance, not a throughput optimization. The mixed replay number moved from 65,938.49 to 68,606.16 events/sec, but the broader matrix did not shift in a consistent way.
+   - The latest optimization pass did not produce a material throughput gain; the observed movement is within benchmark variance, which points to stack redesign rather than another incremental patch.
 
 ### Verified
 

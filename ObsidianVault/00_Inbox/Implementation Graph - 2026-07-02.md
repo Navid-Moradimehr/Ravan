@@ -100,8 +100,8 @@ graph TD
 - datastream-import now converts AI4I, C-MAPSS, and generic CSV slices into the benchmark replay format
 - `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
   - documented full pipeline reference: 125,830.00 events/sec
-  - mixed replay: 68,606.16 events/sec, p99 0.0211 ms
-  - real-world simulator average: 68,236.68 events/sec, p99 0.0205 ms
-  - site-profile average: 65,729.12 events/sec, p99 0.0285 ms
-  - site-profile best latency run: plant-a at 0.0268 ms p99
-- session delta versus the previous CGR-gap run was small and mostly benchmark variance; no architecture-level throughput gain landed in this pass
+  - mixed replay: 68,213.38 events/sec, p99 0.0267 ms
+  - real-world simulator average: 68,074.51 events/sec, p99 0.0264 ms
+  - site-profile average: 69,440.10 events/sec, p99 0.0311 ms
+  - site-profile best latency run: demo-site at 0.0269 ms p99
+- the latest optimization pass stayed inside benchmark variance; the next meaningful gain will need a stack-level redesign rather than another small patch
