@@ -6,6 +6,7 @@
 {{- $fullname := include "data-stream.fullname" . -}}
 {{- $name := include "data-stream.name" . -}}
 {{- $chart := include "data-stream.chart" . -}}
+{{- $runtimeMode := default "python-fallback" .Values.env.RUNTIME_MODE -}}
 
 {{- /* API Service */ -}}
 {{- if .Values.apiService.enabled }}
@@ -102,7 +103,7 @@ spec:
 
 ---
 {{- /* Stream Processor */ -}}
-{{- if .Values.processor.enabled }}
+{{- if and .Values.processor.enabled (eq $runtimeMode "python-fallback") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -136,6 +137,50 @@ spec:
                 optional: true
           resources:
             {{- toYaml .Values.processor.resources | nindent 12 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+{{- end }}
+
+---
+{{- /* Flink Job */ -}}
+{{- if and .Values.flinkJob.enabled (or (eq $runtimeMode "flink-local") (eq $runtimeMode "flink-production")) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-flink-job
+  namespace: {{ include "data-stream.namespace" . }}
+  labels:
+    app: {{ $name }}
+    component: flink-job
+    chart: {{ $chart }}
+spec:
+  replicas: {{ .Values.flinkJob.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+      component: flink-job
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        component: flink-job
+    spec:
+      containers:
+        - name: flink-job
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ $fullname }}-env
+            - secretRef:
+                name: {{ .Values.secrets.existingSecret }}
+                optional: true
+          resources:
+            {{- toYaml .Values.flinkJob.resources | nindent 12 }}
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       tolerations:

@@ -11,6 +11,13 @@ Services:
 {{- if .Values.processor.enabled }}
   Processor:       {{ $name }}-processor (headless)
 {{- end }}
+{{- if .Values.flinkJob.enabled }}
+{{- if eq (default "python-fallback" .Values.env.RUNTIME_MODE) "python-fallback" }}
+  Flink Job:       disabled by runtime mode
+{{- else }}
+  Flink Job:       {{ $name }}-flink-job
+{{- end }}
+{{- end }}
 {{- if .Values.edgeIngest.enabled }}
   Edge Ingest:     {{ $name }}-edge-ingest:{{ .Values.edgeIngest.port }}
 {{- end }}

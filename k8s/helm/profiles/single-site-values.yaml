@@ -2,6 +2,7 @@ env:
   SITE_ID: "demo-site"
   SITE_NAME: "Demo Site"
   DEPLOYMENT_MODE: "single-site"
+  RUNTIME_MODE: "python-fallback"
   REGION: "local-lab"
   NETWORK_ZONE: "zone-a"
   REDPANDA_BROKERS: "redpanda:9092"

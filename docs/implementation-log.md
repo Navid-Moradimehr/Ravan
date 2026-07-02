@@ -755,3 +755,28 @@ Eighth pass added auto-scaling, completed the dataset catalog, and improved Helm
 ### Notes
 - HPA requires the Kubernetes Metrics Server to be installed in the cluster.
 - The SWaT dataset requires academic registration; the URL in the catalog is the public landing page.
+
+## Deployment-plane runtime-mode alignment (2026-07-02)
+
+### Added
+
+1. **Helm chart runtime-mode selection**
+   - Added `flinkJob` service toggles and HPA settings to `k8s/helm/values.yaml`.
+   - The Helm deployment and HPA templates now use `env.RUNTIME_MODE` to render either the legacy Python processor or the Flink job, not both.
+   - Helm profile overlays now declare `RUNTIME_MODE` explicitly for single-site, plant-local, and federated installs.
+
+2. **Generated site bundle alignment**
+   - `services/common/project_manifest.py` now writes `processor.enabled` and `flinkJob.enabled` into generated Helm overlays based on the site profile runtime mode.
+   - Exported per-site Kubernetes bundles now preserve the runtime contract instead of leaving the active processor path implicit.
+
+### Verified
+
+- Targeted suite: `tests/test_helm_chart.py`, `tests/test_project_manifest.py`, `tests/test_site_profiles.py`, `tests/test_datastreamd.py`, `tests/test_datastreamctl.py`
+- Result: `75 passed`
+- `python -m compileall services tests`
+- Rendered generated Helm values for `plant-a` to confirm `RUNTIME_MODE: flink-local`, `processor.enabled: false`, and `flinkJob.enabled: true`
+
+### Notes
+
+- This closes the last major deployment-layer mismatch between the site profile contract and the chart/export path.
+- Remaining work is now mostly about higher-level production hardening and target-site validation, not basic runtime wiring.

@@ -2,6 +2,7 @@ env:
   SITE_ID: "plant-b"
   SITE_NAME: "Plant B"
   DEPLOYMENT_MODE: "federated"
+  RUNTIME_MODE: "flink-production"
   REGION: "tehran-east"
   NETWORK_ZONE: "plant-ops"
   REDPANDA_BROKERS: "redpanda.plant-b.svc.cluster.local:9092"
@@ -13,6 +14,12 @@ env:
   LLM_ENDPOINT_URL: "http://vllm.plant-b.svc.cluster.local:8000/v1"
   LLM_MODEL_ID: "mistralai/Mistral-7B-Instruct-v0.3"
 
+processor:
+  enabled: false
+
+flinkJob:
+  enabled: true
+
 autoScaling:
   apiService:
     enabled: true
@@ -23,6 +30,10 @@ autoScaling:
     minReplicas: 2
     maxReplicas: 4
   processor:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+  flinkJob:
     enabled: true
     minReplicas: 2
     maxReplicas: 6

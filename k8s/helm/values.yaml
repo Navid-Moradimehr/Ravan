@@ -55,6 +55,17 @@ processor:
       cpu: 500m
       memory: 512Mi
 
+flinkJob:
+  enabled: false
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
 edgeIngest:
   enabled: true
   replicaCount: 1
@@ -90,6 +101,12 @@ autoScaling:
     maxReplicas: 10
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 80
+  flinkJob:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
   edgeIngest:
     enabled: false
     minReplicas: 1
@@ -106,6 +123,7 @@ env:
   DEPLOYMENT_MODE: "single-site"
   REGION: "local-lab"
   NETWORK_ZONE: "zone-a"
+  RUNTIME_MODE: "python-fallback"
   REDPANDA_BROKERS: "redpanda:9092"
   TIMESCALE_HOST: "timescaledb"
   TIMESCALE_PORT: "5432"

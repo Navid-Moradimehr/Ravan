@@ -64,6 +64,7 @@ Packaging and installer work is intentionally not part of this phase.
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish diagnostic-agent and supervised action-agent runtime paths.
 5. Keep adding target-site broker/historian p99 probes so the CGR comparison eventually covers real plant latency, not only local replay latency.
+6. Keep the runtime-mode contract aligned across site profiles, Helm, and generated bundles so plant-local and federated exports always render the Flink job path.
 
 ## Real-World Simulator Benchmark Plan
 

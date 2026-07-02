@@ -77,7 +77,11 @@ def test_manifest_export_kubernetes_layout(tmp_path: Path):
     assert (site_root / "kubernetes" / "deployment.yaml").exists()
     assert (site_root / "kubernetes" / "service.yaml").exists()
     assert (site_root / "kubernetes" / "kustomization.yaml").exists()
-    assert "namespaceOverride: datastream-plant-a" in (site_root / "kubernetes" / "helm" / "values.generated.yaml").read_text(encoding="utf-8")
+    generated_values = (site_root / "kubernetes" / "helm" / "values.generated.yaml").read_text(encoding="utf-8")
+    assert "namespaceOverride: datastream-plant-a" in generated_values
+    assert "RUNTIME_MODE: flink-local" in generated_values
+    assert "flinkJob:" in generated_values
+    assert "enabled: true" in generated_values
     assert (site_root / "kubernetes" / "README.md").exists()
     assert any(path.name == "deployment.yaml" for path in written)
 

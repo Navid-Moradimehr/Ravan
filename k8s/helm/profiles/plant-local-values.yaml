@@ -2,6 +2,7 @@ env:
   SITE_ID: "plant-a"
   SITE_NAME: "Plant A"
   DEPLOYMENT_MODE: "plant-local"
+  RUNTIME_MODE: "flink-local"
   REGION: "tehran-west"
   NETWORK_ZONE: "plant-ops"
   REDPANDA_BROKERS: "redpanda.plant-a.svc.cluster.local:9092"
@@ -13,6 +14,12 @@ env:
   LLM_ENDPOINT_URL: "http://ollama.plant-a.svc.cluster.local:11434"
   LLM_MODEL_ID: "mistral"
 
+processor:
+  enabled: false
+
+flinkJob:
+  enabled: true
+
 autoScaling:
   apiService:
     enabled: true
@@ -23,6 +30,10 @@ autoScaling:
     minReplicas: 1
     maxReplicas: 2
   processor:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+  flinkJob:
     enabled: true
     minReplicas: 1
     maxReplicas: 4

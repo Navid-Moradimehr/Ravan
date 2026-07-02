@@ -403,6 +403,9 @@ class ProjectManifest:
 
     def _render_kubernetes_helm_values(self, site_id: str, env: dict[str, str]) -> str:
         profile = load_site_profile(self.site_profile_paths()[site_id])
+        runtime_mode = profile.runtime.mode
+        processor_enabled = runtime_mode == "python-fallback"
+        flink_job_enabled = runtime_mode in {"flink-local", "flink-production"}
         payload = {
             "fullnameOverride": f"datastream-{site_id}",
             "namespaceOverride": f"datastream-{site_id}",
@@ -410,6 +413,14 @@ class ProjectManifest:
                 "repository": "data-stream",
                 "tag": profile.runtime.image_tag,
                 "pullPolicy": "IfNotPresent",
+            },
+            "processor": {
+                "enabled": processor_enabled,
+                "replicaCount": 1,
+            },
+            "flinkJob": {
+                "enabled": flink_job_enabled,
+                "replicaCount": 1,
             },
             "env": env,
             "secrets": {

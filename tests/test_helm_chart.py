@@ -16,9 +16,11 @@ def test_values_yaml_has_service_toggles():
     assert "apiService:" in content
     assert "aiGateway:" in content
     assert "processor:" in content
+    assert "flinkJob:" in content
     assert "edgeIngest:" in content
     assert "secrets:" in content
     assert "existingSecret:" in content
+    assert "RUNTIME_MODE:" in content
 
 
 def test_deployment_template_creates_multiple_deployments():
@@ -26,8 +28,10 @@ def test_deployment_template_creates_multiple_deployments():
     assert "component: api-service" in content
     assert "component: ai-gateway" in content
     assert "component: processor" in content
+    assert "component: flink-job" in content
     assert "component: edge-ingest" in content
     assert "secretRef" in content
+    assert "runtimeMode" in content or "RUNTIME_MODE" in content
 
 
 def test_service_template_creates_multiple_services():
@@ -58,6 +62,7 @@ def test_hpa_template_exists():
     assert "api-service" in content
     assert "ai-gateway" in content
     assert "processor" in content
+    assert "flink-job" in content
     assert "edge-ingest" in content
 
 
@@ -81,7 +86,11 @@ def test_profile_overlays_exist():
     assert (profiles_dir / "federated-values.yaml").exists()
     federated = (profiles_dir / "federated-values.yaml").read_text()
     assert "DEPLOYMENT_MODE: \"federated\"" in federated
+    assert "RUNTIME_MODE: \"flink-production\"" in federated
     assert "DATASTREAM_CENTRAL_ENDPOINT:" in federated
+    plant_local = (profiles_dir / "plant-local-values.yaml").read_text()
+    assert "RUNTIME_MODE: \"flink-local\"" in plant_local
+    assert "flinkJob:" in plant_local
 
 
 if __name__ == "__main__":

@@ -166,3 +166,6 @@ graph TD
 - the bottleneck moved from rolling-window math to record packing and serialization after the migration
 - MsgPack reduced payload size but did not beat JSON throughput on this host, so the next throughput step should focus on a compiled hot path rather than only changing the codec
 - the latest gap-report rerun on the same host moved noticeably slower, reinforcing that single-machine benchmark sessions still have meaningful variance
+- deployment-plane wiring now matches the runtime contract: Helm values, Helm templates, and generated site bundles all switch between `processor` and `flink-job` from the same `runtime.mode`
+- verification on the rendered site bundle confirmed `plant-a` exports with `RUNTIME_MODE: flink-local`, `processor.enabled: false`, and `flinkJob.enabled: true`
+- targeted regression set passed again after the chart update: `75 passed`

@@ -29,6 +29,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Explicit `runtime.mode` contract exists for `python-fallback`, `flink-local`, and `flink-production`.
 - `datastreamd` now uses `runtime.mode` to select the default processor set.
 - Production-pipeline benchmark command exists so the selected runtime mode can be measured directly.
+- Helm chart and generated site bundles now select the processor path or the Flink job from the same runtime-mode contract.
 - Real-world simulator benchmark runner now exists for mock and mixed industrial replay cases.
 - Site-profile benchmark matrix exists for per-site acceptance runs.
 - Site-profile benchmark calibration reports exist for per-site sizing recommendations.
