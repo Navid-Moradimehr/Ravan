@@ -18,6 +18,7 @@ Packaging and installer work is intentionally not part of this phase.
 - JWT default placeholder is length-safe and auth status reports secret strength
 - site-aware project manifest and rollout scaffolding
 - project-manifest rollout acceptance command for combined release-gate and benchmark checks
+- failure isolation between sites, sources, and correlation groups is enforced by manifest validation
 - model gateway abstraction for open-weight and OpenAI-compatible backends
 - read-only agent infrastructure
 - local and site-oriented benchmark harnesses
@@ -51,7 +52,6 @@ Packaging and installer work is intentionally not part of this phase.
 2. Validate vendor connectors against real PLC and sensor traffic.
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish diagnostic-agent and supervised action-agent runtime paths.
-5. Tighten failure isolation between sites, sources, and correlation groups.
 
 ## Real-World Simulator Benchmark Plan
 

@@ -25,7 +25,7 @@
 
 Additional focused CLI regression slice:
 
-- `uv run pytest -q tests/test_datastreamctl.py tests/test_site_profile_matrix_benchmark.py`: 31 passed
+- `uv run pytest -q tests/test_project_manifest.py tests/test_datastreamctl.py`: 43 passed
 
 ### Latest Mock Benchmarks
 
@@ -81,8 +81,8 @@ Latest local run on the current codebase:
 
 | Site | Release Gate | Avg Events/sec | Threshold | Result |
 |------|--------------|----------------|-----------|--------|
-| demo-site | passed | 55,807.17 | 500.0 | passed |
-| plant-a | passed | 59,548.10 | 750.0 | passed |
+| demo-site | passed | 48,558.93 | 500.0 | passed |
+| plant-a | passed | 55,973.26 | 750.0 | passed |
 | **Overall** | - | - | - | passed |
 
 ## Test Suite Results

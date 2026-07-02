@@ -123,3 +123,37 @@ def test_validate_project_manifest_requires_source_site_id():
     )
     errors = validate_project_manifest(broken)
     assert any("site_id is required" in error for error in errors)
+
+
+def test_validate_project_manifest_requires_site_boundary_in_topic():
+    manifest = load_project_manifest(MANIFEST)
+    broken = replace(
+        manifest,
+        sources=manifest.sources + (
+            replace(
+                manifest.sources[0],
+                source_id="site-less-topic",
+                topic="industrial/shared/line-01/site-less-topic",
+            ),
+        ),
+    )
+    errors = validate_project_manifest(broken)
+    assert any("topic must include site boundary" in error for error in errors)
+
+
+def test_validate_project_manifest_requires_explicit_cross_site_correlation_strategy():
+    manifest = load_project_manifest(MANIFEST)
+    broken = replace(
+        manifest,
+        correlation_groups=manifest.correlation_groups
+        + (
+            replace(
+                manifest.correlation_groups[0],
+                name="cross-site-correlation",
+                members=(manifest.sources[0].source_id, manifest.sources[-1].source_id),
+                strategy="site_asset_tag",
+            ),
+        ),
+    )
+    errors = validate_project_manifest(broken)
+    assert any("cross-site grouping requires explicit cross_site or federated strategy" in error for error in errors)

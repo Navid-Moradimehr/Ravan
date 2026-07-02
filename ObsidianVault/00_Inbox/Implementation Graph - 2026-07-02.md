@@ -84,6 +84,7 @@ graph TD
   - plant-a: 59,253.75 events/sec, passed
   - overall: passed
 - `project-manifest rollout-acceptance config/project-manifest.yaml --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1 --skip-network --skip-backup`
-  - demo-site: release-gate passed, benchmark passed at 55,807.17 events/sec
-  - plant-a: release-gate passed, benchmark passed at 59,548.10 events/sec
+  - demo-site: release-gate passed, benchmark passed at 48,558.93 events/sec
+  - plant-a: release-gate passed, benchmark passed at 55,973.26 events/sec
   - overall: passed
+- manifest validation now enforces site boundary markers in source topics and explicit cross-site bridge/correlation strategies

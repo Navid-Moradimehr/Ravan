@@ -735,6 +735,7 @@ def validate_project_manifest(manifest: ProjectManifest) -> list[str]:
         errors.append("at least one site is required")
 
     site_ids = {site.site_id for site in manifest.sites}
+    source_site_map = manifest.source_site_map()
     if len(site_ids) != len(manifest.sites):
         errors.append("site_id values must be unique")
     for site in manifest.sites:
@@ -760,6 +761,8 @@ def validate_project_manifest(manifest: ProjectManifest) -> list[str]:
             errors.append(f"source {source.source_id or '?'}: site_id is required")
         if source.site_id and source.site_id not in site_ids:
             errors.append(f"source {source.source_id}: unknown site_id {source.site_id}")
+        if source.site_id and source.topic and source.site_id not in source.topic.split("/"):
+            errors.append(f"source {source.source_id}: topic must include site boundary for {source.site_id}")
         if not source.source_protocol:
             errors.append(f"source {source.source_id}: source_protocol is required")
         if not source.asset_id:
@@ -782,6 +785,14 @@ def validate_project_manifest(manifest: ProjectManifest) -> list[str]:
             errors.append(f"bridge rule {rule.name or '?'}: unknown from_sources {unknown_from}")
         if unknown_to:
             errors.append(f"bridge rule {rule.name or '?'}: unknown to_sources {unknown_to}")
+        rule_sites = {source_site_map.get(item, "") for item in (*rule.from_sources, *rule.to_sources) if source_site_map.get(item, "")}
+        if len(rule_sites) > 1:
+            if not rule.topic_template:
+                errors.append(f"bridge rule {rule.name or '?'}: cross-site rules require topic_template")
+            elif "{{site_id}}" not in rule.topic_template and "{{source_site_id}}" not in rule.topic_template:
+                errors.append(
+                    f"bridge rule {rule.name or '?'}: cross-site topic_template must include a site placeholder"
+                )
 
     for group in manifest.correlation_groups:
         if not group.name:
@@ -793,6 +804,11 @@ def validate_project_manifest(manifest: ProjectManifest) -> list[str]:
             errors.append(f"correlation group {group.name or '?'}: unknown members {unknown}")
         if group.window_minutes < 1:
             errors.append(f"correlation group {group.name or '?'}: window_minutes must be >= 1")
+        grouped_sites = {source_site_map.get(member, "") for member in group.members if source_site_map.get(member, "")}
+        if len(grouped_sites) > 1 and group.strategy not in {"cross_site", "federated"}:
+            errors.append(
+                f"correlation group {group.name or '?'}: cross-site grouping requires explicit cross_site or federated strategy"
+            )
 
     if manifest.retention.historian_days < manifest.retention.raw_days:
         errors.append("retention.historian_days must be >= retention.raw_days")

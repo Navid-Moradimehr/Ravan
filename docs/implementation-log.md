@@ -49,6 +49,10 @@
    - Added `datastreamctl project-manifest rollout-acceptance` to combine per-site release-gate checks with per-site benchmark acceptance in one operator-facing command.
    - The new gate reuses the existing site release checks and real-world simulator matrix so the rollout summary stays deterministic and local-first.
 
+12. **Manifest isolation hardening**
+   - Tightened project-manifest validation so source topics must carry a site boundary, cross-site bridge rules require explicit topic templates, and cross-site correlation groups require explicit strategy markers.
+   - This makes leakage between sites, sources, and correlation groups easier to catch before rollout acceptance.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
@@ -75,11 +79,11 @@
   - `plant-a`: 59,253.75 events/sec, passed, threshold 750.0
   - overall: passed
 - `uv run python -m services.cli.datastreamctl project-manifest rollout-acceptance config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1 --skip-network --skip-backup`
-  - `demo-site`: release-gate passed, benchmark passed at 55,807.17 events/sec
-  - `plant-a`: release-gate passed, benchmark passed at 59,548.10 events/sec
+  - `demo-site`: release-gate passed, benchmark passed at 48,558.93 events/sec
+  - `plant-a`: release-gate passed, benchmark passed at 55,973.26 events/sec
   - overall: passed
-- `uv run pytest -q tests/test_datastreamctl.py tests/test_site_profile_matrix_benchmark.py`
-  - 31 passed
+- `uv run pytest -q tests/test_project_manifest.py tests/test_datastreamctl.py`
+  - 43 passed
 
 ### Notes
 

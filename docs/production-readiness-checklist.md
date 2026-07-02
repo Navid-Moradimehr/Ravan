@@ -28,6 +28,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Local and site-oriented benchmark harnesses exist.
 - Real-world simulator benchmark runner now exists for mock and mixed industrial replay cases.
 - Site-profile benchmark matrix exists for per-site acceptance runs.
+- Failure isolation between sites, sources, and correlation groups is enforced by manifest validation.
 - Synthetic and replay datasets are available for regression tests.
 - Observability now includes historian query latency, result sizing, broker consumer lag, and WebSocket delivery lag metrics.
 - Every manifest source is explicitly attached to a site boundary.
@@ -66,8 +67,6 @@ These are the changes that matter most before calling the platform production-re
 2. Validate vendor connectors against real PLC and sensor traffic.
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish the diagnostic-agent and supervised action-agent runtime paths.
-5. Tighten failure isolation between sites, sources, and correlation groups.
-
 ## Real-World Simulator Benchmark Plan
 
 ### Goals
