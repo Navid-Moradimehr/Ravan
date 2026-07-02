@@ -290,40 +290,6 @@ Interpretation:
 - validation is still not the main bottleneck on this dataset
 - if the next optimization effort is about raw throughput, record packing and payload encoding deserve the first redesign pass
 
-## Rust Hot-Path Experiment And Live Historian Check
-
-- **Date**: 2026-07-02
-- **Scope**: compiled wire/partition fast path experiment, same-host improvement check, and Docker-backed historian write validation
-
-### Targeted Regression Checks
-
-| Check | Result |
-|-------|--------|
-| `uv run pytest -q tests/test_wire_format.py tests/test_end_to_end_pipeline_benchmark.py tests/test_datastreamctl.py -k "benchmark_cgr_gap_report_runs or benchmark_flink_runtime_slice_runs or benchmark_end_to_end_pipeline_runs"` | 3 passed |
-| Rust extension build (`uv run maturin develop -m rust/fastpath/Cargo.toml`) | passed |
-| Live Postgres schema bootstrap for `processed_events` | passed |
-
-### Same-Host Comparison
-
-The Rust wire-path experiment was measured against the pure-Python path on the same machine. The default path was faster, so the compiled JSON/msgpack encode path was removed from the default runtime flow.
-
-| Benchmark | Rust path enabled | Default path | Change |
-|-----------|-------------------|--------------|--------|
-| end-to-end JSON throughput | 11,350.74 events/sec | 36,569.38 events/sec | +222.2% |
-| end-to-end JSON p99 | 0.1166 ms | 0.0585 ms | -49.8% |
-| end-to-end MsgPack throughput | 17,140.69 events/sec | 35,025.18 events/sec | +104.4% |
-| end-to-end MsgPack p99 | 0.0786 ms | 0.0492 ms | -37.4% |
-| CGR stream slice throughput | 8,468.25 events/sec | 38,567.06 events/sec | +355.4% |
-| CGR stream slice p99 | 0.1617 ms | 0.0515 ms | -68.1% |
-| Flink runtime slice throughput | 8,415.77 events/sec | 43,648.20 events/sec | +418.7% |
-| Flink runtime slice p99 | 0.1625 ms | 0.0398 ms | -75.5% |
-
-Interpretation:
-
-- the compiled bridge is not the default production choice for payload encoding on this host
-- the existing Python/orjson/msgpack path is materially faster for this code shape
-- the Rust work is still useful as a proof that the hot path must be profiled per operation, not assumed faster because it is compiled
-
 ### Live Historian Write
 
 Command:

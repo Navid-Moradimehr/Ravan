@@ -69,7 +69,6 @@ Packaging and installer work is intentionally not part of this phase.
 - combined release-gate and benchmark acceptance reports
 - CGR gap report and gap ratios for local benchmark packs
 - replay p99 latency probes for the local benchmark stack
-- same-host fast-path A/B benchmarks before introducing compiled runtime dependencies
 
 ## Links
 

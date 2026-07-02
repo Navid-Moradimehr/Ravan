@@ -62,7 +62,6 @@ graph TD
 - CGR streaming vs BI comparison note added, with Spark marked as optional for offline ETL and lakehouse workloads
 - optional MsgPack wire-format support added for the industrial event contract
 - end-to-end pipeline benchmark added for JSON vs MsgPack comparison
-- Rust wire-serialization fast path was prototyped, benchmarked, and then removed from the default runtime flow because it regressed throughput on this host
 - Docker-backed historian write validation now has a successful live benchmark result after bootstrapping the missing `processed_events` table
 
 ## Risks Being Addressed
@@ -81,7 +80,6 @@ graph TD
 - benchmark session variance not tracked as a first-class signal
 - unclear Spark integration boundary for open-source industrial rollout
 - binary wire contract not yet proven faster than JSON on the local Python path
-- compiled fast-path experiments must be benchmarked before becoming a default runtime dependency
 
 ## Verification
 

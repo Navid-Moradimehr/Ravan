@@ -1,15 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, is_dataclass
-import os
 from typing import Any
-
-try:  # pragma: no cover - optional compiled fast path
-    import datastream_fastpath
-except ImportError:  # pragma: no cover - extension not installed
-    datastream_fastpath = None
-
-FASTPATH_DISABLED = os.getenv("DATASTREAM_DISABLE_FASTPATH", "").lower() in {"1", "true", "yes", "on"}
 
 
 @dataclass(frozen=True)
@@ -57,11 +49,6 @@ def derive_stream_scope(event: dict[str, Any] | Any) -> StreamScope:
 
 
 def stream_partition_key(event: dict[str, Any] | Any) -> bytes:
-    if not FASTPATH_DISABLED and datastream_fastpath is not None:
-        try:
-            return datastream_fastpath.stream_partition_key_from_event(event)
-        except Exception:
-            pass
     if isinstance(event, dict):
         get = event.get
         return "|".join(
