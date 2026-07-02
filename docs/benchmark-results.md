@@ -138,6 +138,30 @@ Notes:
 - The latest session stayed in the same performance band as the prior run for the replay path; the observed movement is within benchmark variance, not a material throughput win.
 - The documented full-pipeline number is the latest recorded repo benchmark reference and should still be remeasured on a target broker/historian topology before sizing.
 
+### CGR Stream Slice Breakdown
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0
+```
+
+Latest local run on the current codebase:
+
+| Stage | Ops | Avg ms | P50 ms | P95 ms | P99 ms | Max ms | Ops/sec |
+|-------|-----|--------|--------|--------|--------|--------|---------|
+| mapping_validation | 10,000 | 0.0072 | 0.0066 | 0.0096 | 0.0160 | 0.3135 | 139,238.92 |
+| normalization | 10,000 | 0.0086 | 0.0080 | 0.0112 | 0.0189 | 0.3095 | 116,649.36 |
+| partitioning_window_scoring | 10,000 | 0.0334 | 0.0320 | 0.0434 | 0.0538 | 0.8415 | 29,970.54 |
+| serialization | 10,000 | 0.0109 | 0.0104 | 0.0143 | 0.0208 | 0.0928 | 91,859.42 |
+
+Interpretation:
+
+- the rolling window, stream-key derivation, and scoring slice is the dominant cost
+- validation and normalization are not the main bottleneck on this dataset
+- serialization is meaningful but still below the windowing/scoring cost
+- if the next optimization effort is about raw throughput, this is the stage that deserves the first redesign pass
+
 ## Test Suite Results
 
 | Test Category | Tests | Status |

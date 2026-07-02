@@ -50,6 +50,7 @@ graph TD
 - project-manifest rollout acceptance command that combines release-gate and benchmark checks
 - CGR gap report command that compares local benchmark numbers to the public CGR streaming claim
 - isolated CGR-style stream slice benchmark and gap report integration
+- CGR stream slice microbenchmark decomposition for validation, normalization, partitioning/window/scoring, and serialization
 
 ## Risks Being Addressed
 
@@ -110,3 +111,9 @@ graph TD
   - site-profile best latency run: demo-site at 0.0347 ms p99
 - the isolated stream slice confirmed the heavier cost sits in validation, normalization, windowing, scoring, and serialization rather than the host machine alone
 - the latest optimization pass stayed inside benchmark variance for replay, but the isolated slice shows the stack itself is the dominant bottleneck
+- `benchmark cgr-stream-slice --events 10000 --batch-size 256 --warmup-events 0`
+  - mapping + validation: 139,238.92 ops/sec
+  - normalization: 116,649.36 ops/sec
+  - partitioning + rolling window + scoring: 29,970.54 ops/sec
+  - serialization: 91,859.42 ops/sec
+- the rolling window + stream routing + scoring path is the dominant cost inside the isolated slice

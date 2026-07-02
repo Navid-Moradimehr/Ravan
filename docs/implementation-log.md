@@ -87,6 +87,16 @@
      - isolated slice: 15,723.62 events/sec with 0.1414 ms p99
    - This confirmed the main performance cost is in the software path itself, not just host hardware or the raw replay loop.
 
+19. **CGR stream slice microbenchmark decomposition**
+   - Extended `services/benchmarks/cgr_stream_slice.py` to measure mapping/validation, normalization, partitioning+windowing+scoring, and serialization separately.
+   - Added stage breakdown output to `datastreamctl benchmark cgr-stream-slice` and the CLI JSON path so operators can see which part dominates on their workload.
+   - Latest local run on the current codebase:
+     - mapping + validation: 139,238.92 ops/sec
+     - normalization: 116,649.36 ops/sec
+     - partitioning + rolling window + scoring: 29,970.54 ops/sec
+     - serialization: 91,859.42 ops/sec
+   - This showed the rolling window + stream routing + scoring path is the primary bottleneck inside the isolated slice.
+
 ### Verified
 
 - `python -m compileall services tests`: passed

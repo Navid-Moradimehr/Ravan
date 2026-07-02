@@ -16,6 +16,15 @@ This report summarizes the current benchmark state of the platform and compares 
 - Event normalization: `18,433,186 normalizations/sec`
 - Rule evaluation: `571,968 evals/sec`
 
+### CGR slice decomposition
+
+- mapping + validation: `139,238.92 ops/sec`
+- normalization: `116,649.36 ops/sec`
+- partitioning + rolling window + scoring: `29,970.54 ops/sec`
+- serialization: `91,859.42 ops/sec`
+
+The stage-level split shows the platform is not dominated by Pydantic validation or JSON serialization alone. The rolling window plus stream-key routing plus scoring path is the slowest part of the isolated slice and is the best candidate for a structural optimization pass.
+
 ### Rollout and acceptance
 
 - Site-profile matrix:
@@ -79,6 +88,7 @@ What this means in practice:
 - it is not yet at broker-tier streaming throughput parity with CGR Stream
 - local replay p99 is now measured and sits in the ~0.02-0.03 ms band on the current benchmark pack
 - the isolated stream slice shows the heavier cost is in validation, normalization, rolling windowing, scoring, and serialization rather than the raw CSV replay loop
+- the stage-level split shows the biggest cost is in partitioning, rolling windowing, and scoring rather than validation alone
 - the remaining latency gap is target-site broker/historian p99 on real plant hardware, which still needs separate validation
 - the new `cgr-gap-report` command now makes both throughput and replay-latency gaps explicit and repeatable on the local benchmark pack
 - the latest optimization pass did not materially change throughput; the small movement is consistent with benchmark variance, so the next jump needs a stack change rather than another minor patch
