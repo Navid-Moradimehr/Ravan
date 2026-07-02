@@ -60,6 +60,8 @@ Distributed runtime note:
 
 - The host-run Python processor remains the lightweight fallback for local development and direct benchmark work.
 - The Flink job in `services/processor/iot_anomaly_job.py` keys the stream by asset identity, maintains rolling state per key, and checkpoints state so the processor can be scaled horizontally in a real deployment.
+- Site profiles now carry an explicit `runtime.mode` value so operators can keep `python-fallback` for development sites, `flink-local` for plant-local deployments, and `flink-production` for multi-site rollouts.
+- The new `production-pipeline` benchmark command measures the selected runtime mode directly, which makes the fallback versus Flink gap visible in one report.
 ## Runbook
 
 ```powershell

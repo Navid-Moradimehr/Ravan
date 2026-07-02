@@ -62,6 +62,8 @@ graph TD
 - CGR streaming vs BI comparison note added, with Spark marked as optional for offline ETL and lakehouse workloads
 - optional MsgPack wire-format support added for the industrial event contract
 - end-to-end pipeline benchmark added for JSON vs MsgPack comparison
+- explicit runtime.mode contract added for python-fallback, flink-local, and flink-production
+- production-pipeline benchmark command added so the selected runtime mode can be measured directly
 - Docker-backed historian write validation now has a successful live benchmark result after bootstrapping the missing `processed_events` table
 - JSON hot-path simplification removed repeated wire-format resolution from `to_json_bytes`
 
@@ -141,6 +143,10 @@ graph TD
   - 36,842.39 events/sec, 0.0454 ms p99, 6,243,000 payload bytes
 - `benchmark end-to-end-pipeline --wire-format msgpack`
   - 35,424.11 events/sec, 0.0466 ms p99, 5,649,375 payload bytes
+- `benchmark production-pipeline --runtime-mode python-fallback`
+  - 34,229.38 events/sec, 0.0544 ms p99
+- `benchmark production-pipeline --runtime-mode flink-production`
+  - 41,771.06 events/sec, 0.0473 ms p99
 - `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
   - cgr_stream_slice: 40,438.38 events/sec, 0.0403 ms p99
   - flink_runtime_slice: 46,302.88 events/sec, 0.0342 ms p99

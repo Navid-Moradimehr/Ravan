@@ -1,5 +1,36 @@
 # Implementation Log
 
+## 2026-07-02 - Flink-First Runtime Mode Contract And Production Pipeline Benchmark
+
+### Changed
+
+1. **Explicit runtime mode contract**
+   - Added `runtime.mode` to site profiles with validated values for `python-fallback`, `flink-local`, and `flink-production`.
+   - Exported `RUNTIME_MODE` through site and project environment bundles so deployment tooling can branch on the selected execution plane.
+   - Updated the supervisor and CLI status surfaces to show the runtime mode alongside deployment mode.
+
+2. **Production pipeline benchmark surface**
+   - Added a `production-pipeline` benchmark command that runs the selected runtime mode explicitly.
+   - Kept the Python fallback and Flink-aligned paths measurable under one command so docs and regression notes can compare them directly.
+
+### Verified
+
+- `python -m compileall services tests`: passed
+- `uv run pytest -q tests/test_site_profiles.py tests/test_datastreamd.py tests/test_datastreamctl.py`: 50 passed
+- `uv run python -m services.cli.datastreamctl status --site-profile config/site-profiles/single-site.yaml`
+  - runtime_mode: python-fallback
+- `uv run python -m services.cli.datastreamctl benchmark production-pipeline --events 10000 --batch-size 256 --runtime-mode python-fallback --csv data/benchmarks/industrial_mixed_benchmark.csv`
+  - 34,229.38 events/sec
+  - 0.0544 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark production-pipeline --events 10000 --batch-size 256 --runtime-mode flink-production --csv data/benchmarks/industrial_mixed_benchmark.csv`
+  - 41,771.06 events/sec
+  - 0.0473 ms p99
+
+### Notes
+
+- On this host, the Flink-production benchmark path is about `22.0%` faster than the Python fallback benchmark path for the same replay pack and batch settings.
+- The current single-node measurements still carry host-load variance, but the direction of the gap is now consistent with the architecture goal.
+
 ## 2026-07-02 - JSON Hot-Path Simplification And Live Historian Write
 
 ### Changed

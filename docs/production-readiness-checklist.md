@@ -26,6 +26,8 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Open-weight and OpenAI-compatible model gateway abstraction exists.
 - Read-only agent infrastructure exists as a foundation.
 - Local and site-oriented benchmark harnesses exist.
+- Explicit `runtime.mode` contract exists for `python-fallback`, `flink-local`, and `flink-production`.
+- Production-pipeline benchmark command exists so the selected runtime mode can be measured directly.
 - Real-world simulator benchmark runner now exists for mock and mixed industrial replay cases.
 - Site-profile benchmark matrix exists for per-site acceptance runs.
 - Site-profile benchmark calibration reports exist for per-site sizing recommendations.
@@ -55,6 +57,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 
 - Per-site production benchmarking on the actual target broker and historian topology.
 - Live benchmark calibration using the target industrial network.
+- Production-pipeline validation against the real Flink/Kafka/Timescale deployment topology.
 - Repeatability checks over several benchmark sessions to separate regression noise from actual performance loss.
 - Model evaluation lifecycle and promotion workflow.
 - Diagnostic-agent runtime.
@@ -81,6 +84,7 @@ These are the changes that matter most before calling the platform production-re
 6. Treat benchmark session deltas as first-class evidence. A single local run can move 1-12 percent on the same machine, so use repeated runs and median/percentile tracking before calling a change a real regression.
 7. Keep the streaming hot path on Flink and reserve Spark for optional offline ETL and lakehouse jobs.
 8. Treat the wire format as a lever, not a cure-all. If JSON remains faster in Python on the target host, move the hot path into a compiled runtime before forcing binary serialization everywhere.
+9. Use the explicit runtime mode contract to keep `python-fallback` for local development and `flink-production` for real rollout targets.
 
 ## Session Delta Guidance
 

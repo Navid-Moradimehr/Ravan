@@ -23,6 +23,39 @@
 | Kafka producer cache | passed |
 | Manual consumer offset commit | passed |
 
+## Production Runtime Mode Contract Run
+
+- **Date**: 2026-07-02
+- **Scope**: explicit `runtime.mode` contract, runtime status reporting, and the new production-pipeline benchmark command
+
+### Targeted Regression Checks
+
+| Check | Result |
+|-------|--------|
+| `python -m compileall services tests` | passed |
+| Focused unit/regression tests | 50 passed |
+
+### Latest Benchmark Runs
+
+| Benchmark | Value |
+|-----------|-------|
+| Production pipeline throughput, `python-fallback` | 34,229.38 events/sec |
+| Production pipeline p99, `python-fallback` | 0.0544 ms |
+| Production pipeline throughput, `flink-production` | 41,771.06 events/sec |
+| Production pipeline p99, `flink-production` | 0.0473 ms |
+| CGR stream slice throughput | 41,258.38 events/sec |
+| CGR stream slice p99 | 0.0516 ms |
+| Flink runtime slice throughput | 42,918.27 events/sec |
+| Flink runtime slice p99 | 0.0448 ms |
+
+### Change Notes
+
+- The new `runtime.mode` contract makes the execution plane explicit in site profiles and exported environment bundles.
+- The `production-pipeline` benchmark lets the repo compare fallback and Flink-oriented execution paths under one command.
+- On this host, `flink-production` is about `22.0%` faster than `python-fallback` for the same replay pack and batch settings.
+- The Flink runtime slice is about `4.0%` faster than the CGR-style stream slice on this run, with a lower p99 as well.
+- These are still single-host measurements, so the numbers should be treated as baseline evidence rather than production sizing.
+
 ## Distributed Runtime Alignment Run
 
 - **Date**: 2026-07-02
