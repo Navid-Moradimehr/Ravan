@@ -104,3 +104,4 @@ graph TD
   - real-world simulator average: 68,236.68 events/sec, p99 0.0205 ms
   - site-profile average: 65,729.12 events/sec, p99 0.0285 ms
   - site-profile best latency run: plant-a at 0.0268 ms p99
+- session delta versus the previous CGR-gap run was small and mostly benchmark variance; no architecture-level throughput gain landed in this pass

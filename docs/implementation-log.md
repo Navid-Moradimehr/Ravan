@@ -77,6 +77,7 @@
      - site-profile average: 65,729.12 events/sec with 0.0285 ms p99
      - site-profile best latency run: plant-a at 0.0268 ms p99
    - The report now measures replay p99 latency directly while still leaving real target-site broker/historian latency for hardware validation.
+   - Session delta versus the previous CGR-gap run is small and mostly attributable to benchmark variance, not a throughput optimization. The mixed replay number moved from 65,938.49 to 68,606.16 events/sec, but the broader matrix did not shift in a consistent way.
 
 ### Verified
 
