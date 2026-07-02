@@ -29,6 +29,8 @@ from services.benchmarks.end_to_end_pipeline import format_result as format_end_
 from services.benchmarks.end_to_end_pipeline import run_benchmark as run_end_to_end_pipeline_benchmark
 from services.benchmarks.flink_runtime_slice import format_result as format_flink_runtime_slice_result
 from services.benchmarks.flink_runtime_slice import run_benchmark as run_flink_runtime_slice_benchmark
+from services.benchmarks.production_pipeline import format_result as format_production_pipeline_result
+from services.benchmarks.production_pipeline import run_benchmark as run_production_pipeline_benchmark
 from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
 from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
 from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
@@ -254,8 +256,37 @@ def cmd_status(args: argparse.Namespace) -> int:
     ai_status, ai_body = _http_get(f"{ai_base}/health")
     _print_row("AI gateway", f"{ai_base} -> {ai_status} {ai_body.get('status', 'n/a') if ai_status else ai_body.get('error', 'offline')}")
 
+    profile_path = getattr(args, "site_profile", None)
+    if profile_path:
+        try:
+            profile = load_site_profile(profile_path)
+            errors = validate_site_profile(profile)
+            _print_row("site profile", profile_path)
+            _print_row("deployment_mode", profile.deployment_mode)
+            _print_row("runtime_mode", profile.runtime.mode)
+            _print_row("site_profile_valid", "yes" if not errors else "no")
+            if errors:
+                _print_row("validation_errors", "; ".join(errors))
+        except Exception as exc:
+            _print_row("site profile", profile_path)
+            _print_row("site_profile_valid", "no")
+            _print_row("site_profile_error", exc)
+
     if args.json:
-        print(json.dumps({"api": {"status": api_status, "body": api_body}, "ai": {"status": ai_status, "body": ai_body}}, indent=2))
+        payload = {"api": {"status": api_status, "body": api_body}, "ai": {"status": ai_status, "body": ai_body}}
+        if profile_path:
+            try:
+                profile = load_site_profile(profile_path)
+                errors = validate_site_profile(profile)
+                payload["site_profile"] = {
+                    "path": profile_path,
+                    "profile": profile.to_dict(),
+                    "errors": errors,
+                    "valid": not errors,
+                }
+            except Exception as exc:
+                payload["site_profile"] = {"path": profile_path, "errors": [str(exc)], "valid": False}
+        print(json.dumps(payload, indent=2))
     return 0
 
 
@@ -348,6 +379,7 @@ def cmd_site_profile(args: argparse.Namespace) -> int:
             _print_row("path", args.path)
             _print_row("profile_id", profile.profile_id)
             _print_row("deployment_mode", profile.deployment_mode)
+            _print_row("runtime_mode", profile.runtime.mode)
             _print_row("site_id", profile.site.id)
             _print_row("site_name", profile.site.name)
             _print_row("region", profile.site.region)
@@ -1080,6 +1112,57 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("=" * 40)
             print(format_flink_runtime_slice_result(result))
         return 0
+    if args.action == "production-pipeline":
+        result = run_production_pipeline_benchmark(
+            Path(args.csv),
+            target_events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            window_limit=args.window_limit,
+            runtime_mode=args.runtime_mode,
+            wire_format=args.wire_format,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "csv_path": result.csv_path,
+                    "runtime_mode": result.runtime_mode,
+                    "execution_path": result.execution_path,
+                    "events": result.events,
+                    "invalid_events": result.invalid_events,
+                    "batches": result.batches,
+                    "batch_size": result.batch_size,
+                    "window_limit": result.window_limit,
+                    "elapsed_seconds": result.elapsed_seconds,
+                    "events_per_second": result.events_per_second,
+                    "serialized_bytes": result.serialized_bytes,
+                    "roundtrip_bytes": result.roundtrip_bytes,
+                    "latency_p50_ms": result.latency_p50_ms,
+                    "latency_p95_ms": result.latency_p95_ms,
+                    "latency_p99_ms": result.latency_p99_ms,
+                    "latency_max_ms": result.latency_max_ms,
+                    "stage_breakdown": [
+                        {
+                            "name": stage.name,
+                            "operations": stage.operations,
+                            "elapsed_seconds": stage.elapsed_seconds,
+                            "events_per_second": stage.events_per_second,
+                            "avg_ms": stage.avg_ms,
+                            "latency_p50_ms": stage.latency_p50_ms,
+                            "latency_p95_ms": stage.latency_p95_ms,
+                            "latency_p99_ms": stage.latency_p99_ms,
+                            "latency_max_ms": stage.latency_max_ms,
+                        }
+                        for stage in result.stage_breakdown
+                    ],
+                },
+                indent=2,
+            ))
+        else:
+            print("production pipeline benchmark")
+            print("=" * 40)
+            print(format_production_pipeline_result(result))
+        return 0
     if args.action == "end-to-end-pipeline":
         result = run_end_to_end_pipeline_benchmark(
             Path(args.csv),
@@ -1141,8 +1224,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ai-base", default=DEFAULT_AI_BASE, help=f"AI gateway base URL (default: {DEFAULT_AI_BASE})")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("status", help="Show runtime status of API and AI services").set_defaults(func=cmd_status)
+    status = sub.add_parser("status", help="Show runtime status of API and AI services")
+    status.add_argument("--site-profile", default=os.getenv("DATASTREAM_SITE_PROFILE"), help="Optional site profile YAML")
+    status.set_defaults(func=cmd_status)
     status_json = sub.add_parser("status-json", help="Show runtime status as JSON")
+    status_json.add_argument("--site-profile", default=os.getenv("DATASTREAM_SITE_PROFILE"), help="Optional site profile YAML")
     status_json.set_defaults(func=cmd_status)
     status_json.add_argument("--json", action="store_true", default=True)
 
@@ -1324,6 +1410,16 @@ def build_parser() -> argparse.ArgumentParser:
     flink_runtime_slice.add_argument("--window-limit", type=int, default=25)
     flink_runtime_slice.add_argument("--json", action="store_true")
     flink_runtime_slice.set_defaults(func=cmd_benchmark)
+    production_pipeline = benchmark_sub.add_parser("production-pipeline", help="Benchmark the selected production runtime mode")
+    production_pipeline.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    production_pipeline.add_argument("--events", type=int, default=10_000)
+    production_pipeline.add_argument("--batch-size", type=int, default=256)
+    production_pipeline.add_argument("--warmup-events", type=int, default=0)
+    production_pipeline.add_argument("--window-limit", type=int, default=25)
+    production_pipeline.add_argument("--runtime-mode", choices=("python-fallback", "flink-local", "flink-production"), default="python-fallback")
+    production_pipeline.add_argument("--wire-format", choices=("json", "msgpack"), default="json")
+    production_pipeline.add_argument("--json", action="store_true")
+    production_pipeline.set_defaults(func=cmd_benchmark)
     end_to_end_pipeline = benchmark_sub.add_parser("end-to-end-pipeline", help="Benchmark the end-to-end pipeline with selectable wire format")
     end_to_end_pipeline.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
     end_to_end_pipeline.add_argument("--events", type=int, default=10_000)

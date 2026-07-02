@@ -10,6 +10,7 @@ site:
 
 runtime:
   image_tag: latest
+  mode: flink-local
   redpanda_brokers: redpanda.plant-a.svc.cluster.local:9092
   historian_backend: timescaledb
   ai:

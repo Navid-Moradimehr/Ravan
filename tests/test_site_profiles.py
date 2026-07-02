@@ -14,6 +14,7 @@ def test_load_single_site_profile():
     assert profile.profile_id == "single-site-demo"
     assert profile.site.id == "demo-site"
     assert profile.deployment_mode == "single-site"
+    assert profile.runtime.mode == "python-fallback"
 
 
 def test_federated_profile_requires_endpoint(tmp_path):
@@ -50,6 +51,43 @@ federation:
     profile = load_site_profile(path)
     errors = validate_site_profile(profile)
     assert any("central_endpoint" in error for error in errors)
+
+
+def test_runtime_mode_validation_rejects_unknown_mode(tmp_path):
+    path = tmp_path / "bad-mode.yaml"
+    path.write_text(
+        """
+schema_version: 1
+profile_id: bad-mode
+deployment_mode: single-site
+site:
+  id: demo
+  name: Demo
+  region: test
+  network_zone: ops
+runtime:
+  image_tag: latest
+  mode: invalid-mode
+  redpanda_brokers: localhost:9092
+  historian_backend: timescaledb
+  ai:
+    provider: disabled
+    endpoint_url: ""
+    model_id: ""
+    local_only: true
+backups:
+  directory: backups/demo
+  schedule: daily
+  retention_days: 7
+federation:
+  enabled: false
+  export_mode: none
+        """.strip(),
+        encoding="utf-8",
+    )
+    profile = load_site_profile(path)
+    errors = validate_site_profile(profile)
+    assert any("runtime.mode" in error for error in errors)
 
 
 if __name__ == "__main__":

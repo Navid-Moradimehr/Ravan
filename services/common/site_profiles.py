@@ -8,6 +8,7 @@ import yaml
 
 
 VALID_DEPLOYMENT_MODES = {"single-site", "plant-local", "federated"}
+VALID_RUNTIME_MODES = {"python-fallback", "flink-local", "flink-production"}
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class AIBackendProfile:
 @dataclass(frozen=True)
 class RuntimeProfile:
     image_tag: str
+    mode: str
     redpanda_brokers: str
     historian_backend: str
     ai: AIBackendProfile
@@ -69,6 +71,7 @@ class SiteProfile:
             "REGION": self.site.region,
             "NETWORK_ZONE": self.site.network_zone,
             "DEPLOYMENT_MODE": self.deployment_mode,
+            "RUNTIME_MODE": self.runtime.mode,
             "REDPANDA_BROKERS": self.runtime.redpanda_brokers,
             "HISTORIAN_BACKEND": self.runtime.historian_backend,
             "LLM_PROVIDER": self.runtime.ai.provider,
@@ -98,10 +101,16 @@ def load_site_profile(path: Path | str) -> SiteProfile:
     backups = data.get("backups") or {}
     federation = data.get("federation") or {}
 
+    deployment_mode = str(data.get("deployment_mode", "")).strip()
+    default_runtime_mode = {
+        "single-site": "python-fallback",
+        "plant-local": "flink-local",
+        "federated": "flink-production",
+    }.get(deployment_mode, "python-fallback")
     return SiteProfile(
         schema_version=int(data.get("schema_version", 1)),
         profile_id=str(data.get("profile_id", "")).strip(),
-        deployment_mode=str(data.get("deployment_mode", "")).strip(),
+        deployment_mode=deployment_mode,
         site=SiteIdentity(
             id=str(site.get("id", "")).strip(),
             name=str(site.get("name", "")).strip(),
@@ -110,6 +119,7 @@ def load_site_profile(path: Path | str) -> SiteProfile:
         ),
         runtime=RuntimeProfile(
             image_tag=str(runtime.get("image_tag", "latest")).strip(),
+            mode=str(runtime.get("mode", default_runtime_mode)).strip() or default_runtime_mode,
             redpanda_brokers=str(runtime.get("redpanda_brokers", "")).strip(),
             historian_backend=str(runtime.get("historian_backend", "timescaledb")).strip(),
             ai=AIBackendProfile(
@@ -142,6 +152,8 @@ def validate_site_profile(profile: SiteProfile) -> list[str]:
         errors.append("profile_id is required")
     if profile.deployment_mode not in VALID_DEPLOYMENT_MODES:
         errors.append(f"deployment_mode must be one of {sorted(VALID_DEPLOYMENT_MODES)}")
+    if profile.runtime.mode not in VALID_RUNTIME_MODES:
+        errors.append(f"runtime.mode must be one of {sorted(VALID_RUNTIME_MODES)}")
     if not profile.site.id:
         errors.append("site.id is required")
     if not profile.site.name:
@@ -168,4 +180,3 @@ def validate_site_profile(profile: SiteProfile) -> list[str]:
         errors.append("federation.export_mode must be 'none' when federation is disabled")
 
     return errors
-

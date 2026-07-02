@@ -68,6 +68,15 @@ class TestSupervisorLifecycle:
         for name in ("api", "ai", "edge", "processor", "mock"):
             assert name in out
 
+    def test_status_reports_runtime_mode_for_site_profile(self, tmp_path):
+        profile = Path(__file__).resolve().parents[1] / "config" / "site-profiles" / "single-site.yaml"
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = d.main(["status", "--site-profile", str(profile)])
+        out = buf.getvalue()
+        assert rc == 0
+        assert "runtime_mode=python-fallback" in out
+
     def test_down_with_nothing_running_is_clean(self, monkeypatch, tmp_path):
         monkeypatch.setattr(d, "PID_DIR", tmp_path)
         monkeypatch.setattr(d, "PID_FILE", tmp_path / "processes.json")
@@ -81,6 +90,7 @@ class TestSupervisorLifecycle:
         env, meta = d._load_site_profile_context(str(profile))
         assert env["SITE_ID"] == "demo-site"
         assert meta["deployment_mode"] == "single-site"
+        assert meta["runtime_mode"] == "python-fallback"
 
 
 if __name__ == "__main__":

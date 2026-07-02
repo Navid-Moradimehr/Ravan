@@ -94,6 +94,7 @@ class ProcRecord:
     site_profile: str = ""
     site_id: str = ""
     deployment_mode: str = ""
+    runtime_mode: str = ""
     project_manifest: str = ""
     project_id: str = ""
 
@@ -154,6 +155,7 @@ def _load_site_profile_context(path: str | None) -> tuple[dict[str, str], dict[s
             "site_profile": str(path),
             "site_id": profile.site.id,
             "deployment_mode": profile.deployment_mode,
+            "runtime_mode": profile.runtime.mode,
         },
     )
 
@@ -196,6 +198,7 @@ def _load_project_manifest_context(path: str | None, site_id: str | None = None)
         "site_profile": selected_site.profile_path,
         "site_id": selected_site.site_id,
         "deployment_mode": profile.deployment_mode,
+        "runtime_mode": profile.runtime.mode,
     }
     return env, meta
 
@@ -232,6 +235,7 @@ def _start_one(spec: ServiceSpec, extra_env: dict[str, str] | None = None, profi
         site_profile=(profile_meta or {}).get("site_profile", ""),
         site_id=(profile_meta or {}).get("site_id", ""),
         deployment_mode=(profile_meta or {}).get("deployment_mode", ""),
+        runtime_mode=(profile_meta or {}).get("runtime_mode", ""),
         project_manifest=(profile_meta or {}).get("project_manifest", ""),
         project_id=(profile_meta or {}).get("project_id", ""),
     )
@@ -351,11 +355,30 @@ def cmd_status(args: argparse.Namespace) -> int:
             any_dead = True
         print(f"{name:<12}{state:<24}{spec.description}")
         if rec and (rec.site_id or rec.deployment_mode):
-            print(f"{'':12}{'':24}site={rec.site_id or 'n/a'} mode={rec.deployment_mode or 'n/a'}")
+            print(
+                f"{'':12}{'':24}site={rec.site_id or 'n/a'} mode={rec.deployment_mode or 'n/a'} "
+                f"runtime={rec.runtime_mode or 'n/a'}"
+            )
         if rec and (rec.project_id or rec.project_manifest):
             print(f"{'':12}{'':24}project={rec.project_id or 'n/a'} manifest={rec.project_manifest or 'n/a'}")
         if args.json:
             pass
+
+    profile_path = getattr(args, "site_profile", None)
+    if profile_path:
+        try:
+            profile = load_site_profile(profile_path)
+            errors = validate_site_profile(profile)
+            print(f"{'':12}{'':24}site_profile={profile_path}")
+            print(f"{'':12}{'':24}runtime_mode={profile.runtime.mode}")
+            print(f"{'':12}{'':24}site_profile_valid={'yes' if not errors else 'no'}")
+            if errors:
+                print(f"{'':12}{'':24}validation_errors={' ; '.join(errors)}")
+        except Exception as exc:
+            print(f"{'':12}{'':24}site_profile={profile_path}")
+            print(f"{'':12}{'':24}site_profile_valid=no")
+            print(f"{'':12}{'':24}site_profile_error={exc}")
+
     if args.json:
         payload = {
             name: {
@@ -364,10 +387,23 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "module": spec.module,
                 "site_id": records[name].site_id if records.get(name) else "",
                 "deployment_mode": records[name].deployment_mode if records.get(name) else "",
+                "runtime_mode": records[name].runtime_mode if records.get(name) else "",
                 "site_profile": records[name].site_profile if records.get(name) else "",
             }
             for name, spec in ((n, SPEC_BY_NAME[n]) for n in DEFAULT_ORDER)
         }
+        if profile_path:
+            try:
+                profile = load_site_profile(profile_path)
+                errors = validate_site_profile(profile)
+                payload["site_profile"] = {
+                    "path": profile_path,
+                    "profile": profile.to_dict(),
+                    "errors": errors,
+                    "valid": not errors,
+                }
+            except Exception as exc:
+                payload["site_profile"] = {"path": profile_path, "errors": [str(exc)], "valid": False}
         print(json.dumps(payload, indent=2))
     return 1 if any_dead and args.fail_on_down else 0
 
@@ -433,6 +469,7 @@ def build_parser() -> argparse.ArgumentParser:
     status = sub.add_parser("status", help="Show service status")
     status.add_argument("--json", action="store_true")
     status.add_argument("--fail-on-down", action="store_true")
+    status.add_argument("--site-profile", default=os.getenv("DATASTREAM_SITE_PROFILE"), help="Optional site profile YAML")
     status.set_defaults(func=cmd_status)
 
     restart = sub.add_parser("restart", help="Restart services")
