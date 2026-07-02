@@ -1,5 +1,43 @@
 # Implementation Log
 
+## 2026-07-02 - Rust Hot-Path Experiment And Live Historian Write
+
+### Changed
+
+1. **Compiled hot-path experiment**
+   - Added `rust/fastpath` as a PyO3 extension for stream-partition keying and wire serialization experiments.
+   - Measured the compiled wire path against the existing Python/orjson/msgpack path on the same host.
+   - The Rust encode bridge was slower than the default Python path for this code shape, so the default runtime wire serialization was reverted to the Python implementation.
+
+2. **Measurement guardrail**
+   - Added an environment switch so the Rust path can still be toggled for experiments without forcing it into the default flow.
+   - The benchmark docs now record both the regressed Rust-path results and the restored default-path numbers.
+
+3. **Live historian validation**
+   - Bootstrapped the missing `processed_events` table in the Docker-backed Postgres service.
+   - Reran the mixed replay benchmark with `--live-db` and captured a successful historian write rate from the live container.
+
+### Verified
+
+- `uv run maturin develop -m rust/fastpath/Cargo.toml`: passed
+- `uv run pytest -q tests/test_wire_format.py tests/test_end_to_end_pipeline_benchmark.py tests/test_datastreamctl.py -k "benchmark_cgr_gap_report_runs or benchmark_flink_runtime_slice_runs or benchmark_end_to_end_pipeline_runs"`: 3 passed
+- `uv run python -m services.cli.datastreamctl benchmark end-to-end-pipeline --events 10000 --batch-size 256 --warmup-events 0 --wire-format json`
+  - Rust path enabled: 11,350.74 events/sec, 0.1166 ms p99
+  - Default path: 36,569.38 events/sec, 0.0585 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark end-to-end-pipeline --events 10000 --batch-size 256 --warmup-events 0 --wire-format msgpack`
+  - Rust path enabled: 17,140.69 events/sec, 0.0786 ms p99
+  - Default path: 35,025.18 events/sec, 0.0492 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
+  - default-path rerun: mixed_replay 77,864.58 events/sec, cgr_stream_slice 38,567.06 events/sec, flink_runtime_slice 43,648.20 events/sec
+- `uv run python scripts/benchmark_mixed_replay.py --events 10000 --batch-size 256 --warmup-events 0 --live-db`
+  - 10,069.22 events/sec
+  - live DB write rate: 11,483.29 events/sec
+
+### Notes
+
+- the same-host comparison is the clearest evidence we have here, and it shows the Rust wire-serialization bridge is not a net win for this repository
+- the live historian benchmark validates the Docker-backed DB path, but target industrial-network sizing is still outstanding
+
 ## 2026-07-02 - Flink Window-State Alignment and CGR/Spark Policy
 
 ### Changed

@@ -15,7 +15,6 @@ try:
 except ImportError:  # pragma: no cover - optional fast path
     orjson = None
 
-
 WIRE_FORMAT_JSON = "json"
 WIRE_FORMAT_MSGPACK = "msgpack"
 

@@ -26,6 +26,7 @@ Packaging and installer work is intentionally not part of this phase.
 - site-profile benchmark matrix for per-site acceptance runs
 - site-profile benchmark calibration reports for per-site sizing recommendations
 - CGR gap report command for comparing local measurements against the public CGR streaming claim
+- Docker-backed historian write validation for the local replay path
 - dataset conversion workflow for AI4I, C-MAPSS, and generic industrial CSV slices
 - synthetic and replay datasets for regression tests
 - expanded observability for historian query latency, broker lag, and WebSocket delivery lag
@@ -41,6 +42,7 @@ Packaging and installer work is intentionally not part of this phase.
 - supervised action-agent runtime
 - broader connector and vendor validation against actual devices
 - enterprise rollout validation across branches, plants, and subnets
+- live industrial-network historian sizing and broker latency validation on customer topology
 
 ## Foundation Only
 
@@ -67,6 +69,7 @@ Packaging and installer work is intentionally not part of this phase.
 - combined release-gate and benchmark acceptance reports
 - CGR gap report and gap ratios for local benchmark packs
 - replay p99 latency probes for the local benchmark stack
+- same-host fast-path A/B benchmarks before introducing compiled runtime dependencies
 
 ## Links
 
