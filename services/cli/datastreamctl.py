@@ -898,6 +898,17 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                         }
                         for metric in result.metrics
                     ],
+                    "latency_metrics": [
+                        {
+                            "label": metric.label,
+                            "observed_p99_ms": metric.observed_p99_ms,
+                            "target_p99_ms": metric.target_p99_ms,
+                            "gap_ms": metric.gap_ms,
+                            "gap_percent": metric.gap_percent,
+                            "note": metric.note,
+                        }
+                        for metric in result.latency_metrics
+                    ],
                     "latency_note": result.latency_note,
                 },
                 indent=2,

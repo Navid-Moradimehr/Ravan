@@ -23,6 +23,10 @@ class BenchmarkResult:
     elapsed_seconds: float
     events_per_second: float
     serialized_bytes: int
+    latency_p50_ms: float = 0.0
+    latency_p95_ms: float = 0.0
+    latency_p99_ms: float = 0.0
+    latency_max_ms: float = 0.0
     live_db_events_per_second: float | None = None
 
 
@@ -50,6 +54,20 @@ def _load_rows(csv_path: Path) -> list[dict[str, str]]:
     if not rows:
         raise ValueError(f"benchmark input is empty: {csv_path}")
     return rows
+
+
+def _percentile(values: list[float], percentile: float) -> float:
+    if not values:
+        return 0.0
+    if len(values) == 1:
+        return round(values[0], 4)
+    ordered = sorted(values)
+    rank = (percentile / 100.0) * (len(ordered) - 1)
+    lower = int(rank)
+    upper = min(lower + 1, len(ordered) - 1)
+    weight = rank - lower
+    value = ordered[lower] * (1.0 - weight) + ordered[upper] * weight
+    return round(value, 4)
 
 
 def _process_row(row: dict[str, str]) -> tuple[dict[str, Any] | None, bytes | None]:
@@ -81,6 +99,7 @@ def run_benchmark(
     batches = 0
     serialized_bytes = 0
     batch: list[dict[str, Any]] = []
+    latencies_ms: list[float] = []
 
     start = time.perf_counter()
     rows_iter = cycle(rows)
@@ -103,13 +122,16 @@ def run_benchmark(
 
     for index in range(total_iterations):
         row = next(rows_iter)
+        event_started = time.perf_counter()
         normalized, payload = _process_row(row)
+        event_elapsed_ms = (time.perf_counter() - event_started) * 1000.0
         if normalized is None or payload is None:
             invalid_events += 1
             continue
 
         if index >= warmup_events:
             events += 1
+            latencies_ms.append(event_elapsed_ms)
             batch.append(normalized)
             serialized_bytes += len(payload)
             if len(batch) >= batch_size:
@@ -131,6 +153,10 @@ def run_benchmark(
         elapsed_seconds=round(elapsed, 4),
         events_per_second=round(events / elapsed, 2),
         serialized_bytes=serialized_bytes,
+        latency_p50_ms=_percentile(latencies_ms, 50.0),
+        latency_p95_ms=_percentile(latencies_ms, 95.0),
+        latency_p99_ms=_percentile(latencies_ms, 99.0),
+        latency_max_ms=round(max(latencies_ms), 4) if latencies_ms else 0.0,
         live_db_events_per_second=live_db_eps,
     )
 
@@ -145,6 +171,10 @@ def format_result(result: BenchmarkResult) -> str:
         f"elapsed_seconds={result.elapsed_seconds}",
         f"events_per_second={result.events_per_second}",
         f"serialized_bytes={result.serialized_bytes}",
+        f"latency_p50_ms={result.latency_p50_ms}",
+        f"latency_p95_ms={result.latency_p95_ms}",
+        f"latency_p99_ms={result.latency_p99_ms}",
+        f"latency_max_ms={result.latency_max_ms}",
     ]
     if result.live_db_events_per_second is not None:
         lines.append(f"live_db_events_per_second={result.live_db_events_per_second}")

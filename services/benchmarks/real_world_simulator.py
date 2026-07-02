@@ -23,6 +23,10 @@ class RealWorldSimulatorCase:
     elapsed_seconds: float
     events_per_second: float
     serialized_bytes: int
+    latency_p50_ms: float
+    latency_p95_ms: float
+    latency_p99_ms: float
+    latency_max_ms: float
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,12 @@ class RealWorldSimulatorResult:
         if not self.cases:
             return 0.0
         return round(sum(case.events_per_second for case in self.cases) / len(self.cases), 2)
+
+    @property
+    def average_latency_p99_ms(self) -> float:
+        if not self.cases:
+            return 0.0
+        return round(sum(case.latency_p99_ms for case in self.cases) / len(self.cases), 4)
 
 
 def _mock_case_csv(csv_path: Path, preset: str, scenario: str, events: int) -> None:
@@ -79,6 +89,10 @@ def _run_single_case(
         elapsed_seconds=replay.elapsed_seconds,
         events_per_second=replay.events_per_second,
         serialized_bytes=replay.serialized_bytes,
+        latency_p50_ms=replay.latency_p50_ms,
+        latency_p95_ms=replay.latency_p95_ms,
+        latency_p99_ms=replay.latency_p99_ms,
+        latency_max_ms=replay.latency_max_ms,
     )
 
 
@@ -135,16 +149,16 @@ def run_suite(
 
 def format_result(result: RealWorldSimulatorResult) -> str:
     lines = [
-        "case_id | source | scenario | events/sec | batches | invalid_events",
-        "-" * 86,
+        "case_id | source | scenario | events/sec | p99_ms | batches | invalid_events",
+        "-" * 100,
     ]
     for case in result.cases:
         lines.append(
-            f"{case.case_id} | {case.source} | {case.scenario} | {case.events_per_second} | {case.batches} | {case.invalid_events}"
+            f"{case.case_id} | {case.source} | {case.scenario} | {case.events_per_second} | {case.latency_p99_ms} | {case.batches} | {case.invalid_events}"
         )
     if result.cases:
-        lines.append("-" * 86)
-        lines.append(f"avg | - | - | {result.average_events_per_second} | - | -")
+        lines.append("-" * 100)
+        lines.append(f"avg | - | - | {result.average_events_per_second} | {result.average_latency_p99_ms} | - | -")
     return "\n".join(lines)
 
 

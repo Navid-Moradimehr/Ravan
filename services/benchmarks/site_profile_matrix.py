@@ -16,6 +16,7 @@ class SiteProfileBenchmarkResult:
     deployment_mode: str
     profile_path: str
     average_events_per_second: float
+    latency_p99_ms: float
     passed: bool
     detail: str
     simulator: RealWorldSimulatorResult
@@ -67,13 +68,17 @@ def run_matrix(
         threshold = _threshold_for_mode(profile.deployment_mode, min_average_events_per_second)
         average = simulator.average_events_per_second
         passed = average >= threshold and all(case.invalid_events == 0 for case in simulator.cases)
-        detail = f"threshold={threshold} avg={average} invalid_events_ok={all(case.invalid_events == 0 for case in simulator.cases)}"
+        detail = (
+            f"threshold={threshold} avg={average} p99={simulator.average_latency_p99_ms} "
+            f"invalid_events_ok={all(case.invalid_events == 0 for case in simulator.cases)}"
+        )
         runs.append(
             SiteProfileBenchmarkResult(
                 site_id=site.site_id,
                 deployment_mode=profile.deployment_mode,
                 profile_path=site.profile_path,
                 average_events_per_second=average,
+                latency_p99_ms=simulator.average_latency_p99_ms,
                 passed=passed,
                 detail=detail,
                 simulator=simulator,
@@ -84,15 +89,15 @@ def run_matrix(
 
 def format_result(result: SiteProfileMatrixResult) -> str:
     lines = [
-        "site_id | deployment_mode | avg_events/sec | passed | detail",
-        "-" * 90,
+        "site_id | deployment_mode | avg_events/sec | p99_ms | passed | detail",
+        "-" * 104,
     ]
     for run in result.runs:
         lines.append(
-            f"{run.site_id} | {run.deployment_mode} | {run.average_events_per_second} | {str(run.passed).lower()} | {run.detail}"
+            f"{run.site_id} | {run.deployment_mode} | {run.average_events_per_second} | {run.latency_p99_ms} | {str(run.passed).lower()} | {run.detail}"
         )
     if result.runs:
-        lines.append("-" * 90)
+        lines.append("-" * 104)
         lines.append(f"overall | - | - | {str(result.passed).lower()} | -")
     return "\n".join(lines)
 

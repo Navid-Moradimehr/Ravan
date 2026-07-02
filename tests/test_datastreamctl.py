@@ -428,9 +428,11 @@ class TestDatastreamctl:
                     elapsed_seconds=0.1,
                     events_per_second=58_548.76,
                     serialized_bytes=512,
+                    latency_p99_ms=0.12,
                 ),
                 real_world_simulator=SimpleNamespace(
                     average_events_per_second=33_242.66,
+                    average_latency_p99_ms=0.09,
                     cases=(),
                 ),
                 site_profile_matrix=SimpleNamespace(
@@ -448,7 +450,17 @@ class TestDatastreamctl:
                         note="current replay path",
                     ),
                 ),
-                latency_note="p99 not measured",
+                latency_metrics=(
+                    SimpleNamespace(
+                        label="mixed_replay",
+                        observed_p99_ms=0.12,
+                        target_p99_ms=80.0,
+                        gap_ms=79.88,
+                        gap_percent=99.85,
+                        note="current replay path",
+                    ),
+                ),
+                latency_note="p99 measured",
             ),
         )
         rc, out = self._run([
@@ -467,6 +479,7 @@ class TestDatastreamctl:
         assert "cgr gap report" in out
         assert "mixed_replay" in out
         assert "gap_x" in out
+        assert "latency metric" in out
 
 
 if __name__ == "__main__":

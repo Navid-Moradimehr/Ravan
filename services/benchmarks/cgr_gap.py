@@ -30,6 +30,16 @@ class GapMetric:
 
 
 @dataclass(frozen=True)
+class LatencyMetric:
+    label: str
+    observed_p99_ms: float
+    target_p99_ms: float
+    gap_ms: float
+    gap_percent: float
+    note: str
+
+
+@dataclass(frozen=True)
 class CgrGapReport:
     cgr_target_events_per_second: float
     cgr_target_p99_ms: float
@@ -39,6 +49,7 @@ class CgrGapReport:
     real_world_simulator: RealWorldSimulatorResult
     site_profile_matrix: SiteProfileMatrixResult
     metrics: tuple[GapMetric, ...]
+    latency_metrics: tuple[LatencyMetric, ...]
     latency_note: str
 
     @property
@@ -127,6 +138,28 @@ def run_report(
             "average across the simulated real-world benchmark cases",
         ),
     ]
+    latency_metrics = [
+        LatencyMetric(
+            label="mixed_replay",
+            observed_p99_ms=mixed_replay.latency_p99_ms,
+            target_p99_ms=cgr_target_p99_ms,
+            gap_ms=round(cgr_target_p99_ms - mixed_replay.latency_p99_ms, 4),
+            gap_percent=round((1.0 - (mixed_replay.latency_p99_ms / cgr_target_p99_ms)) * 100.0, 2)
+            if cgr_target_p99_ms > 0
+            else 0.0,
+            note="current replay path over the mixed industrial pack",
+        ),
+        LatencyMetric(
+            label="real_world_average",
+            observed_p99_ms=real_world_simulator.average_latency_p99_ms,
+            target_p99_ms=cgr_target_p99_ms,
+            gap_ms=round(cgr_target_p99_ms - real_world_simulator.average_latency_p99_ms, 4),
+            gap_percent=round((1.0 - (real_world_simulator.average_latency_p99_ms / cgr_target_p99_ms)) * 100.0, 2)
+            if cgr_target_p99_ms > 0
+            else 0.0,
+            note="average across the simulated real-world benchmark cases",
+        ),
+    ]
     if site_profile_matrix.runs:
         metrics.append(
             _gap_metric(
@@ -143,10 +176,36 @@ def run_report(
                 f"best selected site profile ({best_run.deployment_mode})",
             )
         )
+        average_latency = round(sum(run.latency_p99_ms for run in site_profile_matrix.runs) / len(site_profile_matrix.runs), 4)
+        best_latency_run = min(site_profile_matrix.runs, key=lambda run: run.latency_p99_ms)
+        latency_metrics.append(
+            LatencyMetric(
+                label="site_profile_average",
+                observed_p99_ms=average_latency,
+                target_p99_ms=cgr_target_p99_ms,
+                gap_ms=round(cgr_target_p99_ms - average_latency, 4),
+                gap_percent=round((1.0 - (average_latency / cgr_target_p99_ms)) * 100.0, 2)
+                if cgr_target_p99_ms > 0
+                else 0.0,
+                note="average across selected site profiles",
+            )
+        )
+        latency_metrics.append(
+            LatencyMetric(
+                label=f"site_profile_best:{best_latency_run.site_id}",
+                observed_p99_ms=best_latency_run.latency_p99_ms,
+                target_p99_ms=cgr_target_p99_ms,
+                gap_ms=round(cgr_target_p99_ms - best_latency_run.latency_p99_ms, 4),
+                gap_percent=round((1.0 - (best_latency_run.latency_p99_ms / cgr_target_p99_ms)) * 100.0, 2)
+                if cgr_target_p99_ms > 0
+                else 0.0,
+                note=f"best latency site profile ({best_latency_run.deployment_mode})",
+            )
+        )
 
     latency_note = (
-        f"Current suite does not measure end-to-end p99 latency; compare against the CGR target of "
-        f"{cgr_target_p99_ms} ms after adding transport and historian timing probes."
+        f"Current suite now measures replay p99 latency; compare it against the CGR target of "
+        f"{cgr_target_p99_ms} ms."
     )
 
     return CgrGapReport(
@@ -158,6 +217,7 @@ def run_report(
         real_world_simulator=real_world_simulator,
         site_profile_matrix=site_profile_matrix,
         metrics=tuple(metrics),
+        latency_metrics=tuple(latency_metrics),
         latency_note=latency_note,
     )
 
@@ -182,6 +242,16 @@ def format_result(result: CgrGapReport) -> str:
         lines.append(
             f"{metric.label} | {metric.observed_events_per_second} | {metric.gap_multiplier} | "
             f"{metric.gap_events_per_second} | {metric.gap_percent} | {metric.note}"
+        )
+    lines.extend([
+        "",
+        "latency metric | observed_p99_ms | target_p99_ms | gap_ms | gap_percent | note",
+        "-" * 100,
+    ])
+    for metric in result.latency_metrics:
+        lines.append(
+            f"{metric.label} | {metric.observed_p99_ms} | {metric.target_p99_ms} | "
+            f"{metric.gap_ms} | {metric.gap_percent} | {metric.note}"
         )
     return "\n".join(lines)
 
