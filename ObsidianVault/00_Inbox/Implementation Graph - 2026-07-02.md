@@ -46,6 +46,7 @@ graph TD
 - regression tests for shared-deployment auth and headers
 - site-profile benchmark matrix for per-site acceptance runs
 - project-manifest rollout acceptance command that combines release-gate and benchmark checks
+- CGR gap report command that compares local benchmark numbers to the public CGR streaming claim
 
 ## Risks Being Addressed
 
@@ -58,6 +59,7 @@ graph TD
 - invisible lag on historian query and stream delivery paths
 - missing runnable benchmark matrix for repeatable real-world simulation cases
 - missing per-site acceptance benchmark matrix
+- missing first-class CGR gap report
 - unauthenticated mutating API requests in shared deployments
 
 ## Verification
@@ -65,6 +67,7 @@ graph TD
 - focused unit tests
 - focused benchmark runs
 - vault notes updated with results and decisions
+- CGR gap report verified against the current local benchmark pack
 
 ## Latest Results
 
@@ -94,3 +97,9 @@ graph TD
   - overall: passed
 - added a public simulation source catalog covering ICS datasets, process datasets, and protocol simulators for benchmark traffic generation
 - datastream-import now converts AI4I, C-MAPSS, and generic CSV slices into the benchmark replay format
+- `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
+  - documented full pipeline reference: 125,830.00 events/sec
+  - mixed replay: 65,938.49 events/sec
+  - real-world simulator average: 68,477.85 events/sec
+  - site-profile best run: 68,636.43 events/sec
+  - latency remains unmeasured in the current suite, so the report now states that gap explicitly

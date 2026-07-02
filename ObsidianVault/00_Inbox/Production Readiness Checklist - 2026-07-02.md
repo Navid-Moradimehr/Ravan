@@ -25,6 +25,7 @@ Packaging and installer work is intentionally not part of this phase.
 - real-world simulator benchmark runner for mock and mixed industrial replay cases
 - site-profile benchmark matrix for per-site acceptance runs
 - site-profile benchmark calibration reports for per-site sizing recommendations
+- CGR gap report command for comparing local measurements against the public CGR streaming claim
 - dataset conversion workflow for AI4I, C-MAPSS, and generic industrial CSV slices
 - synthetic and replay datasets for regression tests
 - expanded observability for historian query latency, broker lag, and WebSocket delivery lag
@@ -54,6 +55,7 @@ Packaging and installer work is intentionally not part of this phase.
 2. Validate vendor connectors against real PLC and sensor traffic.
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish diagnostic-agent and supervised action-agent runtime paths.
+5. Add end-to-end p99 timing probes to the benchmark suite so the CGR comparison includes latency, not only throughput.
 
 ## Real-World Simulator Benchmark Plan
 
@@ -63,6 +65,7 @@ Packaging and installer work is intentionally not part of this phase.
 - local broker/historian validation
 - target-site replay and soak tests
 - combined release-gate and benchmark acceptance reports
+- CGR gap report and gap ratios for local benchmark packs
 
 ## Links
 

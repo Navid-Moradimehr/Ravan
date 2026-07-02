@@ -101,6 +101,30 @@ Latest local run on the current codebase:
 | plant-a | plant-local | 47,759.79 | 750.0 | 47,009.79 | 38,207.83 | 256 |
 | **Overall** | - | - | - | - | - | passed |
 
+### CGR Gap Report
+
+Command:
+
+```bash
+python -m services.cli.datastreamctl benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1
+```
+
+Latest local run on the current codebase:
+
+| Metric | Events/sec | Gap x | Gap events/sec | Gap % |
+|--------|------------|-------|----------------|-------|
+| documented_full_pipeline | 125,830.00 | 15.89 | 1,874,170.00 | 93.71 |
+| mixed_replay | 65,938.49 | 30.33 | 1,934,061.51 | 96.70 |
+| real_world_average | 68,477.85 | 29.21 | 1,931,522.15 | 96.58 |
+| site_profile_average | 67,636.95 | 29.57 | 1,932,363.05 | 96.62 |
+| site_profile_best:plant-a | 68,636.43 | 29.14 | 1,931,363.57 | 96.57 |
+
+Notes:
+
+- The command is now part of the CLI and is useful for tracking the practical gap to the public CGR Stream claim.
+- This report does not yet measure end-to-end p99 latency, so it should be treated as a throughput comparison plus a latency-gap reminder.
+- The documented full-pipeline number is the latest recorded repo benchmark reference and should still be remeasured on a target broker/historian topology before sizing.
+
 ## Test Suite Results
 
 | Test Category | Tests | Status |

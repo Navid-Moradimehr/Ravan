@@ -29,6 +29,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Real-world simulator benchmark runner now exists for mock and mixed industrial replay cases.
 - Site-profile benchmark matrix exists for per-site acceptance runs.
 - Site-profile benchmark calibration reports exist for per-site sizing recommendations.
+- CGR gap report command exists for comparing repo measurements against the public CGR streaming claim.
 - Dataset conversion workflow exists for AI4I, C-MAPSS, and generic industrial CSV slices.
 - Failure isolation between sites, sources, and correlation groups is enforced by manifest validation.
 - Synthetic and replay datasets are available for regression tests.
@@ -70,6 +71,7 @@ These are the changes that matter most before calling the platform production-re
 2. Validate vendor connectors against real PLC and sensor traffic.
 3. Add model evaluation and promotion lifecycle controls.
 4. Finish the diagnostic-agent and supervised action-agent runtime paths.
+5. Add end-to-end p99 latency probes for the benchmark stack so the CGR comparison includes latency, not only throughput.
 ## Real-World Simulator Benchmark Plan
 
 ### Goals

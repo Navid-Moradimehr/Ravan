@@ -61,6 +61,23 @@ This project is not directly comparable to a broker-only benchmark because it in
 - This platform is closer to a site-aware industrial data pipeline with benchmarkable rollout contracts.
 - The current benchmark numbers show the platform can sustain realistic site-level replay in the `45K-60K events/sec` range on the local machine while keeping source/site isolation intact.
 
+## Current Gap To CGR Stream
+
+The public CGR Stream page claims `2M msg/sec` and `P99 < 80ms` for its streaming layer.
+
+Against that reference, the current repo numbers are:
+
+- documented full pipeline: `125,830 events/sec`, about `15.9x` below the CGR claim
+- mixed replay: `65,938.49 events/sec`, about `30.3x` below the CGR claim
+- site-profile best run: `68,636.43 events/sec`, about `29.1x` below the CGR claim
+
+What this means in practice:
+
+- the platform is currently strong for local validation, rollout gating, and pilot-sized industrial deployments
+- it is not yet at broker-tier streaming throughput parity with CGR Stream
+- latency parity is still unknown because the current benchmark suite does not capture end-to-end p99 timing
+- the new `cgr-gap-report` command now makes this gap explicit and repeatable on the local benchmark pack
+
 ## Is It Good Enough For Industrial Usage?
 
 Short answer: **not yet for unattended production deployment**, but **yes for a strong self-hosted industrial beta / pilot**.

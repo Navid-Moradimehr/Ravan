@@ -68,10 +68,20 @@
 16. **Industrial benchmark comparison report**
    - Added `docs/industrial-benchmark-comparison.md` to summarize the measured scores, compare them to broader industrial tool classes, and state the current readiness verdict.
 
+17. **CGR gap report**
+   - Added `services/benchmarks/cgr_gap.py`, `datastreamctl benchmark cgr-gap-report`, and `scripts/benchmark_cgr_gap_report.py` to compare local benchmark output against the public CGR Stream claim.
+   - Updated the benchmark and readiness docs with a current 10k-event comparison run:
+     - documented full pipeline reference: 125,830.00 events/sec
+     - mixed replay: 65,938.49 events/sec
+     - real-world simulator average: 68,477.85 events/sec
+     - site-profile best run: 68,636.43 events/sec
+   - The report keeps latency honest by stating that end-to-end p99 is still unmeasured in the current suite.
+
 ### Verified
 
 - `python -m compileall services tests`: passed
 - `uv run pytest -q tests/test_auth.py tests/test_historian_query_guardrails.py tests/test_api_route_splits.py tests/test_processor_normalization.py tests/test_ai_gateway_providers.py tests/test_datastreamctl.py tests/test_project_manifest.py`: 56 passed
+- `uv run pytest -q tests/test_datastreamctl.py tests/test_site_profile_matrix_benchmark.py tests/test_real_world_simulator_benchmark.py`: 34 passed
 - `uv run python -m services.cli.datastreamctl benchmark deployment-pack --events 10000 --batch-size 256`
   - export generation: 728.91 files/sec
   - mixed replay: 64,775.69 events/sec
