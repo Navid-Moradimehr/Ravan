@@ -64,6 +64,7 @@ graph TD
 - end-to-end pipeline benchmark added for JSON vs MsgPack comparison
 - explicit runtime.mode contract added for python-fallback, flink-local, and flink-production
 - production-pipeline benchmark command added so the selected runtime mode can be measured directly
+- datastreamd now uses runtime.mode to choose the default processor set
 - Docker-backed historian write validation now has a successful live benchmark result after bootstrapping the missing `processed_events` table
 - JSON hot-path simplification removed repeated wire-format resolution from `to_json_bytes`
 
@@ -147,6 +148,8 @@ graph TD
   - 34,229.38 events/sec, 0.0544 ms p99
 - `benchmark production-pipeline --runtime-mode flink-production`
   - 41,771.06 events/sec, 0.0473 ms p99
+- `datastreamd up --site-profile config/site-profiles/federated.yaml`
+  - selects `flink-job` instead of the legacy Python processor by default
 - `benchmark cgr-gap-report --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 10000 --batch-size 256 --warmup-events 0 --min-average-events-per-second 1`
   - cgr_stream_slice: 40,438.38 events/sec, 0.0403 ms p99
   - flink_runtime_slice: 46,302.88 events/sec, 0.0342 ms p99

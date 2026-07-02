@@ -19,6 +19,7 @@ Packaging and installer work is intentionally not part of this phase.
 - site-aware project manifest and rollout scaffolding
 - project-manifest rollout acceptance command for combined release-gate and benchmark checks
 - explicit runtime.mode contract for python-fallback, flink-local, and flink-production
+- datastreamd runtime selection now switches the default processor set by runtime.mode
 - production-pipeline benchmark command for comparing fallback and Flink-oriented execution paths
 - failure isolation between sites, sources, and correlation groups is enforced by manifest validation
 - model gateway abstraction for open-weight and OpenAI-compatible backends
@@ -39,6 +40,7 @@ Packaging and installer work is intentionally not part of this phase.
 ## Incomplete
 
 - per-site production benchmarking on target broker and historian topology
+- end-to-end runtime verification of the Flink-selected processor set on the live data plane
 - production-pipeline validation against the real Flink/Kafka/Timescale deployment topology
 - live benchmark calibration on the target industrial network
 - model evaluation lifecycle and promotion workflow

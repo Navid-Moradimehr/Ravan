@@ -1,5 +1,27 @@
 # Implementation Log
 
+## 2026-07-02 - Runtime Mode Now Selects The Launched Processor Set
+
+### Changed
+
+1. **Supervisor wiring**
+   - Updated `datastreamd` so the selected `runtime.mode` now chooses the default service set.
+   - `python-fallback` starts the Python processor path.
+   - `flink-local` and `flink-production` start the Flink job path instead of the Python processor.
+
+2. **Selection coverage**
+   - Added test coverage proving that a federated site profile selects `flink-job` and does not start the legacy Python processor by default.
+
+### Verified
+
+- `python -m compileall services tests`: passed
+- `uv run pytest -q tests/test_datastreamd.py tests/test_site_profiles.py tests/test_datastreamctl.py`: 51 passed
+
+### Notes
+
+- This is the first step that makes Flink the active processor path instead of only a benchmark target.
+- The full data-plane path still needs live target-topology validation, but the runtime selection is now wired.
+
 ## 2026-07-02 - Flink-First Runtime Mode Contract And Production Pipeline Benchmark
 
 ### Changed

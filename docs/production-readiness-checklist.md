@@ -27,6 +27,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Read-only agent infrastructure exists as a foundation.
 - Local and site-oriented benchmark harnesses exist.
 - Explicit `runtime.mode` contract exists for `python-fallback`, `flink-local`, and `flink-production`.
+- `datastreamd` now uses `runtime.mode` to select the default processor set.
 - Production-pipeline benchmark command exists so the selected runtime mode can be measured directly.
 - Real-world simulator benchmark runner now exists for mock and mixed industrial replay cases.
 - Site-profile benchmark matrix exists for per-site acceptance runs.
@@ -85,6 +86,7 @@ These are the changes that matter most before calling the platform production-re
 7. Keep the streaming hot path on Flink and reserve Spark for optional offline ETL and lakehouse jobs.
 8. Treat the wire format as a lever, not a cure-all. If JSON remains faster in Python on the target host, move the hot path into a compiled runtime before forcing binary serialization everywhere.
 9. Use the explicit runtime mode contract to keep `python-fallback` for local development and `flink-production` for real rollout targets.
+10. Keep the supervisor and deployment templates aligned so runtime mode changes both the active processor and the benchmark baseline.
 
 ## Session Delta Guidance
 
