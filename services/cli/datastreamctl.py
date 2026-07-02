@@ -21,6 +21,8 @@ from services.benchmarks.deployment_pack import format_result as format_deployme
 from services.benchmarks.deployment_pack import format_matrix_result as format_deployment_pack_matrix_result
 from services.benchmarks.deployment_pack import run_benchmark as run_deployment_pack_benchmark
 from services.benchmarks.deployment_pack import run_matrix as run_deployment_pack_matrix
+from services.benchmarks.cgr_gap import format_result as format_cgr_gap_result
+from services.benchmarks.cgr_gap import run_report as run_cgr_gap_report
 from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
 from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
 from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
@@ -822,6 +824,89 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("=" * 40)
             print(format_site_profile_calibration_result(result))
         return 0 if result.passed else 2
+    if args.action == "cgr-gap-report":
+        site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
+        result = run_cgr_gap_report(
+            Path(args.manifest),
+            Path(args.csv),
+            site_ids=site_ids,
+            events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            min_average_events_per_second=args.min_average_events_per_second,
+            cgr_target_events_per_second=args.cgr_events_per_second,
+            cgr_target_p99_ms=args.cgr_p99_ms,
+            documented_full_pipeline_events_per_second=args.documented_full_pipeline_events_per_second,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "cgr_target_events_per_second": result.cgr_target_events_per_second,
+                    "cgr_target_p99_ms": result.cgr_target_p99_ms,
+                    "documented_full_pipeline_events_per_second": result.documented_full_pipeline_events_per_second,
+                    "documented_full_pipeline_note": result.documented_full_pipeline_note,
+                    "mixed_replay": {
+                        "csv_path": result.mixed_replay.csv_path,
+                        "events": result.mixed_replay.events,
+                        "invalid_events": result.mixed_replay.invalid_events,
+                        "batches": result.mixed_replay.batches,
+                        "batch_size": result.mixed_replay.batch_size,
+                        "elapsed_seconds": result.mixed_replay.elapsed_seconds,
+                        "events_per_second": result.mixed_replay.events_per_second,
+                        "serialized_bytes": result.mixed_replay.serialized_bytes,
+                    },
+                    "real_world_simulator": {
+                        "average_events_per_second": result.real_world_simulator.average_events_per_second,
+                        "cases": [
+                            {
+                                "case_id": case.case_id,
+                                "source": case.source,
+                                "scenario": case.scenario,
+                                "events": case.events,
+                                "invalid_events": case.invalid_events,
+                                "batches": case.batches,
+                                "elapsed_seconds": case.elapsed_seconds,
+                                "events_per_second": case.events_per_second,
+                                "serialized_bytes": case.serialized_bytes,
+                            }
+                            for case in result.real_world_simulator.cases
+                        ],
+                    },
+                    "site_profile_matrix": {
+                        "passed": result.site_profile_matrix.passed,
+                        "runs": [
+                            {
+                                "site_id": run.site_id,
+                                "deployment_mode": run.deployment_mode,
+                                "profile_path": run.profile_path,
+                                "average_events_per_second": run.average_events_per_second,
+                                "passed": run.passed,
+                                "detail": run.detail,
+                            }
+                            for run in result.site_profile_matrix.runs
+                        ],
+                    },
+                    "metrics": [
+                        {
+                            "label": metric.label,
+                            "observed_events_per_second": metric.observed_events_per_second,
+                            "target_events_per_second": metric.target_events_per_second,
+                            "gap_multiplier": metric.gap_multiplier,
+                            "gap_events_per_second": metric.gap_events_per_second,
+                            "gap_percent": metric.gap_percent,
+                            "note": metric.note,
+                        }
+                        for metric in result.metrics
+                    ],
+                    "latency_note": result.latency_note,
+                },
+                indent=2,
+            ))
+        else:
+            print("cgr gap report")
+            print("=" * 40)
+            print(format_cgr_gap_result(result))
+        return 0
     raise ValueError(f"unknown benchmark action: {args.action}")
 
 
@@ -988,6 +1073,19 @@ def build_parser() -> argparse.ArgumentParser:
     site_profile_calibration.add_argument("--min-average-events-per-second", type=float, default=1000.0)
     site_profile_calibration.add_argument("--json", action="store_true")
     site_profile_calibration.set_defaults(func=cmd_benchmark)
+    cgr_gap_report = benchmark_sub.add_parser("cgr-gap-report", help="Compare local benchmark results against the public CGR streaming claims")
+    cgr_gap_report.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
+    cgr_gap_report.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    cgr_gap_report.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites in the manifest")
+    cgr_gap_report.add_argument("--events", type=int, default=10_000)
+    cgr_gap_report.add_argument("--batch-size", type=int, default=256)
+    cgr_gap_report.add_argument("--warmup-events", type=int, default=0)
+    cgr_gap_report.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    cgr_gap_report.add_argument("--cgr-events-per-second", type=float, default=2_000_000.0)
+    cgr_gap_report.add_argument("--cgr-p99-ms", type=float, default=80.0)
+    cgr_gap_report.add_argument("--documented-full-pipeline-events-per-second", type=float, default=125_830.0)
+    cgr_gap_report.add_argument("--json", action="store_true")
+    cgr_gap_report.set_defaults(func=cmd_benchmark)
     return parser
 
 

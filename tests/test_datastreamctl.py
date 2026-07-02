@@ -400,6 +400,74 @@ class TestDatastreamctl:
         assert "site profile calibration" in out
         assert "recommended_min" in out
 
+    def test_benchmark_cgr_gap_report_runs(self, monkeypatch, tmp_path):
+        csv_path = tmp_path / "mock.csv"
+        csv_path.write_text(
+            "\n".join(
+                [
+                    "event_id,source_protocol,source_id,asset_id,tag,value,quality,unit,site,line,ts_source,schema_version,fault_type,scenario_id,ground_truth_severity,step",
+                    "evt-1,mqtt,site-a/mqtt/pump-1,Pump-1,Temperature,55.1,good,c,Factory-A,Line-1,2026-07-01T00:00:00Z,1,normal,mock-benchmark,normal,0",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            ctl,
+            "run_cgr_gap_report",
+            lambda *args, **kwargs: SimpleNamespace(
+                cgr_target_events_per_second=2_000_000.0,
+                cgr_target_p99_ms=80.0,
+                documented_full_pipeline_events_per_second=125_830.0,
+                documented_full_pipeline_note="reference",
+                mixed_replay=SimpleNamespace(
+                    csv_path=str(csv_path),
+                    events=12,
+                    invalid_events=0,
+                    batches=3,
+                    batch_size=4,
+                    elapsed_seconds=0.1,
+                    events_per_second=58_548.76,
+                    serialized_bytes=512,
+                ),
+                real_world_simulator=SimpleNamespace(
+                    average_events_per_second=33_242.66,
+                    cases=(),
+                ),
+                site_profile_matrix=SimpleNamespace(
+                    passed=True,
+                    runs=(),
+                ),
+                metrics=(
+                    SimpleNamespace(
+                        label="mixed_replay",
+                        observed_events_per_second=58_548.76,
+                        target_events_per_second=2_000_000.0,
+                        gap_multiplier=34.17,
+                        gap_events_per_second=1_941_451.24,
+                        gap_percent=97.07,
+                        note="current replay path",
+                    ),
+                ),
+                latency_note="p99 not measured",
+            ),
+        )
+        rc, out = self._run([
+            "benchmark",
+            "cgr-gap-report",
+            "--manifest",
+            str(PROJECT_MANIFEST),
+            "--csv",
+            str(csv_path),
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+        ])
+        assert rc == 0
+        assert "cgr gap report" in out
+        assert "mixed_replay" in out
+        assert "gap_x" in out
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
