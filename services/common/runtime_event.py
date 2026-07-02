@@ -51,6 +51,21 @@ class RuntimeEventRecord:
     triggered_rules: tuple[str, ...] = field(default_factory=tuple)
     baseline: dict[str, Any] | None = None
     evaluation: dict[str, Any] | None = None
+    _partition_key_cache: bytes = field(default=b"", init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        project_id = self.project_id or self.site_id
+        self._partition_key_cache = "|".join(
+            [
+                project_id,
+                self.site_id,
+                self.line,
+                self.source_protocol,
+                self.source_id,
+                self.asset_id,
+                self.tag,
+            ]
+        ).encode("utf-8")
 
     @classmethod
     def from_raw_mapping(cls, event: dict[str, Any]) -> "RuntimeEventRecord":
@@ -107,19 +122,7 @@ class RuntimeEventRecord:
         return cls.from_raw_mapping(raw)
 
     def partition_key(self) -> bytes:
-        project_id = self.project_id or self.site_id
-        key = "|".join(
-            [
-                project_id,
-                self.site_id,
-                self.line,
-                self.source_protocol,
-                self.source_id,
-                self.asset_id,
-                self.tag,
-            ]
-        )
-        return key.encode("utf-8")
+        return self._partition_key_cache
 
     def mark_processed(
         self,
