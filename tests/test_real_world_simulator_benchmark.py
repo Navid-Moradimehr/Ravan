@@ -23,10 +23,12 @@ def test_run_real_world_simulator_suite(tmp_path: Path) -> None:
         events=20,
         batch_size=4,
         warmup_events=0,
-        cases=["mock-normal", "industrial-benchmark"],
+        cases=["mock-normal", "multi-plc-line", "burst-load", "dropout-reconnect", "industrial-benchmark"],
     )
 
-    assert len(result.cases) == 2
+    assert len(result.cases) == 5
     assert result.average_events_per_second > 0
     assert result.cases[0].events == 20
     assert "mock-normal" in format_result(result)
+    assert "multi-plc-line" in format_result(result)
+    assert "dropout-reconnect" in format_result(result)

@@ -11,17 +11,28 @@
 
 - manifest/site identity validation gap
 - execution checklist capture
+- rollout acceptance report export
+- multi-PLC simulator scenarios
+- self-hosted secrets guidance
 
 ## Remaining
 
-- per-site rollout acceptance on two independent site profiles
-- secret-store guidance for Docker, systemd, and Kubernetes
-- repeat-run benchmark guidance with median/variance tracking
-- protocol-shaped multi-PLC simulation scenarios
+- packaging artifacts and signed release outputs
+- target-hardware sizing validation
+- restore/rollback drill measurement across at least two sites
 
 ## Notes
 
 - Keep raw plant data local by default.
 - Federation should only consume approved rollups or explicit bridge outputs.
 - Packaging remains deferred until runtime and deployment shape are stable.
+- The simulator now needs to be compared with repeated benchmark sessions, not one-off local runs.
+- Operators should inject JWT, broker, historian, and model secrets from their own secret store.
 
+## Measured Baseline
+
+- `multi-plc-line`: 93,307.08 events/sec
+- `burst-load`: 90,183.52 events/sec
+- `dropout-reconnect`: 95,832.26 events/sec
+- `industrial-benchmark`: 94,157.53 events/sec
+- average: 93,370.10 events/sec

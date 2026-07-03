@@ -10,8 +10,8 @@ This checklist turns the current roadmap into a concrete execution track for a s
 - [x] Keep `site_id`, source identity, and source protocol explicit in the project manifest.
 - [x] Validate topic ownership and site boundary coverage.
 - [x] Validate that each manifest site profile exists.
-- [ ] Validate that each site profile `site.id` matches the manifest `site_id` for every rollout bundle.
-- [ ] Add per-site rollout acceptance reports for at least two independent site profiles.
+- [x] Validate that each site profile `site.id` matches the manifest `site_id` for every rollout bundle.
+- [x] Add per-site rollout acceptance reports for at least two independent site profiles.
 - [ ] Measure restore and rollback drills per site before federation is enabled.
 - [ ] Keep cross-site replication limited to approved rollups, summaries, or explicit bridges.
 
@@ -21,10 +21,10 @@ This checklist turns the current roadmap into a concrete execution track for a s
 - [x] Keep auth and RBAC as local/self-hosted infrastructure rather than cloud-managed dependencies.
 - [x] Keep secrets out of exported manifests.
 - [x] Keep TLS support available for MQTT, OPC UA, and Modbus TCP.
-- [ ] Enforce deployment guidance for operator-managed secret stores.
-- [ ] Document the minimum trusted network zones for broker, historian, and model endpoints.
-- [ ] Add a release note that default JWT placeholders are not production-safe.
-- [ ] Add a clear secret-injection reference for Docker, systemd, and Kubernetes.
+- [x] Enforce deployment guidance for operator-managed secret stores.
+- [x] Document the minimum trusted network zones for broker, historian, and model endpoints.
+- [x] Add a release note that default JWT placeholders are not production-safe.
+- [x] Add a clear secret-injection reference for Docker, systemd, and Kubernetes.
 
 ## 3. Packaging and Distribution
 
@@ -39,9 +39,9 @@ This checklist turns the current roadmap into a concrete execution track for a s
 - [x] Keep a mixed replay benchmark pack in the repo.
 - [x] Keep site-profile soak and calibration scripts available.
 - [x] Keep CGR gap reporting available for local comparisons.
-- [ ] Add explicit scenario definitions for multi-PLC line traffic, burst traffic, dropout, and reconnect behavior.
-- [ ] Add repeat-run guidance so benchmark sessions are compared by median and variance, not one sample.
-- [ ] Keep simulator output close to protocol-shaped industrial traffic.
+- [x] Add explicit scenario definitions for multi-PLC line traffic, burst traffic, dropout, and reconnect behavior.
+- [x] Add repeat-run guidance so benchmark sessions are compared by median and variance, not one sample.
+- [x] Keep simulator output close to protocol-shaped industrial traffic.
 - [ ] Separate architecture validation from target-hardware sizing claims.
 
 ## 5. Immediate Next Implementation Targets
@@ -50,4 +50,3 @@ This checklist turns the current roadmap into a concrete execution track for a s
 2. Add site-profile and project-manifest regression tests.
 3. Update the Obsidian vault with the execution state.
 4. Keep packaging on the back burner until the runtime shape is settled.
-

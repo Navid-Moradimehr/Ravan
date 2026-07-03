@@ -167,6 +167,7 @@ def _run_rollout_acceptance_for_manifest(
     restore_db: str | None = None,
     skip_network: bool = False,
     skip_backup: bool = False,
+    report_dir: str | None = None,
 ) -> dict[str, Any]:
     manifest = load_project_manifest(manifest_path)
     manifest_errors = validate_project_manifest(manifest)
@@ -241,7 +242,25 @@ def _run_rollout_acceptance_for_manifest(
         },
         "sites": sites,
         "passed": passed,
+        "report_dir": report_dir,
     }
+
+
+def _write_rollout_acceptance_report(report_dir: str, payload: dict[str, Any]) -> list[Path]:
+    output_dir = Path(report_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+
+    summary_path = output_dir / "rollout-acceptance-summary.json"
+    summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    written.append(summary_path)
+
+    for site in payload.get("sites", []):
+        site_path = output_dir / f"{site['site_id']}.json"
+        site_path.write_text(json.dumps(site, indent=2), encoding="utf-8")
+        written.append(site_path)
+
+    return written
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -646,8 +665,14 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
             restore_db=args.restore_db,
             skip_network=args.skip_network,
             skip_backup=args.skip_backup,
+            report_dir=args.report_dir,
         )
+        written_reports: list[Path] = []
+        if args.report_dir:
+            written_reports = _write_rollout_acceptance_report(args.report_dir, payload)
         if args.json:
+            if written_reports:
+                payload = {**payload, "written_reports": [str(path) for path in written_reports]}
             print(json.dumps(payload, indent=2))
         else:
             print("project rollout acceptance")
@@ -655,6 +680,10 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
             _print_row("project_id", payload["project_id"])
             _print_row("name", payload["name"])
             _print_row("benchmark_csv", payload["baseline_csv"])
+            if written_reports:
+                _print_row("report_dir", args.report_dir)
+                for path in written_reports:
+                    print(f"{'':6}report  {path}")
             for item in payload["sites"]:
                 mark = "OK" if item["passed"] else "FAIL"
                 print(f"{mark:<6}{item['site_id']:<22}{item['profile_path']}")
@@ -1328,6 +1357,7 @@ def build_parser() -> argparse.ArgumentParser:
     project_rollout.add_argument("--min-average-events-per-second", type=float, default=1000.0)
     project_rollout.add_argument("--backup-dir", default=None)
     project_rollout.add_argument("--restore-db", default=None)
+    project_rollout.add_argument("--report-dir", default=None, help="Optional directory to write JSON rollout acceptance reports")
     project_rollout.add_argument("--skip-network", action="store_true")
     project_rollout.add_argument("--skip-backup", action="store_true")
     project_rollout.add_argument("--json", action="store_true")

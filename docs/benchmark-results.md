@@ -7,6 +7,27 @@
 - **Broker**: Redpanda (Kafka-compatible)
 - **Historian**: TimescaleDB
 
+## Real-World Simulator Baseline
+
+- **Date**: 2026-07-03
+- **Scope**: protocol-shaped multi-PLC and reconnect cases added to the local simulator suite
+
+### Simulator Benchmark Run
+
+| Case | Events/sec | p99 ms | Batches | Invalid events |
+|------|------------|--------|---------|----------------|
+| `multi-plc-line` | 93,307.08 | 0.0180 | 16 | 0 |
+| `burst-load` | 90,183.52 | 0.0167 | 16 | 0 |
+| `dropout-reconnect` | 95,832.26 | 0.0222 | 16 | 0 |
+| `industrial-benchmark` | 94,157.53 | 0.0333 | 16 | 0 |
+| **Average** | **93,370.10** | **0.0226** | - | - |
+
+### Notes
+
+- These numbers are local-development baseline values, not target-hardware sizing claims.
+- The new simulator cases are useful for architecture validation, source identity preservation, and reconnect behavior.
+- Use repeated runs before treating small deltas as meaningful.
+
 ## Native Boundary Rerun
 
 - **Date**: 2026-07-03

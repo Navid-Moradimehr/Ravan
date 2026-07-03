@@ -1,5 +1,47 @@
 # Implementation Log
 
+## 2026-07-03 - Simulator Baseline Measured For Multi-PLC Cases
+
+### Verified
+
+- `uv run python -m services.cli.datastreamctl benchmark real-world-simulator --events 1000 --batch-size 64 --warmup-events 0 --cases multi-plc-line,burst-load,dropout-reconnect,industrial-benchmark`
+  - `multi-plc-line`: 93,307.08 events/sec, 0.0180 ms p99
+  - `burst-load`: 90,183.52 events/sec, 0.0167 ms p99
+  - `dropout-reconnect`: 95,832.26 events/sec, 0.0222 ms p99
+  - `industrial-benchmark`: 94,157.53 events/sec, 0.0333 ms p99
+  - average: 93,370.10 events/sec, 0.0226 ms p99
+
+### Notes
+
+- The simulator suite now has explicit multi-PLC and reconnect shapes while keeping the existing replay pipeline.
+- These are still local baselines; target-site validation is separate.
+
+## 2026-07-03 - Rollout Reports, Secret Guidance, And Multi-PLC Simulator Cases
+
+### Changed
+
+1. **Rollout acceptance automation**
+   - Extended `project-manifest rollout-acceptance` with an optional `--report-dir` output path.
+   - The command now writes a summary JSON file plus one JSON file per site so acceptance results can be archived in CI or release bundles.
+
+2. **Multi-PLC simulator scenarios**
+   - Added protocol-shaped simulator cases for `multi-plc-line`, `burst-load`, and `dropout-reconnect`.
+   - These cases preserve site, line, source, and protocol identity so benchmark runs can validate industrial isolation and reconnect behavior more realistically.
+
+3. **Self-hosted secret guidance**
+   - Added a dedicated secrets and network guidance document for Docker, systemd, and Kubernetes installs.
+   - The guidance keeps credentials in operator-managed secret stores and keeps the generated manifests secret-free.
+
+### Verified
+
+- `uv run python -m pytest tests/test_project_manifest.py tests/test_site_profiles.py`: passed
+- `python -m compileall services`: passed
+
+### Notes
+
+- The simulator scenarios are intentionally additive; the existing benchmark paths still work unchanged.
+- Packaging remains deferred.
+
 ## 2026-07-03 - Multi-Site Validation Gap Closed And Checklist Captured
 
 ### Changed

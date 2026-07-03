@@ -38,6 +38,16 @@ These are not PLC protocols themselves, but they are useful for shaping realisti
 
 These are the easiest way to generate live traffic that looks like PLC and sensor data without needing physical hardware.
 
+### Repository-defined benchmark scenarios
+
+- `mock-normal`: stable baseline with no injected faults.
+- `mock-drift`: gradual sensor offset for drift validation.
+- `mock-spike`: intermittent spikes for anomaly-path validation.
+- `multi-plc-line`: one asset observed by multiple PLC/source identities on the same line.
+- `burst-load`: short-lived spike-heavy traffic for backpressure and peak-load checks.
+- `dropout-reconnect`: signal loss followed by recovery for reconnect and resilience checks.
+- `industrial-benchmark`: replay of the checked-in mixed industrial baseline CSV.
+
 ## Recommended Simulation Stack
 
 1. Use `open62541`, `modbus-simulator`, and MQTT simulators to generate protocol-native traffic.
@@ -45,6 +55,7 @@ These are the easiest way to generate live traffic that looks like PLC and senso
 3. Replay network traces when available, especially SWaT/WaDi/CISS PCAP and historian exports.
 4. Feed the resulting events into `industrial_mixed_benchmark.csv`-style replay packs.
 5. Preserve site boundaries, source IDs, and line IDs so multi-site isolation stays testable.
+6. Compare benchmark sessions using repeated runs and record median/variance, not a single sample.
 
 ## Mapping Rules For This Platform
 
