@@ -4,7 +4,7 @@
 
 ### Dashboard
 
-- Open `http://localhost:3000`.
+- Open `http://localhost:3006`.
 - Verify the industrial command-center title, KPI cards, protocol source cards, AI gateway panel, observability charts, and operator links render.
 - Click `Light mode` and confirm the theme flips to a pale surface palette.
 - Refresh the page and confirm the selected theme persists.

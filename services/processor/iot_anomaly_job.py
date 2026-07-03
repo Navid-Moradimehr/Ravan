@@ -2,20 +2,24 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Iterable
 
 try:  # pragma: no cover - exercised in the Flink container, not the lightweight repo env
     from pyflink.common import WatermarkStrategy
+    from pyflink.common.configuration import Configuration
     from pyflink.common.serialization import SimpleStringSchema
     from pyflink.common.typeinfo import Types
     from pyflink.datastream import StreamExecutionEnvironment
     from pyflink.datastream.connectors.kafka import KafkaOffsetsInitializer, KafkaRecordSerializationSchema, KafkaSink, KafkaSource
+    from pyflink.datastream.connectors.base import DeliveryGuarantee
     from pyflink.datastream.functions import KeyedProcessFunction
     from pyflink.datastream.state import ListStateDescriptor, ValueStateDescriptor
 
     PYFLINK_AVAILABLE = True
 except ModuleNotFoundError:  # pragma: no cover - repo/test environments without Flink packages
     WatermarkStrategy = None  # type: ignore[assignment]
+    Configuration = None  # type: ignore[assignment]
     SimpleStringSchema = None  # type: ignore[assignment]
     Types = None  # type: ignore[assignment]
     StreamExecutionEnvironment = None  # type: ignore[assignment]
@@ -23,6 +27,7 @@ except ModuleNotFoundError:  # pragma: no cover - repo/test environments without
     KafkaRecordSerializationSchema = None  # type: ignore[assignment]
     KafkaSink = None  # type: ignore[assignment]
     KafkaSource = None  # type: ignore[assignment]
+    DeliveryGuarantee = None  # type: ignore[assignment]
     ListStateDescriptor = None  # type: ignore[assignment]
     ValueStateDescriptor = None  # type: ignore[assignment]
 
@@ -121,7 +126,24 @@ def main() -> None:
     checkpoint_interval_ms = int(os.getenv("FLINK_CHECKPOINT_INTERVAL_MS", "10000"))
     starting_offsets = os.getenv("FLINK_STARTING_OFFSETS", "latest").strip().lower()
 
-    env = StreamExecutionEnvironment.get_execution_environment()
+    connector_jars = [
+        os.getenv("FLINK_KAFKA_CONNECTOR_JAR", "file:///opt/flink/lib/flink-connector-kafka-3.3.0-1.20.jar"),
+        os.getenv("FLINK_KAFKA_CLIENTS_JAR", "file:///opt/flink/lib/kafka-clients-3.8.1.jar"),
+    ]
+    existing_jars = []
+    for jar_uri in connector_jars:
+        if jar_uri.startswith("file://"):
+            local_path = Path(jar_uri.removeprefix("file://"))
+            if local_path.exists():
+                existing_jars.append(jar_uri)
+        else:
+            existing_jars.append(jar_uri)
+
+    configuration = Configuration()
+    if existing_jars:
+        configuration.set_string("pipeline.jars", ";".join(existing_jars))
+
+    env = StreamExecutionEnvironment.get_execution_environment(configuration)
     env.set_parallelism(parallelism)
     if checkpoint_interval_ms > 0:
         env.enable_checkpointing(checkpoint_interval_ms)
@@ -149,7 +171,7 @@ def main() -> None:
             .set_value_serialization_schema(SimpleStringSchema())
             .build()
         )
-        .set_delivery_guarantee("at_least_once")
+        .set_delivery_guarantee(DeliveryGuarantee.AT_LEAST_ONCE)
         .set_property("batch.size", "16384")
         .set_property("linger.ms", "10")
         .set_property("compression.type", "lz4")

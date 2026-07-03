@@ -46,7 +46,7 @@ The recommended production install is native on Windows Server / industrial PCs 
 4. Run the generator: `python services/ingestion/mock_generator.py`.
 5. Run the AI gateway locally or through Docker Compose.
 6. Start the dashboard locally: `cd ui; npm run dev`.
-7. Open the dashboard: `http://localhost:3000`.
+7. Open the dashboard: `http://localhost:3006`.
 
 ## Control CLI
 
@@ -146,7 +146,7 @@ against realistic industrial batches without depending on a live model server.
 
 ## Useful URLs
 
-- Dashboard: `http://localhost:3000`
+- Dashboard: `http://localhost:3006`
 - Edge metrics: `http://localhost:8090`
 - Redpanda Console: `http://localhost:18080`
 - Flink UI: `http://localhost:18088`

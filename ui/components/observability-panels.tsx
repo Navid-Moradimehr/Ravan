@@ -42,6 +42,11 @@ const severityConfig = {
 const chartGrid = <CartesianGrid stroke="var(--color-border-subtle)" strokeDasharray="3 3" vertical={false} />;
 const axisProps = { tickLine: false, axisLine: false, tick: { fontSize: 11, fill: "var(--color-text-muted)" } };
 
+function formatMetric(value: unknown, digits: number, fallback = "0") {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(digits) : fallback;
+}
+
 export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnapshot }) {
   const grafanaTone = snapshot.grafana.online
     ? "border-success/30 bg-success/10 text-success"
@@ -62,21 +67,21 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Live throughput"
-          value={snapshot.summary.total_throughput.toFixed(2)}
+          value={formatMetric(snapshot.summary.total_throughput, 2)}
           unit="/s"
           icon={Activity}
           tone="info"
         />
         <StatCard
           label="LLM p95 latency"
-          value={snapshot.summary.ai_latency_p95.toFixed(2)}
+          value={formatMetric(snapshot.summary.ai_latency_p95, 2)}
           unit="s"
           icon={Gauge}
           tone="warning"
         />
         <StatCard
           label="DLQ total"
-          value={snapshot.summary.dlq_total.toFixed(0)}
+          value={formatMetric(snapshot.summary.dlq_total, 0)}
           icon={AlertOctagon}
           tone={snapshot.summary.dlq_total > 0 ? "error" : "success"}
         />

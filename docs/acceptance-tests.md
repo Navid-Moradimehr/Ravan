@@ -47,7 +47,7 @@ npm run build
 npm run start
 ```
 
-Expected result: `http://localhost:3000` renders the operations cockpit and links to Redpanda Console, Grafana, Prometheus, Flink, and AI health.
+Expected result: `http://localhost:3006` renders the operations cockpit and links to Redpanda Console, Grafana, Prometheus, Flink, and AI health.
 
 The dashboard Docker image is optional. Use `docker compose --profile ui -f docker/docker-compose.yml up -d dashboard` only after local npm install/build is healthy.
 
