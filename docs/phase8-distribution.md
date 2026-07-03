@@ -236,6 +236,12 @@ For open-source adoption, the release should include:
 For the deployment recommendation and WSL2 guidance, see `docs/deployment-decision-memo.md`.
 For the actual repo-structure-driven packaging checklist, see `docs/release-packaging-checklist.md`.
 
+### Packaging helpers
+
+- `scripts/package-release.py` stages Windows, Linux, and offline bundles from the current repo structure.
+- `scripts/package-release.ps1` is the Windows wrapper.
+- `scripts/package-release.sh` is the Linux wrapper.
+
 ## Air-Gapped Support
 
 This matters for industrial users.

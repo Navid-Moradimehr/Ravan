@@ -32,9 +32,13 @@
 - self-host install guidance is documented for Linux and Windows operators
 - WSL2 is now explicitly treated as a developer convenience, not a production dependency
 - packaging checklist is now tied to the actual repo structure and build metadata
+- packaging driver scripts now stage Windows, Linux, and offline bundles from the real repo tree
+- Windows bundle export now exists as a first-class manifest layout
 - rollout acceptance report export is now available for archiveable per-site runs
 - the simulator now includes multi-PLC, burst, and reconnect cases
 - self-hosted secrets guidance is already documented for Docker, systemd, and Kubernetes
+- packaging driver scripts now stage Windows, Linux, and offline bundles from the real repo tree
+- Windows bundle export now exists as a first-class manifest layout
 
 ## Measured Baseline
 
@@ -57,6 +61,12 @@
 - release-package can optionally emit `release-signature.json`
 - package output stays separate from future signed release artifacts
 
+## Packaging Driver
+
+- `scripts/package-release.py` stages the actual repo tree into release-ready runtime bundles.
+- `scripts/package-release.ps1` and `scripts/package-release.sh` are thin wrappers for Windows and Linux operators.
+- Windows layout exports native `install.ps1`, `uninstall.ps1`, `.cmd` launchers, and a Windows-specific README.
+
 ## Install Guide
 
 - `docs/self-host-install-guide.md` now covers the local install, upgrade, and operator-owned secret model.
@@ -68,3 +78,8 @@
 - `pyproject.toml` now discovers the full `services.*` tree for distributable builds.
 - runtime JSON assets under `services/ingestion` are included as package data.
 - `*.egg-info/` is ignored so packaging checks do not clutter the repo root.
+
+## Packaging Driver
+
+- `scripts/package-release.py` stages the repo-based bundles.
+- `scripts/package-release.ps1` and `scripts/package-release.sh` are thin wrappers for Windows and Linux operators.

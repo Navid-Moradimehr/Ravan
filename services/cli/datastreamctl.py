@@ -1551,7 +1551,7 @@ def build_parser() -> argparse.ArgumentParser:
     project_export.add_argument("output_dir")
     project_export.add_argument("--site-id", default=None, help="Optional site to export")
     project_export.add_argument("--format", choices=["env", "yaml", "both"], default="both")
-    project_export.add_argument("--layout", choices=["flat", "systemd", "kubernetes"], default="flat")
+    project_export.add_argument("--layout", choices=["flat", "systemd", "windows", "kubernetes"], default="flat")
     project_export.add_argument("--json", action="store_true")
     project_export.set_defaults(func=cmd_project_manifest)
     project_package = project_sub.add_parser("package", help="Export a combined deployment package for one site")

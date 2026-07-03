@@ -72,6 +72,8 @@ Do not require:
 - Docker Desktop
 - cloud credentials
 
+The repo now includes a Windows staging path through `scripts/package-release.py` and `scripts/package-release.ps1`.
+
 ## 5. Linux package contents
 
 Ship:
@@ -92,6 +94,8 @@ Preferred targets:
 - Debian
 - other systemd-based Linux distributions
 
+The repo now includes a Linux staging path through `scripts/package-release.py` and `scripts/package-release.sh`.
+
 ## 6. Offline and air-gapped package contents
 
 Include:
@@ -109,6 +113,8 @@ Leave out:
 
 - external SaaS dependencies
 - mandatory online model endpoints
+
+The repo now includes an offline staging path through `scripts/package-release.py` using the `offline` mode.
 
 ## 7. Structural changes to make packaging reliable
 
@@ -133,10 +139,12 @@ Already in place:
 - backup drill reporting
 - benchmark and calibration commands
 - install guide
+- repo-based packaging driver and OS shell wrappers
+- Windows-native bundle export layout
 
 Still needed for a full installer pipeline:
 
-- OS-specific installer generation
+- final OS-specific installer generation
 - package signing in the final installer format
 - upgrade/uninstall automation
 - smoke-test automation after install

@@ -14,7 +14,7 @@ from services.common.site_profiles import load_site_profile, validate_site_profi
 
 
 VALID_BRIDGE_MODES = {"replicate", "fanout", "correlate", "rollup"}
-VALID_EXPORT_LAYOUTS = {"flat", "systemd", "kubernetes", "package"}
+VALID_EXPORT_LAYOUTS = {"flat", "systemd", "windows", "kubernetes", "package"}
 VALID_EXPORT_FORMATS = {"env", "yaml", "both"}
 
 
@@ -261,6 +261,104 @@ class ProjectManifest:
                 'rm -rf "/etc/datastream/' + f"{self.project_id}/{site_id}" + '"',
                 "systemctl daemon-reload",
                 'echo "Removed ${UNIT_NAME}"',
+                "",
+            ]
+        )
+
+    def _render_windows_readme(self, site_id: str) -> str:
+        return "\n".join(
+            [
+                f"# {self.name} - {site_id}",
+                "",
+                "This directory is ready to be copied to a native Windows host.",
+                "",
+                "Install steps:",
+                "1. Copy the exported site directory to the target host.",
+                "2. Run windows/install.ps1 as Administrator.",
+                "3. Review the generated service command and adjust the Python runtime path if your installer bundles a private runtime.",
+                "4. Start the datastreamd service and verify datastreamctl status.",
+                "",
+                "WSL2 is intentionally not required for production installs.",
+                "",
+            ]
+        )
+
+    def _render_windows_cmd(self, command: str, extra_args: str = "") -> str:
+        return "\n".join(
+            [
+                "@echo off",
+                "setlocal",
+                "set PYTHON=python",
+                f'"%PYTHON%" -m {command} {extra_args} %*',
+                "endlocal",
+                "",
+            ]
+        )
+
+    def _render_windows_install(self, site_id: str) -> str:
+        target_root = f"C:\\Datastream\\{self.project_id}\\{site_id}"
+        service_name = f"datastreamd-{site_id}"
+        return "\n".join(
+            [
+                "param(",
+                "    [string]$SourceDir = $PSScriptRoot,",
+                f"    [string]$TargetDir = '{target_root}',",
+                f"    [string]$ServiceName = '{service_name}'",
+                ")",
+                "",
+                "$ErrorActionPreference = 'Stop'",
+                "",
+                "$binDir = Join-Path $TargetDir 'bin'",
+                "$configDir = Join-Path $TargetDir 'config'",
+                "$dataDir = Join-Path $TargetDir 'data'",
+                "$logsDir = Join-Path $TargetDir 'logs'",
+                "$modelsDir = Join-Path $TargetDir 'models'",
+                "$backupsDir = Join-Path $TargetDir 'backups'",
+                "$envDir = Join-Path $TargetDir 'env'",
+                "",
+                "New-Item -ItemType Directory -Force -Path $binDir, $configDir, $dataDir, $logsDir, $modelsDir, $backupsDir, $envDir | Out-Null",
+                "Copy-Item (Join-Path $SourceDir 'site-profile.yaml') (Join-Path $TargetDir 'site-profile.yaml') -Force",
+                "Copy-Item (Join-Path $SourceDir 'bundle.yaml') (Join-Path $TargetDir 'bundle.yaml') -Force",
+                "Copy-Item (Join-Path $SourceDir 'env\\site.env') (Join-Path $envDir 'site.env') -Force",
+                "",
+                "$ctlWrapper = @'",
+                self._render_windows_cmd("services.cli.datastreamctl"),
+                "'@",
+                "Set-Content -Path (Join-Path $binDir 'datastreamctl.cmd') -Value $ctlWrapper -Encoding ASCII",
+                "",
+                "$dWrapper = @'",
+                self._render_windows_cmd("services.cli.datastreamd", "up --site-profile \"%~dp0..\\site-profile.yaml\""),
+                "'@",
+                "Set-Content -Path (Join-Path $binDir 'datastreamd.cmd') -Value $dWrapper -Encoding ASCII",
+                "",
+                "$pythonExe = (Get-Command python -ErrorAction Stop).Source",
+                "$binaryPath = '\"' + $pythonExe + '\" -m services.cli.datastreamd up --site-profile \"' + (Join-Path $TargetDir 'site-profile.yaml') + '\"'",
+                "if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {",
+                "    Stop-Service -Name $ServiceName -ErrorAction SilentlyContinue",
+                "    sc.exe delete $ServiceName | Out-Null",
+                "}",
+                "New-Service -Name $ServiceName -BinaryPathName $binaryPath -DisplayName $ServiceName -Description 'Local Stream Engine runtime' -StartupType Automatic | Out-Null",
+                "Write-Host ('Installed ' + $ServiceName + ' into ' + $TargetDir)",
+                "",
+            ]
+        )
+
+    def _render_windows_uninstall(self, site_id: str) -> str:
+        service_name = f"datastreamd-{site_id}"
+        return "\n".join(
+            [
+                "param(",
+                f"    [string]$ServiceName = '{service_name}',",
+                f"    [string]$TargetDir = 'C:\\Datastream\\{self.project_id}\\{site_id}'",
+                ")",
+                "",
+                "$ErrorActionPreference = 'Stop'",
+                "",
+                "if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {",
+                "    Stop-Service -Name $ServiceName -ErrorAction SilentlyContinue",
+                "    sc.exe delete $ServiceName | Out-Null",
+                "}",
+                "Write-Host ('Removed ' + $ServiceName + '. Site files remain in ' + $TargetDir + ' for rollback unless you delete them manually.')",
                 "",
             ]
         )
@@ -514,6 +612,12 @@ class ProjectManifest:
             written.append(self._write_text(site_root / "systemd" / "README.md", self._render_systemd_readme(site_id)))
             written.append(self._write_text(site_root / "systemd" / "install.sh", self._render_systemd_install(site_id)))
             written.append(self._write_text(site_root / "systemd" / "uninstall.sh", self._render_systemd_uninstall(site_id)))
+        elif layout == "windows":
+            written.append(self._write_text(site_root / "windows" / "README.md", self._render_windows_readme(site_id)))
+            written.append(self._write_text(site_root / "windows" / "install.ps1", self._render_windows_install(site_id)))
+            written.append(self._write_text(site_root / "windows" / "uninstall.ps1", self._render_windows_uninstall(site_id)))
+            written.append(self._write_text(site_root / "windows" / "bin" / "datastreamctl.cmd", self._render_windows_cmd("services.cli.datastreamctl")))
+            written.append(self._write_text(site_root / "windows" / "bin" / "datastreamd.cmd", self._render_windows_cmd("services.cli.datastreamd", "up")))
         elif layout == "kubernetes":
             written.append(self._write_text(site_root / "kubernetes" / "configmap.yaml", self._render_kubernetes_configmap(site_id, env)))
             written.append(self._write_text(site_root / "kubernetes" / "site-profile-configmap.yaml", self._render_kubernetes_site_profile_configmap(site_id)))
@@ -631,7 +735,7 @@ class ProjectManifest:
             env = envs[sid]
             if layout == "flat":
                 self._export_flat_site(output_path, sid, env, fmt=fmt, written=written)
-            elif layout in {"systemd", "kubernetes"}:
+            elif layout in {"systemd", "windows", "kubernetes"}:
                 self._export_structured_site(output_path, sid, env, fmt=fmt, layout=layout, written=written)
             else:
                 self._export_package_site(output_path, sid, env, fmt=fmt, written=written)

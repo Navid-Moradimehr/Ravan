@@ -1,5 +1,28 @@
 # Implementation Log
 
+## 2026-07-03 - OS Packaging Scripts And Windows Bundle Export
+
+### Changed
+
+1. **Repo-based packaging driver**
+   - Added `scripts/package-release.py` plus `scripts/package-release.ps1` and `scripts/package-release.sh`.
+   - The driver stages Windows, Linux, and offline bundles from the actual repo tree instead of a synthetic layout.
+
+2. **Windows export layout**
+   - Added a native Windows bundle layout to `services/common/project_manifest.py`.
+   - The Windows layout emits `install.ps1`, `uninstall.ps1`, `.cmd` launchers, and a Windows-specific README alongside the site bundle.
+
+### Verified
+
+- `.venv\\Scripts\\python.exe -m pytest -q tests/test_project_manifest.py tests/test_datastreamctl.py`: 60 passed
+- `python scripts/package-release.py --output-dir %TEMP%\\datastream-package-test --site-id demo-site --archive none windows`
+  - staged `demo-site-windows`
+  - file count: 523
+
+### Notes
+
+- The packaging pipeline still stops short of generating MSI/DEB/RPM installers, but the repo now has the correct staging shape to feed them.
+
 ## 2026-07-03 - Packaging Checklist Based On Repo Structure
 
 ### Changed

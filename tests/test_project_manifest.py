@@ -65,6 +65,22 @@ def test_manifest_export_systemd_layout(tmp_path: Path):
     assert any(path.name == "datastreamd.service" for path in written)
 
 
+def test_manifest_export_windows_layout(tmp_path: Path):
+    manifest = load_project_manifest(MANIFEST)
+    written = manifest.export_bundles(tmp_path, site_id="demo-site", fmt="both", layout="windows")
+    site_root = tmp_path / "demo-site"
+    assert site_root.exists()
+    assert (site_root / "env" / "site.env").exists()
+    assert (site_root / "site-profile.yaml").exists()
+    assert (site_root / "bundle.yaml").exists()
+    assert (site_root / "windows" / "README.md").exists()
+    assert (site_root / "windows" / "install.ps1").exists()
+    assert (site_root / "windows" / "uninstall.ps1").exists()
+    assert (site_root / "windows" / "bin" / "datastreamctl.cmd").exists()
+    assert (site_root / "windows" / "bin" / "datastreamd.cmd").exists()
+    assert any(path.name == "install.ps1" for path in written)
+
+
 def test_manifest_export_kubernetes_layout(tmp_path: Path):
     manifest = load_project_manifest(MANIFEST)
     written = manifest.export_bundles(tmp_path, site_id="plant-a", fmt="both", layout="kubernetes")
