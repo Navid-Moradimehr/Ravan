@@ -780,3 +780,25 @@ Eighth pass added auto-scaling, completed the dataset catalog, and improved Helm
 
 - This closes the last major deployment-layer mismatch between the site profile contract and the chart/export path.
 - Remaining work is now mostly about higher-level production hardening and target-site validation, not basic runtime wiring.
+
+## PLC and sensor compatibility refactor (2026-07-03)
+
+### Added
+
+1. **Shared device compatibility helpers**
+   - Added `services/common/device_compat.py` to centralize tag-to-legacy-field mapping, tag-to-unit inference, and protocol family metadata.
+   - `services/common/normalize.py`, `services/common/runtime_event.py`, and `services/edge_ingest/main.py` now consume the shared helper instead of repeating the same tag semantics in multiple places.
+
+2. **Compatibility documentation**
+   - Added a protocol compatibility matrix for OPC UA, Modbus TCP/RTU, MQTT, Sparkplug B, and gateway-first EtherNet/IP / PROFINET coverage.
+   - Added second-brain notes that record the current direct-support versus gateway-first policy.
+
+### Verified
+
+- New regression tests: `tests/test_device_compat.py`
+- Shared tag mapping checks still pass through the existing edge-model tests
+
+### Notes
+
+- The refactor does not change the event contract.
+- It reduces duplicated semantic logic and gives the platform a single place to reason about PLC and sensor compatibility edge cases.

@@ -4,8 +4,10 @@ from fastapi.testclient import TestClient
 import sys
 sys.path.insert(0, "services/api_service")
 from main import app
+from services.api_service.auth import create_access_token
 
 client = TestClient(app)
+AUTH_HEADERS = {"Authorization": f"Bearer {create_access_token('user-1', 'operator')}"}
 
 
 def test_get_bridge_config_not_set():
@@ -29,7 +31,7 @@ def test_set_and_get_bridge_config():
             "amqp_routing_key": "{{asset_id}}.{{tag}}"
         }
     }
-    resp = client.post("/api/v1/outbound-bridge/config", json=config)
+    resp = client.post("/api/v1/outbound-bridge/config", json=config, headers=AUTH_HEADERS)
     assert resp.status_code == 200
     data = resp.json()
     assert data["ok"] is True
@@ -56,14 +58,14 @@ def test_publish_without_bridge_fails():
             "amqp_routing_key": "{{asset_id}}.{{tag}}"
         }
     })
-    resp = client.post("/api/v1/outbound-bridge/enable", params={"enabled": False})
+    resp = client.post("/api/v1/outbound-bridge/enable", params={"enabled": False}, headers=AUTH_HEADERS)
     assert resp.status_code == 200
 
     resp = client.post("/api/v1/outbound-bridge/publish", json={
         "asset_id": "asset-01",
         "tag": "temperature",
         "value": 42.0
-    })
+    }, headers=AUTH_HEADERS)
     assert resp.status_code == 400
 
 
@@ -79,13 +81,13 @@ def test_enable_disable_bridge():
             "amqp_exchange": "industrial.events",
             "amqp_routing_key": "{{asset_id}}.{{tag}}"
         }
-    })
-    resp = client.post("/api/v1/outbound-bridge/enable", params={"enabled": False})
+    }, headers=AUTH_HEADERS)
+    resp = client.post("/api/v1/outbound-bridge/enable", params={"enabled": False}, headers=AUTH_HEADERS)
     assert resp.status_code == 200
     data = resp.json()
     assert data["enabled"] is False
 
-    resp = client.post("/api/v1/outbound-bridge/enable", params={"enabled": True})
+    resp = client.post("/api/v1/outbound-bridge/enable", params={"enabled": True}, headers=AUTH_HEADERS)
     assert resp.status_code == 200
     data = resp.json()
     assert data["enabled"] is True

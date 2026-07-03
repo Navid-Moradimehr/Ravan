@@ -222,3 +222,12 @@
 | 8 | Correlation | pandas + NetworkX | Low |
 | 9 | OPC UA discovery | asyncua | Medium |
 | 10 | Kubernetes | Helm chart | Medium |
+
+## Current Edge Compatibility Direction
+
+The codebase already supports OPC UA, MQTT, Modbus TCP, Modbus RTU, and Sparkplug B at the ingest layer.
+The next compatibility step should be gateway-first support for EtherNet/IP and PROFINET rather than trying to
+reimplement vendor stacks inside the core service.
+
+That approach keeps the platform compatible with a broader set of PLC families while preserving a stable internal
+event contract for historian, analytics, and multi-site rollout.

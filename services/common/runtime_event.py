@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from services.common.device_compat import tag_to_legacy_field
+
 
 def _to_float(value: Any) -> float:
     try:
@@ -43,7 +45,7 @@ def _build_record_from_mapping(event: dict[str, Any]) -> "RuntimeEventRecord":
         scenario_id=str(get("scenario_id", "sc-000")),
         ground_truth_severity=str(get("ground_truth_severity", "normal")),
     )
-    legacy_field = _legacy_field_for_tag(tag)
+    legacy_field = tag_to_legacy_field(tag)
     if legacy_field == "temperature_c":
         record.temperature_c = value
     elif legacy_field == "vibration_mm_s":
@@ -201,14 +203,3 @@ class RollingWindowState:
         if size <= 0:
             return 0.0, 0.0, 0
         return self.temperature_sum / size, self.vibration_sum / size, size
-
-
-def _legacy_field_for_tag(tag: str) -> str | None:
-    lowered = tag.lower()
-    if "temp" in lowered:
-        return "temperature_c"
-    if "vibration" in lowered:
-        return "vibration_mm_s"
-    if "pressure" in lowered:
-        return "pressure_bar"
-    return None

@@ -22,6 +22,7 @@ from services.edge_ingest.model import IndustrialEvent, validate_event, to_json_
 from services.assets.model import load_hierarchy
 from services.historian.client import insert_industrial_event, insert_industrial_events
 from services.common.normalize import to_legacy_iot_event
+from services.common.device_compat import unit_for_tag
 from services.edge_ingest.modbus_rtu_client import ModbusRTUClient, scan_modbus_rtu_devices
 from services.edge_ingest.opcua_discovery import OPCUADiscoveryClient
 from services.common.stream_scope import stream_partition_key
@@ -235,7 +236,7 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
                                 "tag": tag,
                                 "value": value,
                                 "quality": "good",
-                                "unit": unit_for(tag),
+                                "unit": unit_for_tag(tag),
                                 "ts_source": utc_now(),
                             }
                         )
@@ -289,17 +290,6 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
             await asyncio.sleep(3)
         finally:
             client.close()
-
-
-def unit_for(tag: str) -> str:
-    lowered = tag.lower()
-    if "temp" in lowered:
-        return "c"
-    if "vibration" in lowered:
-        return "mm/s"
-    if "pressure" in lowered:
-        return "bar"
-    return ""
 
 
 async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:
@@ -361,7 +351,7 @@ async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop
                             "tag": node_id.split(".")[-1] if "." in node_id else node_id,
                             "value": float(value),
                             "quality": "good",
-                            "unit": unit_for(node_id),
+                            "unit": unit_for_tag(node_id),
                             "ts_source": utc_now(),
                         }
                     )

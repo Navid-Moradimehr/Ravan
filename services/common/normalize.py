@@ -2,23 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from services.common.device_compat import tag_to_legacy_field
+
 
 def _to_float(value: Any) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-
-
-def tag_to_legacy_field(tag: str) -> str | None:
-    lowered = str(tag).lower()
-    if "temp" in lowered:
-        return "temperature_c"
-    if "vibration" in lowered:
-        return "vibration_mm_s"
-    if "pressure" in lowered:
-        return "pressure_bar"
-    return None
 
 
 def normalize_runtime_event(event: dict[str, Any]) -> dict[str, Any]:
