@@ -1,5 +1,27 @@
 # Implementation Log
 
+## 2026-07-03 - Multi-Site Validation Gap Closed And Checklist Captured
+
+### Changed
+
+1. **Manifest/site identity validation**
+   - Added a manifest validation rule that requires each site profile `site.id` to match the manifest `site_id`.
+   - This prevents a rollout bundle from accidentally pointing a site entry at the wrong runtime identity.
+
+2. **Execution tracking**
+   - Added a production hardening checklist that separates multi-site rollout, self-hosted security, packaging, and simulator/benchmark work.
+   - Added an Obsidian vault note to track the same execution state during implementation.
+
+### Verified
+
+- Validation logic updated in `services/common/project_manifest.py`.
+- Regression coverage added in `tests/test_project_manifest.py`.
+
+### Notes
+
+- This is a small but important release-safety fix because site identity drift is a realistic multi-site failure mode.
+- Packaging remains intentionally deferred.
+
 ## 2026-07-03 - Native Fastpath Boundary Added And Kept Opt-In
 
 ### Changed

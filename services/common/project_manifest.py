@@ -761,6 +761,10 @@ def validate_project_manifest(manifest: ProjectManifest) -> list[str]:
             profile_errors = validate_site_profile(profile)
             if profile_errors:
                 errors.extend(f"{site.site_id}: {err}" for err in profile_errors)
+            if profile.site.id and profile.site.id != site.site_id:
+                errors.append(
+                    f"{site.site_id}: site profile site.id {profile.site.id} does not match manifest site_id {site.site_id}"
+                )
 
     source_ids = {source.source_id for source in manifest.sources}
     if len(source_ids) != len(manifest.sources):

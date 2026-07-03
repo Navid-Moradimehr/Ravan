@@ -161,3 +161,49 @@ def test_validate_project_manifest_requires_explicit_cross_site_correlation_stra
     )
     errors = validate_project_manifest(broken)
     assert any("cross-site grouping requires explicit cross_site or federated strategy" in error for error in errors)
+
+
+def test_validate_project_manifest_requires_matching_site_profile_identity(tmp_path: Path):
+    manifest = load_project_manifest(MANIFEST)
+    site_profile = tmp_path / "mismatched-site.yaml"
+    site_profile.write_text(
+        "\n".join(
+            [
+                "schema_version: 1",
+                "profile_id: mismatch-profile",
+                "deployment_mode: single-site",
+                "site:",
+                "  id: not-demo-site",
+                "  name: Not Demo Site",
+                "  region: local-lab",
+                "  network_zone: zone-a",
+                "runtime:",
+                "  image_tag: latest",
+                "  mode: python-fallback",
+                "  redpanda_brokers: redpanda:9092",
+                "  historian_backend: timescaledb",
+                "  ai:",
+                "    provider: disabled",
+                "    endpoint_url: ''",
+                "    model_id: ''",
+                "    local_only: true",
+                "backups:",
+                "  directory: backups/demo-site",
+                "  schedule: daily",
+                "  retention_days: 7",
+                "federation:",
+                "  enabled: false",
+                "  export_mode: none",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    broken = replace(
+        manifest,
+        sites=(
+            replace(manifest.sites[0], profile_path=str(site_profile)),
+            manifest.sites[1],
+        ),
+    )
+    errors = validate_project_manifest(broken)
+    assert any("site profile site.id not-demo-site does not match manifest site_id demo-site" in error for error in errors)
