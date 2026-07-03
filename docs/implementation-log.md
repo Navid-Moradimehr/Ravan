@@ -1,5 +1,37 @@
 # Implementation Log
 
+## 2026-07-03 - Backup Drill Reports, Release Package Skeleton, And Repeat-Run Matrix
+
+### Changed
+
+1. **Backup drill reporting**
+   - Added an optional JSON report directory for the historian backup drill command.
+   - The drill now writes a summary artifact plus component artifacts so restore/rollback checks can be archived.
+
+2. **Release package skeleton**
+   - Added `project-manifest release-package` to emit a release-artifact skeleton with checksums and a release manifest.
+   - The package keeps installable output separate from the later signing workflow.
+
+3. **Repeat-run matrix**
+   - Added repeat-count support to the site-profile matrix and calibration benchmarks.
+   - The matrix now reports mean, median, spread, min, and max so local variance is visible instead of hidden.
+
+### Verified
+
+- `uv run python -m pytest tests/test_datastreamctl.py tests/test_project_manifest.py tests/test_site_profile_matrix_benchmark.py`: passed
+- `uv run python -m pytest tests/test_site_profile_calibration_benchmark.py`: passed
+- `python -m compileall services`: passed
+- `uv run python -m services.cli.datastreamctl benchmark site-profile-matrix --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 1000 --batch-size 64 --warmup-events 0 --min-average-events-per-second 1 --repeat-count 2`
+  - `demo-site`: mean 86,376.50 events/sec, median 86,376.50, stdev 288.99, p99 0.0195 ms
+  - `plant-a`: mean 94,552.48 events/sec, median 94,552.48, stdev 1,214.24, p99 0.0174 ms
+- `uv run python -m services.cli.datastreamctl project-manifest release-package config/project-manifest.yaml %TEMP%\\datastream-release --site-id demo-site --format both`
+  - release manifest and checksums were generated successfully
+
+### Notes
+
+- Packaging is still not the final signed-distribution step; it is now a proper release skeleton.
+- Restore/rollback drill reporting is in place, but target-site validation still needs real infrastructure.
+
 ## 2026-07-03 - Simulator Baseline Measured For Multi-PLC Cases
 
 ### Verified

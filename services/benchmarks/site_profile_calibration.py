@@ -16,6 +16,8 @@ class SiteProfileCalibrationResult:
     deployment_mode: str
     profile_path: str
     observed_average_events_per_second: float
+    observed_median_events_per_second: float
+    observed_stdev_events_per_second: float
     acceptance_threshold: float
     headroom_events_per_second: float
     headroom_ratio: float
@@ -63,6 +65,7 @@ def run_calibration(
     batch_size: int = 256,
     warmup_events: int = 0,
     min_average_events_per_second: float = 1000.0,
+    repeat_count: int = 1,
 ) -> SiteProfileCalibrationMatrixResult:
     manifest = load_project_manifest(manifest_path)
     selected_ids = list(site_ids) if site_ids is not None else [site.site_id for site in manifest.sites]
@@ -74,6 +77,7 @@ def run_calibration(
         batch_size=batch_size,
         warmup_events=warmup_events,
         min_average_events_per_second=min_average_events_per_second,
+        repeat_count=repeat_count,
     )
     benchmark_by_site = {run.site_id: run for run in benchmark.runs}
     runs: list[SiteProfileCalibrationResult] = []
@@ -84,18 +88,20 @@ def run_calibration(
         profile = load_site_profile(site.profile_path)
         run = benchmark_by_site[site.site_id]
         threshold = _threshold_for_mode(profile.deployment_mode, min_average_events_per_second)
-        headroom = run.average_events_per_second - threshold
-        ratio = run.average_events_per_second / threshold if threshold > 0 else 0.0
+        headroom = run.median_events_per_second - threshold
+        ratio = run.median_events_per_second / threshold if threshold > 0 else 0.0
         runs.append(
             SiteProfileCalibrationResult(
                 site_id=site.site_id,
                 deployment_mode=profile.deployment_mode,
                 profile_path=site.profile_path,
                 observed_average_events_per_second=run.average_events_per_second,
+                observed_median_events_per_second=run.median_events_per_second,
+                observed_stdev_events_per_second=run.stdev_events_per_second,
                 acceptance_threshold=threshold,
                 headroom_events_per_second=headroom,
                 headroom_ratio=round(ratio, 2),
-                recommended_min_average_events_per_second=round(max(threshold, run.average_events_per_second * 0.8), 2),
+                recommended_min_average_events_per_second=round(max(threshold, run.median_events_per_second * 0.8), 2),
                 recommended_batch_size=_recommended_batch_size(batch_size, ratio),
                 passed=run.passed and headroom >= 0,
             )
@@ -105,13 +111,13 @@ def run_calibration(
 
 def format_result(result: SiteProfileCalibrationMatrixResult) -> str:
     lines = [
-        "site_id | deployment_mode | avg_events/sec | threshold | headroom | headroom_ratio | recommended_min | recommended_batch",
+        "site_id | deployment_mode | avg_events/sec | median | stdev | threshold | headroom | headroom_ratio | recommended_min | recommended_batch",
         "-" * 120,
     ]
     for run in result.runs:
         lines.append(
-            f"{run.site_id} | {run.deployment_mode} | {run.observed_average_events_per_second} | "
-            f"{run.acceptance_threshold} | {run.headroom_events_per_second} | {run.headroom_ratio} | "
+            f"{run.site_id} | {run.deployment_mode} | {run.observed_average_events_per_second} | {run.observed_median_events_per_second} | "
+            f"{run.observed_stdev_events_per_second} | {run.acceptance_threshold} | {run.headroom_events_per_second} | {run.headroom_ratio} | "
             f"{run.recommended_min_average_events_per_second} | {run.recommended_batch_size}"
         )
     if result.runs:

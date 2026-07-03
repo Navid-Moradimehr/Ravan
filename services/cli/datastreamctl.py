@@ -105,6 +105,22 @@ def _run_backup_drill(backup_dir: str | None, tables: list[str] | None, restore_
     return result
 
 
+def _write_backup_drill_report(report_dir: str, payload: dict[str, Any]) -> list[Path]:
+    output_dir = Path(report_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    summary_path = output_dir / "backup-drill-summary.json"
+    summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    written.append(summary_path)
+    for key in ("backup", "restore", "wal_g"):
+        if payload.get(key) is None:
+            continue
+        item_path = output_dir / f"{key}.json"
+        item_path.write_text(json.dumps(payload[key], indent=2), encoding="utf-8")
+        written.append(item_path)
+    return written
+
+
 def _run_release_gate_for_profile(
     profile_path: str,
     *,
@@ -163,6 +179,7 @@ def _run_rollout_acceptance_for_manifest(
     batch_size: int = 256,
     warmup_events: int = 0,
     min_average_events_per_second: float = 1000.0,
+    repeat_count: int = 1,
     backup_dir: str | None = None,
     restore_db: str | None = None,
     skip_network: bool = False,
@@ -181,6 +198,7 @@ def _run_rollout_acceptance_for_manifest(
         batch_size=batch_size,
         warmup_events=warmup_events,
         min_average_events_per_second=min_average_events_per_second,
+        repeat_count=repeat_count,
     )
     benchmark_by_site = {run.site_id: run for run in benchmark_matrix.runs}
 
@@ -428,8 +446,13 @@ def cmd_backup_drill(args: argparse.Namespace) -> int:
     backup_ok = result["backup"].get("status") == "success"
     restore_ok = result["restore"] is None or result["restore"].get("status") == "success"
     ok = backup_ok and restore_ok
+    written_reports: list[Path] = []
+    if args.report_dir:
+        written_reports = _write_backup_drill_report(args.report_dir, result)
 
     if args.json:
+        if written_reports:
+            result = {**result, "written_reports": [str(path) for path in written_reports]}
         print(json.dumps(result, indent=2))
     else:
         print("backup drill")
@@ -439,6 +462,10 @@ def cmd_backup_drill(args: argparse.Namespace) -> int:
         _print_row("restore_status", result["restore"].get("status", "skipped") if result["restore"] else "skipped")
         _print_row("available_backups", len(result["backups"]))
         _print_row("wal_g_installed", result["wal_g"].get("installed"))
+        if written_reports:
+            _print_row("report_dir", args.report_dir)
+            for path in written_reports:
+                print(f"{'':6}report  {path}")
     return 0 if ok else 2
 
 
@@ -583,6 +610,34 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
                     print(f"ERROR  {err}")
         return 0 if not errors else 1
 
+    if args.action == "release-package":
+        if not args.site_id:
+            raise ValueError("site_id is required for release-package")
+        written = manifest.export_release_artifact(Path(args.output_dir), site_id=args.site_id, fmt=args.format)
+        payload = {
+            "path": args.path,
+            "output_dir": args.output_dir,
+            "site_id": args.site_id,
+            "format": args.format,
+            "written": [str(path) for path in written],
+            "errors": errors,
+            "valid": not errors,
+        }
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("project release package")
+            print("=" * 40)
+            _print_row("output_dir", args.output_dir)
+            _print_row("format", args.format)
+            _print_row("site_id", args.site_id)
+            for path in written:
+                print(path)
+            if errors:
+                for err in errors:
+                    print(f"ERROR  {err}")
+        return 0 if not errors else 1
+
     if args.action == "lint":
         issues = manifest.lint()
         passed = not issues
@@ -661,6 +716,7 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
             batch_size=args.batch_size,
             warmup_events=args.warmup_events,
             min_average_events_per_second=args.min_average_events_per_second,
+            repeat_count=args.repeat_count,
             backup_dir=args.backup_dir,
             restore_db=args.restore_db,
             skip_network=args.skip_network,
@@ -815,6 +871,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             batch_size=args.batch_size,
             warmup_events=args.warmup_events,
             min_average_events_per_second=args.min_average_events_per_second,
+            repeat_count=args.repeat_count,
         )
         if args.json:
             print(json.dumps(
@@ -826,6 +883,11 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                             "deployment_mode": item.deployment_mode,
                             "profile_path": item.profile_path,
                             "average_events_per_second": item.average_events_per_second,
+                            "median_events_per_second": item.median_events_per_second,
+                            "stdev_events_per_second": item.stdev_events_per_second,
+                            "min_events_per_second": item.min_events_per_second,
+                            "max_events_per_second": item.max_events_per_second,
+                            "repeat_count": item.repeat_count,
                             "passed": item.passed,
                             "detail": item.detail,
                         }
@@ -849,6 +911,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             batch_size=args.batch_size,
             warmup_events=args.warmup_events,
             min_average_events_per_second=args.min_average_events_per_second,
+            repeat_count=args.repeat_count,
         )
         if args.json:
             print(json.dumps(
@@ -862,6 +925,11 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                                 "deployment_mode": item.deployment_mode,
                                 "profile_path": item.profile_path,
                                 "average_events_per_second": item.average_events_per_second,
+                                "median_events_per_second": item.median_events_per_second,
+                                "stdev_events_per_second": item.stdev_events_per_second,
+                                "min_events_per_second": item.min_events_per_second,
+                                "max_events_per_second": item.max_events_per_second,
+                                "repeat_count": item.repeat_count,
                                 "passed": item.passed,
                                 "detail": item.detail,
                             }
@@ -874,6 +942,8 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                             "deployment_mode": item.deployment_mode,
                             "profile_path": item.profile_path,
                             "observed_average_events_per_second": item.observed_average_events_per_second,
+                            "observed_median_events_per_second": item.observed_median_events_per_second,
+                            "observed_stdev_events_per_second": item.observed_stdev_events_per_second,
                             "acceptance_threshold": item.acceptance_threshold,
                             "headroom_events_per_second": item.headroom_events_per_second,
                             "headroom_ratio": item.headroom_ratio,
@@ -1285,6 +1355,7 @@ def build_parser() -> argparse.ArgumentParser:
     backup.add_argument("--backup-dir", default=None)
     backup.add_argument("--tables", default=None, help="Comma-separated table names")
     backup.add_argument("--restore-db", default=None, help="Optional restore target database")
+    backup.add_argument("--report-dir", default=None, help="Optional directory to write backup drill reports")
     backup.add_argument("--json", action="store_true")
     backup.set_defaults(func=cmd_backup_drill)
 
@@ -1331,6 +1402,13 @@ def build_parser() -> argparse.ArgumentParser:
     project_package.add_argument("--format", choices=["env", "yaml", "both"], default="both")
     project_package.add_argument("--json", action="store_true")
     project_package.set_defaults(func=cmd_project_manifest)
+    project_release_package = project_sub.add_parser("release-package", help="Export a release-artifact skeleton for one site")
+    project_release_package.add_argument("path")
+    project_release_package.add_argument("output_dir")
+    project_release_package.add_argument("--site-id", required=True, help="Site to package into a release artifact")
+    project_release_package.add_argument("--format", choices=["env", "yaml", "both"], default="both")
+    project_release_package.add_argument("--json", action="store_true")
+    project_release_package.set_defaults(func=cmd_project_manifest)
     project_lint = project_sub.add_parser("lint", help="Lint the project manifest for collisions and policy drift")
     project_lint.add_argument("path")
     project_lint.add_argument("--json", action="store_true")
@@ -1355,6 +1433,7 @@ def build_parser() -> argparse.ArgumentParser:
     project_rollout.add_argument("--batch-size", type=int, default=256)
     project_rollout.add_argument("--warmup-events", type=int, default=0)
     project_rollout.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    project_rollout.add_argument("--repeat-count", type=int, default=1, help="Number of benchmark repeats per site")
     project_rollout.add_argument("--backup-dir", default=None)
     project_rollout.add_argument("--restore-db", default=None)
     project_rollout.add_argument("--report-dir", default=None, help="Optional directory to write JSON rollout acceptance reports")
@@ -1399,6 +1478,7 @@ def build_parser() -> argparse.ArgumentParser:
     site_profile_matrix.add_argument("--batch-size", type=int, default=256)
     site_profile_matrix.add_argument("--warmup-events", type=int, default=0)
     site_profile_matrix.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    site_profile_matrix.add_argument("--repeat-count", type=int, default=3, help="Number of repeated benchmark runs per site")
     site_profile_matrix.add_argument("--json", action="store_true")
     site_profile_matrix.set_defaults(func=cmd_benchmark)
     site_profile_calibration = benchmark_sub.add_parser("site-profile-calibration", help="Calibrate per-site benchmark thresholds from the mixed replay pack")
@@ -1409,6 +1489,7 @@ def build_parser() -> argparse.ArgumentParser:
     site_profile_calibration.add_argument("--batch-size", type=int, default=256)
     site_profile_calibration.add_argument("--warmup-events", type=int, default=0)
     site_profile_calibration.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    site_profile_calibration.add_argument("--repeat-count", type=int, default=3, help="Number of repeated benchmark runs per site")
     site_profile_calibration.add_argument("--json", action="store_true")
     site_profile_calibration.set_defaults(func=cmd_benchmark)
     cgr_gap_report = benchmark_sub.add_parser("cgr-gap-report", help="Compare local benchmark results against the public CGR streaming claims")

@@ -28,6 +28,23 @@
 - The new simulator cases are useful for architecture validation, source identity preservation, and reconnect behavior.
 - Use repeated runs before treating small deltas as meaningful.
 
+## Repeat-Run Matrix Baseline
+
+- **Date**: 2026-07-03
+- **Scope**: repeated site-profile matrix benchmark with median and variance tracking
+
+### Benchmark Run
+
+| Site | Mean events/sec | Median events/sec | Stdev | p99 ms | Repeats |
+|------|-----------------|-------------------|-------|--------|---------|
+| `demo-site` | 86,376.50 | 86,376.50 | 288.99 | 0.0195 | 2 |
+| `plant-a` | 94,552.48 | 94,552.48 | 1,214.24 | 0.0174 | 2 |
+
+### Notes
+
+- The repeat-run matrix uses the median as the pass/fail anchor and reports spread explicitly.
+- Use the repeat count to filter out one-off noise before treating changes as regressions or wins.
+
 ## Native Boundary Rerun
 
 - **Date**: 2026-07-03

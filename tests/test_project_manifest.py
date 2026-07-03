@@ -99,6 +99,16 @@ def test_manifest_package_export(tmp_path: Path):
     assert any(path.name == "site.env" for path in written)
 
 
+def test_manifest_release_package_export(tmp_path: Path):
+    manifest = load_project_manifest(MANIFEST)
+    written = manifest.export_release_artifact(tmp_path, site_id="demo-site", fmt="both")
+    site_root = tmp_path / "demo-site"
+    assert site_root.exists()
+    assert (site_root / "release-manifest.json").exists()
+    assert (site_root / "checksums.sha256").exists()
+    assert any(path.name == "release-manifest.json" for path in written)
+
+
 def test_manifest_lint_flags_collisions():
     manifest = load_project_manifest(MANIFEST)
     issues = manifest.lint()

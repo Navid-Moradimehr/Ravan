@@ -17,7 +17,7 @@
 
 ## Remaining
 
-- packaging artifacts and signed release outputs
+- signed release outputs
 - target-hardware sizing validation
 - restore/rollback drill measurement across at least two sites
 
@@ -36,3 +36,13 @@
 - `dropout-reconnect`: 95,832.26 events/sec
 - `industrial-benchmark`: 94,157.53 events/sec
 - average: 93,370.10 events/sec
+
+## Repeat Matrix
+
+- `demo-site`: mean 86,376.50 events/sec, median 86,376.50, stdev 288.99, repeats 2
+- `plant-a`: mean 94,552.48 events/sec, median 94,552.48, stdev 1,214.24, repeats 2
+
+## Release Skeleton
+
+- release-package command now emits `release-manifest.json` and `checksums.sha256`
+- package output stays separate from future signed release artifacts

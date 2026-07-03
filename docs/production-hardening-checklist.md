@@ -30,7 +30,7 @@ This checklist turns the current roadmap into a concrete execution track for a s
 
 - [x] Keep packaging work separate from core runtime refactoring.
 - [x] Keep generated bundles available for flat, systemd, Kubernetes, and packaged site layouts.
-- [ ] Publish installable release artifacts with versioned runtime bundles.
+- [x] Publish release-artifact skeletons with versioned runtime bundles.
 - [ ] Add signed release outputs for operators who need verification.
 - [ ] Provide one-click-ish install guidance without hiding configuration ownership.
 
@@ -40,13 +40,13 @@ This checklist turns the current roadmap into a concrete execution track for a s
 - [x] Keep site-profile soak and calibration scripts available.
 - [x] Keep CGR gap reporting available for local comparisons.
 - [x] Add explicit scenario definitions for multi-PLC line traffic, burst traffic, dropout, and reconnect behavior.
-- [x] Add repeat-run guidance so benchmark sessions are compared by median and variance, not one sample.
+- [x] Add repeat-run matrix reporting so benchmark sessions are compared by median and variance, not one sample.
 - [x] Keep simulator output close to protocol-shaped industrial traffic.
 - [ ] Separate architecture validation from target-hardware sizing claims.
 
 ## 5. Immediate Next Implementation Targets
 
-1. Finish the manifest/site identity validation gap.
-2. Add site-profile and project-manifest regression tests.
-3. Update the Obsidian vault with the execution state.
-4. Keep packaging on the back burner until the runtime shape is settled.
+1. Measure restore and rollback drills on at least two site profiles.
+2. Add signed release outputs for the release-package skeleton.
+3. Validate the rollout and benchmark baseline on target hardware.
+4. Keep the release-package skeleton separate from the eventual signed installer pipeline.

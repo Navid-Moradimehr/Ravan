@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -631,6 +634,46 @@ class ProjectManifest:
                 self._export_structured_site(output_path, sid, env, fmt=fmt, layout=layout, written=written)
             else:
                 self._export_package_site(output_path, sid, env, fmt=fmt, written=written)
+        return written
+
+    def export_release_artifact(
+        self,
+        output_dir: Path | str,
+        *,
+        site_id: str,
+        fmt: str = "both",
+    ) -> list[Path]:
+        output_path = Path(output_dir)
+        written = self.export_package(output_path, site_id=site_id, fmt=fmt)
+        site_root = output_path / site_id
+        package_files = [path for path in site_root.rglob("*") if path.is_file()]
+        checksums = []
+        for path in sorted(package_files):
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            checksums.append(f"{digest}  {path.relative_to(site_root).as_posix()}")
+        payload = {
+            "project_id": self.project_id,
+            "project_name": self.name,
+            "site_id": site_id,
+            "artifact_type": "release-package",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "format": fmt,
+            "layout": "package",
+            "file_count": len(package_files),
+            "checksums_file": "checksums.sha256",
+            "release_notes": [
+                "This is a self-hosted release skeleton.",
+                "Secrets, signing keys, and installer signing remain operator-owned.",
+                "Use the generated checksums file with your downstream signing workflow.",
+            ],
+        }
+        written.append(
+            self._write_text(
+                site_root / "release-manifest.json",
+                json.dumps(payload, indent=2, sort_keys=False, ensure_ascii=False),
+            )
+        )
+        written.append(self._write_text(site_root / "checksums.sha256", "\n".join(checksums) + "\n"))
         return written
 
     def export_package(

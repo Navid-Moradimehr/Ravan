@@ -26,9 +26,13 @@ def test_run_site_profile_matrix(tmp_path: Path) -> None:
         batch_size=4,
         warmup_events=0,
         min_average_events_per_second=1.0,
+        repeat_count=2,
     )
 
     assert result.passed is True
     assert len(result.runs) == 2
     assert all(run.passed for run in result.runs)
+    assert all(run.repeat_count == 2 for run in result.runs)
+    assert all(run.median_events_per_second >= 0 for run in result.runs)
     assert "demo-site" in format_result(result)
+    assert "median" in format_result(result)

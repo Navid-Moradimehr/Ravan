@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
+from statistics import mean, median, pstdev
 from typing import Iterable
 
 from services.benchmarks.real_world_simulator import RealWorldSimulatorResult, format_result as format_simulator_result, run_suite as run_real_world_simulator_suite
@@ -16,6 +17,11 @@ class SiteProfileBenchmarkResult:
     deployment_mode: str
     profile_path: str
     average_events_per_second: float
+    median_events_per_second: float
+    stdev_events_per_second: float
+    min_events_per_second: float
+    max_events_per_second: float
+    repeat_count: int
     latency_p99_ms: float
     passed: bool
     detail: str
@@ -50,6 +56,7 @@ def run_matrix(
     batch_size: int = 256,
     warmup_events: int = 0,
     min_average_events_per_second: float = 1000.0,
+    repeat_count: int = 1,
 ) -> SiteProfileMatrixResult:
     manifest = load_project_manifest(manifest_path)
     selected_ids = list(site_ids) if site_ids is not None else [site.site_id for site in manifest.sites]
@@ -59,18 +66,32 @@ def run_matrix(
         if site.site_id not in selected_ids:
             continue
         profile = load_site_profile(site.profile_path)
-        simulator = run_real_world_simulator_suite(
-            baseline_csv=baseline_csv,
-            events=events,
-            batch_size=batch_size,
-            warmup_events=warmup_events,
-        )
+        simulator_runs = [
+            run_real_world_simulator_suite(
+                baseline_csv=baseline_csv,
+                events=events,
+                batch_size=batch_size,
+                warmup_events=warmup_events,
+            )
+            for _ in range(max(1, repeat_count))
+        ]
+        observed = [simulator.average_events_per_second for simulator in simulator_runs]
+        aggregate = simulator_runs[-1]
+        average = round(mean(observed), 2)
+        med = round(median(observed), 2)
+        spread = round(pstdev(observed), 2) if len(observed) > 1 else 0.0
+        min_observed = round(min(observed), 2)
+        max_observed = round(max(observed), 2)
         threshold = _threshold_for_mode(profile.deployment_mode, min_average_events_per_second)
-        average = simulator.average_events_per_second
-        passed = average >= threshold and all(case.invalid_events == 0 for case in simulator.cases)
+        passed = med >= threshold and all(
+            case.invalid_events == 0
+            for simulator in simulator_runs
+            for case in simulator.cases
+        )
         detail = (
-            f"threshold={threshold} avg={average} p99={simulator.average_latency_p99_ms} "
-            f"invalid_events_ok={all(case.invalid_events == 0 for case in simulator.cases)}"
+            f"threshold={threshold} median={med} avg={average} stdev={spread} "
+            f"min={min_observed} max={max_observed} p99={aggregate.average_latency_p99_ms} "
+            f"repeat_count={len(simulator_runs)} invalid_events_ok={all(case.invalid_events == 0 for simulator in simulator_runs for case in simulator.cases)}"
         )
         runs.append(
             SiteProfileBenchmarkResult(
@@ -78,10 +99,15 @@ def run_matrix(
                 deployment_mode=profile.deployment_mode,
                 profile_path=site.profile_path,
                 average_events_per_second=average,
-                latency_p99_ms=simulator.average_latency_p99_ms,
+                median_events_per_second=med,
+                stdev_events_per_second=spread,
+                min_events_per_second=min_observed,
+                max_events_per_second=max_observed,
+                repeat_count=len(simulator_runs),
+                latency_p99_ms=aggregate.average_latency_p99_ms,
                 passed=passed,
                 detail=detail,
-                simulator=simulator,
+                simulator=aggregate,
             )
         )
     return SiteProfileMatrixResult(runs=tuple(runs))
@@ -89,12 +115,12 @@ def run_matrix(
 
 def format_result(result: SiteProfileMatrixResult) -> str:
     lines = [
-        "site_id | deployment_mode | avg_events/sec | p99_ms | passed | detail",
+        "site_id | deployment_mode | avg_events/sec | median | stdev | p99_ms | passed | detail",
         "-" * 104,
     ]
     for run in result.runs:
         lines.append(
-            f"{run.site_id} | {run.deployment_mode} | {run.average_events_per_second} | {run.latency_p99_ms} | {str(run.passed).lower()} | {run.detail}"
+            f"{run.site_id} | {run.deployment_mode} | {run.average_events_per_second} | {run.median_events_per_second} | {run.stdev_events_per_second} | {run.latency_p99_ms} | {str(run.passed).lower()} | {run.detail}"
         )
     if result.runs:
         lines.append("-" * 104)

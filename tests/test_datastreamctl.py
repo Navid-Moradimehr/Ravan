@@ -106,6 +106,19 @@ class TestDatastreamctl:
         assert rc == 0
         assert "backup_status" in out
 
+    def test_backup_drill_writes_report_dir(self, monkeypatch, tmp_path):
+        report_dir = tmp_path / "backup-report"
+        monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
+        monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
+        monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
+        monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": True})
+        rc, out = self._run(["backup-drill", "--restore-db", "restore_db", "--report-dir", str(report_dir)])
+        assert rc == 0
+        assert (report_dir / "backup-drill-summary.json").exists()
+        assert (report_dir / "backup.json").exists()
+        assert (report_dir / "restore.json").exists()
+        assert "report_dir" in out
+
     def test_release_gate_can_skip_network_and_run_backup(self, monkeypatch):
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
@@ -343,6 +356,24 @@ class TestDatastreamctl:
         assert (tmp_path / "demo-site" / "systemd" / "install.sh").exists()
         assert (tmp_path / "demo-site" / "kubernetes" / "helm" / "install.sh").exists()
         assert "project package" in out
+
+    def test_project_manifest_release_package_command(self, tmp_path):
+        rc, out = self._run([
+            "project-manifest",
+            "release-package",
+            str(PROJECT_MANIFEST),
+            str(tmp_path),
+            "--site-id",
+            "demo-site",
+            "--format",
+            "both",
+        ])
+        assert rc == 0
+        site_root = tmp_path / "demo-site"
+        assert (site_root / "release-manifest.json").exists()
+        assert (site_root / "checksums.sha256").exists()
+        assert (site_root / "README.md").exists()
+        assert "project release package" in out
 
     def test_benchmark_deployment_pack_runs(self, tmp_path):
         csv_path = tmp_path / "mock.csv"
