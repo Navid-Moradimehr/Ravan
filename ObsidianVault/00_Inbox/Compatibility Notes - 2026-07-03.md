@@ -36,10 +36,19 @@
 - historian write/query helpers are now shared
 - API and AI gateway health surfaces now expose degraded state
 - Flink task handling is more tolerant of malformed input
+- API realtime/WebSocket behavior now lives in a focused runtime module
+- edge ingest is split into settings, publisher, and protocol connector modules
 - packaging is still deferred
 
 ## Benchmark rerun
 
+- API/edge decomposition rerun maintained compatibility and did not introduce a meaningful hot-path regression
+- python-fallback throughput improved to 44,155.47 events/sec
+- flink-production throughput improved to 51,394.54 events/sec
+- cgr-stream-slice throughput improved to 53,312.15 events/sec
+- flink-runtime-slice throughput improved to 51,173.09 events/sec
+- mixed replay throughput improved to 98,558.48 events/sec
+- end-to-end JSON should be remeasured separately because this session used the production-pipeline wrapper instead of the direct end-to-end benchmark command
 - python-fallback throughput improved to 43,419.63 events/sec
 - flink-production throughput improved to 43,251.30 events/sec
 - cgr-stream-slice throughput improved to 50,751.73 events/sec

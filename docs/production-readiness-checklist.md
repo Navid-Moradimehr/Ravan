@@ -16,6 +16,8 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Kafka producer reuse and manual consumer offset commit are implemented on the hot paths.
 - WebSocket streaming is used for live UI updates.
 - Real-time preview and replay tooling exist for local validation.
+- API realtime/WebSocket logic has been split out of `services/api_service/main.py`.
+- Edge ingest settings, publisher, and protocol connectors are split into focused modules.
 
 ### Platform foundations
 
@@ -69,8 +71,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Supervised action-agent runtime.
 - Broader connector/vendor validation against actual devices.
 - Enterprise rollout validation across branches, plants, and subnets.
-- API service decomposition can still be cleaned up further if the next pass needs a sharper router boundary.
-- Edge ingest can still be broken into smaller adapter modules if the platform starts carrying more connector families.
+- Further package cleanup is still possible, but the major runtime splits are in place.
 
 ### Foundation-only areas
 

@@ -7,6 +7,39 @@
 - **Broker**: Redpanda (Kafka-compatible)
 - **Historian**: TimescaleDB
 
+## API And Edge Decomposition Rerun
+
+- **Date**: 2026-07-03
+- **Scope**: API realtime/WebSocket split, edge ingest connector split, and compatibility-hook preservation
+
+### Targeted Regression Checks
+
+| Check | Result |
+|-------|--------|
+| `python -m compileall services` | passed |
+| Focused API regression tests | 16 passed |
+
+### Latest Benchmark Runs
+
+| Benchmark | Value | Change vs previous recorded run |
+|-----------|-------|----------------------------------|
+| Production pipeline throughput, `python-fallback` | 44,155.47 events/sec | `+1.69%` |
+| Production pipeline p99, `python-fallback` | 0.0201 ms | `-44.9%` |
+| Production pipeline throughput, `flink-production` | 51,394.54 events/sec | `+18.8%` |
+| Production pipeline p99, `flink-production` | 0.0447 ms | `-53.4%` |
+| CGR stream slice throughput | 53,312.15 events/sec | `+5.0%` |
+| CGR stream slice p99 | 0.0269 ms | `-49.8%` |
+| Flink runtime slice throughput | 51,173.09 events/sec | `+0.9%` |
+| Flink runtime slice p99 | 0.0336 ms | `-35.6%` |
+| Mixed replay throughput | 98,558.48 events/sec | `+5.6%` |
+| Mixed replay p99 | 0.0142 ms | `-43.0%` |
+
+### Change Notes
+
+- The split was structural rather than algorithmic, so the main value is maintenance and boundary clarity rather than a large throughput jump.
+- The benchmark deltas stayed in the same operating band, which is expected for a refactor that does not alter the hot-path math.
+- The Flink-aligned and CGR-style slice runs improved modestly, while the mixed replay remained the strongest local throughput result.
+
 ## Reliability And Compatibility Rerun
 
 - **Date**: 2026-07-03

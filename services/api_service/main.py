@@ -4,11 +4,10 @@ import os
 import ssl
 import sys
 import asyncio
-import json
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 
@@ -100,8 +99,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from services.common.service_health import ServiceHealthState
-
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Ensure sibling modules (rbac, alert_manager, collaboration) resolve in both
@@ -139,6 +136,8 @@ try:
 except ImportError:
     from services.scenarios.engine import list_scenarios  # type: ignore
 
+from services.api_service.realtime import create_realtime_tasks, router as realtime_router, service_state
+
 
 def build_asset_hierarchy() -> list[dict[str, Any]]:
     """Load the asset config and return a UI-ready tree (site→area→line→...)."""
@@ -163,107 +162,7 @@ class HealthResponse(BaseModel):
     status: str
     version: str = "1.0.0"
     uptime_seconds: int = 0
-    services: dict[str, bool] = Field(default_factory=dict)
-
-# WebSocket connection managers
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-        self._lock = asyncio.Lock()
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        async with self._lock:
-            self.active_connections.append(websocket)
-
-    async def disconnect(self, websocket: WebSocket):
-        async with self._lock:
-            if websocket in self.active_connections:
-                self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: dict[str, Any]):
-        dead = []
-        async with self._lock:
-            connections = list(self.active_connections)
-        for conn in connections:
-            try:
-                await conn.send_json(message)
-            except Exception:
-                dead.append(conn)
-        if dead:
-            async with self._lock:
-                for d in dead:
-                    if d in self.active_connections:
-                        self.active_connections.remove(d)
-
-    async def send_personal(self, websocket: WebSocket, message: dict[str, Any]):
-        try:
-            await websocket.send_json(message)
-        except Exception:
-            await self.disconnect(websocket)
-
-
-alarm_manager = ConnectionManager()
-event_manager = ConnectionManager()
-telemetry_manager = ConnectionManager()
-service_state = ServiceHealthState(name="api-service")
-
-
-# Background broadcaster: polls historian and pushes to WebSocket clients
-async def _alarm_broadcaster():
-    """Poll alarms periodically and broadcast only when data changes."""
-    last_data: list[dict[str, Any]] = []
-    while True:
-        try:
-            data = query_alarms(50)
-            if data != last_data:
-                last_data = data
-                service_state.mark_ok()
-                observe_websocket_batch_delivery("alarms", data)
-                await alarm_manager.broadcast({"type": "update", "alarms": data})
-        except Exception as exc:
-            service_state.mark_degraded("alarm broadcast failure", str(exc))
-        await asyncio.sleep(2.0)
-
-
-async def _event_broadcaster():
-    """Poll events periodically and broadcast only when data changes."""
-    last_data: dict[str, list[dict[str, Any]]] = {}
-    tables = ["industrial_events", "processed_events", "ai_enriched"]
-    while True:
-        for table in tables:
-            try:
-                data = query_historian_events(table, 100)
-                if data != last_data.get(table):
-                    last_data[table] = data
-                    service_state.mark_ok()
-                    observe_websocket_batch_delivery(f"historian:{table}", data)
-                    await event_manager.broadcast({"type": "update", "table": table, "events": data})
-            except Exception as exc:
-                service_state.mark_degraded(f"event broadcast failure:{table}", str(exc))
-        await asyncio.sleep(2.0)
-
-
-async def _telemetry_broadcaster():
-    """Broadcast telemetry snapshot to all connected clients."""
-    from ai_gateway.main import _build_telemetry
-    while True:
-        try:
-            payload = await _build_telemetry()
-            service_state.mark_ok()
-            await telemetry_manager.broadcast({"type": "update", "telemetry": payload})
-        except Exception as exc:
-            service_state.mark_degraded("telemetry broadcast failure", str(exc))
-        await asyncio.sleep(5.0)
-
-
-async def _heartbeat_task():
-    """Send periodic heartbeat to all WebSocket connections."""
-    while True:
-        await asyncio.sleep(WS_HEARTBEAT_INTERVAL)
-        await alarm_manager.broadcast({"type": "heartbeat"})
-        await event_manager.broadcast({"type": "heartbeat"})
-        await telemetry_manager.broadcast({"type": "heartbeat"})
+    services: dict[str, Any] = Field(default_factory=dict)
 
 
 # Use orjson for faster JSON responses if available
@@ -294,12 +193,7 @@ def get_tls_context() -> ssl.SSLContext | None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    tasks = [
-        asyncio.create_task(_alarm_broadcaster()),
-        asyncio.create_task(_event_broadcaster()),
-        asyncio.create_task(_telemetry_broadcaster()),
-        asyncio.create_task(_heartbeat_task()),
-    ]
+    tasks = create_realtime_tasks()
     # Best-effort: self-configure compression/retention on startup so a fresh
     # deploy doesn't silently keep uncompressed data forever. Non-fatal.
     if os.getenv("HISTORIAN_AUTO_SETUP", "1") == "1":
@@ -331,6 +225,7 @@ from services.api_service.routers.retrieval import router as retrieval_router
 from services.api_service.routers.external import router as external_router
 from services.api_service.routers.support import router as support_router
 from services.api_service.routers.admin import router as admin_router
+from services.api_service.routers.historian import ingest_batch, ingest_event
 
 app.include_router(historian_router)
 app.include_router(operations_router)
@@ -341,8 +236,13 @@ app.include_router(retrieval_router)
 app.include_router(external_router)
 app.include_router(support_router)
 app.include_router(admin_router)
-from services.api_service.routers.historian import ingest_batch, ingest_event
+app.include_router(realtime_router)
 from services.api_service.ops_runtime import _render_topic
+
+
+def _persist_webhooks() -> None:
+    """Compatibility hook kept for tests and existing callers."""
+    return None
 
 app.add_middleware(
     CORSMiddleware,
@@ -392,80 +292,6 @@ async def tls_info() -> dict[str, Any]:
         "cert_path": cert_path if os.path.exists(cert_path) else None,
         "setup_script": "scripts/setup-local-tls.sh (or .ps1 on Windows)",
     }
-
-
-# WebSocket endpoints
-@app.websocket("/ws/alarms")
-async def websocket_alarms(websocket: WebSocket):
-    # Only push updates when data actually changes (event-driven, not polling)
-    last_hash = None
-    await alarm_manager.connect(websocket)
-    try:
-        # Send initial data
-        data = query_alarms(50)
-        observe_websocket_batch_delivery("alarms", data)
-        await websocket.send_json({"type": "init", "alarms": data})
-        while True:
-            # Wait for client messages (ping/ack/subscribe)
-            msg = await websocket.receive_text()
-            try:
-                parsed = json.loads(msg)
-                if parsed.get("action") == "ping":
-                    await websocket.send_json({"type": "pong"})
-                elif parsed.get("action") == "subscribe":
-                    # Re-send current data on explicit subscribe
-                    data = query_alarms(50)
-                    await websocket.send_json({"type": "init", "alarms": data})
-            except json.JSONDecodeError:
-                pass
-    except WebSocketDisconnect:
-        await alarm_manager.disconnect(websocket)
-
-
-@app.websocket("/ws/events")
-async def websocket_events(websocket: WebSocket):
-    # Only push updates when data actually changes (event-driven, not polling)
-    last_hashes: dict[str, str | None] = {}
-    await event_manager.connect(websocket)
-    try:
-        # Send initial data for all tables
-        for table in ["industrial_events", "processed_events", "ai_enriched"]:
-            data = query_historian_events(table, 100)
-            observe_websocket_batch_delivery(f"historian:{table}", data)
-            await websocket.send_json({"type": "init", "table": table, "events": data})
-        while True:
-            msg = await websocket.receive_text()
-            try:
-                parsed = json.loads(msg)
-                if parsed.get("action") == "ping":
-                    await websocket.send_json({"type": "pong"})
-                elif parsed.get("action") == "subscribe":
-                    table = parsed.get("table", "industrial_events")
-                    data = query_historian_events(table, 100)
-                    await websocket.send_json({"type": "init", "table": table, "events": data})
-            except json.JSONDecodeError:
-                pass
-    except WebSocketDisconnect:
-        await event_manager.disconnect(websocket)
-
-
-@app.websocket("/ws/telemetry")
-async def websocket_telemetry(websocket: WebSocket):
-    await telemetry_manager.connect(websocket)
-    try:
-        from ai_gateway.main import _build_telemetry
-        payload = await _build_telemetry()
-        await websocket.send_json({"type": "init", "telemetry": payload})
-        while True:
-            msg = await websocket.receive_text()
-            try:
-                parsed = json.loads(msg)
-                if parsed.get("action") == "ping":
-                    await websocket.send_json({"type": "pong"})
-            except json.JSONDecodeError:
-                pass
-    except WebSocketDisconnect:
-        await telemetry_manager.disconnect(websocket)
 
 
 @app.get("/health")

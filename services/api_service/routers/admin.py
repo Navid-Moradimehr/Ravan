@@ -52,6 +52,9 @@ async def register_webhook(config: WebhookConfig) -> dict[str, str]:
 
     hook_id = str(uuid.uuid4())[:8]
     webhook_registry[hook_id] = config
+    from services.api_service.main import _persist_webhooks
+
+    _persist_webhooks()
     return {"id": hook_id, "status": "registered"}
 
 
@@ -65,6 +68,9 @@ async def delete_webhook(hook_id: str) -> dict[str, str]:
     if hook_id not in webhook_registry:
         raise HTTPException(status_code=404, detail="Webhook not found")
     del webhook_registry[hook_id]
+    from services.api_service.main import _persist_webhooks
+
+    _persist_webhooks()
     return {"status": "deleted"}
 
 
@@ -170,4 +176,3 @@ async def get_audit_logs(
     from services.api_service.auth import audit_log
 
     return audit_log.get_logs(limit)
-

@@ -1,5 +1,49 @@
 # Implementation Log
 
+## 2026-07-03 - API Realtime Split And Edge Adapter Split
+
+### Changed
+
+1. **API service decomposition**
+   - Moved WebSocket connection management, broadcaster loops, heartbeat handling, and realtime routes into `services/api_service/realtime.py`.
+   - Kept `services/api_service/main.py` focused on app assembly, middleware, health, metrics, and router inclusion.
+   - Preserved legacy module-level compatibility hooks for `ingest_event`, `ingest_batch`, and webhook persistence tests.
+
+2. **Edge ingest decomposition**
+   - Moved ingestion settings to `services/edge_ingest/settings.py`.
+   - Moved Kafka publishing, historian buffering, and latency metrics to `services/edge_ingest/publisher.py`.
+   - Split connector loops into protocol-focused modules under `services/edge_ingest/connectors/` for MQTT, OPC UA, Modbus TCP, Modbus RTU, and OPC UA discovery.
+
+3. **Compatibility preserved**
+   - Kept the current ingest behavior and legacy export helper available from `services.edge_ingest.main`.
+   - Did not change endpoint names or event payload shapes.
+
+### Verified
+
+- `python -m compileall services`: passed
+- `uv run python -m pytest tests/test_api_security_middleware.py tests/test_federation.py tests/test_realworld_fixes_2.py`: 15 passed
+- `uv run python -m pytest tests/test_api_route_splits.py`: passed
+- `uv run python -m services.cli.datastreamctl benchmark production-pipeline --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --runtime-mode python-fallback --wire-format json --json`
+  - 44,155.47 events/sec
+  - 0.0201 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark production-pipeline --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --runtime-mode flink-production --wire-format json --json`
+  - 51,394.54 events/sec
+  - 0.0447 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark cgr-stream-slice --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --window-limit 25 --json`
+  - 53,312.15 events/sec
+  - 0.0269 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark flink-runtime-slice --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --window-limit 25 --json`
+  - 51,173.09 events/sec
+  - 0.0336 ms p99
+- `uv run python scripts/benchmark_mixed_replay.py --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0`
+  - 98,558.48 events/sec
+  - 0.0142 ms p99
+
+### Notes
+
+- This pass mostly reduced architectural coupling, not algorithmic cost.
+- The latest benchmark set shows no regression from the split itself and small gains in the Flink-aligned slice and mixed replay paths.
+
 ## 2026-07-02 - Runtime Mode Now Selects The Launched Processor Set
 
 ### Changed
