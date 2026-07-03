@@ -62,7 +62,10 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
         )
 
     def process_element(self, value: str, ctx) -> Iterable[str]:  # type: ignore[override]
-        event = RuntimeEventRecord.from_raw_mapping(json.loads(value))
+        try:
+            event = RuntimeEventRecord.from_raw_mapping(json.loads(value))
+        except Exception:
+            return []
 
         samples = list(self._sample_state.get() or [])
         temperature_sum = float(self._temperature_sum_state.value() or 0.0)
@@ -116,6 +119,7 @@ def main() -> None:
     window_limit = max(1, int(os.getenv("RUNTIME_WINDOW_LIMIT", "25")))
     parallelism = int(os.getenv("FLINK_PARALLELISM", "4"))
     checkpoint_interval_ms = int(os.getenv("FLINK_CHECKPOINT_INTERVAL_MS", "10000"))
+    starting_offsets = os.getenv("FLINK_STARTING_OFFSETS", "latest").strip().lower()
 
     env = StreamExecutionEnvironment.get_execution_environment()
     env.set_parallelism(parallelism)
@@ -127,7 +131,9 @@ def main() -> None:
         .set_bootstrap_servers(brokers)
         .set_topics(input_topic)
         .set_group_id("iot-anomaly-processor")
-        .set_starting_offsets(KafkaOffsetsInitializer.latest())
+        .set_starting_offsets(
+            KafkaOffsetsInitializer.earliest() if starting_offsets == "earliest" else KafkaOffsetsInitializer.latest()
+        )
         .set_value_only_deserializer(SimpleStringSchema())
         .set_property("fetch.min.bytes", "1048576")
         .set_property("fetch.max.wait.ms", "500")

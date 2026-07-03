@@ -100,6 +100,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from services.common.service_health import ServiceHealthState
+
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Ensure sibling modules (rbac, alert_manager, collaboration) resolve in both
@@ -204,6 +206,7 @@ class ConnectionManager:
 alarm_manager = ConnectionManager()
 event_manager = ConnectionManager()
 telemetry_manager = ConnectionManager()
+service_state = ServiceHealthState(name="api-service")
 
 
 # Background broadcaster: polls historian and pushes to WebSocket clients
@@ -215,10 +218,11 @@ async def _alarm_broadcaster():
             data = query_alarms(50)
             if data != last_data:
                 last_data = data
+                service_state.mark_ok()
                 observe_websocket_batch_delivery("alarms", data)
                 await alarm_manager.broadcast({"type": "update", "alarms": data})
-        except Exception:
-            pass
+        except Exception as exc:
+            service_state.mark_degraded("alarm broadcast failure", str(exc))
         await asyncio.sleep(2.0)
 
 
@@ -232,10 +236,11 @@ async def _event_broadcaster():
                 data = query_historian_events(table, 100)
                 if data != last_data.get(table):
                     last_data[table] = data
+                    service_state.mark_ok()
                     observe_websocket_batch_delivery(f"historian:{table}", data)
                     await event_manager.broadcast({"type": "update", "table": table, "events": data})
-            except Exception:
-                pass
+            except Exception as exc:
+                service_state.mark_degraded(f"event broadcast failure:{table}", str(exc))
         await asyncio.sleep(2.0)
 
 
@@ -245,9 +250,10 @@ async def _telemetry_broadcaster():
     while True:
         try:
             payload = await _build_telemetry()
+            service_state.mark_ok()
             await telemetry_manager.broadcast({"type": "update", "telemetry": payload})
-        except Exception:
-            pass
+        except Exception as exc:
+            service_state.mark_degraded("telemetry broadcast failure", str(exc))
         await asyncio.sleep(5.0)
 
 
@@ -478,14 +484,17 @@ async def health() -> HealthResponse:
     }
     uptime = int(time.time() - start + 1)
     auth_status = auth_security_status()
+    status = "ok" if not service_state.degraded else "degraded"
     return HealthResponse(
-        status="ok",
+        status=status,
         version="1.0.0",
         uptime_seconds=uptime,
         services={
             **services,
             "auth": auth_status["jwt_secret_configured"],
             "auth_strong": auth_status["jwt_secret_strong_enough"],
+            "degraded": service_state.degraded,
+            "degraded_reason": service_state.degraded_reason or "",
         },
     )
 

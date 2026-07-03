@@ -802,3 +802,48 @@ Eighth pass added auto-scaling, completed the dataset catalog, and improved Helm
 
 - The refactor does not change the event contract.
 - It reduces duplicated semantic logic and gives the platform a single place to reason about PLC and sensor compatibility edge cases.
+
+## Reliability and maintainability pass (2026-07-03)
+
+### Added
+
+1. **Historian write/query consolidation**
+   - Added shared historian row/query helpers in `services/historian/client.py` to remove repeated batch insert and read plumbing.
+   - Batch insert paths for industrial and processed events now share the same execution and retry wrapper.
+
+2. **Degraded-state reporting**
+   - Added a shared service health state helper in `services/common/service_health.py`.
+   - API and AI gateway health surfaces now report degraded mode instead of silently swallowing repeated broadcast/runtime failures.
+
+3. **Flink hardening**
+   - The Flink job now skips malformed input records instead of crashing the stream task.
+   - Starting offsets are now configurable through `FLINK_STARTING_OFFSETS`.
+
+### Verified
+
+- `python -m compileall services tests`
+- `uv run pytest -q tests/test_outbound_bridge.py tests/test_device_compat.py tests/test_edge_model.py tests/test_processor_normalization.py tests/test_runtime_pipeline_contract.py tests/test_historian.py tests/test_auth.py`
+- Result: `29 passed`
+
+### Notes
+
+- This pass is mainly about making failure modes visible and removing duplicate backend code.
+- Packaging is still intentionally deferred to the final phase.
+
+### Benchmark rerun
+
+- `production-pipeline --runtime-mode python-fallback`: `43,419.63 events/sec`, `0.0365 ms p99`
+- `production-pipeline --runtime-mode flink-production`: `43,251.30 events/sec`, `0.0960 ms p99`
+- `cgr-stream-slice`: `50,751.73 events/sec`, `0.0536 ms p99`
+- `flink-runtime-slice`: `50,738.60 events/sec`, `0.0522 ms p99`
+- `mixed replay`: `93,350.90 events/sec`, `0.0249 ms p99`
+- `end-to-end json`: `42,080.58 events/sec`, `0.0605 ms p99`
+
+Compared with the previous recorded runs in the repo:
+
+- Python fallback throughput improved by about `26.85%`
+- Flink production throughput improved by about `3.55%`
+- CGR stream slice throughput improved by about `23.0%`
+- Flink runtime slice throughput improved by about `18.2%`
+- Mixed replay throughput improved by about `41.7%`
+- End-to-end JSON throughput moved about `-9.8%`, which should be repeated before treating it as a real regression

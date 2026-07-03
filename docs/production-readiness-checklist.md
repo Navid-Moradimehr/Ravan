@@ -1,6 +1,6 @@
 # Production Readiness Checklist
 
-**Date**: 2026-07-02
+**Date**: 2026-07-03
 
 This document tracks what is already complete, what is still incomplete, and what remains necessary before the platform should be treated as an industry-standard industrial rollout package.
 
@@ -39,6 +39,9 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Flink keyed-window state now uses the shared rolling-window contract instead of the slower list-and-pop benchmark shape.
 - Optional MsgPack wire-format support now exists for the industrial event contract.
 - Dataset conversion workflow exists for AI4I, C-MAPSS, and generic industrial CSV slices.
+- Historian batch/query plumbing is now consolidated behind shared helpers.
+- API and AI gateway health surfaces report degraded mode instead of swallowing repeated runtime failures.
+- The Flink job now tolerates malformed records and supports configurable starting offsets.
 - Failure isolation between sites, sources, and correlation groups is enforced by manifest validation.
 - Synthetic and replay datasets are available for regression tests.
 - Observability now includes historian query latency, result sizing, broker consumer lag, and WebSocket delivery lag metrics.
@@ -66,6 +69,8 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Supervised action-agent runtime.
 - Broader connector/vendor validation against actual devices.
 - Enterprise rollout validation across branches, plants, and subnets.
+- API service decomposition can still be cleaned up further if the next pass needs a sharper router boundary.
+- Edge ingest can still be broken into smaller adapter modules if the platform starts carrying more connector families.
 
 ### Foundation-only areas
 

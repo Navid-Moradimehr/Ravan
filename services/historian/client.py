@@ -82,6 +82,26 @@ def get_connection():
         pool.putconn(conn)
 
 
+def _execute_values_write(table: str, statement: str, rows: list[tuple[Any, ...]]) -> None:
+    def do_write() -> None:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                execute_values(cur, statement, rows)
+            conn.commit()
+
+    _execute_with_retry(table, do_write)
+
+
+def _fetch_rows(table: str, operation: str, query: str, params: tuple[Any, ...]) -> list[dict[str, Any]]:
+    start = time.monotonic()
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, params)
+            rows = [dict(row) for row in cur.fetchall()]
+    observe_historian_query(table, operation, time.monotonic() - start, len(rows))
+    return rows
+
+
 def _execute_with_retry(table: str, op: Callable[[], None]) -> None:
     """Run a DB write with retry/backoff on transient failures.
 
@@ -157,44 +177,38 @@ def insert_industrial_event(event: dict[str, Any]) -> None:
 def insert_industrial_events(events: list[dict[str, Any]]) -> None:
     if not events:
         return
-
-    def do_write() -> None:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                execute_values(
-                    cur,
-                    """
-                    INSERT INTO industrial_events (
-                        time, event_id, source_protocol, source_id, asset_id, tag,
-                        value, quality, unit, site, line, schema_version,
-                        fault_type, scenario_id, ground_truth_severity, step
-                    ) VALUES %s
-                    """,
-                    [
-                        (
-                            event.get("ts_ingest", datetime.now(timezone.utc).isoformat()),
-                            event.get("event_id"),
-                            event.get("source_protocol"),
-                            event.get("source_id"),
-                            event.get("asset_id"),
-                            event.get("tag"),
-                            float(event.get("value", 0)),
-                            event.get("quality", "good"),
-                            event.get("unit"),
-                            event.get("site", "demo-site"),
-                            event.get("line", "line-01"),
-                            event.get("schema_version", 1),
-                            event.get("fault_type", "normal"),
-                            event.get("scenario_id", "sc-000"),
-                            event.get("ground_truth_severity", "normal"),
-                            event.get("step", 0),
-                        )
-                        for event in events
-                    ],
-                )
-            conn.commit()
-
-    _execute_with_retry("industrial_events", do_write)
+    rows = [
+        (
+            event.get("ts_ingest", datetime.now(timezone.utc).isoformat()),
+            event.get("event_id"),
+            event.get("source_protocol"),
+            event.get("source_id"),
+            event.get("asset_id"),
+            event.get("tag"),
+            float(event.get("value", 0)),
+            event.get("quality", "good"),
+            event.get("unit"),
+            event.get("site", "demo-site"),
+            event.get("line", "line-01"),
+            event.get("schema_version", 1),
+            event.get("fault_type", "normal"),
+            event.get("scenario_id", "sc-000"),
+            event.get("ground_truth_severity", "normal"),
+            event.get("step", 0),
+        )
+        for event in events
+    ]
+    _execute_values_write(
+        "industrial_events",
+        """
+        INSERT INTO industrial_events (
+            time, event_id, source_protocol, source_id, asset_id, tag,
+            value, quality, unit, site, line, schema_version,
+            fault_type, scenario_id, ground_truth_severity, step
+        ) VALUES %s
+        """,
+        rows,
+    )
 
 
 def insert_processed_event(event: dict[str, Any]) -> None:
@@ -245,53 +259,47 @@ def insert_processed_event(event: dict[str, Any]) -> None:
 def insert_processed_events(events: list[dict[str, Any]]) -> None:
     if not events:
         return
-
-    def do_write() -> None:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                execute_values(
-                    cur,
-                    """
-                    INSERT INTO processed_events (
-                        time, event_id, device_id, asset_id, tag, value, unit,
-                        site_id, source_protocol, quality,
-                        schema_version, temperature_c, vibration_mm_s, pressure_bar,
-                        processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
-                        anomaly_score, severity, triggered_rules, baseline, evaluation
-                    ) VALUES %s
-                    """,
-                    [
-                        (
-                            event.get("timestamp", datetime.now(timezone.utc).isoformat()),
-                            event.get("event_id"),
-                            event.get("device_id"),
-                            event.get("asset_id", event.get("device_id")),
-                            event.get("tag", ""),
-                            float(event.get("value", 0) or 0),
-                            event.get("unit", ""),
-                            event.get("site_id"),
-                            event.get("source_protocol"),
-                            event.get("quality"),
-                            event.get("schema_version", 1),
-                            float(event.get("temperature_c", 0)),
-                            float(event.get("vibration_mm_s", 0)),
-                            float(event.get("pressure_bar", 0)),
-                            event.get("processed_at"),
-                            event.get("window_size", 0),
-                            event.get("temperature_avg_c", 0),
-                            event.get("vibration_avg_mm_s", 0),
-                            event.get("anomaly_score", 0),
-                            event.get("severity", "normal"),
-                            list(event.get("triggered_rules") or []),
-                            Json(event.get("baseline")),
-                            Json(event.get("evaluation")),
-                        )
-                        for event in events
-                    ],
-                )
-            conn.commit()
-
-    _execute_with_retry("processed_events", do_write)
+    rows = [
+        (
+            event.get("timestamp", datetime.now(timezone.utc).isoformat()),
+            event.get("event_id"),
+            event.get("device_id"),
+            event.get("asset_id", event.get("device_id")),
+            event.get("tag", ""),
+            float(event.get("value", 0) or 0),
+            event.get("unit", ""),
+            event.get("site_id"),
+            event.get("source_protocol"),
+            event.get("quality"),
+            event.get("schema_version", 1),
+            float(event.get("temperature_c", 0)),
+            float(event.get("vibration_mm_s", 0)),
+            float(event.get("pressure_bar", 0)),
+            event.get("processed_at"),
+            event.get("window_size", 0),
+            event.get("temperature_avg_c", 0),
+            event.get("vibration_avg_mm_s", 0),
+            event.get("anomaly_score", 0),
+            event.get("severity", "normal"),
+            list(event.get("triggered_rules") or []),
+            Json(event.get("baseline")),
+            Json(event.get("evaluation")),
+        )
+        for event in events
+    ]
+    _execute_values_write(
+        "processed_events",
+        """
+        INSERT INTO processed_events (
+            time, event_id, device_id, asset_id, tag, value, unit,
+            site_id, source_protocol, quality,
+            schema_version, temperature_c, vibration_mm_s, pressure_bar,
+            processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
+            anomaly_score, severity, triggered_rules, baseline, evaluation
+        ) VALUES %s
+        """,
+        rows,
+    )
 
 
 def insert_ai_enriched(event: dict[str, Any]) -> None:
@@ -351,41 +359,20 @@ def insert_dead_letter(event: dict[str, Any]) -> None:
 def query_recent_events(table: str, limit: int = 100) -> list[dict[str, Any]]:
     if table not in ALLOWED_QUERY_TABLES:
         raise ValueError(f"unsupported table: {table}")
-    start = time.monotonic()
-    with get_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                f"SELECT * FROM {table} ORDER BY time DESC LIMIT %s",
-                (limit,),
-            )
-            rows = [dict(row) for row in cur.fetchall()]
-    observe_historian_query(table, "recent_events", time.monotonic() - start, len(rows))
-    return rows
+    return _fetch_rows(table, "recent_events", f"SELECT * FROM {table} ORDER BY time DESC LIMIT %s", (limit,))
 
 
 
 
 def query_sql(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
-    start = time.monotonic()
-    with get_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(sql, params)
-            rows = [dict(row) for row in cur.fetchall()]
-    observe_historian_query("sql", "readwrite", time.monotonic() - start, len(rows))
-    return rows
+    return _fetch_rows("sql", "readwrite", sql, params)
 
 
 def query_sql_readonly(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
     safety = validate_readonly_sql(sql)
     if not safety.allowed:
         raise ValueError(safety.reason or "readonly sql rejected")
-    start = time.monotonic()
-    with get_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(sql, params)
-            rows = [dict(row) for row in cur.fetchall()]
-    observe_historian_query("sql", "readonly", time.monotonic() - start, len(rows))
-    return rows
+    return _fetch_rows("sql", "readonly", sql, params)
 
 
 
@@ -398,51 +385,43 @@ def query_tables() -> list[str]:
 
 
 def query_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]:
-    start = time.monotonic()
-    with get_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                """
-                SELECT time, value, quality, fault_type, ground_truth_severity
-                FROM industrial_events
-                WHERE asset_id = %s AND tag = %s
-                  AND time > NOW() - INTERVAL '%s hours'
-                ORDER BY time ASC
-                """,
-                (asset_id, tag, hours),
-            )
-            rows = [dict(row) for row in cur.fetchall()]
-    observe_historian_query("industrial_events", "trend", time.monotonic() - start, len(rows))
-    return rows
+    return _fetch_rows(
+        "industrial_events",
+        "trend",
+        """
+        SELECT time, value, quality, fault_type, ground_truth_severity
+        FROM industrial_events
+        WHERE asset_id = %s AND tag = %s
+          AND time > NOW() - INTERVAL '%s hours'
+        ORDER BY time ASC
+        """,
+        (asset_id, tag, hours),
+    )
 def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
-    start = time.monotonic()
-    with get_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                """
-                SELECT time, asset_id, tag, severity, triggered_rules, evaluation
-                FROM processed_events
-                WHERE severity IN ('warning', 'critical')
-                ORDER BY time DESC
-                LIMIT %s
-                """,
-                (limit,),
-            )
-            rows = cur.fetchall()
-            result = [
-                {
-                    "time": row["time"],
-                    "asset_id": row["asset_id"],
-                    "tag": row["tag"],
-                    "severity": row["severity"],
-                    "message": f"Anomaly detected on {row['asset_id']}.{row['tag']}",
-                    "triggered_rules": row.get("triggered_rules", []),
-                    "acknowledged": False,
-                }
-                for row in rows
-            ]
-    observe_historian_query("processed_events", "alarms", time.monotonic() - start, len(result))
-    return result
+    rows = _fetch_rows(
+        "processed_events",
+        "alarms",
+        """
+        SELECT time, asset_id, tag, severity, triggered_rules, evaluation
+        FROM processed_events
+        WHERE severity IN ('warning', 'critical')
+        ORDER BY time DESC
+        LIMIT %s
+        """,
+        (limit,),
+    )
+    return [
+        {
+            "time": row["time"],
+            "asset_id": row["asset_id"],
+            "tag": row["tag"],
+            "severity": row["severity"],
+            "message": f"Anomaly detected on {row['asset_id']}.{row['tag']}",
+            "triggered_rules": row.get("triggered_rules", []),
+            "acknowledged": False,
+        }
+        for row in rows
+    ]
 
 
 # Data retention and compression policies

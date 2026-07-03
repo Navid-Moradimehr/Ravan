@@ -7,6 +7,42 @@
 - **Broker**: Redpanda (Kafka-compatible)
 - **Historian**: TimescaleDB
 
+## Reliability And Compatibility Rerun
+
+- **Date**: 2026-07-03
+- **Scope**: historian helper consolidation, degraded-state reporting, Flink malformed-input handling, and PLC/sensor compatibility refactor
+
+### Targeted Regression Checks
+
+| Check | Result |
+|-------|--------|
+| `python -m compileall services tests` | passed |
+| Focused refactor tests | 29 passed |
+
+### Latest Benchmark Runs
+
+| Benchmark | Value | Change vs previous recorded run |
+|-----------|-------|----------------------------------|
+| Production pipeline throughput, `python-fallback` | 43,419.63 events/sec | `+26.85%` |
+| Production pipeline p99, `python-fallback` | 0.0365 ms | `-33.0%` |
+| Production pipeline throughput, `flink-production` | 43,251.30 events/sec | `+3.55%` |
+| Production pipeline p99, `flink-production` | 0.0960 ms | `+103.0%` |
+| CGR stream slice throughput | 50,751.73 events/sec | `+23.0%` |
+| CGR stream slice p99 | 0.0536 ms | `+5.8%` |
+| Flink runtime slice throughput | 50,738.60 events/sec | `+18.2%` |
+| Flink runtime slice p99 | 0.0522 ms | `+43.1%` |
+| Mixed replay throughput | 93,350.90 events/sec | `+41.7%` |
+| Mixed replay p99 | 0.0249 ms | `+53.7%` |
+| End-to-end JSON throughput | 42,080.58 events/sec | `-9.8%` |
+| End-to-end JSON p99 | 0.0605 ms | `+122.9%` |
+
+### Change Notes
+
+- The historian helper consolidation and degraded-state reporting did not materially hurt throughput on the hot replay paths.
+- The Python fallback path improved materially on this run, while the Flink production path stayed in the same operating band but showed higher p99 variance.
+- The mixed replay and isolated slice benchmarks improved relative to the prior recorded session.
+- The end-to-end JSON run moved slower than the previous recorded session, so that result should be treated as a follow-up measurement candidate rather than a confirmed regression until it is repeated.
+
 ## Latest Hardening Run
 
 - **Date**: 2026-07-02

@@ -22,6 +22,7 @@ from services.ai_gateway.providers import (
     build_industrial_prompt,
 )
 from services.common.structured_output import validate_industrial_summary
+from services.common.service_health import ServiceHealthState
 from services.common.runtime_metrics import set_consumer_lag
 
 
@@ -37,19 +38,19 @@ batch_severity_total = Counter(
     ["severity"],
 )
 last_success_epoch = Gauge("ai_gateway_last_success_epoch", "Unix timestamp of last successful enrichment")
-service_state: dict[str, Any] = {"running": False, "last_error": None}
+service_state = ServiceHealthState(name="ai-gateway")
 telemetry_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    service_state["running"] = True
+    service_state.mark_running()
     consume_task = asyncio.create_task(consume_loop())
     broadcast_task = asyncio.create_task(historian_broadcast_loop())
     try:
         yield
     finally:
-        service_state["running"] = False
+        service_state.mark_stopped()
         consume_task.cancel()
         broadcast_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
@@ -61,12 +62,17 @@ app = FastAPI(title="Local Stream Engine AI Gateway", version="0.1.0", lifespan=
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
+    status = "starting"
+    if service_state.running:
+        status = "degraded" if service_state.degraded else "ok"
     return {
-        "status": "ok" if service_state["running"] else "starting",
+        "status": status,
         "provider": settings.llm_provider,
         "model": settings.llm_model_id,
         "base_url": settings.llm_endpoint_url,
-        "last_error": service_state["last_error"],
+        "last_error": service_state.last_error,
+        "degraded": service_state.degraded,
+        "degraded_reason": service_state.degraded_reason,
     }
 
 
@@ -79,7 +85,7 @@ async def _build_telemetry() -> dict[str, Any]:
         "pipeline": [
             {"name": "ingest", "status": "active"},
             {"name": "process", "status": "active"},
-            {"name": "ai", "status": "active" if service_state["running"] else "starting"},
+            {"name": "ai", "status": "degraded" if service_state.degraded else "active" if service_state.running else "starting"},
             {"name": "observe", "status": "active"},
         ],
         "llm": {
@@ -87,7 +93,9 @@ async def _build_telemetry() -> dict[str, Any]:
             "model": settings.llm_model_id,
             "base_url": settings.llm_endpoint_url,
             "request_format": settings.llm_request_format,
-            "last_error": service_state["last_error"],
+            "last_error": service_state.last_error,
+            "degraded": service_state.degraded,
+            "degraded_reason": service_state.degraded_reason,
         },
     }
 
@@ -234,7 +242,7 @@ async def historian_broadcast_loop() -> None:
     without polling. Uses content hashing to avoid broadcasting identical state.
     """
     last_snapshot = ""
-    while service_state["running"]:
+    while service_state.running:
         try:
             alarms = query_alarms(50)
             events = query_recent_events("industrial_events", 50)
@@ -250,6 +258,7 @@ async def historian_broadcast_loop() -> None:
                     }
                 )
         except Exception as exc:  # pragma: no cover - keep stream alive but surface errors
+            service_state.mark_degraded("historian broadcast failure", str(exc))
             import logging
             logging.getLogger(__name__).warning("historian broadcast loop error: %s", exc)
         await asyncio.sleep(2.0)
@@ -272,7 +281,7 @@ async def consume_loop() -> None:
     deadline = time.monotonic() + settings.llm_batch_seconds
 
     try:
-        while service_state["running"]:
+        while service_state.running:
             message = consumer.poll(0.25)
             if message and not message.error():
                 consumed_events.inc()
@@ -282,7 +291,7 @@ async def consume_loop() -> None:
                     if high >= 0:
                         set_consumer_lag("ai_gateway", message.topic(), message.partition(), high - (message.offset() + 1))
                 except Exception:
-                    pass
+                    service_state.mark_degraded("consumer lag probe failed")
 
             ready_by_size = len(batch) >= settings.llm_max_batch_size
             ready_by_time = batch and time.monotonic() >= deadline
@@ -295,7 +304,7 @@ async def consume_loop() -> None:
                             asynchronous=False,
                         )
                     except Exception as exc:
-                        service_state["last_error"] = f"offset commit failed: {exc}"
+                        service_state.mark_degraded("offset commit failed", f"offset commit failed: {exc}")
                         asyncio.create_task(_broadcast_telemetry())
                 batch = []
                 deadline = time.monotonic() + settings.llm_batch_seconds
@@ -323,20 +332,20 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
         if not valid:
             fallback_reason = "; ".join(errors)
             if not settings.llm_allow_fallback:
-                service_state["last_error"] = f"LLM output validation failed: {fallback_reason}"
+                service_state.mark_degraded("llm output validation failed", f"LLM output validation failed: {fallback_reason}")
                 asyncio.create_task(_broadcast_telemetry())
                 return False
             content = build_fallback_summary(payloads, f"output_validation_failed: {fallback_reason}")
-            service_state["last_error"] = f"LLM fallback active: output validation failed: {fallback_reason}"
+            service_state.mark_degraded("llm fallback active", f"LLM fallback active: output validation failed: {fallback_reason}")
             asyncio.create_task(_broadcast_telemetry())
     except Exception as exc:
         if not settings.llm_allow_fallback:
-            service_state["last_error"] = str(exc)
+            service_state.mark_degraded("llm request failed", str(exc))
             asyncio.create_task(_broadcast_telemetry())
             return False
         fallback_reason = f"{type(exc).__name__}: {exc}"
         content = build_fallback_summary(payloads, fallback_reason)
-        service_state["last_error"] = f"LLM fallback active: {fallback_reason}"
+        service_state.mark_degraded("llm fallback active", f"LLM fallback active: {fallback_reason}")
         asyncio.create_task(_broadcast_telemetry())
     finally:
         llm_latency.observe(time.monotonic() - started)
@@ -358,6 +367,7 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
     producer.poll(0)
     enriched_events.inc()
     last_success_epoch.set(time.time())
+    service_state.mark_ok()
     asyncio.create_task(_broadcast_telemetry())
     return True
 

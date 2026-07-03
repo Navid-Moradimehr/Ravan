@@ -31,3 +31,18 @@
 - bridge through gateways when the protocol is not native to the core service
 - keep raw streams separate across PLCs and sensors unless a correlation rule explicitly joins them
 
+## Refactor progress
+
+- historian write/query helpers are now shared
+- API and AI gateway health surfaces now expose degraded state
+- Flink task handling is more tolerant of malformed input
+- packaging is still deferred
+
+## Benchmark rerun
+
+- python-fallback throughput improved to 43,419.63 events/sec
+- flink-production throughput improved to 43,251.30 events/sec
+- cgr-stream-slice throughput improved to 50,751.73 events/sec
+- flink-runtime-slice throughput improved to 50,738.60 events/sec
+- mixed replay throughput improved to 93,350.90 events/sec
+- end-to-end JSON throughput moved down to 42,080.58 events/sec and should be repeated once before calling it a regression
