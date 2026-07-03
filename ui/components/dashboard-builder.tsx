@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { LayoutDashboard, Plus, X, GripVertical } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 export type PanelType = "trend" | "alarms" | "events" | "sql" | "webhooks" | "notifications" | "stats";
 
@@ -25,27 +24,53 @@ const PANEL_TYPES: { type: PanelType; label: string; icon: string }[] = [
 ];
 
 export function DashboardBuilder() {
-  const [panels, setPanels] = useState<DashboardPanel[]>(() => {
+  const defaultPanels: DashboardPanel[] = [
+    { id: "1", type: "stats", title: "Overview" },
+    { id: "2", type: "alarms", title: "Active Alarms" },
+  ];
+  const [panels, setPanels] = useState<DashboardPanel[]>(defaultPanels);
+  const [showAdd, setShowAdd] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
     try {
       const saved = localStorage.getItem("dashboard_panels");
-      return saved ? JSON.parse(saved) : [{ id: "1", type: "stats", title: "Overview" }, { id: "2", type: "alarms", title: "Active Alarms" }];
+      if (saved) {
+        setPanels(JSON.parse(saved) as DashboardPanel[]);
+      }
     } catch {
-      return [{ id: "1", type: "stats", title: "Overview" }, { id: "2", type: "alarms", title: "Active Alarms" }];
+      setPanels(defaultPanels);
+    } finally {
+      setHydrated(true);
     }
-  });
-  const [showAdd, setShowAdd] = useState(false);
+  }, []);
 
   const savePanels = useCallback((next: DashboardPanel[]) => {
     setPanels(next);
-    localStorage.setItem("dashboard_panels", JSON.stringify(next));
+    if (hydrated) {
+      localStorage.setItem("dashboard_panels", JSON.stringify(next));
+    }
+  }, [hydrated]);
+
+  useEffect(() => {
+    if (hydrated) {
+      localStorage.setItem("dashboard_panels", JSON.stringify(panels));
+    }
+  }, [hydrated, panels]);
+
+  const createPanelId = useCallback(() => {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+    return Math.random().toString(36).slice(2);
   }, []);
 
   const addPanel = useCallback((type: PanelType) => {
     const label = PANEL_TYPES.find((p) => p.type === type)?.label || type;
-    const next = [...panels, { id: Math.random().toString(36).slice(2), type, title: label }];
+    const next = [...panels, { id: createPanelId(), type, title: label }];
     savePanels(next);
     setShowAdd(false);
-  }, [panels, savePanels]);
+  }, [createPanelId, panels, savePanels]);
 
   const removePanel = useCallback((id: string) => {
     savePanels(panels.filter((p) => p.id !== id));
@@ -82,8 +107,8 @@ export function DashboardBuilder() {
                   <span className="text-sm font-medium">{panel.title}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => movePanel(panel.id, -1)}>↑</Button>
-                  <Button variant="ghost" size="sm" onClick={() => movePanel(panel.id, 1)}>↓</Button>
+                  <Button variant="ghost" size="sm" onClick={() => movePanel(panel.id, -1)}>{"<"}</Button>
+                  <Button variant="ghost" size="sm" onClick={() => movePanel(panel.id, 1)}>{">"}</Button>
                   <Button variant="ghost" size="sm" onClick={() => removePanel(panel.id)}>
                     <X className="size-4 text-error" />
                   </Button>
