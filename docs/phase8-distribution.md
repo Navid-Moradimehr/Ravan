@@ -234,6 +234,7 @@ For open-source adoption, the release should include:
 - compatibility matrix for Windows and Linux
 
 For the deployment recommendation and WSL2 guidance, see `docs/deployment-decision-memo.md`.
+For the actual repo-structure-driven packaging checklist, see `docs/release-packaging-checklist.md`.
 
 ## Air-Gapped Support
 

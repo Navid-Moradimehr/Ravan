@@ -1,5 +1,20 @@
 # Implementation Log
 
+## 2026-07-03 - Packaging Checklist Based On Repo Structure
+
+### Changed
+
+1. **Packaging checklist**
+   - Added `docs/release-packaging-checklist.md` based on the actual service tree, runtime assets, and installer entry points already in the repo.
+
+2. **Build metadata**
+   - Updated `pyproject.toml` to discover the full `services.*` package tree and include runtime JSON package data.
+   - Added `*.egg-info/` to `.gitignore` so packaging checks do not leave generated metadata in the repo root.
+
+### Verified
+
+- Structural packaging change only; no runtime behavior changed.
+
 ## 2026-07-03 - Deployment Decision Memo And WSL2 Guidance
 
 ### Changed

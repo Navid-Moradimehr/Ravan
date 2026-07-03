@@ -31,6 +31,7 @@
 - benchmark report exports now include host-profile metadata for local-vs-target separation
 - self-host install guidance is documented for Linux and Windows operators
 - WSL2 is now explicitly treated as a developer convenience, not a production dependency
+- packaging checklist is now tied to the actual repo structure and build metadata
 - rollout acceptance report export is now available for archiveable per-site runs
 - the simulator now includes multi-PLC, burst, and reconnect cases
 - self-hosted secrets guidance is already documented for Docker, systemd, and Kubernetes
@@ -60,3 +61,10 @@
 
 - `docs/self-host-install-guide.md` now covers the local install, upgrade, and operator-owned secret model.
 - `docs/deployment-decision-memo.md` records the native Windows/Linux recommendation and the WSL2 boundary.
+- `docs/release-packaging-checklist.md` maps package contents to the services tree, config, data, and entry points.
+
+## Build Metadata
+
+- `pyproject.toml` now discovers the full `services.*` tree for distributable builds.
+- runtime JSON assets under `services/ingestion` are included as package data.
+- `*.egg-info/` is ignored so packaging checks do not clutter the repo root.

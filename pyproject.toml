@@ -21,4 +21,10 @@ datastreamd = "services.cli.datastreamd:main"
 datastream-import = "services.cli.datastream_import:main"
 
 [tool.setuptools]
-packages = ["services"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["services*"]
+
+[tool.setuptools.package-data]
+"services.ingestion" = ["*.json"]

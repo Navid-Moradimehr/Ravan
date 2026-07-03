@@ -11,6 +11,7 @@ node_modules/
 dist/
 build/
 coverage/
+*.egg-info/
 *.log
 docker/data/
 docker/grafana/data/
