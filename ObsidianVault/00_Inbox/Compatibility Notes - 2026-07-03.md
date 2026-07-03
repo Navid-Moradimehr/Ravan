@@ -40,10 +40,18 @@
 - edge ingest is split into settings, publisher, and protocol connector modules
 - remaining API router domains are split into focused modules and thin aggregators
 - ingest path now avoids repeated model_dump/normalize work for the same event
+- Rust fastpath module exists but stays opt-in behind `DATASTREAM_NATIVE_FASTPATH`
 - packaging is still deferred
 
 ## Benchmark rerun
 
+- the native-enabled trial regressed materially on this host, so the compiled boundary remains experimental only
+- default-off benchmarks recovered to the expected operating band
+- python-fallback throughput was 43,313.52 events/sec
+- flink-production throughput was 48,872.32 events/sec
+- cgr-stream-slice throughput was 48,801.91 events/sec
+- mixed replay throughput was 86,897.73 events/sec
+- end-to-end JSON throughput was 43,934.40 events/sec
 - first run in this session was noisy and underperformed the previous baseline
 - repeat run landed close to baseline, so there is no clear material win yet
 - python-fallback repeat throughput was 42,259.28 events/sec

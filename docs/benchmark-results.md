@@ -7,6 +7,50 @@
 - **Broker**: Redpanda (Kafka-compatible)
 - **Historian**: TimescaleDB
 
+## Native Boundary Rerun
+
+- **Date**: 2026-07-03
+- **Scope**: Rust fastpath compiled and kept opt-in behind `DATASTREAM_NATIVE_FASTPATH`
+
+### Targeted Regression Checks
+
+| Check | Result |
+|-------|--------|
+| `cargo build --release` for `rust/fastpath` | passed |
+| `python -m compileall services` | passed |
+| Focused compatibility tests | 20 passed |
+
+### Default-Off Benchmark Runs
+
+| Benchmark | Value | Change vs previous recorded run |
+|-----------|-------|----------------------------------|
+| Production pipeline throughput, `python-fallback` | 43,313.52 events/sec | `+2.5%` |
+| Production pipeline p99, `python-fallback` | 0.0329 ms | `-43.8%` |
+| Production pipeline throughput, `flink-production` | 48,872.32 events/sec | `-5.1%` |
+| Production pipeline p99, `flink-production` | 0.0342 ms | `+3.8%` |
+| CGR stream slice throughput | 48,801.91 events/sec | `-7.3%` |
+| CGR stream slice p99 | 0.0466 ms | `+73.9%` |
+| Mixed replay throughput | 86,897.73 events/sec | `-8.5%` |
+| Mixed replay p99 | 0.0258 ms | `+75.9%` |
+| End-to-end JSON throughput | 43,934.40 events/sec | `+4.4%` |
+| End-to-end JSON p99 | 0.0320 ms | `-47.1%` |
+
+### Native-Enabled Trial
+
+| Benchmark | Value |
+|-----------|-------|
+| Production pipeline throughput, `python-fallback` | 20,772.19 events/sec |
+| Production pipeline throughput, `flink-production` | 19,440.74 events/sec |
+| CGR stream slice throughput | 19,178.74 events/sec |
+| Mixed replay throughput | 49,179.10 events/sec |
+
+### Change Notes
+
+- The Rust fastpath module now exists and loads only when `DATASTREAM_NATIVE_FASTPATH=1`.
+- Enabling the native path on this host slowed the benchmark mix materially, so the default stays on the Python/orjson path.
+- The useful outcome of this pass is the compiled boundary itself, not a default-on performance win.
+- The default-off numbers are the ones to use for release notes and production sizing.
+
 ## API Router Split And Hot-Path Rerun
 
 - **Date**: 2026-07-03

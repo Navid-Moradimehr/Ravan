@@ -41,6 +41,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Dedicated Flink job image now exists for the compose deployment path.
 - Flink keyed-window state now uses the shared rolling-window contract instead of the slower list-and-pop benchmark shape.
 - Optional MsgPack wire-format support now exists for the industrial event contract.
+- Optional Rust fastpath module now exists for JSON bytes and partition-key handling, but it is opt-in and not the default runtime path.
 - Dataset conversion workflow exists for AI4I, C-MAPSS, and generic industrial CSV slices.
 - Historian batch/query plumbing is now consolidated behind shared helpers.
 - API and AI gateway health surfaces report degraded mode instead of swallowing repeated runtime failures.
@@ -74,6 +75,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Enterprise rollout validation across branches, plants, and subnets.
 - Further package cleanup is still possible, but the major runtime splits are in place.
 - The current host still shows benchmark variance large enough that small code changes should be treated as neutral until repeated.
+- The compiled boundary experiment should stay opt-in unless it is revalidated on target hardware.
 
 ### Foundation-only areas
 

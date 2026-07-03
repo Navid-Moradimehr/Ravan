@@ -5,6 +5,8 @@ import json
 import os
 from typing import Any
 
+from services.common.native_fastpath import json_bytes as native_json_bytes
+
 try:
     import msgpack
 except ImportError:  # pragma: no cover - optional binary fast path
@@ -43,6 +45,9 @@ def serialize_payload(payload: Any, wire_format: str | None = None) -> bytes:
         if msgpack is None:
             raise RuntimeError("msgpack is required for DATASTREAM_WIRE_FORMAT=msgpack")
         return msgpack.packb(normalized, use_bin_type=True)
+    native = native_json_bytes(normalized)
+    if native is not None:
+        return native
     if orjson is not None:
         return orjson.dumps(normalized)
     return json.dumps(normalized, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

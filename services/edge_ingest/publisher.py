@@ -7,6 +7,7 @@ from typing import Any
 from confluent_kafka import Producer
 from prometheus_client import Counter, Gauge, Histogram
 
+from services.common.native_fastpath import encode_event_bundle
 from services.common.normalize import to_legacy_iot_event
 from services.common.stream_scope import stream_partition_key
 from services.edge_ingest.model import IndustrialEvent, to_json_bytes, validate_event
@@ -64,9 +65,15 @@ class EdgePublisher:
         else:
             assert event is not None
             event_dict = event.model_dump(mode="json")
-            key = stream_partition_key(event_dict)
-            self._buffer.append((self.settings.normalized_topic, key, to_json_bytes(event_dict)))
-            self._buffer.append((self.settings.legacy_topic, key, to_json_bytes(to_legacy_iot_event(event_dict))))
+            bundle = encode_event_bundle(event_dict)
+            if bundle is None:
+                key = stream_partition_key(event_dict)
+                normalized_bytes = to_json_bytes(event_dict)
+                legacy_bytes = to_json_bytes(to_legacy_iot_event(event_dict))
+            else:
+                key, normalized_bytes, legacy_bytes = bundle
+            self._buffer.append((self.settings.normalized_topic, key, normalized_bytes))
+            self._buffer.append((self.settings.legacy_topic, key, legacy_bytes))
             self._historian_buffer.append(event_dict)
             events_total.labels(protocol=event.source_protocol).inc()
             last_success_epoch.labels(protocol=event.source_protocol).set(time.time())

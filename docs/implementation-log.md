@@ -1,5 +1,46 @@
 # Implementation Log
 
+## 2026-07-03 - Native Fastpath Boundary Added And Kept Opt-In
+
+### Changed
+
+1. **Compiled runtime boundary**
+   - Added a Rust `cdylib` under `rust/fastpath` with helpers for JSON bytes, partition keys, and ingest bundle generation.
+   - Added `services/common/native_fastpath.py` to load the compiled module only when `DATASTREAM_NATIVE_FASTPATH` is enabled.
+   - Wired the ingest/runtime helpers to use the native boundary if it is available, while preserving the Python/orjson fallback path.
+
+2. **Measurement outcome**
+   - Built the Rust module successfully with `cargo build --release`.
+   - Benchmarked both the default-off path and the experimental native-enabled path.
+   - The experimental native path regressed materially on this host, so the repo default remains the Python/orjson path.
+
+### Verified
+
+- `cargo build --release` in `rust/fastpath`: passed
+- `python -m compileall services`: passed
+- `uv run python -m pytest tests/test_edge_model.py tests/test_api_route_splits.py tests/test_api_security_middleware.py tests/test_realworld_fixes_2.py tests/test_federation.py`: 20 passed
+- `uv run python -m services.cli.datastreamctl benchmark production-pipeline --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --runtime-mode python-fallback --wire-format json --json`
+  - 43,313.52 events/sec
+  - 0.0329 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark production-pipeline --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --runtime-mode flink-production --wire-format json --json`
+  - 48,872.32 events/sec
+  - 0.0342 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark cgr-stream-slice --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --window-limit 25 --json`
+  - 48,801.91 events/sec
+  - 0.0466 ms p99
+- `uv run python scripts/benchmark_mixed_replay.py --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0`
+  - 86,897.73 events/sec
+  - 0.0258 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark end-to-end-pipeline --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --wire-format json --json`
+  - 43,934.40 events/sec
+  - 0.0320 ms p99
+
+### Notes
+
+- The native boundary is ready for users who want to experiment with it, but it is not the default runtime choice.
+- The default-off path stayed healthy and is the only setting I would use for release documentation at this point.
+- The benchmark evidence says the current Python/orjson path is still the practical default for this codebase.
+
 ## 2026-07-03 - Remaining API Router Split And Ingest Hot-Path Cleanup
 
 ### Changed

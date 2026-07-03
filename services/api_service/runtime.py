@@ -8,6 +8,7 @@ from functools import lru_cache
 import httpx
 
 from services.common.stream_scope import stream_partition_key
+from services.common.native_fastpath import encode_event_bundle
 
 try:
     from assets.model import load_hierarchy, hierarchy_to_tree
@@ -78,12 +79,18 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     except Exception:
         pass
 
-    key = stream_partition_key(event_dict)
-    try:
+    bundle = encode_event_bundle(event_dict)
+    if bundle is None:
+        key = stream_partition_key(event_dict)
+        normalized_bytes = to_json_bytes(event_dict)
         legacy_event = _to_legacy_iot_event(event_dict)
+        legacy_bytes = to_json_bytes(legacy_event)
+    else:
+        key, normalized_bytes, legacy_bytes = bundle
+    try:
         _publish_kafka(brokers, raw_topic, key, to_json_bytes(event_dict))
-        _publish_kafka(brokers, normalized_topic, key, to_json_bytes(event_dict))
-        _publish_kafka(brokers, legacy_topic, key, to_json_bytes(legacy_event))
+        _publish_kafka(brokers, normalized_topic, key, normalized_bytes)
+        _publish_kafka(brokers, legacy_topic, key, legacy_bytes)
     except Exception as e:
         return {"status": "stored_only", "event_id": event_id, "warning": f"kafka_publish_failed: {e}"}
     return {"status": "ingested", "event_id": event_id}

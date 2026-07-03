@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any
 
+from services.common.native_fastpath import stream_partition_key as native_stream_partition_key
+
 
 @dataclass(frozen=True)
 class StreamScope:
@@ -57,6 +59,9 @@ def stream_partition_key(event: dict[str, Any] | Any) -> bytes:
             pass
 
     if isinstance(event, dict):
+        native = native_stream_partition_key(event)
+        if native is not None:
+            return native
         get = event.get
         return "|".join(
             [
