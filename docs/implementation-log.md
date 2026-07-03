@@ -1,5 +1,42 @@
 # Implementation Log
 
+## 2026-07-03 - Remaining API Router Split And Ingest Hot-Path Cleanup
+
+### Changed
+
+1. **Remaining API router split**
+   - Split the old `support` and `design` responsibilities into focused router modules for backup, reports, pipelines, schemas, preview, connectors, digital twin, and OEE.
+   - Kept `services/api_service/routers/support.py` and `services/api_service/routers/design.py` as thin aggregators so the app surface stayed stable.
+
+2. **Hot-path cleanup**
+   - Removed redundant `model_dump`/normalize conversions from the ingest publish path.
+   - Reused the already-built event dictionary for Kafka payloads, historian buffering, and legacy event conversion.
+   - Let the shared partition-key helper reuse cached keys when the record already exposes one.
+   - Removed a benchmark no-op from the CGR-style stream slice.
+
+### Verified
+
+- `python -m compileall services`: passed
+- `uv run python -m pytest tests/test_api_security_middleware.py tests/test_federation.py tests/test_realworld_fixes_2.py tests/test_api_route_splits.py tests/test_edge_model.py`: 20 passed
+- `uv run python -m services.cli.datastreamctl benchmark production-pipeline --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --runtime-mode python-fallback --wire-format json --json`
+  - first run: 30,540.92 events/sec
+  - repeat run: 42,259.28 events/sec
+- `uv run python -m services.cli.datastreamctl benchmark production-pipeline --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --runtime-mode flink-production --wire-format json --json`
+  - 51,526.15 events/sec
+  - 0.0320 ms p99
+- `uv run python -m services.cli.datastreamctl benchmark cgr-stream-slice --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0 --window-limit 25 --json`
+  - first run: 37,772.90 events/sec
+  - repeat run: 52,640.64 events/sec
+- `uv run python scripts/benchmark_mixed_replay.py --csv data/benchmarks/industrial_mixed_benchmark.csv --events 10000 --batch-size 256 --warmup-events 0`
+  - first run: 78,763.79 events/sec
+  - repeat run: 94,941.61 events/sec
+
+### Notes
+
+- This session showed clear host variance, so the repeat runs are the only numbers worth comparing to the previous baseline.
+- The code cleanup is still worth keeping because it removes duplicated conversions even though it did not create a dramatic single-host throughput gain.
+- The repeat runs stayed close to baseline rather than showing a large improvement, so this pass should be treated as a structural cleanup with neutral performance impact.
+
 ## 2026-07-03 - API Realtime Split And Edge Adapter Split
 
 ### Changed

@@ -147,8 +147,6 @@ def run_benchmark(
         record_build_elapsed_ms = (time.perf_counter() - stage_started) * 1000.0
 
         stage_started = time.perf_counter()
-        _ = runtime_event.partition_key()
-
         device_window = windows.get(runtime_event.device_id)
         if device_window is None:
             device_window = RollingWindowState(maxlen=window_limit)

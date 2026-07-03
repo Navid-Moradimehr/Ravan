@@ -49,6 +49,13 @@ def derive_stream_scope(event: dict[str, Any] | Any) -> StreamScope:
 
 
 def stream_partition_key(event: dict[str, Any] | Any) -> bytes:
+    partition_key = getattr(event, "partition_key", None)
+    if callable(partition_key):
+        try:
+            return partition_key()
+        except Exception:
+            pass
+
     if isinstance(event, dict):
         get = event.get
         return "|".join(

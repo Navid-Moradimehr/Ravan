@@ -7,6 +7,38 @@
 - **Broker**: Redpanda (Kafka-compatible)
 - **Historian**: TimescaleDB
 
+## API Router Split And Hot-Path Rerun
+
+- **Date**: 2026-07-03
+- **Scope**: split remaining API router domains, removed redundant ingest conversions, and removed a benchmark no-op
+
+### Targeted Regression Checks
+
+| Check | Result |
+|-------|--------|
+| `python -m compileall services` | passed |
+| Focused compatibility tests | 20 passed |
+
+### Stable Benchmark Repeats
+
+| Benchmark | Value | Change vs previous recorded run |
+|-----------|-------|----------------------------------|
+| Production pipeline throughput, `python-fallback` | 42,259.28 events/sec | `-4.3%` |
+| Production pipeline p99, `python-fallback` | 0.0588 ms | `+61.9%` |
+| Production pipeline throughput, `flink-production` | 51,526.15 events/sec | `+0.26%` |
+| Production pipeline p99, `flink-production` | 0.0320 ms | `-28.4%` |
+| CGR stream slice throughput | 52,640.64 events/sec | `-1.3%` |
+| CGR stream slice p99 | 0.0275 ms | `+2.9%` |
+| Mixed replay throughput | 94,941.61 events/sec | `-3.7%` |
+| Mixed replay p99 | 0.0147 ms | `-41.0%` |
+
+### Change Notes
+
+- The API router split is complete, but the measured throughput improvement from the ingest cleanup was not substantial on this machine.
+- The first benchmark run in this session was noisier and materially slower than the repeat run, so the repeat run is the better comparison point.
+- The net result is that the hot-path cleanup did not produce a clear production-sized gain here, but it also did not introduce a regression in the repeat run.
+- For now, treat the code change as a maintainability win with neutral-to-mild performance impact on this host.
+
 ## API And Edge Decomposition Rerun
 
 - **Date**: 2026-07-03

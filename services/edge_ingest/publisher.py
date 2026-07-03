@@ -63,10 +63,11 @@ class EdgePublisher:
             dlq_total.labels(protocol=protocol).inc()
         else:
             assert event is not None
-            key = stream_partition_key(event)
-            self._buffer.append((self.settings.normalized_topic, key, to_json_bytes(event)))
-            self._buffer.append((self.settings.legacy_topic, key, to_json_bytes(to_legacy_iot_event(event))))
-            self._historian_buffer.append(event.model_dump(mode="json"))
+            event_dict = event.model_dump(mode="json")
+            key = stream_partition_key(event_dict)
+            self._buffer.append((self.settings.normalized_topic, key, to_json_bytes(event_dict)))
+            self._buffer.append((self.settings.legacy_topic, key, to_json_bytes(to_legacy_iot_event(event_dict))))
+            self._historian_buffer.append(event_dict)
             events_total.labels(protocol=event.source_protocol).inc()
             last_success_epoch.labels(protocol=event.source_protocol).set(time.time())
             observe_latency(event)

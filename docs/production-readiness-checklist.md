@@ -18,6 +18,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Real-time preview and replay tooling exist for local validation.
 - API realtime/WebSocket logic has been split out of `services/api_service/main.py`.
 - Edge ingest settings, publisher, and protocol connectors are split into focused modules.
+- Remaining API router domains are split into focused modules and thin aggregators.
 
 ### Platform foundations
 
@@ -72,6 +73,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Broader connector/vendor validation against actual devices.
 - Enterprise rollout validation across branches, plants, and subnets.
 - Further package cleanup is still possible, but the major runtime splits are in place.
+- The current host still shows benchmark variance large enough that small code changes should be treated as neutral until repeated.
 
 ### Foundation-only areas
 
