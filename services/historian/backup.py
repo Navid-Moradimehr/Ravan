@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,12 @@ from typing import Any
 logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DOCKER_COMPOSE_FILE = PROJECT_ROOT / "docker" / "docker-compose.yml"
+DEFAULT_SNAPSHOT_TABLES: tuple[str, ...] = (
+    "industrial_events",
+    "processed_events",
+    "ai_enriched",
+    "dead_letter_events",
+)
 
 
 def _connection_params() -> dict[str, str]:
@@ -386,4 +393,83 @@ def get_walg_status() -> dict[str, Any]:
         "recommended_for": "Production continuous archiving",
         "documentation": "https://github.com/wal-g/wal-g",
         "installation": "See docs/open-source-research.md",
+    }
+
+
+def collect_historian_snapshot(table_names: Iterable[str] | None = None) -> dict[str, Any]:
+    """Collect simple row-count snapshots for historian tables.
+
+    The snapshot is intentionally small so backup/restore drills can compare
+    pre/post restore state without depending on a full logical diff.
+    """
+    tables = tuple(table_names or DEFAULT_SNAPSHOT_TABLES)
+    conn = _connection_params()
+    query = "; ".join(
+        f"SELECT '{table}' AS table_name, COUNT(*)::bigint AS row_count FROM {table}"
+        for table in tables
+    )
+    cmd = [
+        "psql",
+        f"--host={conn['host']}",
+        f"--port={conn['port']}",
+        f"--username={conn['user']}",
+        "--dbname",
+        conn["database"],
+        "--no-align",
+        "--tuples-only",
+        "--field-separator=|",
+        "--command",
+        query,
+    ]
+    env = os.environ.copy()
+    env["PGPASSWORD"] = conn["password"]
+
+    try:
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True, check=True)
+        counts: dict[str, int] = {}
+        for line in result.stdout.splitlines():
+            parts = [part.strip() for part in line.split("|")]
+            if len(parts) != 2 or not parts[0]:
+                continue
+            try:
+                counts[parts[0]] = int(parts[1])
+            except ValueError:
+                counts[parts[0]] = 0
+        return {
+            "status": "success",
+            "database": conn["database"],
+            "tables": counts,
+            "table_count": len(counts),
+            "row_count_total": sum(counts.values()),
+            "transport": "psql",
+        }
+    except FileNotFoundError:
+        return {
+            "status": "error",
+            "error": "psql not found on host; install PostgreSQL client tools to collect historian snapshots.",
+        }
+    except subprocess.CalledProcessError as e:
+        return {
+            "status": "error",
+            "error": e.stderr,
+            "command": " ".join(cmd),
+        }
+
+
+def compare_historian_snapshots(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    before_tables = before.get("tables", {}) if isinstance(before, dict) else {}
+    after_tables = after.get("tables", {}) if isinstance(after, dict) else {}
+    all_tables = sorted(set(before_tables) | set(after_tables))
+    diffs: dict[str, dict[str, int]] = {}
+    for table in all_tables:
+        before_count = int(before_tables.get(table, 0))
+        after_count = int(after_tables.get(table, 0))
+        if before_count != after_count:
+            diffs[table] = {"before": before_count, "after": after_count, "delta": after_count - before_count}
+    return {
+        "matched": not diffs and before.get("status") == "success" and after.get("status") == "success",
+        "before": before,
+        "after": after,
+        "diffs": diffs,
+        "table_count": len(all_tables),
     }

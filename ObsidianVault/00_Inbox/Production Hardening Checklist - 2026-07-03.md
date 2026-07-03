@@ -11,13 +11,10 @@
 
 - manifest/site identity validation gap
 - execution checklist capture
-- rollout acceptance report export
-- multi-PLC simulator scenarios
-- self-hosted secrets guidance
 
 ## Remaining
 
-- signed release outputs
+- target-hardware benchmark validation
 - target-hardware sizing validation
 - restore/rollback drill measurement across at least two sites
 
@@ -28,6 +25,12 @@
 - Packaging remains deferred until runtime and deployment shape are stable.
 - The simulator now needs to be compared with repeated benchmark sessions, not one-off local runs.
 - Operators should inject JWT, broker, historian, and model secrets from their own secret store.
+- backup drills now capture before/after historian snapshots and compare row counts
+- release-package can emit `release-signature.json` when the operator supplies a signing key
+- site-profile matrix/calibration benchmarks can export report directories for archiving
+- rollout acceptance report export is now available for archiveable per-site runs
+- the simulator now includes multi-PLC, burst, and reconnect cases
+- self-hosted secrets guidance is already documented for Docker, systemd, and Kubernetes
 
 ## Measured Baseline
 
@@ -45,4 +48,5 @@
 ## Release Skeleton
 
 - release-package command now emits `release-manifest.json` and `checksums.sha256`
+- release-package can optionally emit `release-signature.json`
 - package output stays separate from future signed release artifacts

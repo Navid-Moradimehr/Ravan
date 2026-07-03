@@ -50,6 +50,9 @@ graph TD
 - regression tests for shared-deployment auth and headers
 - site-profile benchmark matrix for per-site acceptance runs
 - project-manifest rollout acceptance command that combines release-gate and benchmark checks
+- historian backup drills now capture before/after snapshots and compare row counts
+- release-package now supports operator-provided signing keys and writes `release-signature.json`
+- site-profile matrix and calibration benchmarks can export report directories for archiving
 - CGR gap report command that compares local benchmark numbers to the public CGR streaming claim
 - isolated CGR-style stream slice benchmark and gap report integration
 - CGR stream slice microbenchmark decomposition for validation, normalization, partitioning/window/scoring, and serialization
@@ -83,6 +86,7 @@ graph TD
 - unauthenticated mutating API requests in shared deployments
 - benchmark session variance not tracked as a first-class signal
 - unclear Spark integration boundary for open-source industrial rollout
+- target-hardware benchmark validation is still pending
 
 ## Verification
 
@@ -121,6 +125,10 @@ graph TD
 - `site-profile-matrix --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1`
   - demo-site: 44,795.24 events/sec, passed
   - plant-a: 59,253.75 events/sec, passed
+  - overall: passed
+- `site-profile-matrix --site-ids demo-site,plant-a --events 1000 --batch-size 64 --warmup-events 0 --min-average-events-per-second 1 --repeat-count 2`
+  - demo-site: mean 92,118.08 events/sec, median 92,118.08, stdev 1,071.01, p99 0.0185 ms
+  - plant-a: mean 93,961.76 events/sec, median 93,961.76, stdev 1,167.15, p99 0.0248 ms
   - overall: passed
 - `project-manifest rollout-acceptance config/project-manifest.yaml --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1 --skip-network --skip-backup`
   - demo-site: release-gate passed, benchmark passed at 48,558.93 events/sec

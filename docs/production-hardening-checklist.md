@@ -14,6 +14,7 @@ This checklist turns the current roadmap into a concrete execution track for a s
 - [x] Add per-site rollout acceptance reports for at least two independent site profiles.
 - [ ] Measure restore and rollback drills per site before federation is enabled.
 - [ ] Keep cross-site replication limited to approved rollups, summaries, or explicit bridges.
+- [x] Add restore/rollback snapshot comparison and report export for backup drills.
 
 ## 2. Self-Hosted Security
 
@@ -31,7 +32,7 @@ This checklist turns the current roadmap into a concrete execution track for a s
 - [x] Keep packaging work separate from core runtime refactoring.
 - [x] Keep generated bundles available for flat, systemd, Kubernetes, and packaged site layouts.
 - [x] Publish release-artifact skeletons with versioned runtime bundles.
-- [ ] Add signed release outputs for operators who need verification.
+- [x] Add signed release outputs for operators who need verification.
 - [ ] Provide one-click-ish install guidance without hiding configuration ownership.
 
 ## 4. Real-World Simulator and Benchmarks
@@ -47,6 +48,6 @@ This checklist turns the current roadmap into a concrete execution track for a s
 ## 5. Immediate Next Implementation Targets
 
 1. Measure restore and rollback drills on at least two site profiles.
-2. Add signed release outputs for the release-package skeleton.
-3. Validate the rollout and benchmark baseline on target hardware.
+2. Validate the rollout and benchmark baseline on target hardware.
+3. Provide one-click-ish install guidance without hiding configuration ownership.
 4. Keep the release-package skeleton separate from the eventual signed installer pipeline.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import hmac
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -642,6 +643,8 @@ class ProjectManifest:
         *,
         site_id: str,
         fmt: str = "both",
+        signing_key: str | None = None,
+        signing_key_id: str = "operator-provided",
     ) -> list[Path]:
         output_path = Path(output_dir)
         written = self.export_package(output_path, site_id=site_id, fmt=fmt)
@@ -674,6 +677,32 @@ class ProjectManifest:
             )
         )
         written.append(self._write_text(site_root / "checksums.sha256", "\n".join(checksums) + "\n"))
+        if signing_key:
+            manifest_bytes = (site_root / "release-manifest.json").read_bytes()
+            checksums_bytes = (site_root / "checksums.sha256").read_bytes()
+            signature = hmac.new(
+                signing_key.encode("utf-8"),
+                manifest_bytes + b"\n" + checksums_bytes,
+                hashlib.sha256,
+            ).hexdigest()
+            signature_payload = {
+                "project_id": self.project_id,
+                "project_name": self.name,
+                "site_id": site_id,
+                "artifact_type": "release-signature",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "algorithm": "HMAC-SHA256",
+                "key_id": signing_key_id,
+                "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+                "checksums_sha256": hashlib.sha256(checksums_bytes).hexdigest(),
+                "signature": signature,
+            }
+            written.append(
+                self._write_text(
+                    site_root / "release-signature.json",
+                    json.dumps(signature_payload, indent=2, sort_keys=False, ensure_ascii=False),
+                )
+            )
         return written
 
     def export_package(

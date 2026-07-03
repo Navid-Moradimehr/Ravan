@@ -22,10 +22,35 @@
 - `uv run python -m pytest tests/test_site_profile_calibration_benchmark.py`: passed
 - `python -m compileall services`: passed
 - `uv run python -m services.cli.datastreamctl benchmark site-profile-matrix --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 1000 --batch-size 64 --warmup-events 0 --min-average-events-per-second 1 --repeat-count 2`
-  - `demo-site`: mean 86,376.50 events/sec, median 86,376.50, stdev 288.99, p99 0.0195 ms
-  - `plant-a`: mean 94,552.48 events/sec, median 94,552.48, stdev 1,214.24, p99 0.0174 ms
+  - `demo-site`: mean 92,118.08 events/sec, median 92,118.08, stdev 1,071.01, p99 0.0185 ms
+  - `plant-a`: mean 93,961.76 events/sec, median 93,961.76, stdev 1,167.15, p99 0.0248 ms
 - `uv run python -m services.cli.datastreamctl project-manifest release-package config/project-manifest.yaml %TEMP%\\datastream-release --site-id demo-site --format both`
   - release manifest and checksums were generated successfully
+
+## 2026-07-03 - Backup Snapshot Comparison, Signed Release Artifacts, And Benchmark Report Exports
+
+### Changed
+
+1. **Backup drill comparison**
+   - Added historian snapshot collection before and after restore so the drill can report whether the row counts matched.
+   - The backup drill report now persists `before_snapshot`, `after_snapshot`, and `snapshot_comparison` JSON artifacts.
+
+2. **Signed release artifacts**
+   - Added optional HMAC-based release signing to `project-manifest release-package`.
+   - The command now emits `release-signature.json` when `--sign` is set and a signing key is provided via the operator-owned environment variable.
+
+3. **Benchmark report exports**
+   - Added optional report directories for the site-profile matrix and calibration benchmarks.
+   - The benchmark commands now write summary JSON and per-site artifacts so repeat runs can be archived alongside the CLI output.
+
+### Verified
+
+- `uv run python -m pytest tests/test_datastreamctl.py tests/test_project_manifest.py`: passed
+- `uv run python -m services.cli.datastreamctl benchmark site-profile-matrix --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 1000 --batch-size 64 --warmup-events 0 --min-average-events-per-second 1 --repeat-count 2`
+  - `demo-site`: mean 86,376.50 events/sec, median 86,376.50, stdev 288.99, p99 0.0195 ms
+  - `plant-a`: mean 94,552.48 events/sec, median 94,552.48, stdev 1,214.24, p99 0.0174 ms
+- `uv run python -m services.cli.datastreamctl project-manifest release-package config/project-manifest.yaml %TEMP%\\datastream-release --site-id demo-site --format both --sign`
+  - release manifest, checksums, and signature artifacts were generated successfully
 
 ### Notes
 

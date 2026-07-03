@@ -131,7 +131,7 @@ against realistic industrial batches without depending on a live model server.
 - `services/api_service/routers/retrieval.py` exposes deterministic retrieval/search over historian, alarms, assets, reports, and scenarios.
 - `config/site-profiles/` contains example site profile contracts for `single-site`, `plant-local`, and `federated` rollout shapes.
 - `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
-- `docs/benchmark-results.md` includes the latest local benchmark numbers for the mixed replay path and the AI gateway provider abstraction.
+- `docs/benchmark-results.md` includes the latest local benchmark numbers for the mixed replay path, repeat-run site matrix, and release-package verification.
 - `services/api_service/routers/historian.py` and `services/api_service/runtime.py` hold the split historian routing and shared API runtime helpers.
 - `scripts/benchmark_mixed_replay.py` runs the mixed replay benchmark against the local industrial replay pack.
 - `scripts/benchmark_ai_gateway_mock.py` benchmarks the provider-neutral AI gateway against realistic mock industrial batches.

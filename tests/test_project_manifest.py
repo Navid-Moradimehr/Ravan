@@ -109,6 +109,23 @@ def test_manifest_release_package_export(tmp_path: Path):
     assert any(path.name == "release-manifest.json" for path in written)
 
 
+def test_manifest_signed_release_package_export(tmp_path: Path):
+    manifest = load_project_manifest(MANIFEST)
+    written = manifest.export_release_artifact(
+        tmp_path,
+        site_id="demo-site",
+        fmt="both",
+        signing_key="test-signing-key",
+        signing_key_id="unit-test",
+    )
+    site_root = tmp_path / "demo-site"
+    assert site_root.exists()
+    assert (site_root / "release-signature.json").exists()
+    signature = (site_root / "release-signature.json").read_text(encoding="utf-8")
+    assert '"algorithm": "HMAC-SHA256"' in signature
+    assert any(path.name == "release-signature.json" for path in written)
+
+
 def test_manifest_lint_flags_collisions():
     manifest = load_project_manifest(MANIFEST)
     issues = manifest.lint()

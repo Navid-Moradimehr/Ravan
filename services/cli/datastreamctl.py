@@ -37,7 +37,14 @@ from services.benchmarks.site_profile_calibration import format_result as format
 from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
 from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
 from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
-from services.historian.backup import create_backup, get_walg_status, list_backups, restore_backup
+from services.historian.backup import (
+    collect_historian_snapshot,
+    compare_historian_snapshots,
+    create_backup,
+    get_walg_status,
+    list_backups,
+    restore_backup,
+)
 
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
 DEFAULT_AI_BASE = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080")
@@ -92,16 +99,24 @@ def _parse_tables(value: str | None) -> list[str] | None:
 
 
 def _run_backup_drill(backup_dir: str | None, tables: list[str] | None, restore_db: str | None) -> dict[str, Any]:
+    before_snapshot = collect_historian_snapshot()
     result: dict[str, Any] = {
+        "before_snapshot": before_snapshot,
         "backup": create_backup(backup_dir=backup_dir, tables=tables),
         "restore": None,
         "backups": list_backups(backup_dir=backup_dir),
         "wal_g": get_walg_status(),
+        "after_snapshot": None,
+        "snapshot_comparison": None,
     }
     if result["backup"].get("status") != "success":
         return result
     if restore_db:
         result["restore"] = restore_backup(result["backup"]["path"], restore_db)
+        if result["restore"].get("status") == "success":
+            after_snapshot = collect_historian_snapshot()
+            result["after_snapshot"] = after_snapshot
+            result["snapshot_comparison"] = compare_historian_snapshots(before_snapshot, after_snapshot)
     return result
 
 
@@ -112,7 +127,7 @@ def _write_backup_drill_report(report_dir: str, payload: dict[str, Any]) -> list
     summary_path = output_dir / "backup-drill-summary.json"
     summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     written.append(summary_path)
-    for key in ("backup", "restore", "wal_g"):
+    for key in ("before_snapshot", "backup", "restore", "after_snapshot", "snapshot_comparison", "wal_g"):
         if payload.get(key) is None:
             continue
         item_path = output_dir / f"{key}.json"
@@ -278,6 +293,90 @@ def _write_rollout_acceptance_report(report_dir: str, payload: dict[str, Any]) -
         site_path.write_text(json.dumps(site, indent=2), encoding="utf-8")
         written.append(site_path)
 
+    return written
+
+
+def _write_site_profile_matrix_report(report_dir: str, result: Any) -> list[Path]:
+    output_dir = Path(report_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    summary = {
+        "passed": result.passed,
+        "runs": [
+            {
+                "site_id": run.site_id,
+                "deployment_mode": run.deployment_mode,
+                "profile_path": run.profile_path,
+                "average_events_per_second": run.average_events_per_second,
+                "median_events_per_second": run.median_events_per_second,
+                "stdev_events_per_second": run.stdev_events_per_second,
+                "min_events_per_second": run.min_events_per_second,
+                "max_events_per_second": run.max_events_per_second,
+                "repeat_count": run.repeat_count,
+                "latency_p99_ms": run.latency_p99_ms,
+                "passed": run.passed,
+                "detail": run.detail,
+            }
+            for run in result.runs
+        ],
+    }
+    summary_path = output_dir / "site-profile-matrix-summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    written.append(summary_path)
+    for run in summary["runs"]:
+        site_path = output_dir / f"{run['site_id']}.json"
+        site_path.write_text(json.dumps(run, indent=2), encoding="utf-8")
+        written.append(site_path)
+    return written
+
+
+def _write_site_profile_calibration_report(report_dir: str, result: Any) -> list[Path]:
+    output_dir = Path(report_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    summary = {
+        "passed": result.passed,
+        "benchmark": {
+            "passed": result.benchmark.passed,
+            "runs": [
+                {
+                    "site_id": run.site_id,
+                    "deployment_mode": run.deployment_mode,
+                    "profile_path": run.profile_path,
+                    "average_events_per_second": run.average_events_per_second,
+                    "median_events_per_second": run.median_events_per_second,
+                    "stdev_events_per_second": run.stdev_events_per_second,
+                    "min_events_per_second": run.min_events_per_second,
+                    "max_events_per_second": run.max_events_per_second,
+                    "repeat_count": run.repeat_count,
+                    "latency_p99_ms": run.latency_p99_ms,
+                    "passed": run.passed,
+                    "detail": run.detail,
+                }
+                for run in result.benchmark.runs
+            ],
+        },
+        "runs": [
+            {
+                "site_id": run.site_id,
+                "deployment_mode": run.deployment_mode,
+                "profile_path": run.profile_path,
+                "observed_average_events_per_second": run.observed_average_events_per_second,
+                "observed_median_events_per_second": run.observed_median_events_per_second,
+                "observed_stdev_events_per_second": run.observed_stdev_events_per_second,
+                "acceptance_threshold": run.acceptance_threshold,
+                "headroom_events_per_second": run.headroom_events_per_second,
+                "headroom_ratio": run.headroom_ratio,
+                "recommended_min_average_events_per_second": run.recommended_min_average_events_per_second,
+                "recommended_batch_size": run.recommended_batch_size,
+                "passed": run.passed,
+            }
+            for run in result.runs
+        ],
+    }
+    summary_path = output_dir / "site-profile-calibration-summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    written.append(summary_path)
     return written
 
 
@@ -462,6 +561,8 @@ def cmd_backup_drill(args: argparse.Namespace) -> int:
         _print_row("restore_status", result["restore"].get("status", "skipped") if result["restore"] else "skipped")
         _print_row("available_backups", len(result["backups"]))
         _print_row("wal_g_installed", result["wal_g"].get("installed"))
+        if result.get("snapshot_comparison") is not None:
+            _print_row("snapshot_match", "yes" if result["snapshot_comparison"].get("matched") else "no")
         if written_reports:
             _print_row("report_dir", args.report_dir)
             for path in written_reports:
@@ -613,12 +714,24 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
     if args.action == "release-package":
         if not args.site_id:
             raise ValueError("site_id is required for release-package")
-        written = manifest.export_release_artifact(Path(args.output_dir), site_id=args.site_id, fmt=args.format)
+        signing_key = None
+        if args.sign:
+            signing_key = os.getenv(args.signing_key_env)
+            if not signing_key:
+                raise ValueError(f"{args.signing_key_env} is required when --sign is set")
+        written = manifest.export_release_artifact(
+            Path(args.output_dir),
+            site_id=args.site_id,
+            fmt=args.format,
+            signing_key=signing_key,
+            signing_key_id=args.signing_key_env,
+        )
         payload = {
             "path": args.path,
             "output_dir": args.output_dir,
             "site_id": args.site_id,
             "format": args.format,
+            "signed": bool(signing_key),
             "written": [str(path) for path in written],
             "errors": errors,
             "valid": not errors,
@@ -631,6 +744,7 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
             _print_row("output_dir", args.output_dir)
             _print_row("format", args.format)
             _print_row("site_id", args.site_id)
+            _print_row("signed", "yes" if signing_key else "no")
             for path in written:
                 print(path)
             if errors:
@@ -873,10 +987,61 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             min_average_events_per_second=args.min_average_events_per_second,
             repeat_count=args.repeat_count,
         )
+        written_reports: list[Path] = []
+        if args.report_dir:
+            written_reports = _write_site_profile_matrix_report(args.report_dir, result)
         if args.json:
-            print(json.dumps(
-                {
-                    "passed": result.passed,
+            payload = {
+                "passed": result.passed,
+                "runs": [
+                    {
+                        "site_id": item.site_id,
+                        "deployment_mode": item.deployment_mode,
+                        "profile_path": item.profile_path,
+                        "average_events_per_second": item.average_events_per_second,
+                        "median_events_per_second": item.median_events_per_second,
+                        "stdev_events_per_second": item.stdev_events_per_second,
+                        "min_events_per_second": item.min_events_per_second,
+                        "max_events_per_second": item.max_events_per_second,
+                        "repeat_count": item.repeat_count,
+                        "passed": item.passed,
+                        "detail": item.detail,
+                    }
+                    for item in result.runs
+                ],
+            }
+            if written_reports:
+                payload["written_reports"] = [str(path) for path in written_reports]
+            print(json.dumps(payload, indent=2))
+        else:
+            print("site profile benchmark matrix")
+            print("=" * 40)
+            print(format_site_profile_matrix_result(result))
+            if written_reports:
+                _print_row("report_dir", args.report_dir)
+                for path in written_reports:
+                    print(f"{'':6}report  {path}")
+        return 0 if result.passed else 2
+    if args.action == "site-profile-calibration":
+        site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
+        result = run_site_profile_calibration(
+            Path(args.manifest),
+            Path(args.csv),
+            site_ids=site_ids,
+            events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            min_average_events_per_second=args.min_average_events_per_second,
+            repeat_count=args.repeat_count,
+        )
+        written_reports: list[Path] = []
+        if args.report_dir:
+            written_reports = _write_site_profile_calibration_report(args.report_dir, result)
+        if args.json:
+            payload = {
+                "passed": result.passed,
+                "benchmark": {
+                    "passed": result.benchmark.passed,
                     "runs": [
                         {
                             "site_id": item.site_id,
@@ -891,75 +1056,38 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                             "passed": item.passed,
                             "detail": item.detail,
                         }
-                        for item in result.runs
+                        for item in result.benchmark.runs
                     ],
                 },
-                indent=2,
-            ))
-        else:
-            print("site profile benchmark matrix")
-            print("=" * 40)
-            print(format_site_profile_matrix_result(result))
-        return 0 if result.passed else 2
-    if args.action == "site-profile-calibration":
-        site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
-        result = run_site_profile_calibration(
-            Path(args.manifest),
-            Path(args.csv),
-            site_ids=site_ids,
-            events=args.events,
-            batch_size=args.batch_size,
-            warmup_events=args.warmup_events,
-            min_average_events_per_second=args.min_average_events_per_second,
-            repeat_count=args.repeat_count,
-        )
-        if args.json:
-            print(json.dumps(
-                {
-                    "passed": result.passed,
-                    "benchmark": {
-                        "passed": result.benchmark.passed,
-                        "runs": [
-                            {
-                                "site_id": item.site_id,
-                                "deployment_mode": item.deployment_mode,
-                                "profile_path": item.profile_path,
-                                "average_events_per_second": item.average_events_per_second,
-                                "median_events_per_second": item.median_events_per_second,
-                                "stdev_events_per_second": item.stdev_events_per_second,
-                                "min_events_per_second": item.min_events_per_second,
-                                "max_events_per_second": item.max_events_per_second,
-                                "repeat_count": item.repeat_count,
-                                "passed": item.passed,
-                                "detail": item.detail,
-                            }
-                            for item in result.benchmark.runs
-                        ],
-                    },
-                    "runs": [
-                        {
-                            "site_id": item.site_id,
-                            "deployment_mode": item.deployment_mode,
-                            "profile_path": item.profile_path,
-                            "observed_average_events_per_second": item.observed_average_events_per_second,
-                            "observed_median_events_per_second": item.observed_median_events_per_second,
-                            "observed_stdev_events_per_second": item.observed_stdev_events_per_second,
-                            "acceptance_threshold": item.acceptance_threshold,
-                            "headroom_events_per_second": item.headroom_events_per_second,
-                            "headroom_ratio": item.headroom_ratio,
-                            "recommended_min_average_events_per_second": item.recommended_min_average_events_per_second,
-                            "recommended_batch_size": item.recommended_batch_size,
-                            "passed": item.passed,
-                        }
-                        for item in result.runs
-                    ],
-                },
-                indent=2,
-            ))
+                "runs": [
+                    {
+                        "site_id": item.site_id,
+                        "deployment_mode": item.deployment_mode,
+                        "profile_path": item.profile_path,
+                        "observed_average_events_per_second": item.observed_average_events_per_second,
+                        "observed_median_events_per_second": item.observed_median_events_per_second,
+                        "observed_stdev_events_per_second": item.observed_stdev_events_per_second,
+                        "acceptance_threshold": item.acceptance_threshold,
+                        "headroom_events_per_second": item.headroom_events_per_second,
+                        "headroom_ratio": item.headroom_ratio,
+                        "recommended_min_average_events_per_second": item.recommended_min_average_events_per_second,
+                        "recommended_batch_size": item.recommended_batch_size,
+                        "passed": item.passed,
+                    }
+                    for item in result.runs
+                ],
+            }
+            if written_reports:
+                payload["written_reports"] = [str(path) for path in written_reports]
+            print(json.dumps(payload, indent=2))
         else:
             print("site profile calibration")
             print("=" * 40)
             print(format_site_profile_calibration_result(result))
+            if written_reports:
+                _print_row("report_dir", args.report_dir)
+                for path in written_reports:
+                    print(f"{'':6}report  {path}")
         return 0 if result.passed else 2
     if args.action == "cgr-gap-report":
         site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
@@ -1407,6 +1535,8 @@ def build_parser() -> argparse.ArgumentParser:
     project_release_package.add_argument("output_dir")
     project_release_package.add_argument("--site-id", required=True, help="Site to package into a release artifact")
     project_release_package.add_argument("--format", choices=["env", "yaml", "both"], default="both")
+    project_release_package.add_argument("--sign", action="store_true", help="Write a release-signature.json using the configured signing key")
+    project_release_package.add_argument("--signing-key-env", default="DATASTREAM_RELEASE_SIGNING_KEY", help="Environment variable that holds the signing key")
     project_release_package.add_argument("--json", action="store_true")
     project_release_package.set_defaults(func=cmd_project_manifest)
     project_lint = project_sub.add_parser("lint", help="Lint the project manifest for collisions and policy drift")
@@ -1479,6 +1609,7 @@ def build_parser() -> argparse.ArgumentParser:
     site_profile_matrix.add_argument("--warmup-events", type=int, default=0)
     site_profile_matrix.add_argument("--min-average-events-per-second", type=float, default=1000.0)
     site_profile_matrix.add_argument("--repeat-count", type=int, default=3, help="Number of repeated benchmark runs per site")
+    site_profile_matrix.add_argument("--report-dir", default=None, help="Optional directory to write JSON benchmark reports")
     site_profile_matrix.add_argument("--json", action="store_true")
     site_profile_matrix.set_defaults(func=cmd_benchmark)
     site_profile_calibration = benchmark_sub.add_parser("site-profile-calibration", help="Calibrate per-site benchmark thresholds from the mixed replay pack")
@@ -1490,6 +1621,7 @@ def build_parser() -> argparse.ArgumentParser:
     site_profile_calibration.add_argument("--warmup-events", type=int, default=0)
     site_profile_calibration.add_argument("--min-average-events-per-second", type=float, default=1000.0)
     site_profile_calibration.add_argument("--repeat-count", type=int, default=3, help="Number of repeated benchmark runs per site")
+    site_profile_calibration.add_argument("--report-dir", default=None, help="Optional directory to write JSON benchmark reports")
     site_profile_calibration.add_argument("--json", action="store_true")
     site_profile_calibration.set_defaults(func=cmd_benchmark)
     cgr_gap_report = benchmark_sub.add_parser("cgr-gap-report", help="Compare local benchmark results against the public CGR streaming claims")

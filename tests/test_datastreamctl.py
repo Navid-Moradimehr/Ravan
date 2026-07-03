@@ -98,6 +98,8 @@ class TestDatastreamctl:
         assert "python-fallback" in out
 
     def test_backup_drill_uses_backup_helpers(self, monkeypatch):
+        monkeypatch.setattr(ctl, "collect_historian_snapshot", lambda table_names=None: {"status": "success", "tables": {"industrial_events": 3}})
+        monkeypatch.setattr(ctl, "compare_historian_snapshots", lambda before, after: {"matched": True, "diffs": {}, "before": before, "after": after})
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
         monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
@@ -105,9 +107,12 @@ class TestDatastreamctl:
         rc, out = self._run(["backup-drill", "--restore-db", "restore_db"])
         assert rc == 0
         assert "backup_status" in out
+        assert "snapshot_match" in out
 
     def test_backup_drill_writes_report_dir(self, monkeypatch, tmp_path):
         report_dir = tmp_path / "backup-report"
+        monkeypatch.setattr(ctl, "collect_historian_snapshot", lambda table_names=None: {"status": "success", "tables": {"industrial_events": 3}})
+        monkeypatch.setattr(ctl, "compare_historian_snapshots", lambda before, after: {"matched": True, "diffs": {}, "before": before, "after": after})
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
         monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
@@ -115,8 +120,11 @@ class TestDatastreamctl:
         rc, out = self._run(["backup-drill", "--restore-db", "restore_db", "--report-dir", str(report_dir)])
         assert rc == 0
         assert (report_dir / "backup-drill-summary.json").exists()
+        assert (report_dir / "before_snapshot.json").exists()
         assert (report_dir / "backup.json").exists()
         assert (report_dir / "restore.json").exists()
+        assert (report_dir / "after_snapshot.json").exists()
+        assert (report_dir / "snapshot_comparison.json").exists()
         assert "report_dir" in out
 
     def test_release_gate_can_skip_network_and_run_backup(self, monkeypatch):
@@ -375,6 +383,24 @@ class TestDatastreamctl:
         assert (site_root / "README.md").exists()
         assert "project release package" in out
 
+    def test_project_manifest_release_package_signed_command(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("DATASTREAM_RELEASE_SIGNING_KEY", "test-signing-key")
+        rc, out = self._run([
+            "project-manifest",
+            "release-package",
+            str(PROJECT_MANIFEST),
+            str(tmp_path),
+            "--site-id",
+            "demo-site",
+            "--format",
+            "both",
+            "--sign",
+        ])
+        assert rc == 0
+        site_root = tmp_path / "demo-site"
+        assert (site_root / "release-signature.json").exists()
+        assert "signed" in out
+
     def test_benchmark_deployment_pack_runs(self, tmp_path):
         csv_path = tmp_path / "mock.csv"
         csv_path.write_text(
@@ -470,6 +496,43 @@ class TestDatastreamctl:
         assert "demo-site" in out
         assert "plant-a" in out
 
+    def test_benchmark_site_profile_matrix_writes_report_dir(self, tmp_path):
+        csv_path = tmp_path / "mock.csv"
+        csv_path.write_text(
+            "\n".join(
+                [
+                    "event_id,source_protocol,source_id,asset_id,tag,value,quality,unit,site,line,ts_source,schema_version,fault_type,scenario_id,ground_truth_severity,step",
+                    "evt-1,mqtt,site-a/mqtt/pump-1,Pump-1,Temperature,55.1,good,c,Factory-A,Line-1,2026-07-01T00:00:00Z,1,normal,mock-benchmark,normal,0",
+                    "evt-2,opcua,site-a/opcua/pump-2,Pump-2,Vibration,7.5,good,mm/s,Factory-A,Line-1,2026-07-01T00:00:01Z,1,degradation,mock-benchmark,normal,1",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        report_dir = tmp_path / "matrix-report"
+        rc, out = self._run([
+            "benchmark",
+            "site-profile-matrix",
+            "--manifest",
+            str(PROJECT_MANIFEST),
+            "--csv",
+            str(csv_path),
+            "--site-ids",
+            "demo-site,plant-a",
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+            "--min-average-events-per-second",
+            "1",
+            "--report-dir",
+            str(report_dir),
+        ])
+        assert rc == 0
+        assert (report_dir / "site-profile-matrix-summary.json").exists()
+        assert (report_dir / "demo-site.json").exists()
+        assert (report_dir / "plant-a.json").exists()
+        assert "report_dir" in out
+
     def test_benchmark_site_profile_calibration_runs(self, tmp_path):
         csv_path = tmp_path / "mock.csv"
         csv_path.write_text(
@@ -501,6 +564,41 @@ class TestDatastreamctl:
         assert rc == 0
         assert "site profile calibration" in out
         assert "recommended_min" in out
+
+    def test_benchmark_site_profile_calibration_writes_report_dir(self, tmp_path):
+        csv_path = tmp_path / "mock.csv"
+        csv_path.write_text(
+            "\n".join(
+                [
+                    "event_id,source_protocol,source_id,asset_id,tag,value,quality,unit,site,line,ts_source,schema_version,fault_type,scenario_id,ground_truth_severity,step",
+                    "evt-1,mqtt,site-a/mqtt/pump-1,Pump-1,Temperature,55.1,good,c,Factory-A,Line-1,2026-07-01T00:00:00Z,1,normal,mock-benchmark,normal,0",
+                    "evt-2,opcua,site-a/opcua/pump-2,Pump-2,Vibration,7.5,good,mm/s,Factory-A,Line-1,2026-07-01T00:00:01Z,1,degradation,mock-benchmark,normal,1",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        report_dir = tmp_path / "calibration-report"
+        rc, out = self._run([
+            "benchmark",
+            "site-profile-calibration",
+            "--manifest",
+            str(PROJECT_MANIFEST),
+            "--csv",
+            str(csv_path),
+            "--site-ids",
+            "demo-site,plant-a",
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+            "--min-average-events-per-second",
+            "1",
+            "--report-dir",
+            str(report_dir),
+        ])
+        assert rc == 0
+        assert (report_dir / "site-profile-calibration-summary.json").exists()
+        assert "report_dir" in out
 
     def test_benchmark_cgr_gap_report_runs(self, monkeypatch, tmp_path):
         csv_path = tmp_path / "mock.csv"

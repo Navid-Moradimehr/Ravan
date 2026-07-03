@@ -357,6 +357,35 @@ Latest local run on the current codebase:
 | plant-a | plant-local | 47,759.79 | 750.0 | 47,009.79 | 38,207.83 | 256 |
 | **Overall** | - | - | - | - | - | passed |
 
+### Repeat-Run Site Matrix
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl benchmark site-profile-matrix --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 1000 --batch-size 64 --warmup-events 0 --min-average-events-per-second 1 --repeat-count 2
+```
+
+Latest local run on the current codebase:
+
+| Site | Mean Events/sec | Median Events/sec | Stdev | P99 ms | Repeats |
+|------|-----------------|-------------------|-------|--------|---------|
+| demo-site | 92,118.08 | 92,118.08 | 1,071.01 | 0.0185 | 2 |
+| plant-a | 93,961.76 | 93,961.76 | 1,167.15 | 0.0248 | 2 |
+
+### Release Package Verification
+
+Command:
+
+```bash
+uv run python -m services.cli.datastreamctl project-manifest release-package config/project-manifest.yaml %TEMP%\\datastream-release --site-id demo-site --format both --sign
+```
+
+Latest local run on the current codebase:
+
+- `release-manifest.json` generated successfully
+- `checksums.sha256` generated successfully
+- `release-signature.json` generated successfully when `DATASTREAM_RELEASE_SIGNING_KEY` was present
+
 ### CGR Gap Report
 
 Command:
