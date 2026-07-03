@@ -26,6 +26,12 @@ services:
       - internal://redpanda:8082,external://localhost:18082
       - --schema-registry-addr
       - internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --set
+      - audit_enabled=false
+      - --set
+      - partition_autobalancing_mode=node_add
+      - --set
+      - core_balancing_continuous=false
     ports:
       - "18081:18081"
       - "18082:18082"
