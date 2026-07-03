@@ -369,8 +369,10 @@ Latest local run on the current codebase:
 
 | Site | Mean Events/sec | Median Events/sec | Stdev | P99 ms | Repeats |
 |------|-----------------|-------------------|-------|--------|---------|
-| demo-site | 92,118.08 | 92,118.08 | 1,071.01 | 0.0185 | 2 |
-| plant-a | 93,961.76 | 93,961.76 | 1,167.15 | 0.0248 | 2 |
+| demo-site | 90,392.42 | 90,392.42 | 6,175.55 | 0.0152 | 2 |
+| plant-a | 92,189.32 | 92,189.32 | 1,804.84 | 0.0213 | 2 |
+
+The matrix reports now include a `host_profile.json` artifact with CPU, memory, and platform metadata so local numbers are clearly separated from target-hardware sizing claims.
 
 ### Release Package Verification
 

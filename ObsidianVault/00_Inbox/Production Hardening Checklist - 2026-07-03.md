@@ -28,6 +28,8 @@
 - backup drills now capture before/after historian snapshots and compare row counts
 - release-package can emit `release-signature.json` when the operator supplies a signing key
 - site-profile matrix/calibration benchmarks can export report directories for archiving
+- benchmark report exports now include host-profile metadata for local-vs-target separation
+- self-host install guidance is documented for Linux and Windows operators
 - rollout acceptance report export is now available for archiveable per-site runs
 - the simulator now includes multi-PLC, burst, and reconnect cases
 - self-hosted secrets guidance is already documented for Docker, systemd, and Kubernetes
@@ -44,9 +46,15 @@
 
 - `demo-site`: mean 86,376.50 events/sec, median 86,376.50, stdev 288.99, repeats 2
 - `plant-a`: mean 94,552.48 events/sec, median 94,552.48, stdev 1,214.24, repeats 2
+- `demo-site`: mean 90,392.42 events/sec, median 90,392.42, stdev 6,175.55, repeats 2
+- `plant-a`: mean 92,189.32 events/sec, median 92,189.32, stdev 1,804.84, repeats 2
 
 ## Release Skeleton
 
 - release-package command now emits `release-manifest.json` and `checksums.sha256`
 - release-package can optionally emit `release-signature.json`
 - package output stays separate from future signed release artifacts
+
+## Install Guide
+
+- `docs/self-host-install-guide.md` now covers the local install, upgrade, and operator-owned secret model.

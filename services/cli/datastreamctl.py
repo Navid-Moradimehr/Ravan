@@ -11,6 +11,7 @@ import argparse
 from dataclasses import asdict
 import json
 import os
+import platform
 import sys
 from typing import Any
 from pathlib import Path
@@ -89,6 +90,26 @@ def _http_get(url: str, timeout: float = 2.0) -> tuple[int, Any]:
 
 def _print_row(label: str, value: Any) -> None:
     print(f"{label:<22}{value}")
+
+
+def _host_profile() -> dict[str, Any]:
+    memory_gb = None
+    try:
+        import psutil  # type: ignore
+
+        memory_gb = round(psutil.virtual_memory().total / (1024**3), 2)
+    except Exception:
+        memory_gb = None
+    return {
+        "hostname": platform.node(),
+        "platform": platform.platform(),
+        "system": platform.system(),
+        "release": platform.release(),
+        "machine": platform.machine(),
+        "processor": platform.processor(),
+        "cpu_count": os.cpu_count(),
+        "memory_gb": memory_gb,
+    }
 
 
 def _parse_tables(value: str | None) -> list[str] | None:
@@ -300,7 +321,9 @@ def _write_site_profile_matrix_report(report_dir: str, result: Any) -> list[Path
     output_dir = Path(report_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
+    host_profile = _host_profile()
     summary = {
+        "host_profile": host_profile,
         "passed": result.passed,
         "runs": [
             {
@@ -323,6 +346,9 @@ def _write_site_profile_matrix_report(report_dir: str, result: Any) -> list[Path
     summary_path = output_dir / "site-profile-matrix-summary.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     written.append(summary_path)
+    host_profile_path = output_dir / "host-profile.json"
+    host_profile_path.write_text(json.dumps(host_profile, indent=2), encoding="utf-8")
+    written.append(host_profile_path)
     for run in summary["runs"]:
         site_path = output_dir / f"{run['site_id']}.json"
         site_path.write_text(json.dumps(run, indent=2), encoding="utf-8")
@@ -334,7 +360,9 @@ def _write_site_profile_calibration_report(report_dir: str, result: Any) -> list
     output_dir = Path(report_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
+    host_profile = _host_profile()
     summary = {
+        "host_profile": host_profile,
         "passed": result.passed,
         "benchmark": {
             "passed": result.benchmark.passed,
@@ -377,6 +405,9 @@ def _write_site_profile_calibration_report(report_dir: str, result: Any) -> list
     summary_path = output_dir / "site-profile-calibration-summary.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     written.append(summary_path)
+    host_profile_path = output_dir / "host-profile.json"
+    host_profile_path.write_text(json.dumps(host_profile, indent=2), encoding="utf-8")
+    written.append(host_profile_path)
     return written
 
 

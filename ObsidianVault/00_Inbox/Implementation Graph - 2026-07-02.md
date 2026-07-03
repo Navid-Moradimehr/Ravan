@@ -127,8 +127,8 @@ graph TD
   - plant-a: 59,253.75 events/sec, passed
   - overall: passed
 - `site-profile-matrix --site-ids demo-site,plant-a --events 1000 --batch-size 64 --warmup-events 0 --min-average-events-per-second 1 --repeat-count 2`
-  - demo-site: mean 92,118.08 events/sec, median 92,118.08, stdev 1,071.01, p99 0.0185 ms
-  - plant-a: mean 93,961.76 events/sec, median 93,961.76, stdev 1,167.15, p99 0.0248 ms
+  - demo-site: mean 90,392.42 events/sec, median 90,392.42, stdev 6,175.55, p99 0.0152 ms
+  - plant-a: mean 92,189.32 events/sec, median 92,189.32, stdev 1,804.84, p99 0.0213 ms
   - overall: passed
 - `project-manifest rollout-acceptance config/project-manifest.yaml --site-ids demo-site,plant-a --events 20 --batch-size 4 --min-average-events-per-second 1 --skip-network --skip-backup`
   - demo-site: release-gate passed, benchmark passed at 48,558.93 events/sec

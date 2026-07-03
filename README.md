@@ -125,6 +125,7 @@ against realistic industrial batches without depending on a live model server.
 - `docs/app-functionality.md` explains the platform in plain language: what each part does, its inputs and outputs, and how users interact with it.
 - `docs/feature-audit.md` lists the implemented feature set and current completion status.
 - `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
+- `docs/self-host-install-guide.md` gives the operator-facing local install and upgrade flow.
 - `docs/multi-site-rollout.md` defines the production-hardening plan for multi-site industrial deployment.
 - `docs/model-agent-roadmap.md` defines the production model stack plan, including LLM roles, future agent infrastructure, and production gaps.
 - `services/api_service/routers/modeling.py` exposes the read-only model, prompt, tool, and context contract surface.

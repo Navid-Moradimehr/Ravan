@@ -1,5 +1,25 @@
 # Implementation Log
 
+## 2026-07-03 - Install Guide And Host-Profile Benchmark Reporting
+
+### Changed
+
+1. **Self-host install guide**
+   - Added `docs/self-host-install-guide.md` with a concrete operator install and upgrade flow for Linux and Windows.
+   - The guide focuses on local ownership of secrets, config, data, logs, models, and backups.
+
+2. **Benchmark host profile**
+   - Added host-profile metadata to the site-profile benchmark report exports.
+   - The benchmark artifacts now capture CPU, memory, and platform context so the local results stay clearly separated from target-hardware sizing claims.
+
+### Verified
+
+- `uv run python -m pytest tests/test_datastreamctl.py tests/test_project_manifest.py`: passed
+- `python -m compileall services`: passed
+- `uv run python -m services.cli.datastreamctl benchmark site-profile-matrix --manifest config/project-manifest.yaml --csv data/benchmarks/industrial_mixed_benchmark.csv --site-ids demo-site,plant-a --events 1000 --batch-size 64 --warmup-events 0 --min-average-events-per-second 1 --repeat-count 2 --report-dir %TEMP%\\datastream-matrix-report`
+  - `demo-site`: mean 90,392.42 events/sec, median 90,392.42, stdev 6,175.55, p99 0.0152 ms
+  - `plant-a`: mean 92,189.32 events/sec, median 92,189.32, stdev 1,804.84, p99 0.0213 ms
+
 ## 2026-07-03 - Backup Drill Reports, Release Package Skeleton, And Repeat-Run Matrix
 
 ### Changed

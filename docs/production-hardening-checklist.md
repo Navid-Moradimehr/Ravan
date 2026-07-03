@@ -33,7 +33,7 @@ This checklist turns the current roadmap into a concrete execution track for a s
 - [x] Keep generated bundles available for flat, systemd, Kubernetes, and packaged site layouts.
 - [x] Publish release-artifact skeletons with versioned runtime bundles.
 - [x] Add signed release outputs for operators who need verification.
-- [ ] Provide one-click-ish install guidance without hiding configuration ownership.
+- [x] Provide one-click-ish install guidance without hiding configuration ownership.
 
 ## 4. Real-World Simulator and Benchmarks
 
@@ -49,5 +49,4 @@ This checklist turns the current roadmap into a concrete execution track for a s
 
 1. Measure restore and rollback drills on at least two site profiles.
 2. Validate the rollout and benchmark baseline on target hardware.
-3. Provide one-click-ish install guidance without hiding configuration ownership.
-4. Keep the release-package skeleton separate from the eventual signed installer pipeline.
+3. Keep the release-package skeleton separate from the eventual signed installer pipeline.

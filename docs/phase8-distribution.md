@@ -336,6 +336,8 @@ Run without installing:
 python -m services.cli.datastreamctl scenarios
 ```
 
+For the operator install and upgrade path, see `docs/self-host-install-guide.md`.
+
 ### What this unlocks
 
 - a scriptable, browser-free operator surface for industrial and SSH environments
