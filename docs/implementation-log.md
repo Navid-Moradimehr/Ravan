@@ -1,5 +1,20 @@
 # Implementation Log
 
+## 2026-07-03 - Deployment Decision Memo And WSL2 Guidance
+
+### Changed
+
+1. **Deployment memo**
+   - Added `docs/deployment-decision-memo.md` to record the recommended native, service-first install path.
+
+2. **WSL2 guidance**
+   - Clarified that WSL2 is a developer convenience for Windows workstations, not a required production dependency.
+   - Updated the self-host install guide and README to reflect the native Windows/Linux production recommendation.
+
+### Verified
+
+- Documentation-only change; no runtime behavior changed.
+
 ## 2026-07-03 - Install Guide And Host-Profile Benchmark Reporting
 
 ### Changed

@@ -30,6 +30,7 @@
 - site-profile matrix/calibration benchmarks can export report directories for archiving
 - benchmark report exports now include host-profile metadata for local-vs-target separation
 - self-host install guidance is documented for Linux and Windows operators
+- WSL2 is now explicitly treated as a developer convenience, not a production dependency
 - rollout acceptance report export is now available for archiveable per-site runs
 - the simulator now includes multi-PLC, burst, and reconnect cases
 - self-hosted secrets guidance is already documented for Docker, systemd, and Kubernetes
@@ -58,3 +59,4 @@
 ## Install Guide
 
 - `docs/self-host-install-guide.md` now covers the local install, upgrade, and operator-owned secret model.
+- `docs/deployment-decision-memo.md` records the native Windows/Linux recommendation and the WSL2 boundary.

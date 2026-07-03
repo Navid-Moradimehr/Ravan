@@ -233,6 +233,8 @@ For open-source adoption, the release should include:
 - contribution guide
 - compatibility matrix for Windows and Linux
 
+For the deployment recommendation and WSL2 guidance, see `docs/deployment-decision-memo.md`.
+
 ## Air-Gapped Support
 
 This matters for industrial users.

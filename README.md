@@ -1,6 +1,6 @@
 # Local Stream Engine
 
-Local Stream Engine is a WSL2-first real-time data platform inspired by CGR/GITA Streaming and BI product capabilities: industrial edge ingestion, low-latency streaming, stateful processing, operational analytics, and AI-assisted insight generation.
+Local Stream Engine is a self-hosted real-time data platform inspired by CGR/GITA Streaming and BI product capabilities: industrial edge ingestion, low-latency streaming, stateful processing, operational analytics, and AI-assisted insight generation.
 
 ## Architecture
 
@@ -35,6 +35,8 @@ the remaining application surface without changing the public API.
 - Observability: Prometheus and Grafana
 - UI: Next.js, TypeScript, Tailwind CSS, shadcn/ui
 - UI observability: live charts for throughput, AI latency, protocol mix, severity mix, and Grafana health
+
+The recommended production install is native on Windows Server / industrial PCs or Linux servers. WSL2 is useful for local development and demos, but it should not be a required production dependency or bundled as part of the installer unless the deployment target is explicitly a developer workstation.
 
 ## Quick Start
 

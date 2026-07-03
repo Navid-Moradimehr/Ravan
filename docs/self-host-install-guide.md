@@ -60,6 +60,8 @@ Then install the generated `systemd/install.sh` on the target host.
 
 Use the same package export flow and keep the runtime rooted under a local directory that the operator controls.
 
+Do not require WSL2 for the production install. If a team wants WSL2 for development or demos, treat it as an optional workstation convenience, not a bundled runtime dependency.
+
 ## Upgrade flow
 
 1. Stop the runtime.
