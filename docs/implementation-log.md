@@ -85,6 +85,26 @@
 - The semantic plane is now durable enough for production deployment while still staying compatible with the current single-node install path.
 - AI and retrieval now have direct access to semantic context without requiring a separate ad hoc store.
 
+## 2026-07-04 - Industrial Benchmark Fixture Hardening
+
+### Changed
+
+1. **Benchmark inputs**
+   - Updated the benchmark tests to use `data/benchmarks/industrial_mixed_benchmark.csv` as the shared industrial fixture instead of tiny hand-written two-row samples.
+   - The real-world simulator test now exercises `mock-normal`, `mock-drift`, `mock-spike`, `multi-plc-line`, `burst-load`, `dropout-reconnect`, and `industrial-benchmark`.
+
+2. **Repeat-run stability**
+   - Ran the benchmark suite with repeated measurements and recorded the median throughput and p99 values to reduce single-run noise.
+
+### Verified
+
+- `.venv\\Scripts\\python.exe -m pytest tests/test_mixed_replay_benchmark.py tests/test_end_to_end_pipeline_benchmark.py tests/test_real_world_simulator_benchmark.py tests/test_site_profile_matrix_benchmark.py -q`
+  - `4 passed`
+
+### Notes
+
+- The benchmark suite now reflects actual industrial-shaped event streams more closely, but it is still a local single-node approximation rather than live plant telemetry.
+
 ## 2026-07-03 - OS Packaging Scripts And Windows Bundle Export
 
 ### Changed

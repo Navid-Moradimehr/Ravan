@@ -7,6 +7,34 @@
 - **Broker**: Kafka KRaft
 - **Historian**: TimescaleDB
 
+## Industrial Dataset Rerun
+
+- **Date**: 2026-07-04
+- **Scope**: repeated runs over the repo's mixed industrial benchmark CSV and the protocol-shaped simulator cases (`mock-normal`, `mock-drift`, `mock-spike`, `multi-plc-line`, `burst-load`, `dropout-reconnect`, `industrial-benchmark`)
+
+### Latest Benchmark Run
+
+| Benchmark | Median events/sec | Median p99 ms | Notes |
+|-----------|-------------------|---------------|-------|
+| Real-world simulator average | 89,720.82 | 0.0216 | median of 3 runs over the multi-case simulator suite |
+| Production pipeline `python-fallback` | 42,448.19 | 0.0410 | median of 3 runs over the mixed industrial dataset |
+| Production pipeline `flink-local` | 51,248.20 | 0.0324 | median of 3 runs over the mixed industrial dataset |
+| Site profile matrix `demo-site` | 90,922.74 | 0.0214 | repeat count 3, passed |
+| Site profile matrix `plant-a` | 91,818.77 | 0.0221 | repeat count 3, passed |
+
+### Comparison To Prior Recorded Baseline
+
+- Real-world simulator average improved by `60.66%` versus the prior recorded `55,838.30` median.
+- Production pipeline `python-fallback` improved by `75.23%` versus the prior recorded `24,224.33` median.
+- Production pipeline `flink-local` improved by `186.84%` versus the prior recorded `17,865.50` median.
+- Both site profiles remained above threshold and passed with repeat-count smoothing.
+
+### Interpretation
+
+- The benchmark suite is no longer using hand-written two-row samples; it now exercises the repo's mixed industrial CSV plus protocol-shaped simulator cases.
+- The Python fallback remains competitive on this host, but the Flink-local contract now shows a meaningful gain over the last recorded baseline run.
+- These are still single-node local measurements, so they validate product shape and regression behavior, not final plant sizing.
+
 ## Kafka Migration Session
 
 - **Date**: 2026-07-04
