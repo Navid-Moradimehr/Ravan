@@ -36,6 +36,8 @@
 - The single-node Flink local benchmark is 6.32 percent slower than the Python fallback on this host.
 - The CGR gap report still shows the project far below a 2,000,000 events/sec broker-centric target, but the local suite is now validating the full product path rather than a broker-only slice.
 - The current bottleneck is no longer broker naming or aliasing; it is the single-node Python/serialization/historian stack and the non-production benchmark topology.
+- The apples-to-apples multi-PLC benchmark from 2026-07-03 now measures 62,920.94 events/sec, which is 32.61 percent below the earlier 93,370.10 baseline.
+- Function-level profiling shows the hot path is dominated by `map_row_to_event`, Pydantic validation, normalization, and JSON serialization rather than the windowing math.
 
 ## Real-World Simulator Baseline
 

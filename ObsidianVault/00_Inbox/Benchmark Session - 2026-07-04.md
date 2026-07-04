@@ -17,6 +17,8 @@
 - The second run in this session improved the real-world simulator average by 12.41 percent over the first run.
 - `flink-local` is 6.32 percent slower than `python-fallback` on this single-node host.
 - The benchmark gap is dominated by the local topology and serialization/sink work, not by broker naming or aliasing.
+- The exact 2026-07-03 multi-PLC benchmark shape now measures 62,920.94 events/sec, which is 32.61 percent below the earlier 93,370.10 baseline.
+- cProfile points to `map_row_to_event`, Pydantic validation, normalization, and JSON serialization as the heaviest cumulative costs in the replay path.
 
 ## Notes
 
