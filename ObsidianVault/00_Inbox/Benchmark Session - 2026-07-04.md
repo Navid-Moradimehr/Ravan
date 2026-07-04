@@ -23,6 +23,11 @@
   - `flink-runtime-slice` median: 25,741.62 events/sec
   - `cgr-stream-slice` median: 24,260.30 events/sec
 
+- Component split rerun inside the container runtime:
+  - processor math only median: 198,735.35 events/sec
+  - historian batch write median: 13,138.78 events/sec
+  - Kafka producer send median: 299,214.93 events/sec
+
 ## Comparison
 
 - The real-world simulator run is 43.04 percent below the prior real-world simulator baseline in `docs/benchmark-results.md`.
@@ -35,6 +40,7 @@
 - The mapping-compile experiment was then removed from the codebase to avoid carrying extra complexity for a non-result.
 - The corrected hot-path rerun shows the isolated Flink slice and CGR slice improved on median, but the full real-world simulator and `flink-local` production path still do not match the earlier best runs.
 - The `production-pipeline` `flink-local` mode is a thin wrapper around the same runtime slice benchmark, so the gap between those two numbers is not a separate execution problem; it is mostly run variance.
+- The component split makes the bottleneck plain: historian writes are the slowest live subsystem; processor math is not the cap; Kafka publish is above historian throughput on this host.
 
 ## Notes
 

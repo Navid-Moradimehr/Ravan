@@ -78,6 +78,24 @@
 - The full real-world simulator still trails the earlier best numbers, so the remaining gap is now outside the isolated slice and likely tied to surrounding orchestration and single-node variance.
 - `production-pipeline` in `flink-local` is only a thin wrapper around `flink-runtime-slice`; the gap between those two measurements is not structural and falls within host/process variance on repeated runs.
 
+### Component Split Rerun
+
+- **Date**: 2026-07-04
+- **Scope**: isolate processor math, historian batch writes, and Kafka producer overhead inside the container runtime
+
+| Component | Median throughput | Notes |
+|-----------|-------------------|-------|
+| Processor math only | 198,735.35 events/sec | `RollingWindowState.append` + `build_runtime_event_payload` in-process |
+| Historian batch write | 13,138.78 events/sec | `insert_processed_events` into live Docker-backed TimescaleDB |
+| Kafka producer send | 299,214.93 events/sec | `Producer.produce` + `poll(0)` to a created Kafka topic |
+
+### Component Split Notes
+
+- The processor math is no longer the bottleneck.
+- Historian writes are the slowest isolated piece in the live stack.
+- Kafka producer send cost is high but still well above the historian sink; on this host, the DB write path is the tighter cap than broker publish.
+- The live historian batch path improved compared with the earlier recorded live DB benchmark, but it still sits far below the in-process processor path.
+
 ## Real-World Simulator Baseline
 
 - **Date**: 2026-07-03
