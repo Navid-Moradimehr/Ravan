@@ -26,6 +26,8 @@ def test_split_domain_routes_registered():
         "/api/v1/search/hybrid",
         "/api/v1/search/index/rebuild",
         "/api/v1/search/index/evaluate",
+        "/api/v1/semantic/core",
+        "/api/v1/semantic/graph",
         "/api/v1/retrieval/catalog",
         "/api/v1/retrieval/search",
         "/api/v1/digital-twin/scenes/{scene_id}",

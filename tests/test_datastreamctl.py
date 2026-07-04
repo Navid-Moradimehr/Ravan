@@ -837,6 +837,40 @@ class TestDatastreamctl:
         assert "serialized_bytes=" in out
         assert "keyed_state_enrichment" in out
 
+    def test_benchmark_semantic_graph_slice_runs(self, monkeypatch, tmp_path):
+        hierarchy_path = tmp_path / "assets.yaml"
+        hierarchy_path.write_text("sites: []", encoding="utf-8")
+        monkeypatch.setattr(
+            ctl,
+            "run_semantic_graph_slice_benchmark",
+            lambda *args, **kwargs: SimpleNamespace(
+                hierarchy_path=str(hierarchy_path),
+                iterations=100,
+                warmup_iterations=10,
+                entity_count=7,
+                relationship_count=6,
+                measurement_count=9,
+                elapsed_seconds=0.01,
+                graphs_per_second=10_000.0,
+                entities_per_second=70_000.0,
+                relationships_per_second=60_000.0,
+            ),
+        )
+        rc, out = self._run([
+            "benchmark",
+            "semantic-graph-slice",
+            "--hierarchy",
+            str(hierarchy_path),
+            "--iterations",
+            "100",
+            "--warmup-iterations",
+            "10",
+        ])
+        assert rc == 0
+        assert "semantic graph slice benchmark" in out
+        assert "graphs_per_second=" in out
+        assert "entity_count=7" in out
+
     def test_benchmark_end_to_end_pipeline_runs(self, monkeypatch, tmp_path):
         csv_path = tmp_path / "mock.csv"
         csv_path.write_text(

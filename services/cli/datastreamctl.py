@@ -34,6 +34,8 @@ from services.benchmarks.production_pipeline import format_result as format_prod
 from services.benchmarks.production_pipeline import run_benchmark as run_production_pipeline_benchmark
 from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
 from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
+from services.benchmarks.semantic_graph_slice import format_result as format_semantic_graph_slice_result
+from services.benchmarks.semantic_graph_slice import run_benchmark as run_semantic_graph_slice_benchmark
 from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
 from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
 from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
@@ -1370,6 +1372,33 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("=" * 40)
             print(format_flink_runtime_slice_result(result))
         return 0
+    if args.action == "semantic-graph-slice":
+        result = run_semantic_graph_slice_benchmark(
+            Path(args.hierarchy),
+            iterations=args.iterations,
+            warmup_iterations=args.warmup_iterations,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "hierarchy_path": result.hierarchy_path,
+                    "iterations": result.iterations,
+                    "warmup_iterations": result.warmup_iterations,
+                    "entity_count": result.entity_count,
+                    "relationship_count": result.relationship_count,
+                    "measurement_count": result.measurement_count,
+                    "elapsed_seconds": result.elapsed_seconds,
+                    "graphs_per_second": result.graphs_per_second,
+                    "entities_per_second": result.entities_per_second,
+                    "relationships_per_second": result.relationships_per_second,
+                },
+                indent=2,
+            ))
+        else:
+            print("semantic graph slice benchmark")
+            print("=" * 40)
+            print(format_semantic_graph_slice_result(result))
+        return 0
     if args.action == "production-pipeline":
         result = run_production_pipeline_benchmark(
             Path(args.csv),
@@ -1684,6 +1713,12 @@ def build_parser() -> argparse.ArgumentParser:
     flink_runtime_slice.add_argument("--window-limit", type=int, default=25)
     flink_runtime_slice.add_argument("--json", action="store_true")
     flink_runtime_slice.set_defaults(func=cmd_benchmark)
+    semantic_graph_slice = benchmark_sub.add_parser("semantic-graph-slice", help="Benchmark semantic graph projection from the industrial hierarchy")
+    semantic_graph_slice.add_argument("--hierarchy", default=str(Path("config/assets.yaml")))
+    semantic_graph_slice.add_argument("--iterations", type=int, default=1_000)
+    semantic_graph_slice.add_argument("--warmup-iterations", type=int, default=100)
+    semantic_graph_slice.add_argument("--json", action="store_true")
+    semantic_graph_slice.set_defaults(func=cmd_benchmark)
     production_pipeline = benchmark_sub.add_parser("production-pipeline", help="Benchmark the selected production runtime mode")
     production_pipeline.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
     production_pipeline.add_argument("--events", type=int, default=10_000)

@@ -89,6 +89,11 @@ class AssetHierarchy:
                             tags.extend(asset.tags.values())
         return tags
 
+    def to_semantic_graph(self, source_uri: str | None = None):
+        from services.common.semantic_core import SemanticGraph
+
+        return SemanticGraph.from_asset_hierarchy(self, source_uri=source_uri or "config/assets.yaml")
+
 
 def _load_tag(tag_data: dict[str, Any]) -> TagMetadata:
     return TagMetadata(

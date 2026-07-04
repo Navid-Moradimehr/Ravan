@@ -1,5 +1,23 @@
 # Implementation Log
 
+## 2026-07-04 - Universal Semantic Core And Graph Projection
+
+### Changed
+
+1. **Universal semantic core**
+   - Added `services/common/semantic_core.py` with platform primitives, ontology packs, and a semantic graph projection model.
+   - The current industrial hierarchy now projects into a universal graph without replacing the existing manufacturing-specific data model.
+
+2. **Semantic API surface**
+   - Added `/api/v1/semantic/core` and `/api/v1/semantic/graph` so the platform can expose the semantic substrate directly.
+
+3. **Benchmark coverage**
+   - Added a semantic-graph projection benchmark so the new abstraction has its own measurement path.
+
+### Notes
+
+- The current manufacturing ontology remains intact. The new semantic layer is additive and is intended to become the platform core over time.
+
 ## 2026-07-03 - OS Packaging Scripts And Windows Bundle Export
 
 ### Changed
