@@ -13,7 +13,7 @@ async def main() -> None:
 
     settings = Settings()
     stop_event = asyncio.Event()
-    publisher = EdgePublisher(settings)
+    publisher = EdgePublisher(settings, batch_size=settings.historian_batch_size)
     start_http_server(settings.metrics_port)
 
     loop = asyncio.get_running_loop()

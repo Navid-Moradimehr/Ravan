@@ -96,6 +96,28 @@
 - Kafka producer send cost is high but still well above the historian sink; on this host, the DB write path is the tighter cap than broker publish.
 - The live historian batch path improved compared with the earlier recorded live DB benchmark, but it still sits far below the in-process processor path.
 
+### Historian Batch Sweep
+
+Command:
+
+```bash
+docker compose -f docker/docker-compose.yml exec -T processor sh -lc "cd /app && python - <<'PY' ... PY"
+```
+
+Latest local run in the processor container:
+
+| Batch size | Median events/sec | Mean events/sec |
+|------------|-------------------|-----------------|
+| 256 | 12,604.50 | 12,284.52 |
+| 512 | 9,903.92 | 10,758.17 |
+| 1024 | 16,831.34 | 16,689.27 |
+
+Interpretation:
+
+- `1024` was the best batch size in this sweep.
+- The runtime defaults were updated to use this setting for the processor and edge ingest historian buffers.
+- This is a low-risk gain because it changes buffering, not the storage schema or write contract.
+
 ## Real-World Simulator Baseline
 
 - **Date**: 2026-07-03

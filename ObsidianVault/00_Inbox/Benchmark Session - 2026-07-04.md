@@ -28,6 +28,11 @@
   - historian batch write median: 13,138.78 events/sec
   - Kafka producer send median: 299,214.93 events/sec
 
+- Historian batch sweep inside the processor container:
+  - batch size 256 median: 12,604.50 events/sec
+  - batch size 512 median: 9,903.92 events/sec
+  - batch size 1024 median: 16,831.34 events/sec
+
 ## Comparison
 
 - The real-world simulator run is 43.04 percent below the prior real-world simulator baseline in `docs/benchmark-results.md`.
@@ -41,6 +46,7 @@
 - The corrected hot-path rerun shows the isolated Flink slice and CGR slice improved on median, but the full real-world simulator and `flink-local` production path still do not match the earlier best runs.
 - The `production-pipeline` `flink-local` mode is a thin wrapper around the same runtime slice benchmark, so the gap between those two numbers is not a separate execution problem; it is mostly run variance.
 - The component split makes the bottleneck plain: historian writes are the slowest live subsystem; processor math is not the cap; Kafka publish is above historian throughput on this host.
+- The historian sink wants larger batches here, and `1024` was the best value in the sweep, so the runtime defaults were updated to use it.
 
 ## Notes
 

@@ -34,3 +34,4 @@ class Settings:
     modbus_host: str = os.getenv("MODBUS_HOST", "localhost")
     modbus_port: int = int(os.getenv("MODBUS_PORT", "5020"))
     poll_seconds: float = float(os.getenv("EDGE_POLL_SECONDS", "1"))
+    historian_batch_size: int = int(os.getenv("EDGE_HISTORIAN_BATCH_SIZE", "1024"))
