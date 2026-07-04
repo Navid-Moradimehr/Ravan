@@ -910,6 +910,37 @@ def list_semantic_lineage(*, site_id: str | None = None, limit: int = 100) -> li
     return rows[: max(1, limit)]
 
 
+def insert_audit_log(event: dict[str, Any]) -> dict[str, Any]:
+    row = (
+        event.get("time") or _utc_now(),
+        event.get("user_id", ""),
+        event.get("action", ""),
+        event.get("resource", ""),
+        Json(event.get("details", {})),
+    )
+
+    def do_write() -> None:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO audit_logs (time, user_id, action, resource, details)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    row,
+                )
+            conn.commit()
+
+    _execute_with_retry("audit_logs", do_write)
+    return {
+        "time": row[0],
+        "user_id": row[1],
+        "action": row[2],
+        "resource": row[3],
+        "details": event.get("details", {}),
+    }
+
+
 # Data retention and compression policies
 import logging
 logger = logging.getLogger(__name__)

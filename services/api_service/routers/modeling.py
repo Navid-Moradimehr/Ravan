@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from services.common.agent_runtime import build_agent_runtime_contract
 from services.common.agent_tools import build_context_package, tool_registry
 from services.common.modeling import ModelRegistry
 from services.common.prompt_registry import prompt_registry
@@ -46,3 +47,7 @@ async def get_context(
         site_profile_path=Path(site_profile) if site_profile else None,
     )
 
+
+@router.get("/api/v1/modeling/agent-runtime")
+async def get_agent_runtime() -> dict[str, Any]:
+    return build_agent_runtime_contract()

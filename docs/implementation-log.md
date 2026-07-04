@@ -129,6 +129,23 @@
 - This hardens the distributed path without changing the single-node default behavior.
 - The platform is now clearer about where semantic data should live in plant-local and federated rollouts.
 
+## 2026-07-04 - Agent Runtime Contract And Release Checklist
+
+### Changed
+
+1. **Agent runtime infrastructure**
+   - Added `services/common/agent_runtime.py` with a read-only diagnostic runtime contract, supervised action runtime scaffold, and audited tool-call records.
+   - Exposed the runtime contract through `/api/v1/modeling/agent-runtime`.
+   - Added historian audit-log persistence support for agent-assisted tool and action records.
+
+2. **Release checklist**
+   - Added `docs/production-readiness-action-plan.md` and the matching Obsidian note so the readiness report now has owners, exit criteria, and execution order.
+
+### Notes
+
+- The platform still does not ship a diagnostic agent or supervised action agent.
+- It now ships the infrastructure and policy surface that user-built agents can integrate with safely.
+
 ## 2026-07-03 - OS Packaging Scripts And Windows Bundle Export
 
 ### Changed

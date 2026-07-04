@@ -20,6 +20,7 @@ def test_split_domain_routes_registered():
         "/api/v1/modeling/tools",
         "/api/v1/modeling/prompts",
         "/api/v1/modeling/context",
+        "/api/v1/modeling/agent-runtime",
         "/api/v1/search/catalog",
         "/api/v1/search/plan",
         "/api/v1/search/semantic",

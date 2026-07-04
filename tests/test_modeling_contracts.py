@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from services.common.agent_tools import build_context_package, tool_registry
+from services.common.agent_runtime import DiagnosticAgentRuntime, build_agent_runtime_contract
 from services.common.modeling import ModelRegistry
 from services.common.semantic_core import SemanticEntity, SemanticGraph
 from services.common.prompt_registry import prompt_registry
@@ -114,3 +115,43 @@ federation:
     assert context["model_roles"]["validation_errors"] == []
     assert context["semantic"]["counts"]["entities"] >= 1
     assert context["semantic"]["matches"]["counts"]["entities"] >= 1
+
+
+def test_agent_runtime_contract_is_read_only():
+    contract = build_agent_runtime_contract()
+    diagnostic_policy = contract["diagnostic_policy"]
+    action_policy = contract["action_policy"]
+    assert diagnostic_policy["read_only"] is True
+    assert diagnostic_policy["allowed_tools"]
+    assert all(tool.startswith(("historian.", "assets.", "reports.", "scenarios.", "semantic.")) for tool in diagnostic_policy["allowed_tools"])
+    assert action_policy["approval_required"] is True
+    assert action_policy["read_only"] is False
+
+
+def test_diagnostic_runtime_records_read_only_tool_calls(monkeypatch):
+    import services.common.agent_runtime as agent_runtime
+
+    captured = []
+    monkeypatch.setattr(agent_runtime, "insert_audit_log", lambda event: captured.append(event) or event)
+
+    runtime = DiagnosticAgentRuntime(actor_id="agent-1", site_id="demo-site")
+    call = runtime.record_tool_call(
+        call_id="call-1",
+        tool_name="historian.recent_events",
+        arguments={"limit": 5},
+        result_summary="ok",
+        metadata={"source": "test"},
+    )
+
+    assert call.approved is True
+    assert captured and captured[0]["action"] == "agent_tool_call"
+    assert captured[0]["details"]["approved"] is True
+
+
+def test_diagnostic_runtime_rejects_non_read_only_tools():
+    runtime = DiagnosticAgentRuntime(actor_id="agent-1")
+    try:
+        runtime.record_tool_call(call_id="call-2", tool_name="connectors.write", arguments={})
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
