@@ -55,8 +55,6 @@ class DeadLetterEvent(BaseModel):
     payload: dict[str, Any] | str
     ts_ingest: str = Field(default_factory=lambda: utc_now())
     schema_version: int = 1
-
-
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 

@@ -57,6 +57,26 @@
 - This change was rolled back in the codebase after the measurement pass because it did not deliver a durable throughput win.
 - The benchmark noise on this machine is still large enough that any sub-5 percent delta should be treated cautiously.
 
+### Hot Path Correction Rerun
+
+- **Date**: 2026-07-04
+- **Scope**: keep the validated model, normalize from `model_dump(mode="python")`, and rerun the same 10k benchmarks three times
+
+| Benchmark | Median events/sec | Prior recorded baseline | Change |
+|-----------|-------------------|-------------------------|--------|
+| Real-world simulator average | 55,838.30 | 62,920.94 | `-11.26%` |
+| Production pipeline `python-fallback` | 24,224.33 | 20,344.35 | `+19.07%` |
+| Production pipeline `flink-local` | 17,865.50 | 23,383.44 | `-23.60%` |
+| Flink runtime slice | 25,741.62 | 22,538.39 | `+14.21%` |
+| CGR stream slice | 24,260.30 | 21,403.10 | `+13.35%` |
+
+### Hot Path Interpretation
+
+- Normalizing from the Pydantic model directly was slower and was not kept.
+- The dict-based normalization path is the correct one for this codebase.
+- The isolated Flink slice and CGR slice improved on median, which means the shared runtime shape is helping the hot path.
+- The full real-world simulator and `flink-local` production path still trail the earlier best numbers, so the remaining gap is now outside the isolated slice and likely tied to surrounding orchestration and single-node variance.
+
 ## Real-World Simulator Baseline
 
 - **Date**: 2026-07-03

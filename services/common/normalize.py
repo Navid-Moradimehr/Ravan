@@ -12,7 +12,13 @@ def _to_float(value: Any) -> float:
         return 0.0
 
 
-def normalize_runtime_event(event: dict[str, Any]) -> dict[str, Any]:
+def normalize_runtime_event(event: dict[str, Any] | Any) -> dict[str, Any]:
+    if not isinstance(event, dict):
+        if hasattr(event, "model_dump"):
+            event = event.model_dump(mode="python")
+        else:
+            event = dict(event)
+
     if "device_id" in event:
         return event
 
@@ -48,19 +54,23 @@ def normalize_runtime_event(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def to_legacy_iot_event(event: dict[str, Any] | Any) -> dict[str, Any]:
-    event_dict = event.model_dump() if hasattr(event, "model_dump") else dict(event)
+    if not isinstance(event, dict):
+        if hasattr(event, "model_dump"):
+            event = event.model_dump(mode="python")
+        else:
+            event = dict(event)
 
-    tag = str(event_dict.get("tag", ""))
-    value = event_dict.get("value", 0)
+    tag = str(event.get("tag", ""))
+    value = event.get("value", 0)
 
     base = {
-        "event_id": event_dict.get("event_id"),
-        "device_id": event_dict.get("asset_id", "unknown-asset"),
-        "site_id": event_dict.get("site", "demo-site"),
-        "timestamp": event_dict.get("ts_source"),
-        "source_protocol": event_dict.get("source_protocol", "unknown"),
-        "quality": event_dict.get("quality", "unknown"),
-        "schema_version": event_dict.get("schema_version", 1),
+        "event_id": event.get("event_id"),
+        "device_id": event.get("asset_id", "unknown-asset"),
+        "site_id": event.get("site", "demo-site"),
+        "timestamp": event.get("ts_source"),
+        "source_protocol": event.get("source_protocol", "unknown"),
+        "quality": event.get("quality", "unknown"),
+        "schema_version": event.get("schema_version", 1),
         "temperature_c": 0.0,
         "vibration_mm_s": 0.0,
         "pressure_bar": 0.0,

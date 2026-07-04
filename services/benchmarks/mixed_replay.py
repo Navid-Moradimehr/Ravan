@@ -75,7 +75,7 @@ def _process_row(row: dict[str, str]) -> tuple[dict[str, Any] | None, bytes | No
     if dlq is not None:
         return None, None
 
-    normalized = normalize_runtime_event(event.model_dump(mode="json"))
+    normalized = normalize_runtime_event(event)
     temperature = float(normalized.get("temperature_c", 0))
     vibration = float(normalized.get("vibration_mm_s", 0))
     anomaly_score = score_event(normalized, temperature_avg=temperature, vibration_avg=vibration, detector=None)

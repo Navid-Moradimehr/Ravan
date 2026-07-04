@@ -16,6 +16,13 @@
   - production pipeline `python-fallback`: 20,278.13 events/sec on the repeat run, 21,805.30 on the first run
   - production pipeline `flink-local`: 20,633.02 events/sec on the repeat run, 23,020.73 on the first run
 
+- Hot path correction rerun with 3 passes per benchmark:
+  - real-world simulator median: 55,838.30 events/sec
+  - production pipeline `python-fallback` median: 24,224.33 events/sec
+  - production pipeline `flink-local` median: 17,865.50 events/sec
+  - `flink-runtime-slice` median: 25,741.62 events/sec
+  - `cgr-stream-slice` median: 24,260.30 events/sec
+
 ## Comparison
 
 - The real-world simulator run is 43.04 percent below the prior real-world simulator baseline in `docs/benchmark-results.md`.
@@ -26,6 +33,7 @@
 - cProfile points to `map_row_to_event`, Pydantic validation, normalization, and JSON serialization as the heaviest cumulative costs in the replay path.
 - The mapping-compilation change is not a durable performance win: the repeat run was only slightly better than baseline in the simulator and the production pipeline remained mixed.
 - The mapping-compile experiment was then removed from the codebase to avoid carrying extra complexity for a non-result.
+- The corrected hot-path rerun shows the isolated Flink slice and CGR slice improved on median, but the full real-world simulator and `flink-local` production path still do not match the earlier best runs.
 
 ## Notes
 
