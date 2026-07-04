@@ -11,6 +11,11 @@
   - `cgr_stream_slice`: 21,403.10 events/sec
   - `flink_runtime_slice`: 22,538.39 events/sec
 
+- Mapping compilation rerun:
+  - real-world simulator average: 63,569.61 events/sec on the repeat run, 47,593.64 on the first run
+  - production pipeline `python-fallback`: 20,278.13 events/sec on the repeat run, 21,805.30 on the first run
+  - production pipeline `flink-local`: 20,633.02 events/sec on the repeat run, 23,020.73 on the first run
+
 ## Comparison
 
 - The real-world simulator run is 43.04 percent below the prior real-world simulator baseline in `docs/benchmark-results.md`.
@@ -19,6 +24,8 @@
 - The benchmark gap is dominated by the local topology and serialization/sink work, not by broker naming or aliasing.
 - The exact 2026-07-03 multi-PLC benchmark shape now measures 62,920.94 events/sec, which is 32.61 percent below the earlier 93,370.10 baseline.
 - cProfile points to `map_row_to_event`, Pydantic validation, normalization, and JSON serialization as the heaviest cumulative costs in the replay path.
+- The mapping-compilation change is not a durable performance win: the repeat run was only slightly better than baseline in the simulator and the production pipeline remained mixed.
+- The mapping-compile experiment was then removed from the codebase to avoid carrying extra complexity for a non-result.
 
 ## Notes
 

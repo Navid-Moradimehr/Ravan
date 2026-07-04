@@ -48,7 +48,6 @@ DEFAULT_MAPPING: dict[str, str] = {
     "step": "step",
 }
 
-
 def _load_rows(csv_path: Path) -> list[dict[str, str]]:
     rows = list(read_csv_rows(csv_path))
     if not rows:

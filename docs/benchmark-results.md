@@ -39,6 +39,24 @@
 - The apples-to-apples multi-PLC benchmark from 2026-07-03 now measures 62,920.94 events/sec, which is 32.61 percent below the earlier 93,370.10 baseline.
 - Function-level profiling shows the hot path is dominated by `map_row_to_event`, Pydantic validation, normalization, and JSON serialization rather than the windowing math.
 
+### Mapping Compilation Rerun
+
+- **Date**: 2026-07-04
+- **Scope**: compile the CSV-to-event mapping once per benchmark module and rerun the same slices
+
+| Benchmark | First run events/sec | Second run events/sec | Prior exact baseline | Change vs baseline |
+|-----------|----------------------|-----------------------|----------------------|-------------------|
+| Real-world simulator average | 47,593.64 | 63,569.61 | 62,920.94 | `-24.39%` / `+1.03%` |
+| Production pipeline `python-fallback` | 21,805.30 | 20,278.13 | 20,344.35 | `+7.18%` / `-0.33%` |
+| Production pipeline `flink-local` | 23,020.73 | 20,633.02 | 23,383.44 | `-1.55%` / `-11.76%` |
+
+### Mapping Compilation Notes
+
+- The first real-world simulator run regressed versus the prior exact baseline, then the repeat run slightly exceeded it.
+- The production pipeline results were mixed and did not show a durable gain.
+- This change was rolled back in the codebase after the measurement pass because it did not deliver a durable throughput win.
+- The benchmark noise on this machine is still large enough that any sub-5 percent delta should be treated cautiously.
+
 ## Real-World Simulator Baseline
 
 - **Date**: 2026-07-03

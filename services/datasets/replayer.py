@@ -69,7 +69,10 @@ def filter_rows_by_time(
             yield row
 
 
-def map_row_to_event(row: dict[str, str], mapping: dict[str, str]) -> dict[str, Any]:
+def map_row_to_event(
+    row: dict[str, str],
+    mapping: dict[str, str],
+) -> dict[str, Any]:
     """Map CSV columns to IndustrialEvent fields using the provided mapping."""
     event: dict[str, Any] = {
         "event_id": "",
@@ -89,7 +92,7 @@ def map_row_to_event(row: dict[str, str], mapping: dict[str, str]) -> dict[str, 
     }
     for csv_col, event_field in mapping.items():
         raw = row.get(csv_col, "")
-        if event_field in ("value",):
+        if event_field == "value":
             try:
                 event[event_field] = float(raw)
             except ValueError:
@@ -120,7 +123,6 @@ def replay(config: ReplayConfig) -> None:
     delay = 1 / max(config.rate_per_second, 1)
     produced = 0
     started_at = time.time()
-
     # Time-travel: filter rows by timestamp window
     rows = read_csv_rows(config.csv_path)
     if config.timestamp_column and (config.time_travel_start or config.time_travel_end):

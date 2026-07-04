@@ -30,7 +30,6 @@ DEFAULT_MAPPING: dict[str, str] = {
     "step": "step",
 }
 
-
 @dataclass(frozen=True)
 class StageBenchmarkResult:
     name: str
