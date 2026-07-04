@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     kafka_brokers: str = Field(
         default="localhost:19092",
-        validation_alias=AliasChoices("kafka_brokers", "KAFKA_BROKERS", "REDPANDA_BROKERS"),
+        validation_alias=AliasChoices("kafka_brokers", "KAFKA_BROKERS"),
     )
     processed_topic: str = "iot.processed"
     ai_enriched_topic: str = "iot.ai_enriched"

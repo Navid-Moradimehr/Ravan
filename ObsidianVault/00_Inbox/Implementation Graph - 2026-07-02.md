@@ -10,7 +10,7 @@ Harden the runtime contracts for self-hosted industrial rollout without changing
 graph TD
   A[API Service] --> B[Historian]
   A --> C[Redispatch/WebSockets]
-  D[Edge Ingest] --> E[Redpanda]
+  D[Edge Ingest] --> E[Kafka]
   E --> F[Processor]
   F --> B
   E --> L[Flink Job / Keyed State]

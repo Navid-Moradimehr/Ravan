@@ -4,7 +4,7 @@
 
 - Replaced Redpanda compose service with Kafka KRaft.
 - Replaced Redpanda Console references with Kafka UI.
-- Switched broker env resolution to `KAFKA_BROKERS` with temporary `REDPANDA_BROKERS` compatibility.
+- Switched broker env resolution to `KAFKA_BROKERS` only.
 - Updated the landing page into a routed command center plus dedicated pipeline, processing, historian, observability, and integrations pages.
 - Updated the main runbook and acceptance/test guidance to match the Kafka stack.
 - Added a full historian schema for `industrial_events`, `processed_events`, `ai_enriched`, and `dead_letter_events`.
@@ -13,8 +13,7 @@
 
 ## Still to validate
 
-- Refresh benchmark numbers against the previous Redpanda baseline.
-- Decide whether to keep the temporary `REDPANDA_BROKERS` alias for one release or remove it before tagging.
+- Refresh benchmark numbers against the previous broker baseline.
 - Resolve the local desktop port conflict on `3006` if the dashboard container itself needs to run on that port.
 
 ## Notes

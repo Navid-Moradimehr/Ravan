@@ -201,7 +201,7 @@
 | Solution | Type | License | Notes |
 |----------|------|---------|-------|
 | **Kafka transactions** | Java | Apache 2.0 | Built into Kafka |
-| **Redpanda** | C++ | BSL | Kafka-compatible, supports transactions |
+| **Kafka** | Java/Scala | Apache 2.0 | Standard distributed log, supports transactions |
 | **Flink checkpointing** | Java | Apache 2.0 | Exactly-once with Kafka |
 
 **Recommendation**: Enable Flink checkpointing with Kafka transactions. Already partially supported.

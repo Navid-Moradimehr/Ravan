@@ -4,7 +4,7 @@ This note captures the current architectural decision point for the open-source 
 
 ## What CGR Publicly Presents
 
-The public CGR streaming page describes a managed industrial streaming stack centered on Kafka/Redpanda, Kafka Connect, Schema Registry, Flink, ksqlDB, MQTT bridging, CDC, MirrorMaker 2, tiered storage, and observability. Their public claim is much closer to a tuned multi-node production service than to a local replay harness.
+The public CGR streaming page describes a managed industrial streaming stack centered on Kafka, Kafka Connect, Schema Registry, Flink, ksqlDB, MQTT bridging, CDC, MirrorMaker 2, tiered storage, and observability. Their public claim is much closer to a tuned multi-node production service than to a local replay harness.
 
 The public CGR BI page describes an OLAP-oriented analytics stack centered on ClickHouse/Druid with a LookML-style semantic layer, dashboards, SQL exploration, and governed analytics.
 

@@ -53,7 +53,7 @@ The stage-level split shows the platform is not dominated by Pydantic validation
 
 This project is not directly comparable to a broker-only benchmark because it includes replay, normalization, release gating, calibration, and import tooling in one stack.
 
-### Compared to Kafka / Redpanda style brokers
+### Compared to Kafka-style brokers
 
 - Brokering engines are optimized for raw message throughput and broker durability.
 - This platform adds ingest normalization, historian writes, rollout validation, and operator-facing report generation on top of that.

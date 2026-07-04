@@ -11,7 +11,7 @@ site:
 runtime:
   image_tag: latest
   mode: flink-production
-  redpanda_brokers: redpanda.plant-b.svc.cluster.local:9092
+  kafka_brokers: kafka.plant-b.svc.cluster.local:9092
   historian_backend: timescaledb
   ai:
     provider: vllm

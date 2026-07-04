@@ -990,7 +990,7 @@ Fifth pass focused on deployment: the Helm chart was a single-deployment monolit
 - Full Python suite: 163 passed.
 
 ### Notes
-- The Helm chart assumes dependencies (TimescaleDB, Redpanda) are installed separately or as subcharts.
+- The Helm chart assumes dependencies (TimescaleDB, Kafka) are installed separately or as subcharts.
 - The processor Deployment is headless (no Service) since it only consumes from Kafka and writes to the historian.
 
 ## Real-world correctness review, pass 6 (2026-06-29)
@@ -1016,7 +1016,7 @@ Sixth pass added edge-to-cloud federation — a critical capability for industri
 - Full Python suite: 166 passed.
 
 ### Notes
-- The federation service uses the REST API for cloud transport (simple, works through firewalls/proxies). For high-volume deployments, consider adding a Kafka-based replication path (MirrorMaker 2 or Redpanda replication).
+- The federation service uses the REST API for cloud transport (simple, works through firewalls/proxies). For high-volume deployments, consider adding a Kafka-based replication path (MirrorMaker 2 or cluster-level replication).
 - The cloud historian must expose the batch ingest endpoint and validate the `Authorization: Bearer` header.
 
 ## Real-world correctness review, pass 7 (2026-06-29)

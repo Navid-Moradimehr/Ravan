@@ -11,7 +11,7 @@ site:
 runtime:
   image_tag: latest
   mode: python-fallback
-  redpanda_brokers: localhost:19092
+  kafka_brokers: localhost:19092
   historian_backend: timescaledb
   ai:
     provider: openai_compat

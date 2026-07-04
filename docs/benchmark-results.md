@@ -4,8 +4,38 @@
 - **Date**: 2026-06-30
 - **Platform**: Local Stream Engine (Python 3.11, Windows/WSL2)
 - **Hardware**: Single-node development machine
-- **Broker**: Redpanda (Kafka-compatible)
+- **Broker**: Kafka KRaft
 - **Historian**: TimescaleDB
+
+## Kafka Migration Session
+
+- **Date**: 2026-07-04
+- **Scope**: reran the local benchmark suite after the Kafka migration, UI split, historian schema fix, and broker alias removal.
+
+### Real-World Simulator Run
+
+| Case | Events/sec | p99 ms | Batches | Invalid events |
+|------|------------|--------|---------|----------------|
+| `mock-normal` | 52,238.01 | 0.0368 | 40 | 0 |
+| `mock-drift` | 54,092.85 | 0.0410 | 40 | 0 |
+| `mock-spike` | 55,016.00 | 0.0362 | 40 | 0 |
+| `industrial-benchmark` | 51,382.60 | 0.0396 | 40 | 0 |
+| **Average** | **53,182.36** | **0.0384** | - | - |
+
+### Production Pipeline Run
+
+| Runtime mode | Events/sec | p99 ms | Notes |
+|--------------|------------|--------|-------|
+| `python-fallback` | 19,064.00 | 0.0876 | lower overhead on this single-node host |
+| `flink-local` | 17,859.78 | 0.1007 | Flink contract is wired, but not faster on this host |
+
+### Comparative Notes
+
+- Relative to the previous real-world simulator baseline of 93,370.10 events/sec, the new average is 43.04 percent lower.
+- The second run in this session improved the real-world simulator average by 12.41 percent over the first run, which shows the host is still noisy.
+- The single-node Flink local benchmark is 6.32 percent slower than the Python fallback on this host.
+- The CGR gap report still shows the project far below a 2,000,000 events/sec broker-centric target, but the local suite is now validating the full product path rather than a broker-only slice.
+- The current bottleneck is no longer broker naming or aliasing; it is the single-node Python/serialization/historian stack and the non-production benchmark topology.
 
 ## Real-World Simulator Baseline
 
@@ -756,7 +786,7 @@ Interpretation:
 | Platform | Throughput | Latency | Notes |
 |----------|-----------|---------|-------|
 | Apache Kafka (theoretical max) | 2M+ msgs/sec | <10ms p99 | Bare metal, tuned |
-| Redpanda (this project's broker) | 1M+ msgs/sec | <5ms p99 | C++ implementation |
+| Kafka (current project broker) | 1M+ msgs/sec | <5ms p99 | Standard broker deployment |
 | MQTT brokers (HiveMQ/EMQX) | 1M+ msgs/sec | <5ms | IoT-optimized |
 | Typical Industrial SCADA | 1K-10K tags/sec | 100ms-1s | Legacy protocols |
 | **Local Stream Engine (full pipeline)** | **125K events/sec** | N/A | Python, single-node |

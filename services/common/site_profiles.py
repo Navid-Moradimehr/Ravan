@@ -74,7 +74,6 @@ class SiteProfile:
             "DEPLOYMENT_MODE": self.deployment_mode,
             "RUNTIME_MODE": self.runtime.mode,
             "KAFKA_BROKERS": brokers,
-            "REDPANDA_BROKERS": brokers,
             "HISTORIAN_BACKEND": self.runtime.historian_backend,
             "LLM_PROVIDER": self.runtime.ai.provider,
             "LLM_ENDPOINT_URL": self.runtime.ai.endpoint_url,
@@ -122,7 +121,7 @@ def load_site_profile(path: Path | str) -> SiteProfile:
         runtime=RuntimeProfile(
             image_tag=str(runtime.get("image_tag", "latest")).strip(),
             mode=str(runtime.get("mode", default_runtime_mode)).strip() or default_runtime_mode,
-            kafka_brokers=str(runtime.get("kafka_brokers", runtime.get("redpanda_brokers", ""))).strip(),
+            kafka_brokers=str(runtime.get("kafka_brokers", "")).strip(),
             historian_backend=str(runtime.get("historian_backend", "timescaledb")).strip(),
             ai=AIBackendProfile(
                 provider=str(ai.get("provider", "openai_compat")).strip(),
