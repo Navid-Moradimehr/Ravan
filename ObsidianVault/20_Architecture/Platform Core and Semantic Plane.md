@@ -27,6 +27,9 @@ Keep the current industrial app intact, but project it onto a universal semantic
   - semantic graph entities, relationships, and ontology packs are now included in retrieval/modeling context packages
 - Benchmark realism:
   - benchmark tests now use the mixed industrial CSV fixture and protocol-shaped simulator cases instead of tiny hand-written samples
+- Distributed rollout:
+  - plant-local and federated site profiles now export `SEMANTIC_STORE_BACKEND=db` so the semantic plane is explicitly database-backed in distributed installs
+  - the simulator now includes a dedicated `multi-site-correlation` case for correlated PLC signals across sites
 
 ## Architecture Note
 
@@ -40,3 +43,4 @@ The manufacturing model stays as a domain pack. The platform core should remain 
 - Lineage should be recorded at ingest time and when semantic writes happen so AI and simulation can later reconstruct provenance.
 - The semantic plane should default to the database backend when the historian is available and fall back to file-backed mode only for offline development.
 - Benchmark tests should validate the real industrial-shaped flows the platform is expected to handle, even when those flows are still simulated locally.
+- Multi-site correlation should be benchmarked as its own workload shape because it stresses both isolation and cross-site reasoning.

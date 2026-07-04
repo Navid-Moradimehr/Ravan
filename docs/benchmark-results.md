@@ -35,6 +35,36 @@
 - The Python fallback remains competitive on this host, but the Flink-local contract now shows a meaningful gain over the last recorded baseline run.
 - These are still single-node local measurements, so they validate product shape and regression behavior, not final plant sizing.
 
+## Multi-Site Correlation Rerun
+
+- **Date**: 2026-07-04
+- **Scope**: added a dedicated `multi-site-correlation` simulator case and remeasured the same mixed industrial workload with repeated sampling
+
+### Latest Benchmark Run
+
+| Benchmark | Median events/sec | Median p99 ms | Notes |
+|-----------|-------------------|---------------|-------|
+| Real-world simulator average | 92,916.29 | 0.0220 | median of 3 runs over the expanded multi-site suite |
+| `multi-site-correlation` case | 93,410.63 | 0.0221 | preserves duplicate asset signals across two sites |
+| Production pipeline `python-fallback` | 43,117.39 | 0.0414 | median of 3 runs over the mixed industrial dataset |
+| Production pipeline `flink-local` | 51,261.99 | 0.0395 | median of 3 runs over the mixed industrial dataset |
+| Site profile matrix `demo-site` | 93,628.34 | 0.0212 | repeat count 3, passed |
+| Site profile matrix `plant-a` | 91,893.59 | 0.0207 | repeat count 3, passed |
+
+### Comparison To Prior Recorded Baseline
+
+- Real-world simulator average improved by `3.56%` versus the prior `89,720.82` median.
+- The new `multi-site-correlation` case lands in the same throughput band as the other simulator cases, which is what we want for a correlation-heavy but still bounded workload.
+- Production pipeline `python-fallback` improved by `1.58%` versus the prior `42,448.19` median.
+- Production pipeline `flink-local` improved by `0.03%` versus the prior `51,248.20` median.
+- The new site-profile env hardening did not add a measurable regression on this host.
+
+### Interpretation
+
+- The benchmark suite now explicitly exercises a multi-site correlation shape, not just per-site replay.
+- The distributed deployment path is still functionally present rather than fully optimized, but the semantic-store backend selection is now explicit for plant-local and federated profiles.
+- These results are still local single-node measurements. They are good enough for regression tracking and release gates, but not a substitute for a real multi-node pilot.
+
 ## Kafka Migration Session
 
 - **Date**: 2026-07-04

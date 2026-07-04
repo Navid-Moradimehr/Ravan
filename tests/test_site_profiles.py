@@ -15,6 +15,17 @@ def test_load_single_site_profile():
     assert profile.site.id == "demo-site"
     assert profile.deployment_mode == "single-site"
     assert profile.runtime.mode == "python-fallback"
+    assert profile.to_env()["SEMANTIC_STORE_BACKEND"] == "auto"
+
+
+def test_plant_local_profile_sets_db_backed_semantic_store():
+    profile = load_site_profile(REPO_ROOT / "config" / "site-profiles" / "plant-local.yaml")
+    assert profile.to_env()["SEMANTIC_STORE_BACKEND"] == "db"
+
+
+def test_federated_profile_sets_db_backed_semantic_store():
+    profile = load_site_profile(REPO_ROOT / "config" / "site-profiles" / "federated.yaml")
+    assert profile.to_env()["SEMANTIC_STORE_BACKEND"] == "db"
 
 
 def test_federated_profile_requires_endpoint(tmp_path):

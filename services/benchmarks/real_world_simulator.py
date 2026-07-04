@@ -197,6 +197,40 @@ def _dropout_reconnect_case_csv(csv_path: Path, events: int) -> None:
     _write_case_csv(csv_path, sources, scenario_selector=selector, cycles=max(8, ceil(events / max(len(sources), 1))))
 
 
+def _multi_site_correlation_case_csv(csv_path: Path, events: int) -> None:
+    sources = [
+        SimulatedSource("demo-site/line-01/plc-01", "opcua", "Pump-01", "Temperature", "c", "Demo-Site", "Line-01", 54.8, 3.0, 0.0, 120.0),
+        SimulatedSource("demo-site/line-01/plc-02", "mqtt", "Pump-01", "Temperature", "c", "Demo-Site", "Line-01", 55.2, 2.8, 0.0, 120.0),
+        SimulatedSource("plant-a/line-02/plc-11", "opcua", "Pump-01", "Vibration", "mm/s", "Plant-A", "Line-02", 3.9, 0.7, 0.0, 20.0),
+        SimulatedSource("plant-a/line-02/gateway-03", "modbus", "Pump-01", "Pressure", "bar", "Plant-A", "Line-02", 6.1, 1.0, 0.0, 15.0),
+        SimulatedSource("plant-a/line-02/plc-12", "mqtt", "Pump-02", "Temperature", "c", "Plant-A", "Line-02", 56.4, 3.2, 0.0, 120.0),
+    ]
+
+    def selector(source: SimulatedSource, step: int) -> ScenarioState:
+        if source.site == "Demo-Site":
+            return ScenarioState(
+                scenario_type=ScenarioType.DRIFT if source.source_id.endswith("plc-02") else ScenarioType.NORMAL,
+                scenario_id="multi-site-correlation",
+                step=step,
+                params={"drift_rate": 0.025} if source.source_id.endswith("plc-02") else {},
+            )
+        if source.tag == "Vibration":
+            return ScenarioState(
+                scenario_type=ScenarioType.SPIKE,
+                scenario_id="multi-site-correlation",
+                step=step,
+                params={"spike_prob": 0.20, "spike_magnitude": 8.0},
+            )
+        return ScenarioState(
+            scenario_type=ScenarioType.NORMAL,
+            scenario_id="multi-site-correlation",
+            step=step,
+            params={},
+        )
+
+    _write_case_csv(csv_path, sources, scenario_selector=selector, cycles=max(8, ceil(events / max(len(sources), 1))))
+
+
 def _run_single_case(
     *,
     case_id: str,
@@ -240,6 +274,9 @@ def _prepare_case_csv(case_id: str, csv_path: Path, events: int) -> None:
     if case_id == "dropout-reconnect":
         _dropout_reconnect_case_csv(csv_path, events)
         return
+    if case_id == "multi-site-correlation":
+        _multi_site_correlation_case_csv(csv_path, events)
+        return
     raise ValueError(f"unknown simulator case: {case_id}")
 
 
@@ -256,6 +293,7 @@ def run_suite(
         "mock-drift",
         "mock-spike",
         "industrial-benchmark",
+        "multi-site-correlation",
     ]
     results: list[RealWorldSimulatorCase] = []
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -331,7 +369,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cases",
         default=None,
-        help="Comma-separated case ids: mock-normal,mock-drift,mock-spike,multi-plc-line,burst-load,dropout-reconnect,industrial-benchmark",
+        help="Comma-separated case ids: mock-normal,mock-drift,mock-spike,multi-plc-line,burst-load,dropout-reconnect,multi-site-correlation,industrial-benchmark",
     )
     return parser
 

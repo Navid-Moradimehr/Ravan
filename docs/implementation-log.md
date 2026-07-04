@@ -105,6 +105,30 @@
 
 - The benchmark suite now reflects actual industrial-shaped event streams more closely, but it is still a local single-node approximation rather than live plant telemetry.
 
+## 2026-07-04 - Multi-Site Correlation Case And Distributed Semantic Backend
+
+### Changed
+
+1. **Multi-site simulator case**
+   - Added a dedicated `multi-site-correlation` benchmark case to the real-world simulator suite.
+   - The new case preserves duplicate asset signals across `demo-site` and `plant-a` so correlation and site isolation can be exercised together.
+
+2. **Distributed semantic backend**
+   - `SiteProfile.to_env()` now exports `SEMANTIC_STORE_BACKEND=db` for `plant-local` and `federated` deployments.
+   - `single-site` keeps `SEMANTIC_STORE_BACKEND=auto` so the file fallback remains available for local development.
+
+### Verified
+
+- `.venv\\Scripts\\python.exe -m pytest tests/test_site_profiles.py tests/test_real_world_simulator_benchmark.py -q`
+  - `6 passed`
+- `.venv\\Scripts\\python.exe -m pytest tests/test_datastreamd.py tests/test_project_manifest.py -q`
+  - `29 passed`
+
+### Notes
+
+- This hardens the distributed path without changing the single-node default behavior.
+- The platform is now clearer about where semantic data should live in plant-local and federated rollouts.
+
 ## 2026-07-03 - OS Packaging Scripts And Windows Bundle Export
 
 ### Changed

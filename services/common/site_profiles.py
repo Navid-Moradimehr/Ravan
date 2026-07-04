@@ -66,6 +66,7 @@ class SiteProfile:
 
     def to_env(self) -> dict[str, str]:
         brokers = self.runtime.kafka_brokers
+        semantic_store_backend = "db" if self.deployment_mode in {"plant-local", "federated"} else "auto"
         return {
             "SITE_ID": self.site.id,
             "SITE_NAME": self.site.name,
@@ -79,6 +80,7 @@ class SiteProfile:
             "LLM_ENDPOINT_URL": self.runtime.ai.endpoint_url,
             "LLM_MODEL_ID": self.runtime.ai.model_id,
             "LLM_LOCAL_ONLY": "true" if self.runtime.ai.local_only else "false",
+            "SEMANTIC_STORE_BACKEND": semantic_store_backend,
             "DATASTREAM_BACKUP_DIR": self.backups.directory,
             "DATASTREAM_BACKUP_SCHEDULE": self.backups.schedule,
             "DATASTREAM_BACKUP_RETENTION_DAYS": str(self.backups.retention_days),
