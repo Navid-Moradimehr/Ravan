@@ -34,6 +34,7 @@
 - The mapping-compilation change is not a durable performance win: the repeat run was only slightly better than baseline in the simulator and the production pipeline remained mixed.
 - The mapping-compile experiment was then removed from the codebase to avoid carrying extra complexity for a non-result.
 - The corrected hot-path rerun shows the isolated Flink slice and CGR slice improved on median, but the full real-world simulator and `flink-local` production path still do not match the earlier best runs.
+- The `production-pipeline` `flink-local` mode is a thin wrapper around the same runtime slice benchmark, so the gap between those two numbers is not a separate execution problem; it is mostly run variance.
 
 ## Notes
 

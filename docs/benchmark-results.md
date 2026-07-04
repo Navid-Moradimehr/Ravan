@@ -75,7 +75,8 @@
 - Normalizing from the Pydantic model directly was slower and was not kept.
 - The dict-based normalization path is the correct one for this codebase.
 - The isolated Flink slice and CGR slice improved on median, which means the shared runtime shape is helping the hot path.
-- The full real-world simulator and `flink-local` production path still trail the earlier best numbers, so the remaining gap is now outside the isolated slice and likely tied to surrounding orchestration and single-node variance.
+- The full real-world simulator still trails the earlier best numbers, so the remaining gap is now outside the isolated slice and likely tied to surrounding orchestration and single-node variance.
+- `production-pipeline` in `flink-local` is only a thin wrapper around `flink-runtime-slice`; the gap between those two measurements is not structural and falls within host/process variance on repeated runs.
 
 ## Real-World Simulator Baseline
 
