@@ -36,6 +36,28 @@
 
 - Pack metadata is advisory, not a hard partition. The current planner behavior stays compatible with existing historian and alarm queries.
 
+## 2026-07-04 - Persistent Semantic Store And Lineage
+
+### Changed
+
+1. **Writable semantic store**
+   - Added `services/common/semantic_store.py` as a file-backed semantic graph store with ontology packs, entities, relationships, documents, workflows, observations, states, events, and lineage records.
+   - The store boots from the existing asset hierarchy when no persisted semantic file exists yet.
+
+2. **Semantic write APIs**
+   - Added write endpoints for ontology packs, graph entities, relationships, documents, workflows, observations, and lineage records.
+   - Added site-scoped filtering for semantic graph search.
+
+3. **Lineage integration**
+   - Runtime event ingestion now records lineage entries for accepted and rejected events so provenance exists alongside the semantic graph.
+
+4. **Benchmark coverage**
+   - Added a semantic-store write benchmark to measure the persistence path separately from projection and query throughput.
+
+### Notes
+
+- The store is intentionally file-backed for now so the platform keeps its current single-server posture while gaining a persistent semantic plane.
+
 ## 2026-07-03 - OS Packaging Scripts And Windows Bundle Export
 
 ### Changed

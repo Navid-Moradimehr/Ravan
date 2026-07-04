@@ -905,6 +905,37 @@ class TestDatastreamctl:
         assert "queries_per_second=" in out
         assert "query_count=3" in out
 
+    def test_benchmark_semantic_store_write_runs(self, monkeypatch, tmp_path):
+        store_path = tmp_path / "semantic-store.json"
+        monkeypatch.setattr(
+            ctl,
+            "run_semantic_store_write_benchmark",
+            lambda *args, **kwargs: SimpleNamespace(
+                store_path=str(store_path),
+                iterations=100,
+                warmup_iterations=10,
+                elapsed_seconds=0.03,
+                writes_per_second=10_000.0,
+                entity_count=20,
+                relationship_count=20,
+                lineage_count=20,
+            ),
+        )
+        rc, out = self._run([
+            "benchmark",
+            "semantic-store-write",
+            "--store",
+            str(store_path),
+            "--iterations",
+            "100",
+            "--warmup-iterations",
+            "10",
+        ])
+        assert rc == 0
+        assert "semantic store write benchmark" in out
+        assert "writes_per_second=" in out
+        assert "lineage_count=20" in out
+
     def test_benchmark_end_to_end_pipeline_runs(self, monkeypatch, tmp_path):
         csv_path = tmp_path / "mock.csv"
         csv_path.write_text(

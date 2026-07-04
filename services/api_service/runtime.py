@@ -72,11 +72,48 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
             insert_dead_letter({**dlq.model_dump(mode="json"), "origin": "api"})
         except Exception:
             pass
+        try:
+            from services.common.semantic_store import SemanticLineageRecord, get_semantic_store
+
+            get_semantic_store().record_lineage(
+                SemanticLineageRecord(
+                    lineage_id=str(_uuid.uuid4()),
+                    kind="rejected_event",
+                    source_id=str(payload.get("source_id", "api")),
+                    entity_id=str(payload.get("asset_id", "")),
+                    site_id=str(payload.get("site", "demo-site")),
+                    occurred_at=payload.get("ts_source", ""),
+                    metadata={"reason": "validation_failed", "event_id": dlq.event_id},
+                )
+            )
+        except Exception:
+            pass
         return {"status": "rejected", "event_id": dlq.event_id, "reason": "validation_failed"}
 
     event_dict = event_model.model_dump(mode="json")
     try:
         insert_industrial_event(event_dict)
+    except Exception:
+        pass
+    try:
+        from services.common.semantic_store import SemanticLineageRecord, get_semantic_store
+
+        get_semantic_store().record_lineage(
+            SemanticLineageRecord(
+                lineage_id=str(_uuid.uuid4()),
+                kind="ingested_event",
+                source_id=str(event_dict.get("source_id", payload.get("source_id", "api"))),
+                target_id=str(event_dict.get("event_id", "")),
+                entity_id=str(event_dict.get("asset_id", "")),
+                site_id=str(event_dict.get("site", "demo-site")),
+                occurred_at=str(event_dict.get("ts_source", "")),
+                metadata={
+                    "source_protocol": event_dict.get("source_protocol", ""),
+                    "tag": event_dict.get("tag", ""),
+                    "quality": event_dict.get("quality", ""),
+                },
+            )
+        )
     except Exception:
         pass
 

@@ -252,10 +252,150 @@ class SemanticGraph:
             "events": len(self.events),
         }
 
-    def search_entities(self, query: str, *, limit: int = 10) -> list[SemanticEntity]:
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "SemanticGraph":
+        graph = cls()
+        graph.ontology_packs = [
+            OntologyPack(
+                pack_id=str(item.get("pack_id", "")),
+                name=str(item.get("name", "")),
+                layer=str(item.get("layer", "platform")),
+                version=str(item.get("version", "1.0")),
+                concepts=tuple(str(concept) for concept in item.get("concepts", []) if concept),
+                notes=tuple(str(note) for note in item.get("notes", []) if note),
+            )
+            for item in data.get("ontology_packs", [])
+            if item.get("pack_id")
+        ]
+        graph.entities = {
+            str(item.get("entity_id", "")): SemanticEntity(
+                entity_id=str(item.get("entity_id", "")),
+                entity_type=str(item.get("entity_type", "entity")),
+                name=str(item.get("name", "")),
+                labels=tuple(str(label) for label in item.get("labels", []) if label),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("entities", [])
+            if item.get("entity_id")
+        }
+        graph.relationships = {
+            str(item.get("relationship_id", "")): SemanticRelationship(
+                relationship_id=str(item.get("relationship_id", "")),
+                source_id=str(item.get("source_id", "")),
+                target_id=str(item.get("target_id", "")),
+                relationship_type=str(item.get("relationship_type", "related_to")),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("relationships", [])
+            if item.get("relationship_id")
+        }
+        graph.measurements = {
+            str(item.get("measurement_id", "")): SemanticMeasurement(
+                measurement_id=str(item.get("measurement_id", "")),
+                entity_id=str(item.get("entity_id", "")),
+                name=str(item.get("name", "")),
+                unit=str(item.get("unit", "")),
+                minimum=item.get("minimum"),
+                maximum=item.get("maximum"),
+                warning_low=item.get("warning_low"),
+                warning_high=item.get("warning_high"),
+                critical_low=item.get("critical_low"),
+                critical_high=item.get("critical_high"),
+                sampling_rate_hz=item.get("sampling_rate_hz"),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("measurements", [])
+            if item.get("measurement_id")
+        }
+        graph.observations = {
+            str(item.get("observation_id", "")): SemanticObservation(
+                observation_id=str(item.get("observation_id", "")),
+                entity_id=str(item.get("entity_id", "")),
+                observed_at=str(item.get("observed_at", "")),
+                value=item.get("value"),
+                source_id=str(item.get("source_id", "")),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("observations", [])
+            if item.get("observation_id")
+        }
+        graph.actions = {
+            str(item.get("action_id", "")): SemanticAction(
+                action_id=str(item.get("action_id", "")),
+                actor_id=str(item.get("actor_id", "")),
+                target_id=str(item.get("target_id", "")),
+                action_type=str(item.get("action_type", "")),
+                occurred_at=str(item.get("occurred_at", "")),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("actions", [])
+            if item.get("action_id")
+        }
+        graph.documents = {
+            str(item.get("document_id", "")): SemanticDocument(
+                document_id=str(item.get("document_id", "")),
+                title=str(item.get("title", "")),
+                document_type=str(item.get("document_type", "document")),
+                uri=str(item.get("uri", "")),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("documents", [])
+            if item.get("document_id")
+        }
+        graph.locations = {
+            str(item.get("location_id", "")): SemanticLocation(
+                location_id=str(item.get("location_id", "")),
+                name=str(item.get("name", "")),
+                location_type=str(item.get("location_type", "location")),
+                parent_id=item.get("parent_id"),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("locations", [])
+            if item.get("location_id")
+        }
+        graph.states = {
+            str(item.get("state_id", "")): SemanticState(
+                state_id=str(item.get("state_id", "")),
+                entity_id=str(item.get("entity_id", "")),
+                state=str(item.get("state", "")),
+                valid_from=str(item.get("valid_from", "")),
+                valid_to=item.get("valid_to"),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("states", [])
+            if item.get("state_id")
+        }
+        graph.workflows = {
+            str(item.get("workflow_id", "")): SemanticWorkflow(
+                workflow_id=str(item.get("workflow_id", "")),
+                name=str(item.get("name", "")),
+                workflow_type=str(item.get("workflow_type", "workflow")),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("workflows", [])
+            if item.get("workflow_id")
+        }
+        graph.events = {
+            str(item.get("event_id", "")): SemanticEvent(
+                event_id=str(item.get("event_id", "")),
+                event_type=str(item.get("event_type", "")),
+                occurred_at=str(item.get("occurred_at", "")),
+                source_id=str(item.get("source_id", "")),
+                entity_id=str(item.get("entity_id", "")),
+                payload=dict(item.get("payload", {})),
+                metadata=dict(item.get("metadata", {})),
+            )
+            for item in data.get("events", [])
+            if item.get("event_id")
+        }
+        return graph
+
+    def search_entities(self, query: str, *, limit: int = 10, site_id: str | None = None) -> list[SemanticEntity]:
         tokens = {part.lower() for part in query.replace("/", " ").replace("-", " ").split() if part}
         scored: list[tuple[int, SemanticEntity]] = []
         for entity in self.entities.values():
+            if site_id and str(entity.metadata.get("site_id", "")).lower() != site_id.lower():
+                continue
             score = 0
             candidate_terms = {entity.entity_id.lower(), entity.entity_type.lower(), entity.name.lower(), *{label.lower() for label in entity.labels}}
             candidate_terms.update(str(value).lower() for value in entity.metadata.values() if value is not None)
@@ -269,10 +409,12 @@ class SemanticGraph:
         scored.sort(key=lambda item: (-item[0], item[1].entity_id))
         return [entity for _, entity in scored[: max(1, limit)]]
 
-    def search_relationships(self, query: str, *, limit: int = 10) -> list[SemanticRelationship]:
+    def search_relationships(self, query: str, *, limit: int = 10, site_id: str | None = None) -> list[SemanticRelationship]:
         tokens = {part.lower() for part in query.replace("/", " ").replace("-", " ").split() if part}
         scored: list[tuple[int, SemanticRelationship]] = []
         for relationship in self.relationships.values():
+            if site_id and str(relationship.metadata.get("site_id", "")).lower() != site_id.lower():
+                continue
             score = 0
             candidate_terms = {
                 relationship.relationship_id.lower(),
@@ -291,12 +433,13 @@ class SemanticGraph:
         scored.sort(key=lambda item: (-item[0], item[1].relationship_id))
         return [relationship for _, relationship in scored[: max(1, limit)]]
 
-    def graph_search(self, query: str, *, limit: int = 10) -> dict[str, Any]:
-        entities = self.search_entities(query, limit=limit)
-        relationships = self.search_relationships(query, limit=limit)
+    def graph_search(self, query: str, *, limit: int = 10, site_id: str | None = None) -> dict[str, Any]:
+        entities = self.search_entities(query, limit=limit, site_id=site_id)
+        relationships = self.search_relationships(query, limit=limit, site_id=site_id)
         return {
             "query": query,
             "limit": limit,
+            "site_id": site_id,
             "entities": [entity.to_dict() for entity in entities],
             "relationships": [relationship.to_dict() for relationship in relationships],
             "counts": {"entities": len(entities), "relationships": len(relationships)},
@@ -317,6 +460,9 @@ class SemanticGraph:
             "events": [event.to_dict() for event in self.events.values()],
             "counts": self.counts(),
         }
+
+    def clone(self) -> "SemanticGraph":
+        return SemanticGraph.from_dict(self.to_dict())
 
     @staticmethod
     def _node_id(*parts: str) -> str:
@@ -342,7 +488,7 @@ class SemanticGraph:
                     location_id=site_id,
                     name=site.name,
                     location_type="site",
-                    metadata={"source_type": "site"},
+                    metadata={"source_type": "site", "site_id": site.id},
                 )
             )
             graph.add_entity(
@@ -351,7 +497,7 @@ class SemanticGraph:
                     entity_type="site",
                     name=site.name,
                     labels=("site",),
-                    metadata={"source_type": "site"},
+                    metadata={"source_type": "site", "site_id": site.id},
                 )
             )
 
@@ -363,7 +509,7 @@ class SemanticGraph:
                         name=area.name,
                         location_type="area",
                         parent_id=site_id,
-                        metadata={"source_type": "area"},
+                        metadata={"source_type": "area", "site_id": site.id},
                     )
                 )
                 graph.add_entity(
@@ -393,7 +539,7 @@ class SemanticGraph:
                             name=line.name,
                             location_type="line",
                             parent_id=area_id,
-                            metadata={"source_type": "line"},
+                            metadata={"source_type": "line", "site_id": site.id},
                         )
                     )
                     graph.add_entity(
