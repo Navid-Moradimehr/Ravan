@@ -1,61 +1,36 @@
 name: local-stream-engine
 
 services:
-  redpanda:
-    image: docker.redpanda.com/redpandadata/redpanda:v24.3.5
+  kafka:
+    image: apache/kafka:4.1.2
     command:
-      - redpanda
-      - start
-      - --smp
-      - "1"
-      - --memory
-      - 1G
-      - --reserve-memory
-      - 0M
-      - --overprovisioned
-      - --node-id
-      - "0"
-      - --check=false
-      - --kafka-addr
-      - internal://0.0.0.0:9092,external://0.0.0.0:19092
-      - --advertise-kafka-addr
-      - internal://redpanda:9092,external://localhost:19092
-      - --pandaproxy-addr
-      - internal://0.0.0.0:8082,external://0.0.0.0:18082
-      - --advertise-pandaproxy-addr
-      - internal://redpanda:8082,external://localhost:18082
-      - --schema-registry-addr
-      - internal://0.0.0.0:8081,external://0.0.0.0:18081
-      - --set
-      - audit_enabled=false
-      - --set
-      - partition_autobalancing_mode=node_add
-      - --set
-      - core_balancing_continuous=false
+      - bash
+      - -lc
+      - |
+        if [ ! -f /var/lib/kafka/data/meta.properties ]; then
+          /opt/kafka/bin/kafka-storage.sh format -t "$(/opt/kafka/bin/kafka-storage.sh random-uuid)" -c /opt/kafka/config/server.properties
+        fi
+        exec /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties
     ports:
-      - "18081:18081"
-      - "18082:18082"
-      - "19092:19092"
-      - "19644:9644"
+      - "19092:29092"
     volumes:
-      - redpanda-data:/var/lib/redpanda/data
+      - kafka-data:/var/lib/kafka/data
+      - ./kafka/server.properties:/opt/kafka/config/server.properties:ro
     healthcheck:
-      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true'"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-  redpanda-console:
-    image: docker.redpanda.com/redpandadata/console:v2.8.1
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
     depends_on:
-      redpanda:
+      kafka:
         condition: service_healthy
     environment:
-      KAFKA_BROKERS: redpanda:9092
-      SCHEMAREGISTRY_ENABLED: "true"
-      SCHEMAREGISTRY_URLS: http://redpanda:8081
-      REDPANDA_ADMINAPI_ENABLED: "true"
-      REDPANDA_ADMINAPI_URLS: http://redpanda:9644
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_READONLY: "false"
     ports:
       - "18080:8080"
 
@@ -80,12 +55,12 @@ services:
   connect:
     image: debezium/connect:3.0.0.Final
     depends_on:
-      redpanda:
+      kafka:
         condition: service_healthy
       postgres:
         condition: service_healthy
     environment:
-      BOOTSTRAP_SERVERS: redpanda:9092
+      BOOTSTRAP_SERVERS: kafka:9092
       GROUP_ID: debezium-connect
       CONFIG_STORAGE_TOPIC: connect_configs
       OFFSET_STORAGE_TOPIC: connect_offsets
@@ -102,10 +77,12 @@ services:
       context: ..
       dockerfile: services/ai_gateway/Dockerfile
     depends_on:
-      redpanda:
+      kafka:
         condition: service_healthy
     environment:
-      REDPANDA_BROKERS: redpanda:9092
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      KAFKA_BROKERS: kafka:9092
       PROCESSED_TOPIC: iot.processed
       AI_ENRICHED_TOPIC: iot.ai_enriched
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://host.docker.internal:1234/v1}
@@ -123,10 +100,12 @@ services:
       context: ..
       dockerfile: services/processor/Dockerfile
     depends_on:
-      redpanda:
+      kafka:
         condition: service_healthy
     environment:
-      REDPANDA_BROKERS: redpanda:9092
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      KAFKA_BROKERS: kafka:9092
       IOT_TOPIC: iot.raw
       PROCESSED_TOPIC: iot.processed
 
@@ -177,7 +156,7 @@ services:
       context: ..
       dockerfile: services/edge_ingest/Dockerfile
     depends_on:
-      redpanda:
+      kafka:
         condition: service_healthy
       mqtt-broker:
         condition: service_started
@@ -186,7 +165,9 @@ services:
       modbus-sim:
         condition: service_started
     environment:
-      REDPANDA_BROKERS: redpanda:9092
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      KAFKA_BROKERS: kafka:9092
       EDGE_PROTOCOLS: ${EDGE_PROTOCOLS:-mqtt,opcua,modbus}
       MQTT_HOST: mqtt-broker
       MQTT_PORT: 1883
@@ -213,7 +194,7 @@ services:
       PROMETHEUS_BASE_URL: http://prometheus:9090
       GRAFANA_BASE_URL: http://grafana:3000
     ports:
-      - "3000:3000"
+      - "3006:3006"
     profiles:
       - ui
 
@@ -247,9 +228,9 @@ services:
     depends_on:
       - jobmanager
       - taskmanager
-      - redpanda
+      - kafka
     environment:
-      REDPANDA_BROKERS: redpanda:9092
+      KAFKA_BROKERS: kafka:9092
       IOT_TOPIC: iot.raw
       PROCESSED_TOPIC: iot.processed
       FLINK_PARALLELISM: ${FLINK_PARALLELISM:-4}
@@ -312,7 +293,7 @@ services:
       - "15433:5432"
     volumes:
       - timescale-data:/var/lib/postgresql/data
-      - ./postgres/init-timescale.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      - ./postgres/init-timescale-full.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stream -d stream_engine"]
       interval: 10s
@@ -355,7 +336,7 @@ services:
       - api
 
 volumes:
-  redpanda-data:
+  kafka-data:
   postgres-data:
   prometheus-data:
   grafana-data:

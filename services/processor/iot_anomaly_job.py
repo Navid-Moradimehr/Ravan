@@ -36,6 +36,8 @@ except ModuleNotFoundError:  # pragma: no cover - repo/test environments without
 
     PYFLINK_AVAILABLE = False
 
+from services.common.brokers import resolve_kafka_brokers
+
 from services.common.runtime_event import RuntimeEventRecord
 from services.processor.runtime_pipeline import build_runtime_event_payload
 
@@ -118,7 +120,7 @@ def main() -> None:
     if not PYFLINK_AVAILABLE:
         raise RuntimeError("pyflink is required to run the distributed runtime job")
 
-    brokers = os.getenv("REDPANDA_BROKERS", "redpanda:9092")
+    brokers = resolve_kafka_brokers("localhost:19092")
     input_topic = os.getenv("IOT_TOPIC", "iot.raw")
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
     window_limit = max(1, int(os.getenv("RUNTIME_WINDOW_LIMIT", "25")))
@@ -178,7 +180,7 @@ def main() -> None:
         .build()
     )
 
-    stream = env.from_source(source, WatermarkStrategy.no_watermarks(), "redpanda-iot-source")
+    stream = env.from_source(source, WatermarkStrategy.no_watermarks(), "kafka-iot-source")
     keyed = stream.key_by(_partition_key)
     processed = keyed.process(IndustrialRuntimeProcessFunction(window_limit), output_type=Types.STRING())
     processed.sink_to(sink)

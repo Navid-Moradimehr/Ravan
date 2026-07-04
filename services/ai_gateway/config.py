@@ -13,7 +13,10 @@ class Settings(BaseSettings):
         validate_by_alias=True,
     )
 
-    redpanda_brokers: str = "localhost:19092"
+    kafka_brokers: str = Field(
+        default="localhost:19092",
+        validation_alias=AliasChoices("kafka_brokers", "KAFKA_BROKERS", "REDPANDA_BROKERS"),
+    )
     processed_topic: str = "iot.processed"
     ai_enriched_topic: str = "iot.ai_enriched"
     llm_provider: str = Field(default="openai_compat", validation_alias=AliasChoices("llm_provider", "LLM_PROVIDER"))

@@ -7,7 +7,7 @@ powershell -ExecutionPolicy Bypass -File scripts/run-local.ps1
 docker compose -f docker/docker-compose.yml ps
 ```
 
-Expected result: Redpanda, Console, PostgreSQL, AI Gateway, Prometheus, Grafana, and Dashboard are running.
+Expected result: Kafka, Kafka UI, PostgreSQL, AI Gateway, Prometheus, Grafana, and Dashboard are running.
 
 ## Ingestion
 
@@ -24,7 +24,7 @@ powershell -ExecutionPolicy Bypass -File scripts/register-debezium.ps1
 powershell -ExecutionPolicy Bypass -File scripts/seed-orders.ps1
 ```
 
-Expected result: Redpanda Console shows `dbserver1.public.orders` messages for inserts and updates.
+Expected result: Kafka UI shows `dbserver1.public.orders` messages for inserts and updates.
 
 ## AI Gateway
 
@@ -47,7 +47,7 @@ npm run build
 npm run start
 ```
 
-Expected result: `http://localhost:3006` renders the operations cockpit and links to Redpanda Console, Grafana, Prometheus, Flink, and AI health.
+Expected result: `http://localhost:3006` renders the command center and links to Kafka UI, Grafana, Prometheus, Flink, and AI health.
 
 The dashboard Docker image is optional. Use `docker compose --profile ui -f docker/docker-compose.yml up -d dashboard` only after local npm install/build is healthy.
 

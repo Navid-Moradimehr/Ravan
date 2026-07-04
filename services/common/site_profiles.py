@@ -31,7 +31,7 @@ class AIBackendProfile:
 class RuntimeProfile:
     image_tag: str
     mode: str
-    redpanda_brokers: str
+    kafka_brokers: str
     historian_backend: str
     ai: AIBackendProfile
 
@@ -65,6 +65,7 @@ class SiteProfile:
         return asdict(self)
 
     def to_env(self) -> dict[str, str]:
+        brokers = self.runtime.kafka_brokers
         return {
             "SITE_ID": self.site.id,
             "SITE_NAME": self.site.name,
@@ -72,7 +73,8 @@ class SiteProfile:
             "NETWORK_ZONE": self.site.network_zone,
             "DEPLOYMENT_MODE": self.deployment_mode,
             "RUNTIME_MODE": self.runtime.mode,
-            "REDPANDA_BROKERS": self.runtime.redpanda_brokers,
+            "KAFKA_BROKERS": brokers,
+            "REDPANDA_BROKERS": brokers,
             "HISTORIAN_BACKEND": self.runtime.historian_backend,
             "LLM_PROVIDER": self.runtime.ai.provider,
             "LLM_ENDPOINT_URL": self.runtime.ai.endpoint_url,
@@ -120,7 +122,7 @@ def load_site_profile(path: Path | str) -> SiteProfile:
         runtime=RuntimeProfile(
             image_tag=str(runtime.get("image_tag", "latest")).strip(),
             mode=str(runtime.get("mode", default_runtime_mode)).strip() or default_runtime_mode,
-            redpanda_brokers=str(runtime.get("redpanda_brokers", "")).strip(),
+            kafka_brokers=str(runtime.get("kafka_brokers", runtime.get("redpanda_brokers", ""))).strip(),
             historian_backend=str(runtime.get("historian_backend", "timescaledb")).strip(),
             ai=AIBackendProfile(
                 provider=str(ai.get("provider", "openai_compat")).strip(),
@@ -158,8 +160,8 @@ def validate_site_profile(profile: SiteProfile) -> list[str]:
         errors.append("site.id is required")
     if not profile.site.name:
         errors.append("site.name is required")
-    if not profile.runtime.redpanda_brokers:
-        errors.append("runtime.redpanda_brokers is required")
+    if not profile.runtime.kafka_brokers:
+        errors.append("runtime.kafka_brokers is required")
     if not profile.runtime.historian_backend:
         errors.append("runtime.historian_backend is required")
     if profile.runtime.ai.provider != "disabled" and not profile.runtime.ai.endpoint_url:

@@ -16,6 +16,7 @@ except Exception:  # pragma: no cover - optional runtime dependency
     Producer = Any  # type: ignore[assignment]
     HAS_KAFKA = False
 
+from services.common.brokers import resolve_kafka_brokers
 from services.edge_ingest.model import to_json_bytes, utc_now
 
 
@@ -158,10 +159,10 @@ def replay_ai4i(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Replay AI4I 2020 predictive maintenance dataset into Kafka/Redpanda")
+    parser = argparse.ArgumentParser(description="Replay AI4I 2020 predictive maintenance dataset into Kafka")
     parser.add_argument("--csv", required=True, type=Path, help="Path to AI4I CSV file")
     parser.add_argument("--topic", default="industrial.normalized", help="Target Kafka topic")
-    parser.add_argument("--brokers", default=os.getenv("REDPANDA_BROKERS", "localhost:19092"), help="Kafka brokers")
+    parser.add_argument("--brokers", default=resolve_kafka_brokers("localhost:19092"), help="Kafka brokers")
     parser.add_argument("--rate", type=int, default=25, help="Messages per second")
     parser.add_argument("--loop", action="store_true", help="Loop the dataset indefinitely")
     parser.add_argument("--max-events", type=int, default=0, help="Max events to produce (0 = unlimited)")

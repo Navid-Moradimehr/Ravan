@@ -21,6 +21,7 @@ except Exception:  # pragma: no cover - optional runtime dependency
     Producer = Any  # type: ignore[assignment]
     HAS_KAFKA = False
 
+from services.common.brokers import resolve_kafka_brokers
 from services.edge_ingest.model import utc_now
 from services.scenarios.engine import ScenarioState, ScenarioType, apply_scenario, advance_scenario, load_scenario_from_env
 
@@ -156,11 +157,11 @@ def replay_to_kafka(
     topic: str = "industrial.normalized",
     brokers: str = None,
 ) -> None:
-    """Stream mock events to Kafka/Redpanda."""
+    """Stream mock events to Kafka."""
     if not HAS_KAFKA:
         raise RuntimeError("confluent_kafka is required for live mock replay")
     if brokers is None:
-        brokers = os.getenv("REDPANDA_BROKERS", "localhost:19092")
+        brokers = resolve_kafka_brokers("localhost:19092")
 
     producer = Producer({"bootstrap.servers": brokers, "client.id": "mock-generator"})
     running = True
@@ -204,7 +205,7 @@ def main():
     parser.add_argument("--csv", type=Path, help="Output CSV file instead of Kafka")
     parser.add_argument("--csv-rows", type=int, default=1000, help="Rows per asset for CSV")
     parser.add_argument("--topic", default="industrial.normalized", help="Kafka topic")
-    parser.add_argument("--brokers", default=os.getenv("REDPANDA_BROKERS", "localhost:19092"),
+    parser.add_argument("--brokers", default=resolve_kafka_brokers("localhost:19092"),
                         help="Kafka brokers")
     args = parser.parse_args()
 

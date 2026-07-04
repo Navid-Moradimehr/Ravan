@@ -10,7 +10,7 @@ $compose = "docker/docker-compose.yml"
 $env:MQTT_RATE_PER_SECOND = "$MqttRatePerSecond"
 
 $services = @(
-  "redpanda",
+  "kafka",
   "mqtt-broker",
   "mqtt-sim",
   "opcua-sim",

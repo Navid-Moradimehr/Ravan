@@ -116,11 +116,11 @@ async def events() -> StreamingResponse:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=4)
         telemetry_subscribers.add(queue)
         try:
-            yield f"data: {json.dumps(await _build_telemetry())}\n\n"
+            yield f"data: {json.dumps(await _build_telemetry(), default=str)}\n\n"
             while service_state["running"]:
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=30.0)
-                    yield f"data: {json.dumps(payload)}\n\n"
+                    yield f"data: {json.dumps(payload, default=str)}\n\n"
                 except asyncio.TimeoutError:
                     yield ":heartbeat\n\n"
         finally:
@@ -215,11 +215,11 @@ async def historian_stream() -> StreamingResponse:
         historian_subscribers.add(queue)
         try:
             # Send initial snapshot
-            yield f"data: {json.dumps({'type': 'init', 'alarms': query_alarms(20), 'events': query_recent_events('industrial_events', 20)})}\n\n"
+            yield f"data: {json.dumps({'type': 'init', 'alarms': query_alarms(20), 'events': query_recent_events('industrial_events', 20)}, default=str)}\n\n"
             while service_state["running"]:
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=5.0)
-                    yield f"data: {json.dumps(payload)}\n\n"
+                    yield f"data: {json.dumps(payload, default=str)}\n\n"
                 except asyncio.TimeoutError:
                     yield ":heartbeat\n\n"
         finally:
@@ -246,7 +246,7 @@ async def historian_broadcast_loop() -> None:
         try:
             alarms = query_alarms(50)
             events = query_recent_events("industrial_events", 50)
-            snapshot = json.dumps({"alarms": alarms[:20], "events": events[:20]}, sort_keys=True)
+            snapshot = json.dumps({"alarms": alarms[:20], "events": events[:20]}, sort_keys=True, default=str)
             if snapshot != last_snapshot:
                 last_snapshot = snapshot
                 await _broadcast_historian(
@@ -267,14 +267,14 @@ async def historian_broadcast_loop() -> None:
 async def consume_loop() -> None:
     consumer = Consumer(
         {
-            "bootstrap.servers": settings.redpanda_brokers,
+            "bootstrap.servers": settings.kafka_brokers,
             "group.id": "ai-gateway",
             "auto.offset.reset": "latest",
             "enable.auto.commit": False,
             "enable.auto.offset.store": False,
         }
     )
-    producer = Producer({"bootstrap.servers": settings.redpanda_brokers, "client.id": "ai-gateway"})
+    producer = Producer({"bootstrap.servers": settings.kafka_brokers, "client.id": "ai-gateway"})
     consumer.subscribe([settings.processed_topic])
 
     batch: list[tuple[str, int, int, dict[str, Any]]] = []

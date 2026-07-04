@@ -10,9 +10,9 @@ MQTT Simulator ---------+--> Edge Ingest --> industrial.normalized --+
 Modbus TCP Simulator ---+                                           |
                                                                     +--> Processor --> AI Gateway
 Mock IoT Generator -------------------------------------------------+
-PostgreSQL orders --> Debezium CDC --> Redpanda topics
+PostgreSQL orders --> Debezium CDC --> Kafka topics
 
-Prometheus scrapes broker, edge, and AI metrics; Grafana and the web dashboard expose operational views.
+Prometheus scrapes edge and AI metrics; Grafana and the web dashboard expose operational views.
 ```
 
 The ingest path now batches historian writes and the runtime processor and
@@ -25,7 +25,7 @@ the remaining application surface without changing the public API.
 
 ## Stack
 
-- Streaming: Redpanda, Redpanda Console, Schema Registry-compatible API
+- Streaming: Apache Kafka, Kafka UI, internal schema registry contract
 - Industrial edge: local OPC UA, MQTT, and Modbus TCP simulators plus normalized edge ingest
 - Processing: Apache Flink / PyFlink plus the runtime Python processor fallback
 - Processing internals: shared enrichment contract used by both processing paths
@@ -78,7 +78,7 @@ datastreamd logs api -n 50
 datastreamd down
 ```
 
-`datastreamd` manages the Python service surface only; run `docker compose` first for Redpanda, Postgres/TimescaleDB, and Grafana. The distributed Flink processor is available through the compose `flink-job` service.
+`datastreamd` manages the Python service surface only; run `docker compose` first for Kafka, Postgres/TimescaleDB, and Grafana. The distributed Flink processor is available through the compose `flink-job` service.
 
 See `docs/phase8-distribution.md` for the full distribution plan.
 
@@ -147,8 +147,9 @@ against realistic industrial batches without depending on a live model server.
 ## Useful URLs
 
 - Dashboard: `http://localhost:3006`
+- Kafka UI: `http://localhost:18080`
 - Edge metrics: `http://localhost:8090`
-- Redpanda Console: `http://localhost:18080`
+- Kafka UI: `http://localhost:18080`
 - Flink UI: `http://localhost:18088`
 - AI Gateway: `http://localhost:8080/health`
 - Grafana: `http://localhost:13000`

@@ -551,7 +551,7 @@ def cmd_site_profile(args: argparse.Namespace) -> int:
             _print_row("site_name", profile.site.name)
             _print_row("region", profile.site.region)
             _print_row("network_zone", profile.site.network_zone)
-            _print_row("brokers", profile.runtime.redpanda_brokers)
+            _print_row("brokers", profile.runtime.kafka_brokers)
             _print_row("ai_provider", profile.runtime.ai.provider)
             _print_row("backup_dir", profile.backups.directory)
             _print_row("federation", profile.federation.enabled)

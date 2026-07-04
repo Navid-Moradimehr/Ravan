@@ -2,7 +2,7 @@
 
 Launches the platform services (api_service, ai_gateway, edge_ingest,
 processor, mock generator) as managed subprocesses and tracks their
-lifecycle. Does NOT manage Docker infrastructure (Redpanda, Postgres,
+lifecycle. Does NOT manage Docker infrastructure (Kafka, Postgres,
 Grafana) - that stays with docker compose for now.
 
 Usage:

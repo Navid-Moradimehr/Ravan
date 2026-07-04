@@ -60,6 +60,12 @@ def _connection_string() -> str:
     return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
 
+def _coalesce_timestamp(value: Any | None) -> str:
+    if value:
+        return str(value)
+    return datetime.now(timezone.utc).isoformat()
+
+
 
 
 @functools.lru_cache(maxsize=1)
@@ -151,7 +157,7 @@ def insert_industrial_event(event: dict[str, Any]) -> None:
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        event.get("ts_ingest", datetime.now(timezone.utc).isoformat()),
+                        _coalesce_timestamp(event.get("ts_ingest")),
                         event.get("event_id"),
                         event.get("source_protocol"),
                         event.get("source_id"),
@@ -179,7 +185,7 @@ def insert_industrial_events(events: list[dict[str, Any]]) -> None:
         return
     rows = [
         (
-            event.get("ts_ingest", datetime.now(timezone.utc).isoformat()),
+            _coalesce_timestamp(event.get("ts_ingest")),
             event.get("event_id"),
             event.get("source_protocol"),
             event.get("source_id"),
@@ -226,7 +232,7 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        event.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                        _coalesce_timestamp(event.get("timestamp")),
                         event.get("event_id"),
                         event.get("device_id"),
                         event.get("asset_id", event.get("device_id")),
@@ -261,7 +267,7 @@ def insert_processed_events(events: list[dict[str, Any]]) -> None:
         return
     rows = [
         (
-            event.get("timestamp", datetime.now(timezone.utc).isoformat()),
+            _coalesce_timestamp(event.get("timestamp")),
             event.get("event_id"),
             event.get("device_id"),
             event.get("asset_id", event.get("device_id")),
@@ -313,7 +319,7 @@ def insert_ai_enriched(event: dict[str, Any]) -> None:
                     ) VALUES (%s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        datetime.now(timezone.utc).isoformat(),
+                        _coalesce_timestamp(None),
                         event.get("source"),
                         event.get("model"),
                         event.get("batch_size", 0),
@@ -341,7 +347,7 @@ def insert_dead_letter(event: dict[str, Any]) -> None:
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        event.get("ts_ingest", datetime.now(timezone.utc).isoformat()),
+                        _coalesce_timestamp(event.get("ts_ingest")),
                         event.get("event_id"),
                         event.get("source_protocol"),
                         event.get("source_id"),

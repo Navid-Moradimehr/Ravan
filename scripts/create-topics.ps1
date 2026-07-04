@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$broker = $env:REDPANDA_BROKERS
+$broker = $env:KAFKA_BROKERS
 if (-not $broker) {
     $broker = "localhost:19092"
 }
@@ -15,7 +15,7 @@ $topics = @(
 )
 
 foreach ($topic in $topics) {
-    docker compose -f docker/docker-compose.yml exec -T redpanda rpk topic create $topic.Name --brokers redpanda:9092 --partitions $topic.Partitions --replicas 1 2>$null
+    docker compose -f docker/docker-compose.yml exec -T kafka /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic $topic.Name --bootstrap-server localhost:9092 --partitions $topic.Partitions --replication-factor 1 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Topic exists or create failed: $($topic.Name)"
     } else {
@@ -23,7 +23,7 @@ foreach ($topic in $topics) {
     }
 
     if ($topic.Compact) {
-        docker compose -f docker/docker-compose.yml exec -T redpanda rpk topic alter-config $topic.Name --brokers redpanda:9092 --set cleanup.policy=compact
+        docker compose -f docker/docker-compose.yml exec -T kafka /opt/kafka/bin/kafka-configs.sh --alter --bootstrap-server localhost:9092 --entity-type topics --entity-name $topic.Name --add-config cleanup.policy=compact
         Write-Host "Configured compact cleanup policy: $($topic.Name)"
     }
 }

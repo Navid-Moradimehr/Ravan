@@ -7,6 +7,7 @@ import os
 from typing import Any
 
 from confluent_kafka import Consumer, KafkaError
+from services.common.brokers import resolve_kafka_brokers
 
 
 class OutboundBridge:
@@ -128,7 +129,7 @@ class OutboundBridge:
 
 def main() -> None:
     bridge = OutboundBridge(
-        kafka_brokers=os.getenv("REDPANDA_BROKERS", "localhost:19092"),
+        kafka_brokers=resolve_kafka_brokers("localhost:19092"),
         source_topic=os.getenv("OUTBOUND_SOURCE_TOPIC", "iot.processed"),
         mqtt_host=os.getenv("OUTBOUND_MQTT_HOST"),
         mqtt_port=int(os.getenv("OUTBOUND_MQTT_PORT", "1883")),

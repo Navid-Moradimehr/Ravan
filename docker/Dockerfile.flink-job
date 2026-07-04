@@ -17,4 +17,4 @@ COPY requirements.txt /opt/stream/requirements.txt
 
 ENV PYTHONPATH=/opt/stream
 
-CMD ["bash", "-lc", "flink run -py /opt/stream/services/processor/iot_anomaly_job.py -pyfs /opt/stream"]
+CMD ["bash", "-lc", "flink run -m jobmanager:8081 -py /opt/stream/services/processor/iot_anomaly_job.py -pyfs /opt/stream"]

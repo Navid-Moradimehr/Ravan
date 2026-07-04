@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
 from confluent_kafka import Producer
+from services.common.brokers import resolve_kafka_brokers
 from services.scenarios.engine import ScenarioState, apply_scenario, advance_scenario, load_scenario_from_env
 
 
@@ -62,7 +63,7 @@ def build_event(device_count: int, scenario_state: ScenarioState) -> SensorEvent
 
 
 def main() -> None:
-    brokers = os.getenv("REDPANDA_BROKERS", "localhost:19092")
+    brokers = resolve_kafka_brokers("localhost:19092")
     topic = os.getenv("IOT_TOPIC", "iot.raw")
     rate_per_second = env_int("MOCK_RATE_PER_SECOND", 100)
     device_count = env_int("MOCK_DEVICE_COUNT", 50)

@@ -7,6 +7,7 @@ import signal
 import time
 
 from confluent_kafka import Consumer, Producer, TopicPartition
+from services.common.brokers import resolve_kafka_brokers
 from services.common.normalize import normalize_runtime_event
 from services.common.runtime_metrics import set_consumer_lag
 from services.common.runtime_event import RollingWindowState, RuntimeEventRecord
@@ -48,7 +49,7 @@ def _prune_windows(
 
 
 def main() -> None:
-    brokers = os.getenv("REDPANDA_BROKERS", "localhost:19092")
+    brokers = resolve_kafka_brokers("localhost:19092")
     input_topic = os.getenv("IOT_TOPIC", "iot.raw")
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
     progress_every = int(os.getenv("PROCESSOR_PROGRESS_EVERY", "1000"))

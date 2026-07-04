@@ -5,16 +5,16 @@
 ### Dashboard
 
 - Open `http://localhost:3006`.
-- Verify the industrial command-center title, KPI cards, protocol source cards, AI gateway panel, observability charts, and operator links render.
+- Verify the industrial command-center title, KPI cards, route cards, pipeline summary, observability snapshot, and operator links render.
 - Click `Light mode` and confirm the theme flips to a pale surface palette.
 - Refresh the page and confirm the selected theme persists.
-- Confirm the observability section shows throughput, AI latency, protocol mix, severity mix, and a Grafana status card.
+- Confirm the observability route shows throughput, AI latency, protocol mix, severity mix, and service health cards.
 - Confirm the Grafana operator link goes to `http://localhost:13000/login` rather than a public signup page.
 
 ### Industrial Edge Ingestion
 
 - Run `powershell -ExecutionPolicy Bypass -File scripts/start-industrial-sim.ps1`.
-- Open Redpanda Console and verify `industrial.raw`, `industrial.normalized`, `industrial.dlq`, and `iot.raw` exist.
+- Open Kafka UI and verify `industrial.raw`, `industrial.normalized`, `industrial.dlq`, and `iot.raw` exist.
 - Confirm `industrial.normalized` receives OPC UA, MQTT, and Modbus records with `source_protocol`, `asset_id`, `tag`, `value`, `quality`, `ts_source`, and `ts_ingest`.
 - Confirm `iot.raw` receives compatibility records that the existing processor can score.
 - Open `http://localhost:8090` and verify edge Prometheus metrics are exposed.
@@ -32,7 +32,7 @@
 ### Streaming Ingestion
 
 - Run `python services/ingestion/mock_generator.py`.
-- Verify `iot.raw` receives messages in Redpanda Console.
+- Verify `iot.raw` receives messages in Kafka UI.
 - Stop and restart the generator to confirm the pipeline recovers cleanly.
 
 ### Stream Processing
@@ -51,7 +51,7 @@
 
 - Run `powershell -ExecutionPolicy Bypass -File scripts/register-debezium.ps1`.
 - Run `powershell -ExecutionPolicy Bypass -File scripts/seed-orders.ps1`.
-- Confirm `dbserver1.public.orders` appears in Redpanda.
+- Confirm `dbserver1.public.orders` appears in Kafka UI.
 
 ### Observability
 

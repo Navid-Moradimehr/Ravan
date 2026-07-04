@@ -7,6 +7,7 @@ from functools import lru_cache
 
 import httpx
 
+from services.common.brokers import resolve_kafka_brokers
 from services.common.stream_scope import stream_partition_key
 from services.common.native_fastpath import encode_event_bundle
 
@@ -40,7 +41,7 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     except Exception:
         from historian.client import insert_industrial_event, insert_dead_letter  # type: ignore
 
-    brokers = os.getenv("REDPANDA_BROKERS", "localhost:19092")
+    brokers = resolve_kafka_brokers("localhost:19092")
     normalized_topic = os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized")
     raw_topic = os.getenv("INDUSTRIAL_RAW_TOPIC", "industrial.raw")
     legacy_topic = os.getenv("IOT_TOPIC", "iot.raw")

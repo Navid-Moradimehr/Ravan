@@ -6,12 +6,12 @@ Use an industrial control-room visual system: graphite surfaces, sharp borders, 
 
 ## Screens
 
-- Overview cockpit
-- Stream explorer
+- Command center
+- Pipeline explorer
 - Processing and Flink view
-- CDC view
-- AI gateway view
-- Ops/debug view
+- Historian and CDC view
+- Observability view
+- Integrations and AI view
 
 ## Constraints
 

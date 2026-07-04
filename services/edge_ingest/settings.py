@@ -3,10 +3,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from services.common.brokers import resolve_kafka_brokers
+
 
 @dataclass(frozen=True)
 class Settings:
-    brokers: str = os.getenv("REDPANDA_BROKERS", "localhost:19092")
+    brokers: str = resolve_kafka_brokers("localhost:19092")
     normalized_topic: str = os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized")
     raw_topic: str = os.getenv("INDUSTRIAL_RAW_TOPIC", "industrial.raw")
     legacy_topic: str = os.getenv("IOT_TOPIC", "iot.raw")

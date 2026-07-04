@@ -19,6 +19,7 @@ except Exception:  # pragma: no cover - optional runtime dependency
     Producer = Any  # type: ignore[assignment]
     HAS_KAFKA = False
 
+from services.common.brokers import resolve_kafka_brokers
 from services.edge_ingest.model import IndustrialEvent, to_json_bytes, utc_now
 from services.common.stream_scope import stream_partition_key
 
@@ -155,10 +156,10 @@ def replay(config: ReplayConfig) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Replay industrial dataset CSV into Kafka/Redpanda")
+    parser = argparse.ArgumentParser(description="Replay industrial dataset CSV into Kafka")
     parser.add_argument("--csv", required=True, type=Path, help="Path to CSV file")
     parser.add_argument("--topic", default="industrial.normalized", help="Target Kafka topic")
-    parser.add_argument("--brokers", default=os.getenv("REDPANDA_BROKERS", "localhost:19092"), help="Kafka brokers")
+    parser.add_argument("--brokers", default=resolve_kafka_brokers("localhost:19092"), help="Kafka brokers")
     parser.add_argument("--rate", type=int, default=10, help="Messages per second")
     parser.add_argument("--loop", action="store_true", help="Loop the dataset indefinitely")
     parser.add_argument("--timestamp-col", default=None, help="Column to use as ts_source")

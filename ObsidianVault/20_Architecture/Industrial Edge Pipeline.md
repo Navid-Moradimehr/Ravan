@@ -4,7 +4,7 @@ The project now has a hardware-free industrial edge tier.
 
 ## Components
 
-- `edge-ingest`: bridges OPC UA, MQTT, and Modbus TCP payloads into Redpanda.
+- `edge-ingest`: bridges OPC UA, MQTT, and Modbus TCP payloads into Kafka.
 - `opcua-sim`: deterministic OPC UA tag simulator for `Pump-01`.
 - `mqtt-broker` and `mqtt-sim`: broker plus telemetry publisher.
 - `modbus-sim`: Modbus TCP holding-register simulator for `Pump-03`.

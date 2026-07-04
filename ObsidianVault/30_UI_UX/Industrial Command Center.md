@@ -1,6 +1,6 @@
 # Industrial Command Center
 
-The dashboard has been rebuilt as a shadcn-based operations cockpit.
+The dashboard is now a routed shadcn-based operations cockpit with a dedicated command center and separate domain views.
 
 ## Design Direction
 
@@ -11,9 +11,9 @@ The dashboard has been rebuilt as a shadcn-based operations cockpit.
 
 ## Primary Views
 
-- Overview KPIs.
-- Protocol source health.
-- Pipeline stages.
-- Live event sample table.
-- Test workflow commands.
-- AI gateway and operator links.
+- Command center overview.
+- Pipeline view.
+- Processing view.
+- Historian view.
+- Observability view.
+- Integrations view.

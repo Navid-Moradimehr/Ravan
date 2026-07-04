@@ -379,7 +379,7 @@ For the operator install and upgrade path, see `docs/self-host-install-guide.md`
 | `processor` | `services.processor.runtime_processor` | Stream processing and anomaly scoring |
 | `mock` | `services.datasets.mock_generator` | Mock industrial data generator |
 
-`datastreamd` manages the Python services only. Docker infrastructure (Redpanda, Postgres/TimescaleDB, Grafana, Prometheus) still runs through `docker compose` as before.
+`datastreamd` manages the Python services only. Docker infrastructure (Kafka, Postgres/TimescaleDB, Grafana, Prometheus) still runs through `docker compose` as before.
 
 ### Commands
 
@@ -404,6 +404,6 @@ datastreamd logs api -n 50        # tail a service log
 
 Before `datastreamd up` will keep services UP:
 
-1. `docker compose -f docker/docker-compose.yml up -d` for Redpanda, Postgres/TimescaleDB, Grafana.
+1. `docker compose -f docker/docker-compose.yml up -d` for Kafka, Postgres/TimescaleDB, Grafana.
 2. `scripts/create-industrial-topics.ps1` (or `.sh`) to create Kafka topics.
 3. A valid `.env` copied from `.env.example`.

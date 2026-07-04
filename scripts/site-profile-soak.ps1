@@ -50,7 +50,7 @@ function Wait-HttpOk {
 }
 
 Write-Host "Preparing infrastructure for site profile soak..."
-docker compose -f $compose --profile edge up -d redpanda postgres mqtt-broker mqtt-sim opcua-sim modbus-sim prometheus grafana
+docker compose -f $compose --profile edge up -d kafka postgres mqtt-broker mqtt-sim opcua-sim modbus-sim prometheus grafana
 if ($LASTEXITCODE -ne 0) { throw "docker compose up failed" }
 
 Write-Host "Stopping compose-managed app services to avoid port conflicts..."
@@ -64,6 +64,7 @@ $env:MQTT_RATE_PER_SECOND = "$MqttRatePerSecond"
 $env:TIMESCALE_HOST = "localhost"
 $env:TIMESCALE_PORT = "15432"
 $env:DATASTREAM_DOCKER_DB_SERVICE = "postgres"
+$env:KAFKA_BROKERS = "localhost:19092"
 $env:REDPANDA_BROKERS = "localhost:19092"
 $env:MQTT_HOST = "localhost"
 $env:MQTT_PORT = "1883"

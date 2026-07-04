@@ -7,8 +7,8 @@ Build a local-first streaming and BI control plane that combines real-time inges
 ## MVP Sequence
 
 1. Bootstrap repository, docs vault, scripts, and environment templates.
-2. Start core Docker infrastructure: Redpanda, Redpanda Console, PostgreSQL, Prometheus, Grafana.
-3. Produce deterministic IoT sensor events into Redpanda.
+2. Start core Docker infrastructure: Kafka, Kafka UI, PostgreSQL, Prometheus, Grafana.
+3. Produce deterministic IoT sensor events into Kafka.
 4. Process events with a PyFlink anomaly/window job.
 5. Batch processed events into a provider-neutral AI gateway.
 6. Add Debezium CDC from PostgreSQL `orders`.

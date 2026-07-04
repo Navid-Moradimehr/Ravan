@@ -7,12 +7,12 @@
   "panels": [
     {
       "type": "timeseries",
-      "title": "Redpanda Kafka requests",
+      "title": "Edge ingest throughput",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(redpanda_kafka_request_latency_seconds_count[1m]))",
-          "legendFormat": "requests/sec"
+          "expr": "sum(rate(edge_ingest_events_total[1m]))",
+          "legendFormat": "events/sec"
         }
       ]
     },

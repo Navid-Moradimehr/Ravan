@@ -37,7 +37,7 @@ The platform should not force users to outsource:
 
 Use for a pilot line or first plant.
 
-- one Redpanda cluster
+- one Kafka cluster
 - one historian
 - one AI gateway
 - one API/UI layer
@@ -167,7 +167,7 @@ Use these fields to identify a stream:
 
 Recommended behavior:
 
-- use the full stream identity for Kafka/Redpanda partition keys
+- use the full stream identity for Kafka partition keys
 - store the raw historian rows with source-aware metadata intact
 - keep each PLC or gateway stream separate even when two sources report the same asset and tag
 - bridge streams only through explicit correlation, federation, or outbound bridge rules

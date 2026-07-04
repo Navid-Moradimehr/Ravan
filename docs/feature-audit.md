@@ -31,7 +31,7 @@ For the current complete/incomplete production checklist, see `docs/production-r
 - Latency metrics (p95)
 
 ### Data Pipeline (6/6)
-- CDC pipeline (PostgreSQL → Debezium → Redpanda)
+- CDC pipeline (PostgreSQL → Debezium → Kafka)
 - Dataset replay engine
 - AI4I 2020 adapter
 - Generic CSV replayer
