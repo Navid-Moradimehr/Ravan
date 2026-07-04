@@ -871,6 +871,40 @@ class TestDatastreamctl:
         assert "graphs_per_second=" in out
         assert "entity_count=7" in out
 
+    def test_benchmark_semantic_graph_query_runs(self, monkeypatch, tmp_path):
+        hierarchy_path = tmp_path / "assets.yaml"
+        hierarchy_path.write_text("sites: []", encoding="utf-8")
+        monkeypatch.setattr(
+            ctl,
+            "run_semantic_graph_query_benchmark",
+            lambda *args, **kwargs: SimpleNamespace(
+                hierarchy_path=str(hierarchy_path),
+                iterations=100,
+                warmup_iterations=10,
+                query_count=3,
+                matched_entities=12,
+                matched_relationships=24,
+                elapsed_seconds=0.02,
+                queries_per_second=15_000.0,
+            ),
+        )
+        rc, out = self._run([
+            "benchmark",
+            "semantic-graph-query",
+            "--hierarchy",
+            str(hierarchy_path),
+            "--iterations",
+            "100",
+            "--warmup-iterations",
+            "10",
+            "--limit",
+            "5",
+        ])
+        assert rc == 0
+        assert "semantic graph query benchmark" in out
+        assert "queries_per_second=" in out
+        assert "query_count=3" in out
+
     def test_benchmark_end_to_end_pipeline_runs(self, monkeypatch, tmp_path):
         csv_path = tmp_path / "mock.csv"
         csv_path.write_text(

@@ -252,6 +252,56 @@ class SemanticGraph:
             "events": len(self.events),
         }
 
+    def search_entities(self, query: str, *, limit: int = 10) -> list[SemanticEntity]:
+        tokens = {part.lower() for part in query.replace("/", " ").replace("-", " ").split() if part}
+        scored: list[tuple[int, SemanticEntity]] = []
+        for entity in self.entities.values():
+            score = 0
+            candidate_terms = {entity.entity_id.lower(), entity.entity_type.lower(), entity.name.lower(), *{label.lower() for label in entity.labels}}
+            candidate_terms.update(str(value).lower() for value in entity.metadata.values() if value is not None)
+            for token in tokens:
+                if token in candidate_terms:
+                    score += 3
+                elif any(token in term or term in token for term in candidate_terms):
+                    score += 1
+            if score > 0:
+                scored.append((score, entity))
+        scored.sort(key=lambda item: (-item[0], item[1].entity_id))
+        return [entity for _, entity in scored[: max(1, limit)]]
+
+    def search_relationships(self, query: str, *, limit: int = 10) -> list[SemanticRelationship]:
+        tokens = {part.lower() for part in query.replace("/", " ").replace("-", " ").split() if part}
+        scored: list[tuple[int, SemanticRelationship]] = []
+        for relationship in self.relationships.values():
+            score = 0
+            candidate_terms = {
+                relationship.relationship_id.lower(),
+                relationship.relationship_type.lower(),
+                relationship.source_id.lower(),
+                relationship.target_id.lower(),
+            }
+            candidate_terms.update(str(value).lower() for value in relationship.metadata.values() if value is not None)
+            for token in tokens:
+                if token in candidate_terms:
+                    score += 3
+                elif any(token in term or term in token for term in candidate_terms):
+                    score += 1
+            if score > 0:
+                scored.append((score, relationship))
+        scored.sort(key=lambda item: (-item[0], item[1].relationship_id))
+        return [relationship for _, relationship in scored[: max(1, limit)]]
+
+    def graph_search(self, query: str, *, limit: int = 10) -> dict[str, Any]:
+        entities = self.search_entities(query, limit=limit)
+        relationships = self.search_relationships(query, limit=limit)
+        return {
+            "query": query,
+            "limit": limit,
+            "entities": [entity.to_dict() for entity in entities],
+            "relationships": [relationship.to_dict() for relationship in relationships],
+            "counts": {"entities": len(entities), "relationships": len(relationships)},
+        }
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "ontology_packs": [pack.to_dict() for pack in self.ontology_packs],

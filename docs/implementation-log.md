@@ -18,6 +18,24 @@
 
 - The current manufacturing ontology remains intact. The new semantic layer is additive and is intended to become the platform core over time.
 
+## 2026-07-04 - Semantic Planner And Graph Query Layer
+
+### Changed
+
+1. **Ontology-aware SQL planner**
+   - Updated `services/common/semantic_model.py` and `services/common/query_plan.py` so the deterministic query planner now carries ontology-pack metadata.
+   - The planner still resolves the same industrial SQL shapes, but it now records whether a query belongs to the platform core or the manufacturing pack.
+
+2. **Graph query API**
+   - Added graph search and entity/relationship lookup endpoints under `/api/v1/semantic/graph`.
+
+3. **Benchmark coverage**
+   - Added a semantic-graph query benchmark in addition to the projection benchmark.
+
+### Notes
+
+- Pack metadata is advisory, not a hard partition. The current planner behavior stays compatible with existing historian and alarm queries.
+
 ## 2026-07-03 - OS Packaging Scripts And Windows Bundle Export
 
 ### Changed

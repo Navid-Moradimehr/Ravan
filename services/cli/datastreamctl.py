@@ -36,6 +36,8 @@ from services.benchmarks.real_world_simulator import format_result as format_rea
 from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
 from services.benchmarks.semantic_graph_slice import format_result as format_semantic_graph_slice_result
 from services.benchmarks.semantic_graph_slice import run_benchmark as run_semantic_graph_slice_benchmark
+from services.benchmarks.semantic_graph_query import format_result as format_semantic_graph_query_result
+from services.benchmarks.semantic_graph_query import run_benchmark as run_semantic_graph_query_benchmark
 from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
 from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
 from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
@@ -1399,6 +1401,32 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("=" * 40)
             print(format_semantic_graph_slice_result(result))
         return 0
+    if args.action == "semantic-graph-query":
+        result = run_semantic_graph_query_benchmark(
+            Path(args.hierarchy),
+            iterations=args.iterations,
+            warmup_iterations=args.warmup_iterations,
+            limit=args.limit,
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "hierarchy_path": result.hierarchy_path,
+                    "iterations": result.iterations,
+                    "warmup_iterations": result.warmup_iterations,
+                    "query_count": result.query_count,
+                    "matched_entities": result.matched_entities,
+                    "matched_relationships": result.matched_relationships,
+                    "elapsed_seconds": result.elapsed_seconds,
+                    "queries_per_second": result.queries_per_second,
+                },
+                indent=2,
+            ))
+        else:
+            print("semantic graph query benchmark")
+            print("=" * 40)
+            print(format_semantic_graph_query_result(result))
+        return 0
     if args.action == "production-pipeline":
         result = run_production_pipeline_benchmark(
             Path(args.csv),
@@ -1719,6 +1747,13 @@ def build_parser() -> argparse.ArgumentParser:
     semantic_graph_slice.add_argument("--warmup-iterations", type=int, default=100)
     semantic_graph_slice.add_argument("--json", action="store_true")
     semantic_graph_slice.set_defaults(func=cmd_benchmark)
+    semantic_graph_query = benchmark_sub.add_parser("semantic-graph-query", help="Benchmark semantic graph query throughput")
+    semantic_graph_query.add_argument("--hierarchy", default=str(Path("config/assets.yaml")))
+    semantic_graph_query.add_argument("--iterations", type=int, default=1_000)
+    semantic_graph_query.add_argument("--warmup-iterations", type=int, default=100)
+    semantic_graph_query.add_argument("--limit", type=int, default=10)
+    semantic_graph_query.add_argument("--json", action="store_true")
+    semantic_graph_query.set_defaults(func=cmd_benchmark)
     production_pipeline = benchmark_sub.add_parser("production-pipeline", help="Benchmark the selected production runtime mode")
     production_pipeline.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
     production_pipeline.add_argument("--events", type=int, default=10_000)

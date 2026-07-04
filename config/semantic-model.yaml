@@ -3,9 +3,53 @@ version: "1.0"
 notes:
   - Deterministic semantic layer for industrial historian, alarms, assets, reports, and scenarios.
   - The model compiles only read-only SQL and can be used as a compatibility layer for future LLM planners.
+ontology_packs:
+  - pack_id: platform.core
+    name: Platform Core
+    layer: platform
+    version: "1.0"
+    concepts:
+      - Entity
+      - Relationship
+      - Event
+      - Observation
+      - Measurement
+      - State
+      - Action
+      - Document
+      - Location
+      - Policy
+      - Time
+      - Workflow
+      - Schema
+      - Lineage
+    notes:
+      - Universal primitives used by every installation.
+  - pack_id: industry.manufacturing
+    name: Manufacturing Pack
+    layer: industry
+    version: "1.0"
+    concepts:
+      - Site
+      - Area
+      - Line
+      - Cell
+      - Asset
+      - Tag
+      - Shift
+      - Batch
+      - Recipe
+      - Machine
+      - Operator
+      - WorkOrder
+      - Product
+      - OEE
+    notes:
+      - First domain pack for the current industrial app.
 entities:
   - name: industrial_events
     table: industrial_events
+    ontology_pack: platform.core
     kind: fact
     time_field: time
     aliases: [events, historian, telemetry, measurements]
@@ -45,6 +89,7 @@ entities:
         kind: dimension
   - name: processed_events
     table: processed_events
+    ontology_pack: platform.core
     kind: fact
     time_field: time
     aliases: [alarms, warnings, anomalies]
@@ -73,6 +118,7 @@ entities:
         kind: dimension
   - name: assets
     table: assets
+    ontology_pack: industry.manufacturing
     kind: dimension
     aliases: [hierarchy, site topology, equipment]
     default_limit: 500
@@ -94,6 +140,7 @@ entities:
         kind: dimension
   - name: report_templates
     table: report_templates
+    ontology_pack: platform.core
     kind: dimension
     aliases: [reports, templates]
     default_limit: 100
@@ -112,6 +159,7 @@ entities:
         kind: dimension
   - name: scenarios
     table: scenarios
+    ontology_pack: platform.core
     kind: dimension
     aliases: [simulation, test cases, benchmarks]
     default_limit: 100

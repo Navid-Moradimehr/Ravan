@@ -7,6 +7,8 @@ from typing import Any
 
 import yaml
 
+from services.common.semantic_core import DEFAULT_ONTOLOGY_PACKS, OntologyPack
+
 
 @dataclass(frozen=True)
 class SemanticField:
@@ -24,6 +26,7 @@ class SemanticField:
 class SemanticEntity:
     name: str
     table: str
+    ontology_pack: str = "platform.core"
     kind: str = "fact"
     time_field: str | None = None
     aliases: tuple[str, ...] = field(default_factory=tuple)
@@ -48,6 +51,7 @@ class SemanticEntity:
 class SemanticModel:
     name: str
     version: str
+    ontology_packs: tuple[OntologyPack, ...]
     entities: tuple[SemanticEntity, ...]
     notes: tuple[str, ...] = field(default_factory=tuple)
 
@@ -56,6 +60,36 @@ class SemanticModel:
 
     def entity_map(self) -> dict[str, SemanticEntity]:
         return {entity.name: entity for entity in self.entities}
+
+    def pack_map(self) -> dict[str, OntologyPack]:
+        return {pack.pack_id: pack for pack in self.ontology_packs}
+
+    def find_pack(self, pack_id: str) -> OntologyPack | None:
+        lookup = str(pack_id).lower().strip()
+        for pack in self.ontology_packs:
+            if lookup == pack.pack_id.lower() or lookup == pack.name.lower():
+                return pack
+        return None
+
+    def infer_pack(self, query_terms: list[str]) -> OntologyPack | None:
+        lowered = {term.lower() for term in query_terms}
+        best: OntologyPack | None = None
+        best_score = -1
+        for pack in self.ontology_packs:
+            score = 0
+            terms = {pack.pack_id.lower(), pack.name.lower(), pack.layer.lower()}
+            terms.update(concept.lower() for concept in pack.concepts)
+            for note in pack.notes:
+                terms.update(note.lower().split())
+            for term in lowered:
+                if term in terms:
+                    score += 3
+                elif any(term in candidate or candidate in term for candidate in terms):
+                    score += 1
+            if score > best_score:
+                best = pack
+                best_score = score
+        return best
 
     def find_entity(self, name: str) -> SemanticEntity | None:
         lookup = str(name).lower().strip()
@@ -94,10 +128,12 @@ def _default_model_dict() -> dict[str, Any]:
             "Semantic layer is deterministic and provider-neutral.",
             "It is designed to compile only validated select queries.",
         ],
+        "ontology_packs": list(DEFAULT_ONTOLOGY_PACKS),
         "entities": [
             {
                 "name": "industrial_events",
                 "table": "industrial_events",
+                "ontology_pack": "platform.core",
                 "kind": "fact",
                 "time_field": "time",
                 "aliases": ["events", "historian", "telemetry", "measurements"],
@@ -117,6 +153,7 @@ def _default_model_dict() -> dict[str, Any]:
             {
                 "name": "processed_events",
                 "table": "processed_events",
+                "ontology_pack": "platform.core",
                 "kind": "fact",
                 "time_field": "time",
                 "aliases": ["alarms", "warnings", "anomalies"],
@@ -134,6 +171,7 @@ def _default_model_dict() -> dict[str, Any]:
             {
                 "name": "assets",
                 "table": "assets",
+                "ontology_pack": "industry.manufacturing",
                 "kind": "dimension",
                 "aliases": ["hierarchy", "site topology", "equipment"],
                 "fields": [
@@ -148,6 +186,7 @@ def _default_model_dict() -> dict[str, Any]:
             {
                 "name": "report_templates",
                 "table": "report_templates",
+                "ontology_pack": "platform.core",
                 "kind": "dimension",
                 "aliases": ["reports", "templates"],
                 "fields": [
@@ -161,6 +200,7 @@ def _default_model_dict() -> dict[str, Any]:
             {
                 "name": "scenarios",
                 "table": "scenarios",
+                "ontology_pack": "platform.core",
                 "kind": "dimension",
                 "aliases": ["simulation", "test cases", "benchmarks"],
                 "fields": [
@@ -176,6 +216,18 @@ def _default_model_dict() -> dict[str, Any]:
 
 
 def _load_model_from_data(data: dict[str, Any]) -> SemanticModel:
+    ontology_packs = tuple(
+        OntologyPack(
+            pack_id=str(raw_pack.get("pack_id", "")),
+            name=str(raw_pack.get("name", "")),
+            layer=str(raw_pack.get("layer", "platform")),
+            version=str(raw_pack.get("version", "1.0")),
+            concepts=tuple(str(concept) for concept in raw_pack.get("concepts", []) if concept),
+            notes=tuple(str(note) for note in raw_pack.get("notes", []) if note),
+        )
+        for raw_pack in data.get("ontology_packs", [])
+        if raw_pack.get("pack_id")
+    )
     entities: list[SemanticEntity] = []
     for raw_entity in data.get("entities", []):
         fields = tuple(
@@ -193,6 +245,7 @@ def _load_model_from_data(data: dict[str, Any]) -> SemanticModel:
             SemanticEntity(
                 name=str(raw_entity.get("name", "")),
                 table=str(raw_entity.get("table", raw_entity.get("name", ""))),
+                ontology_pack=str(raw_entity.get("ontology_pack", "platform.core")),
                 kind=str(raw_entity.get("kind", "fact")),
                 time_field=raw_entity.get("time_field"),
                 aliases=tuple(str(alias) for alias in raw_entity.get("aliases", []) if alias),
@@ -203,6 +256,17 @@ def _load_model_from_data(data: dict[str, Any]) -> SemanticModel:
     return SemanticModel(
         name=str(data.get("name", "industrial-semantic-model")),
         version=str(data.get("version", "1.0")),
+        ontology_packs=ontology_packs or tuple(
+            OntologyPack(
+                pack_id=str(raw_pack["pack_id"]),
+                name=str(raw_pack["name"]),
+                layer=str(raw_pack["layer"]),
+                version=str(raw_pack["version"]),
+                concepts=tuple(str(concept) for concept in raw_pack["concepts"]),
+                notes=tuple(str(note) for note in raw_pack["notes"]),
+            )
+            for raw_pack in DEFAULT_ONTOLOGY_PACKS
+        ),
         entities=tuple(entities),
         notes=tuple(str(note) for note in data.get("notes", []) if note),
     )
@@ -218,4 +282,3 @@ def load_semantic_model(path: str | Path | None = None) -> SemanticModel:
     else:
         data = _default_model_dict()
     return _load_model_from_data(data)
-

@@ -12,8 +12,13 @@ Keep the current industrial app intact, but project it onto a universal semantic
 - API endpoints:
   - `/api/v1/semantic/core`
   - `/api/v1/semantic/graph`
+- Graph query endpoints:
+  - `/api/v1/semantic/graph/search`
+  - `/api/v1/semantic/graph/entities/{entity_id}`
+  - `/api/v1/semantic/graph/relationships/{relationship_id}`
 - Benchmark:
   - semantic graph projection slice
+  - semantic graph query slice
 
 ## Architecture Note
 

@@ -8,7 +8,9 @@ The platform now exposes a universal semantic substrate alongside the existing i
 - Ontology packs: a stable platform-core pack plus a manufacturing pack that preserves the current app vocabulary.
 - Semantic projection: the current `Site -> Area -> Line -> Cell -> Asset -> Tag` hierarchy can now be projected into a graph without changing the source model.
 - API surface: `/api/v1/semantic/core` and `/api/v1/semantic/graph`.
+- Graph query surface: `/api/v1/semantic/graph/search`, `/api/v1/semantic/graph/entities/{entity_id}`, and `/api/v1/semantic/graph/relationships/{relationship_id}`.
 - Benchmark: a semantic-graph projection benchmark that measures projection cost separately from ingestion and historian paths.
+- Benchmark: a semantic-graph query benchmark that measures graph-search throughput separately from projection.
 
 ## Design Rule
 

@@ -38,6 +38,7 @@ class QueryPlan:
     intent: str
     entity: str
     table: str
+    ontology_pack: str = "platform.core"
     measure: str | None = None
     select_fields: tuple[str, ...] = field(default_factory=tuple)
     filters: tuple[QueryFilter, ...] = field(default_factory=tuple)
@@ -84,28 +85,43 @@ def _detect_time_window(tokens: list[str]) -> tuple[dict[str, Any] | None, list[
 
 
 def _pick_entity(model: SemanticModel, tokens: list[str]) -> SemanticEntity:
+    return _pick_entity_with_pack(model, tokens, None)
+
+
+def _pick_entity_with_pack(model: SemanticModel, tokens: list[str], pack_id: str | None) -> SemanticEntity:
+    scoped_model = model
+    if pack_id:
+        scoped_entities = tuple(entity for entity in model.entities if entity.ontology_pack == pack_id)
+        if scoped_entities:
+            scoped_model = SemanticModel(
+                name=model.name,
+                version=model.version,
+                ontology_packs=model.ontology_packs,
+                entities=scoped_entities,
+                notes=model.notes,
+            )
     lowered = set(tokens)
     if {"alarm", "alarms", "warning", "warnings", "critical", "anomaly"} & lowered:
-        entity = model.find_entity("processed_events")
+        entity = scoped_model.find_entity("processed_events")
         if entity:
             return entity
     if {"trend", "history", "hist", "telemetry", "events", "measurements"} & lowered:
-        entity = model.find_entity("industrial_events")
+        entity = scoped_model.find_entity("industrial_events")
         if entity:
             return entity
     if {"asset", "assets", "equipment", "hierarchy"} & lowered:
-        entity = model.find_entity("assets")
+        entity = scoped_model.find_entity("assets")
         if entity:
             return entity
     if {"report", "reports", "template", "templates"} & lowered:
-        entity = model.find_entity("report_templates")
+        entity = scoped_model.find_entity("report_templates")
         if entity:
             return entity
     if {"scenario", "scenarios", "benchmark", "benchmarks"} & lowered:
-        entity = model.find_entity("scenarios")
+        entity = scoped_model.find_entity("scenarios")
         if entity:
             return entity
-    return model.infer_entity(tokens)
+    return scoped_model.infer_entity(tokens)
 
 
 def _pick_measure(tokens: list[str]) -> tuple[str | None, list[str]]:
@@ -145,6 +161,7 @@ def build_query_plan(
 ) -> QueryPlan:
     semantic_model = model or load_semantic_model()
     tokens = _tokenize(query)
+    selected_pack = semantic_model.infer_pack(tokens) or semantic_model.find_pack("platform.core")
     entity = _pick_entity(semantic_model, tokens)
     measure, measure_notes = _pick_measure(tokens)
     time_window, time_notes = _detect_time_window(tokens)
@@ -189,10 +206,13 @@ def build_query_plan(
             limit = 100
 
     notes = tuple(note for note in (*measure_notes, *time_notes) if note)
+    if selected_pack is not None:
+        notes = (*notes, f"ontology pack selected: {selected_pack.pack_id}")
     return QueryPlan(
         intent=query,
         entity=entity.name,
         table=entity.table,
+        ontology_pack=entity.ontology_pack or (selected_pack.pack_id if selected_pack else "platform.core"),
         measure=measure,
         select_fields=tuple(dict.fromkeys(select_fields)),
         filters=tuple(filters),

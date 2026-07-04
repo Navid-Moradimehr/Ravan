@@ -20,6 +20,7 @@ def test_build_and_compile_alarm_plan():
     assert "LIMIT %s" in compiled.sql
     assert compiled.params[0] == 6
     assert validate_readonly_sql(compiled.sql).allowed
+    assert plan.ontology_pack == "platform.core"
 
 
 def test_build_and_compile_count_plan():
@@ -31,3 +32,10 @@ def test_build_and_compile_count_plan():
     assert "GROUP BY" in compiled.sql or plan.group_by == ()
     assert compiled.params[0] == 24
 
+
+def test_asset_queries_prefer_manufacturing_pack():
+    model = load_semantic_model()
+    plan = build_query_plan("show asset hierarchy and equipment", model=model, limit=10)
+
+    assert plan.entity == "assets"
+    assert plan.ontology_pack == "industry.manufacturing"
