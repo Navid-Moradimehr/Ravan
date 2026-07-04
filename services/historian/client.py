@@ -11,6 +11,20 @@ from typing import Any, Callable
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor, execute_values
 
+from services.common.semantic_core import (
+    OntologyPack,
+    SemanticAction,
+    SemanticDocument,
+    SemanticEntity,
+    SemanticEvent,
+    SemanticGraph,
+    SemanticLocation,
+    SemanticMeasurement,
+    SemanticObservation,
+    SemanticRelationship,
+    SemanticState,
+    SemanticWorkflow,
+)
 from services.common.sql_compiler import validate_readonly_sql
 from services.common.runtime_metrics import observe_historian_query
 
@@ -49,6 +63,20 @@ WRITE_BACKOFF_SECONDS = tuple(
     float(x) for x in os.getenv("HISTORIAN_WRITE_BACKOFF_SECONDS", "0.2,0.6,1.8").split(",")
 )
 ALLOWED_QUERY_TABLES = {"industrial_events", "processed_events", "ai_enriched", "dead_letter_events"}
+SEMANTIC_TABLES = {
+    "semantic_ontology_packs",
+    "semantic_entities",
+    "semantic_relationships",
+    "semantic_measurements",
+    "semantic_observations",
+    "semantic_actions",
+    "semantic_documents",
+    "semantic_locations",
+    "semantic_states",
+    "semantic_workflows",
+    "semantic_events",
+    "semantic_lineage",
+}
 
 
 def _connection_string() -> str:
@@ -430,6 +458,456 @@ def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
         }
         for row in rows
     ]
+
+
+def _semantic_rows(table: str, order_by: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
+    if table not in SEMANTIC_TABLES:
+        raise ValueError(f"unsupported semantic table: {table}")
+    sql = f"SELECT * FROM {table}"
+    if order_by:
+        sql += f" ORDER BY {order_by}"
+    params: tuple[Any, ...] = ()
+    if limit is not None:
+        sql += " LIMIT %s"
+        params = (limit,)
+    return _fetch_rows(table, "semantic_read", sql, params)
+
+
+def _semantic_upsert(
+    table: str,
+    key_column: str,
+    row: dict[str, Any],
+    *,
+    json_columns: set[str] | None = None,
+) -> dict[str, Any]:
+    json_columns = json_columns or set()
+    columns = list(row.keys())
+    if key_column not in columns:
+        raise ValueError(f"{table} upsert requires key column {key_column}")
+    values = [Json(row[column]) if column in json_columns else row[column] for column in columns]
+    updates = ", ".join(f"{column} = EXCLUDED.{column}" for column in columns if column != key_column)
+    if updates:
+        updates = f"{updates}, updated_at = NOW()"
+    statement = f"""
+        INSERT INTO {table} ({", ".join(columns)})
+        VALUES ({", ".join(["%s"] * len(columns))})
+        ON CONFLICT ({key_column}) DO UPDATE SET
+            {updates}
+    """
+    def do_write() -> None:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(statement, values)
+            conn.commit()
+
+    _execute_with_retry(table, do_write)
+    return row
+
+
+def replace_semantic_graph(graph: Any) -> None:
+    from services.common.semantic_core import SemanticGraph
+
+    if not isinstance(graph, SemanticGraph):
+        raise TypeError("graph must be a SemanticGraph")
+
+    def do_write() -> None:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                for table in (
+                    "semantic_events",
+                    "semantic_workflows",
+                    "semantic_states",
+                    "semantic_locations",
+                    "semantic_documents",
+                    "semantic_actions",
+                    "semantic_observations",
+                    "semantic_measurements",
+                    "semantic_relationships",
+                    "semantic_entities",
+                    "semantic_ontology_packs",
+                ):
+                    cur.execute(f"DELETE FROM {table}")
+
+                for pack in graph.ontology_packs:
+                    cur.execute(
+                        """
+                        INSERT INTO semantic_ontology_packs (
+                            pack_id, name, layer, version, concepts, notes, metadata, updated_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                        ON CONFLICT (pack_id) DO UPDATE SET
+                            name = EXCLUDED.name,
+                            layer = EXCLUDED.layer,
+                            version = EXCLUDED.version,
+                            concepts = EXCLUDED.concepts,
+                            notes = EXCLUDED.notes,
+                            metadata = EXCLUDED.metadata,
+                            updated_at = NOW()
+                        """,
+                        (
+                            pack.pack_id,
+                            pack.name,
+                            pack.layer,
+                            pack.version,
+                            list(pack.concepts),
+                            list(pack.notes),
+                            Json({}),
+                        ),
+                    )
+
+                def _insert_many(table: str, rows: list[tuple[Any, ...]], statement: str) -> None:
+                    if rows:
+                        execute_values(cur, statement, rows, page_size=len(rows))
+
+                _insert_many(
+                    "semantic_entities",
+                    [
+                        (
+                            entity.entity_id,
+                            entity.entity_type,
+                            entity.name,
+                            list(entity.labels),
+                            Json(entity.metadata),
+                        )
+                        for entity in graph.entities.values()
+                    ],
+                    """
+                    INSERT INTO semantic_entities (
+                        entity_id, entity_type, name, labels, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+                _insert_many(
+                    "semantic_relationships",
+                    [
+                        (
+                            relationship.relationship_id,
+                            relationship.source_id,
+                            relationship.target_id,
+                            relationship.relationship_type,
+                            Json(relationship.metadata),
+                        )
+                        for relationship in graph.relationships.values()
+                    ],
+                    """
+                    INSERT INTO semantic_relationships (
+                        relationship_id, source_id, target_id, relationship_type, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+                _insert_many(
+                    "semantic_measurements",
+                    [
+                        (
+                            measurement.measurement_id,
+                            measurement.entity_id,
+                            measurement.name,
+                            measurement.unit,
+                            measurement.minimum,
+                            measurement.maximum,
+                            measurement.warning_low,
+                            measurement.warning_high,
+                            measurement.critical_low,
+                            measurement.critical_high,
+                            measurement.sampling_rate_hz,
+                            Json(measurement.metadata),
+                        )
+                        for measurement in graph.measurements.values()
+                    ],
+                    """
+                    INSERT INTO semantic_measurements (
+                        measurement_id, entity_id, name, unit, minimum, maximum,
+                        warning_low, warning_high, critical_low, critical_high,
+                        sampling_rate_hz, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+                _insert_many(
+                    "semantic_observations",
+                    [
+                        (
+                            observation.observation_id,
+                            observation.entity_id,
+                            observation.observed_at,
+                            Json(observation.value),
+                            observation.source_id,
+                            Json(observation.metadata),
+                        )
+                        for observation in graph.observations.values()
+                    ],
+                    """
+                    INSERT INTO semantic_observations (
+                        observation_id, entity_id, observed_at, value, source_id, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+                _insert_many(
+                    "semantic_actions",
+                    [
+                        (
+                            action.action_id,
+                            action.actor_id,
+                            action.target_id,
+                            action.action_type,
+                            action.occurred_at,
+                            Json(action.metadata),
+                        )
+                        for action in graph.actions.values()
+                    ],
+                    """
+                    INSERT INTO semantic_actions (
+                        action_id, actor_id, target_id, action_type, occurred_at, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+                _insert_many(
+                    "semantic_documents",
+                    [
+                        (
+                            document.document_id,
+                            document.title,
+                            document.document_type,
+                            document.uri,
+                            Json(document.metadata),
+                        )
+                        for document in graph.documents.values()
+                    ],
+                    """
+                    INSERT INTO semantic_documents (
+                        document_id, title, document_type, uri, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+                _insert_many(
+                    "semantic_locations",
+                    [
+                        (
+                            location.location_id,
+                            location.name,
+                            location.location_type,
+                            location.parent_id,
+                            Json(location.metadata),
+                        )
+                        for location in graph.locations.values()
+                    ],
+                    """
+                    INSERT INTO semantic_locations (
+                        location_id, name, location_type, parent_id, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+                _insert_many(
+                    "semantic_states",
+                    [
+                        (
+                            state.state_id,
+                            state.entity_id,
+                            state.state,
+                            state.valid_from,
+                            state.valid_to,
+                            Json(state.metadata),
+                        )
+                        for state in graph.states.values()
+                    ],
+                    """
+                    INSERT INTO semantic_states (
+                        state_id, entity_id, state, valid_from, valid_to, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+                _insert_many(
+                    "semantic_workflows",
+                    [
+                        (
+                            workflow.workflow_id,
+                            workflow.name,
+                            workflow.workflow_type,
+                            Json(workflow.metadata),
+                        )
+                        for workflow in graph.workflows.values()
+                    ],
+                    """
+                    INSERT INTO semantic_workflows (
+                        workflow_id, name, workflow_type, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+                _insert_many(
+                    "semantic_events",
+                    [
+                        (
+                            event.event_id,
+                            event.event_type,
+                            event.occurred_at,
+                            event.source_id,
+                            event.entity_id,
+                            Json(event.payload),
+                            Json(event.metadata),
+                        )
+                        for event in graph.events.values()
+                    ],
+                    """
+                    INSERT INTO semantic_events (
+                        event_id, event_type, occurred_at, source_id, entity_id, payload, metadata, updated_at
+                    ) VALUES %s
+                    """,
+                )
+            conn.commit()
+
+    _execute_with_retry("semantic_graph", do_write)
+
+
+def load_semantic_graph() -> dict[str, Any]:
+    graph = SemanticGraph.default()
+    packs = [
+        OntologyPack(
+            pack_id=str(row["pack_id"]),
+            name=str(row["name"]),
+            layer=str(row["layer"]),
+            version=str(row["version"]),
+            concepts=tuple(row.get("concepts") or []),
+            notes=tuple(row.get("notes") or []),
+        )
+        for row in _semantic_rows("semantic_ontology_packs", "pack_id ASC")
+    ]
+    if packs:
+        graph.ontology_packs = packs
+    graph.entities = {
+        str(row["entity_id"]): SemanticEntity(
+            entity_id=str(row["entity_id"]),
+            entity_type=str(row["entity_type"]),
+            name=str(row.get("name", "")),
+            labels=tuple(row.get("labels") or []),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_entities", "entity_id ASC")
+    }
+    graph.relationships = {
+        str(row["relationship_id"]): SemanticRelationship(
+            relationship_id=str(row["relationship_id"]),
+            source_id=str(row["source_id"]),
+            target_id=str(row["target_id"]),
+            relationship_type=str(row["relationship_type"]),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_relationships", "relationship_id ASC")
+    }
+    graph.measurements = {
+        str(row["measurement_id"]): SemanticMeasurement(
+            measurement_id=str(row["measurement_id"]),
+            entity_id=str(row["entity_id"]),
+            name=str(row.get("name", "")),
+            unit=str(row.get("unit", "")),
+            minimum=row.get("minimum"),
+            maximum=row.get("maximum"),
+            warning_low=row.get("warning_low"),
+            warning_high=row.get("warning_high"),
+            critical_low=row.get("critical_low"),
+            critical_high=row.get("critical_high"),
+            sampling_rate_hz=row.get("sampling_rate_hz"),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_measurements", "measurement_id ASC")
+    }
+    graph.observations = {
+        str(row["observation_id"]): SemanticObservation(
+            observation_id=str(row["observation_id"]),
+            entity_id=str(row["entity_id"]),
+            observed_at=str(row["observed_at"]),
+            value=row.get("value"),
+            source_id=str(row.get("source_id", "")),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_observations", "observed_at DESC, observation_id ASC")
+    }
+    graph.actions = {
+        str(row["action_id"]): SemanticAction(
+            action_id=str(row["action_id"]),
+            actor_id=str(row["actor_id"]),
+            target_id=str(row["target_id"]),
+            action_type=str(row["action_type"]),
+            occurred_at=str(row["occurred_at"]),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_actions", "occurred_at DESC, action_id ASC")
+    }
+    graph.documents = {
+        str(row["document_id"]): SemanticDocument(
+            document_id=str(row["document_id"]),
+            title=str(row["title"]),
+            document_type=str(row.get("document_type", "document")),
+            uri=str(row.get("uri", "")),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_documents", "document_id ASC")
+    }
+    graph.locations = {
+        str(row["location_id"]): SemanticLocation(
+            location_id=str(row["location_id"]),
+            name=str(row["name"]),
+            location_type=str(row.get("location_type", "location")),
+            parent_id=row.get("parent_id"),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_locations", "location_id ASC")
+    }
+    graph.states = {
+        str(row["state_id"]): SemanticState(
+            state_id=str(row["state_id"]),
+            entity_id=str(row["entity_id"]),
+            state=str(row["state"]),
+            valid_from=str(row["valid_from"]),
+            valid_to=row.get("valid_to"),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_states", "valid_from DESC, state_id ASC")
+    }
+    graph.workflows = {
+        str(row["workflow_id"]): SemanticWorkflow(
+            workflow_id=str(row["workflow_id"]),
+            name=str(row["name"]),
+            workflow_type=str(row.get("workflow_type", "workflow")),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_workflows", "workflow_id ASC")
+    }
+    graph.events = {
+        str(row["event_id"]): SemanticEvent(
+            event_id=str(row["event_id"]),
+            event_type=str(row["event_type"]),
+            occurred_at=str(row["occurred_at"]),
+            source_id=str(row.get("source_id", "")),
+            entity_id=str(row.get("entity_id", "")),
+            payload=dict(row.get("payload") or {}),
+            metadata=dict(row.get("metadata") or {}),
+        )
+        for row in _semantic_rows("semantic_events", "occurred_at DESC, event_id ASC")
+    }
+    return graph.to_dict()
+
+
+def upsert_semantic_lineage(record: dict[str, Any]) -> dict[str, Any]:
+    row = {
+        "lineage_id": record["lineage_id"],
+        "kind": record.get("kind", "unknown"),
+        "source_id": record.get("source_id", ""),
+        "target_id": record.get("target_id", ""),
+        "entity_id": record.get("entity_id", ""),
+        "relationship_id": record.get("relationship_id", ""),
+        "site_id": record.get("site_id", ""),
+        "dataset_id": record.get("dataset_id", ""),
+        "model_version": record.get("model_version", ""),
+        "processing_version": record.get("processing_version", ""),
+        "occurred_at": record.get("occurred_at") or _utc_now(),
+        "metadata": record.get("metadata", {}),
+    }
+    return _semantic_upsert("semantic_lineage", "lineage_id", row, json_columns={"metadata"})
+
+
+def list_semantic_lineage(*, site_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    rows = _semantic_rows("semantic_lineage", "occurred_at DESC, lineage_id DESC")
+    if site_id:
+        rows = [row for row in rows if str(row.get("site_id", "")).lower() == site_id.lower()]
+    return rows[: max(1, limit)]
 
 
 # Data retention and compression policies

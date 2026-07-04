@@ -8,6 +8,7 @@ from typing import Any
 from services.analytics.reporting import report_engine
 from services.assets.model import hierarchy_to_tree, load_hierarchy
 from services.common.modeling import ModelRegistry
+from services.common.semantic_store import get_semantic_store
 from services.historian.client import query_alarms, query_recent_events, query_trend
 from services.scenarios.engine import list_scenarios
 
@@ -111,6 +112,40 @@ class ToolRegistry:
                 tags=("simulation", "read_only"),
             )
         )
+        self.register(
+            ToolSpec(
+                name="semantic.graph_search",
+                description="Search the semantic graph for entities and relationships.",
+                read_only=True,
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+                        "site_id": {"type": "string"},
+                    },
+                    "required": ["query"],
+                },
+                output_schema={"type": "object"},
+                tags=("semantic", "read_only", "graph"),
+            )
+        )
+        self.register(
+            ToolSpec(
+                name="semantic.lineage",
+                description="Read semantic lineage records.",
+                read_only=True,
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "site_id": {"type": "string"},
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 1000},
+                    },
+                },
+                output_schema={"type": "array", "items": {"type": "object"}},
+                tags=("semantic", "read_only", "lineage"),
+            )
+        )
 
     def register(self, spec: ToolSpec) -> None:
         self._tools[spec.name] = spec
@@ -135,6 +170,8 @@ def build_context_package(
     site_profile_path: Path | str | None = None,
 ) -> dict[str, Any]:
     assets = hierarchy_to_tree(load_hierarchy(Path("config/assets.yaml")))
+    semantic_store = get_semantic_store()
+    semantic_graph = semantic_store.graph()
     context: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "scope": {
@@ -151,9 +188,14 @@ def build_context_package(
         "report_templates": report_engine.list_templates(),
         "read_only_tools": tool_registry.list_tools(),
         "model_roles": ModelRegistry.from_env().export(),
+        "semantic": {
+            "counts": semantic_graph.counts(),
+            "ontology_packs": [pack.to_dict() for pack in semantic_graph.ontology_packs],
+        },
     }
     if asset_id and tag:
         context["trend"] = query_trend(asset_id, tag, hours)
+        context["semantic"]["matches"] = semantic_graph.graph_search(f"{asset_id} {tag}", limit=limit)
     if site_profile_path is not None:
         from services.common.site_profiles import load_site_profile, validate_site_profile
 
@@ -161,5 +203,8 @@ def build_context_package(
         context["site_profile"] = profile.to_dict()
         context["site_profile_validation"] = validate_site_profile(profile)
         context["model_roles"] = ModelRegistry.from_site_profile(profile).export()
+        site_id = profile.site.id if getattr(profile, "site", None) else None
+        if site_id:
+            context["semantic"]["site_id"] = site_id
+            context["semantic"]["site_matches"] = semantic_graph.graph_search(site_id, limit=limit, site_id=site_id)
     return context
-

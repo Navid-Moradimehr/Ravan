@@ -56,7 +56,34 @@
 
 ### Notes
 
-- The store is intentionally file-backed for now so the platform keeps its current single-server posture while gaining a persistent semantic plane.
+- The store now prefers the historian database when available and falls back to file-backed mode only when the database is absent, so the platform keeps its current single-server posture without losing durability.
+
+## 2026-07-04 - Semantic DB Backing And AI Context Integration
+
+### Changed
+
+1. **DB-backed semantic persistence**
+   - Added semantic tables to the Timescale/Postgres schema for ontology packs, entities, relationships, measurements, observations, actions, documents, locations, states, workflows, events, and lineage.
+   - The semantic store now uses the database backend automatically when Timescale is reachable, while preserving the file-backed fallback for isolated tests and offline development.
+
+2. **Retrieval and modeling context**
+   - Expanded retrieval documents to include semantic ontology packs, entities, and relationships.
+   - Expanded the modeling context package and tool registry so agents can inspect the semantic graph and lineage through read-only paths.
+
+3. **Safety and bootstrap**
+   - The DB backend now falls back cleanly to the file store when the historian database is unavailable, keeping the repo runnable without extra services.
+
+### Verified
+
+- `.venv\\Scripts\\python.exe -m pytest tests/test_semantic_store.py tests/test_modeling_contracts.py tests/test_semantic_api_smoke.py tests/test_semantic_core.py -q`
+  - `12 passed`
+- `.venv\\Scripts\\python.exe -m pytest tests/test_api_route_splits.py tests/test_datastreamctl.py tests/test_semantic_graph_benchmark.py tests/test_semantic_graph_query_benchmark.py tests/test_semantic_store_benchmark.py -q`
+  - `50 passed`
+
+### Notes
+
+- The semantic plane is now durable enough for production deployment while still staying compatible with the current single-node install path.
+- AI and retrieval now have direct access to semantic context without requiring a separate ad hoc store.
 
 ## 2026-07-03 - OS Packaging Scripts And Windows Bundle Export
 

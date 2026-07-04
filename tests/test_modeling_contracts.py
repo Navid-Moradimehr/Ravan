@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from services.common.agent_tools import build_context_package, tool_registry
 from services.common.modeling import ModelRegistry
+from services.common.semantic_core import SemanticEntity, SemanticGraph
 from services.common.prompt_registry import prompt_registry
 from services.common.structured_output import validate_industrial_summary
 
@@ -62,6 +64,17 @@ def test_context_builder_uses_injected_data(monkeypatch, tmp_path):
         lambda path: {"assets": [{"id": "plant-01", "name": "Plant 01", "type": "site", "children": []}]},
     )
     monkeypatch.setattr(agent_tools, "hierarchy_to_tree", lambda hierarchy: hierarchy["assets"])
+    graph = SemanticGraph.default()
+    graph.add_entity(
+        SemanticEntity(
+            entity_id="site/demo/asset-1",
+            entity_type="asset",
+            name="Pump 01",
+            labels=("asset", "pump"),
+            metadata={"site_id": "demo-site"},
+        )
+    )
+    monkeypatch.setattr(agent_tools, "get_semantic_store", lambda: SimpleNamespace(graph=lambda: graph))
 
     profile_path = tmp_path / "profile.yaml"
     profile_path.write_text(
@@ -99,3 +112,5 @@ federation:
     assert context["trend"][0]["tag"] == "Temperature"
     assert context["site_profile"]["profile_id"] == "demo"
     assert context["model_roles"]["validation_errors"] == []
+    assert context["semantic"]["counts"]["entities"] >= 1
+    assert context["semantic"]["matches"]["counts"]["entities"] >= 1

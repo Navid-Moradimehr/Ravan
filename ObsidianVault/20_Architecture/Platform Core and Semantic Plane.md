@@ -17,12 +17,14 @@ Keep the current industrial app intact, but project it onto a universal semantic
   - `/api/v1/semantic/graph/entities/{entity_id}`
   - `/api/v1/semantic/graph/relationships/{relationship_id}`
 - Write and persistence:
-  - file-backed semantic store at `data/semantic/semantic-store.json`
+  - Postgres-backed semantic store with file fallback at `data/semantic/semantic-store.json`
   - write endpoints for ontology packs, entities, relationships, documents, workflows, observations, and lineage
 - Benchmark:
   - semantic graph projection slice
   - semantic graph query slice
   - semantic store write slice
+- AI context:
+  - semantic graph entities, relationships, and ontology packs are now included in retrieval/modeling context packages
 
 ## Architecture Note
 
@@ -34,3 +36,4 @@ The manufacturing model stays as a domain pack. The platform core should remain 
 - The knowledge graph should become the semantic backbone over time.
 - The digital twin should stay a projection, not the source of truth.
 - Lineage should be recorded at ingest time and when semantic writes happen so AI and simulation can later reconstruct provenance.
+- The semantic plane should default to the database backend when the historian is available and fall back to file-backed mode only for offline development.

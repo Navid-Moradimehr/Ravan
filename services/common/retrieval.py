@@ -8,6 +8,7 @@ from typing import Any
 from services.analytics.reporting import report_engine
 from services.common.cache import ttl_cache
 from services.common.embeddings import build_embedding_client
+from services.common.semantic_store import get_semantic_store
 from services.assets.model import hierarchy_to_tree, load_hierarchy
 from services.historian.client import query_alarms, query_recent_events, query_trend
 from services.scenarios.engine import list_scenarios
@@ -81,6 +82,67 @@ def _snippet(text: str, terms: list[str], width: int = 160) -> str:
             end = min(len(text), idx + width)
             return text[start:end].strip()
     return text[:width].strip()
+
+
+def _semantic_graph_documents(limit: int = 100) -> list[RetrievalDocument]:
+    try:
+        graph = get_semantic_store().graph()
+    except Exception:
+        return []
+
+    documents: list[RetrievalDocument] = []
+    for pack in graph.ontology_packs[:limit]:
+        documents.append(
+            RetrievalDocument(
+                doc_id=f"semantic:pack:{pack.pack_id}",
+                source="semantic.ontology_packs",
+                title=pack.name,
+                text=" ".join(
+                    str(part)
+                    for part in [pack.pack_id, pack.name, pack.layer, pack.version, *pack.concepts, *pack.notes]
+                    if part
+                ),
+                payload=pack.to_dict(),
+                tags=("semantic", "ontology", "pack"),
+            )
+        )
+    for entity in list(graph.entities.values())[:limit]:
+        documents.append(
+            RetrievalDocument(
+                doc_id=f"semantic:entity:{entity.entity_id}",
+                source="semantic.entities",
+                title=entity.name or entity.entity_id,
+                text=" ".join(
+                    str(part)
+                    for part in [entity.entity_id, entity.entity_type, entity.name, *entity.labels, *entity.metadata.values()]
+                    if part is not None
+                ),
+                payload=entity.to_dict(),
+                tags=("semantic", "entity", entity.entity_type),
+            )
+        )
+    for relationship in list(graph.relationships.values())[:limit]:
+        documents.append(
+            RetrievalDocument(
+                doc_id=f"semantic:relationship:{relationship.relationship_id}",
+                source="semantic.relationships",
+                title=relationship.relationship_type,
+                text=" ".join(
+                    str(part)
+                    for part in [
+                        relationship.relationship_id,
+                        relationship.source_id,
+                        relationship.target_id,
+                        relationship.relationship_type,
+                        *relationship.metadata.values(),
+                    ]
+                    if part is not None
+                ),
+                payload=relationship.to_dict(),
+                tags=("semantic", "relationship", relationship.relationship_type),
+            )
+        )
+    return documents
 
 
 @ttl_cache(ttl_seconds=15.0, max_size=32)
@@ -212,6 +274,8 @@ def _build_retrieval_documents_cached(
                 tags=("simulation", "scenario"),
             )
         )
+
+    documents.extend(_semantic_graph_documents(limit=min(100, limit * 2)))
 
     return documents
 
@@ -368,6 +432,24 @@ def build_retrieval_catalog(*, asset_config: Path | str = Path("config/assets.ya
                 "description": "Available industrial simulation scenarios",
                 "read_only": True,
             },
+            {
+                "name": "semantic.ontology_packs",
+                "kind": "semantic",
+                "description": "Platform and industry ontology packs that define the semantic layer",
+                "read_only": True,
+            },
+            {
+                "name": "semantic.entities",
+                "kind": "semantic",
+                "description": "Semantic entities for assets, locations, documents, and workflows",
+                "read_only": True,
+            },
+            {
+                "name": "semantic.relationships",
+                "kind": "semantic",
+                "description": "Semantic graph relationships and topology links",
+                "read_only": True,
+            },
         ],
         "asset_nodes": len(assets),
         "search_modes": ["token", "hybrid", "semantic"],
@@ -375,6 +457,7 @@ def build_retrieval_catalog(*, asset_config: Path | str = Path("config/assets.ya
         "notes": [
             "This is a deterministic retrieval boundary, not a governed BI semantic layer.",
             "Hybrid search combines token overlap, phrase match, and embeddings when available.",
+            "Semantic graph entities and ontology packs are included for AI-ready context assembly.",
             "Persistent chunked indexing is available for long manuals and notes.",
             "Use it for read-only context assembly and future agent tooling.",
         ],
