@@ -14,15 +14,17 @@
 
 3. **SWaT staging**
    - The SWaT workbook can now be downloaded and staged locally without crashing the importer when extraction is requested on a non-zip file.
+   - Added a SWaT workbook/CSV normalization path so the dataset can flow into the benchmark replay format.
 
 4. **Benchmark coverage**
    - Measured AI4I and C-MAPSS through the same end-to-end pipeline used for the simulator cases so the benchmark path now includes public real-world-shaped datasets.
    - AI4I end-to-end run: 43,342.11 events/sec, p99 0.0313 ms.
    - C-MAPSS end-to-end run: 41,598.31 events/sec, p99 0.0453 ms.
+   - SWaT synthetic-workbook end-to-end run: 46,706.71 events/sec, p99 0.0286 ms.
 
 ### Notes
 
-- SWaT is staged but not yet normalized into the replay CSV format.
+- SWaT normalization exists, but the public workbook download in this environment still needs validation against the real upstream file rather than only the synthetic workbook fixture.
 - C-MAPSS benchmark throughput is lower than the synthetic industrial replay cases, which is expected because the dataset is much larger and denser.
 
 ## 2026-07-05 - Backup Drill Matrix For Per-Site Measurement

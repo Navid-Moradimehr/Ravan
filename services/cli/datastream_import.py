@@ -103,7 +103,7 @@ SOURCES: tuple[ImportSource, ...] = (
         source_id="swat",
         name="SWaT / WADI Water Treatment Testbed",
         category="industrial",
-        format="zip",
+        format="xlsx",
         url="https://itrust.sutd.edu.sg/wp-content/uploads/2021/11/SWaT_Dataset_Attack_v0.xlsx",
         filename="swat.xlsx",
         size_note="~30 MB",
@@ -353,7 +353,7 @@ def build_parser() -> argparse.ArgumentParser:
     convert = sub.add_parser("convert", help="Convert a dataset to the benchmark CSV format")
     convert.add_argument("input")
     convert.add_argument("output")
-    convert.add_argument("--preset", choices=["ai4i", "cmapss", "generic"], default="ai4i")
+    convert.add_argument("--preset", choices=["ai4i", "cmapss", "generic", "swat"], default="ai4i")
     convert.add_argument("--site-id", default="demo-site")
     convert.add_argument("--line", default="line-01")
     convert.add_argument("--source-prefix", default="dataset")

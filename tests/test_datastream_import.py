@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 import textwrap
 import zipfile
+from xml.sax.saxutils import escape
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -21,7 +22,7 @@ class TestImportSources:
         for s in imp.SOURCES:
             assert s.url.startswith("http"), s
             assert s.filename
-            assert s.format in {"csv", "zip"}
+            assert s.format in {"csv", "zip", "xlsx"}
 
     def test_source_by_id_lookup(self):
         assert imp.SOURCE_BY_ID["ai4i"].source_id == "ai4i"
@@ -29,6 +30,56 @@ class TestImportSources:
 
 
 class TestImportCommands:
+    def _make_minimal_xlsx(self, path: Path, rows: list[list[str]]) -> None:
+        def cell_ref(col_idx: int, row_idx: int) -> str:
+            col = ""
+            idx = col_idx + 1
+            while idx:
+                idx, rem = divmod(idx - 1, 26)
+                col = chr(65 + rem) + col
+            return f"{col}{row_idx}"
+
+        def row_xml(values: list[str], row_idx: int) -> str:
+            cells = []
+            for idx, value in enumerate(values):
+                ref = cell_ref(idx, row_idx)
+                if row_idx == 1:
+                    cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{escape(value)}</t></is></c>')
+                else:
+                    cells.append(f'<c r="{ref}"><v>{escape(value)}</v></c>')
+            return f'<row r="{row_idx}">{"".join(cells)}</row>'
+
+        sheet_rows = "".join(row_xml(row, idx + 1) for idx, row in enumerate(rows))
+        sheet_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>{sheet_rows}</sheetData>
+</worksheet>"""
+        workbook_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>
+</workbook>"""
+        rels_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>"""
+        root_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>"""
+        content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>"""
+        with zipfile.ZipFile(path, "w") as zf:
+            zf.writestr("[Content_Types].xml", content_types)
+            zf.writestr("_rels/.rels", root_rels)
+            zf.writestr("xl/workbook.xml", workbook_xml)
+            zf.writestr("xl/_rels/workbook.xml.rels", rels_xml)
+            zf.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+
     def _run(self, argv):
         buf = io.StringIO()
         rc = 0
@@ -169,6 +220,25 @@ class TestImportCommands:
         content = output_path.read_text(encoding="utf-8")
         assert "S1" in content
         assert "plant-a" in content
+
+    def test_convert_swat_xlsx_creates_benchmark_csv(self, tmp_path):
+        input_path = tmp_path / "swat.xlsx"
+        self._make_minimal_xlsx(
+            input_path,
+            [
+                ["Timestamp", "Label", "FIT101", "LIT101"],
+                ["2026-07-01T00:00:00Z", "normal", "1.5", "2.5"],
+                ["2026-07-01T00:00:01Z", "attack", "1.8", "2.7"],
+            ],
+        )
+        output_path = tmp_path / "swat-out.csv"
+        rc, out = self._run(["convert", str(input_path), str(output_path), "--preset", "swat", "--site-id", "plant-a", "--line", "line-01", "--source-prefix", "swat"])
+        assert rc == 0
+        assert output_path.exists()
+        assert "converted preset=swat" in out
+        content = output_path.read_text(encoding="utf-8")
+        assert "FIT101" in content
+        assert "attack" in content
 
     def test_fetch_swat_extract_skips_non_zip(self, tmp_path, monkeypatch):
         monkeypatch.setattr(imp, "DEFAULT_DATA_DIR", tmp_path)

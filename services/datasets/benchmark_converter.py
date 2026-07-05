@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import zipfile
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Iterator
@@ -151,6 +152,126 @@ def _read_cmapss_rows(input_path: Path) -> list[dict[str, str]]:
         return parse_lines(f)
 
 
+def _xlsx_col_index(ref: str) -> int:
+    index = 0
+    for char in ref:
+        if char.isalpha():
+            index = index * 26 + (ord(char.upper()) - 64)
+    return max(index - 1, 0)
+
+
+def _read_swat_rows(input_path: Path) -> list[dict[str, str]]:
+    if input_path.suffix.lower() == ".csv":
+        with open(input_path, "r", encoding="utf-8") as f:
+            return list(csv.DictReader(f))
+    if not zipfile.is_zipfile(input_path):
+        return []
+
+    ns = {
+        "main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+        "rel": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        "pkgrel": "http://schemas.openxmlformats.org/package/2006/relationships",
+    }
+
+    with zipfile.ZipFile(input_path) as zf:
+        shared_strings: list[str] = []
+        if "xl/sharedStrings.xml" in zf.namelist():
+            root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+            for si in root.findall("main:si", ns):
+                parts = [node.text or "" for node in si.iterfind(".//main:t", ns)]
+                shared_strings.append("".join(parts))
+
+        sheet_path = None
+        if "xl/workbook.xml" in zf.namelist() and "xl/_rels/workbook.xml.rels" in zf.namelist():
+            workbook = ET.fromstring(zf.read("xl/workbook.xml"))
+            rels_root = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+            rels = {
+                rel.get("Id"): rel.get("Target")
+                for rel in rels_root.findall("pkgrel:Relationship", ns)
+                if rel.get("Id") and rel.get("Target")
+            }
+            sheets = workbook.findall("main:sheets/main:sheet", ns)
+            if sheets:
+                sheet_id = sheets[0].get(f"{{{ns['rel']}}}id")
+                target = rels.get(sheet_id)
+                if target:
+                    sheet_path = target.lstrip("/")
+                    if not sheet_path.startswith("xl/"):
+                        sheet_path = f"xl/{sheet_path}"
+        if not sheet_path:
+            candidates = [name for name in zf.namelist() if name.startswith("xl/worksheets/sheet") and name.endswith(".xml")]
+            if not candidates:
+                return []
+            sheet_path = sorted(candidates)[0]
+
+        sheet_root = ET.fromstring(zf.read(sheet_path))
+        rows: list[dict[str, str]] = []
+        headers: list[str] = []
+        for row in sheet_root.findall(".//main:sheetData/main:row", ns):
+            cells: dict[int, str] = {}
+            for cell in row.findall("main:c", ns):
+                ref = cell.get("r", "")
+                cell_index = _xlsx_col_index(ref)
+                cell_type = cell.get("t")
+                value = ""
+                if cell_type == "inlineStr":
+                    value_node = cell.find("main:is/main:t", ns)
+                    value = value_node.text if value_node is not None and value_node.text is not None else ""
+                else:
+                    raw_value = cell.findtext("main:v", default="", namespaces=ns)
+                    if cell_type == "s" and raw_value.isdigit():
+                        idx = int(raw_value)
+                        value = shared_strings[idx] if idx < len(shared_strings) else ""
+                    else:
+                        value = raw_value
+                cells[cell_index] = value
+            ordered = [cells.get(idx, "") for idx in range(max(cells.keys(), default=-1) + 1)]
+            if not headers:
+                headers = [str(value).strip() for value in ordered]
+                continue
+            row_map = {headers[idx]: ordered[idx] if idx < len(ordered) else "" for idx in range(len(headers))}
+            rows.append(row_map)
+        return rows
+
+
+def _swat_events(rows: list[dict[str, str]], *, site_id: str, line: str, source_prefix: str) -> Iterator[dict[str, Any]]:
+    if not rows:
+        return
+    meta_keys = {"timestamp", "ts", "label", "attack", "mode", "date", "time"}
+    sensor_keys = [key for key in rows[0].keys() if key and key.strip().lower() not in meta_keys]
+    for row_idx, row in enumerate(rows):
+        ts_value = row.get("Timestamp") or row.get("timestamp") or row.get("ts") or utc_now()
+        label = (row.get("Label") or row.get("label") or row.get("attack") or "normal").strip().lower()
+        fault_type = "attack" if label not in {"", "0", "normal", "false", "no"} else "normal"
+        severity = "bad" if fault_type == "attack" else "normal"
+        for step_idx, key in enumerate(sensor_keys, start=1):
+            raw_value = row.get(key, "")
+            if raw_value is None or raw_value == "":
+                continue
+            try:
+                value = float(str(raw_value).replace(",", ""))
+            except ValueError:
+                continue
+            yield {
+                "event_id": f"{source_prefix}-{row_idx + 1}-{step_idx}",
+                "source_protocol": "dataset",
+                "source_id": f"{source_prefix}/swat",
+                "asset_id": "swat-process",
+                "tag": key,
+                "value": value,
+                "quality": "bad" if fault_type == "attack" else "good",
+                "unit": "",
+                "site": site_id,
+                "line": line,
+                "ts_source": ts_value,
+                "schema_version": 1,
+                "fault_type": fault_type,
+                "scenario_id": "swat",
+                "ground_truth_severity": severity,
+                "step": step_idx,
+            }
+
+
 def _generic_events(rows: list[dict[str, str]], *, site_id: str, line: str, source_prefix: str) -> Iterator[dict[str, Any]]:
     for row_idx, row in enumerate(rows):
         asset_id = row.get("asset_id") or row.get("asset") or row.get("machine_id") or f"asset-{row_idx + 1}"
@@ -201,5 +322,9 @@ def convert_dataset(
         with open(input_path, "r", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         events = list(_generic_events(rows, site_id=site_id, line=line, source_prefix=source_prefix))
+        return ConvertResult(str(input_path), str(output_path), preset, len(rows), _write_events(output_path, events))
+    if preset == "swat":
+        rows = _read_swat_rows(input_path)
+        events = list(_swat_events(rows, site_id=site_id, line=line, source_prefix=source_prefix))
         return ConvertResult(str(input_path), str(output_path), preset, len(rows), _write_events(output_path, events))
     raise ValueError(f"unknown preset: {preset}")

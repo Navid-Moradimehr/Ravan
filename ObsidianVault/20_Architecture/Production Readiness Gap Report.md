@@ -17,7 +17,7 @@
 - explicit `SEMANTIC_STORE_BACKEND=db` for plant-local and federated profiles
 - backup-drill matrix tooling for per-site restore/rollback measurement
 - AI4I and C-MAPSS public dataset import and benchmark conversion
-- SWaT workbook staging without importer crashes on non-zip extraction requests
+- SWaT workbook/CSV normalization path with benchmark coverage on a synthetic workbook fixture
 
 ## Still Missing
 
@@ -27,6 +27,7 @@
 - real PLC/sensor vendor compatibility validation
 - model evaluation/promotion lifecycle
 - diagnostic and supervised action agents
+- one more SWaT verification pass against the exact upstream workbook source used in public distribution
 
 ## Release Stance
 

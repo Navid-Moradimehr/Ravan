@@ -22,7 +22,7 @@ def test_nasa_bearing_source_config():
 
 def test_swat_source_config():
     src = SOURCE_BY_ID["swat"]
-    assert src.format == "zip" or src.format == "xlsx"
+    assert src.format == "xlsx" or src.format == "zip"
     assert "academic" in src.license_note.lower() or "registration" in src.license_note.lower()
 
 
