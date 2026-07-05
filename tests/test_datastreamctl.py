@@ -166,6 +166,79 @@ class TestDatastreamctl:
         assert (report_dir / f"{expected_single_site}.json").exists()
         assert (report_dir / f"{expected_plant_local}.json").exists()
 
+    def test_local_phase_one_combines_backup_and_benchmark(self, monkeypatch, tmp_path):
+        report_dir = tmp_path / "phase-one-report"
+        monkeypatch.setattr(
+            ctl,
+            "_run_backup_drill_matrix",
+            lambda *args, **kwargs: {
+                "site_profiles": kwargs.get("site_profiles", []),
+                "runs": [
+                    {
+                        "site_profile": str(SITE_PROFILE),
+                        "profile_id": "single-site-demo",
+                        "site_id": "demo-site",
+                        "deployment_mode": "single-site",
+                        "backup_dir": "backups/demo-site",
+                        "restore_db": "restore_db",
+                        "backup_status": "success",
+                        "restore_status": "success",
+                        "backup_elapsed_seconds": 0.12,
+                        "restore_elapsed_seconds": 0.23,
+                        "total_elapsed_seconds": 0.45,
+                        "snapshot_match": True,
+                        "details": {"backup": {"status": "success"}, "restore": {"status": "success"}},
+                    }
+                ],
+                "passed": True,
+            },
+        )
+        monkeypatch.setattr(
+            ctl,
+            "run_site_profile_matrix",
+            lambda *args, **kwargs: SimpleNamespace(
+                passed=True,
+                runs=(
+                    SimpleNamespace(
+                        site_id="demo-site",
+                        deployment_mode="single-site",
+                        profile_path=str(SITE_PROFILE),
+                        average_events_per_second=5000.0,
+                        median_events_per_second=5000.0,
+                        stdev_events_per_second=0.0,
+                        min_events_per_second=5000.0,
+                        max_events_per_second=5000.0,
+                        repeat_count=1,
+                        latency_p99_ms=0.02,
+                        passed=True,
+                        detail="threshold=1",
+                    ),
+                ),
+            ),
+        )
+        rc, out = self._run([
+            "local-phase-one",
+            "--site-profiles",
+            str(SITE_PROFILE),
+            "--site-ids",
+            "demo-site",
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+            "--min-average-events-per-second",
+            "1",
+            "--report-dir",
+            str(report_dir),
+        ])
+        assert rc == 0
+        assert "local phase one" in out
+        assert "backup_passed" in out
+        assert "benchmark_passed" in out
+        assert (report_dir / "local-phase-one-summary.json").exists()
+        assert (report_dir / "backup-drill" / "backup-drill-matrix-summary.json").exists()
+        assert (report_dir / "benchmark" / "site-profile-matrix-summary.json").exists()
+
     def test_release_gate_can_skip_network_and_run_backup(self, monkeypatch):
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})

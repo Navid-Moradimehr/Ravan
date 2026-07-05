@@ -1,5 +1,20 @@
 # Implementation Log
 
+## 2026-07-05 - Local Phase-One Gate
+
+### Changed
+
+1. **Combined local drill gate**
+   - Added `local-phase-one` to run restore/rollback drills and site-profile benchmarks together from a single command.
+   - The gate writes a combined phase report plus subreports for the backup drill and benchmark portions.
+
+2. **Readiness tracking**
+   - Marked the local phase-one gate as complete in the hardening and readiness planning docs.
+
+### Notes
+
+- This is still a local single-machine readiness gate. It does not replace real target-site validation or multi-node rollout testing.
+
 ## 2026-07-05 - SWaT Simulator Case
 
 ### Changed

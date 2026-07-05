@@ -13,6 +13,7 @@ This checklist turns the current roadmap into a concrete execution track for a s
 - [x] Validate that each site profile `site.id` matches the manifest `site_id` for every rollout bundle.
 - [x] Add per-site rollout acceptance reports for at least two independent site profiles.
 - [x] Add a backup-drill matrix command so restore/rollback drills can be measured across multiple site profiles.
+- [x] Add a local phase-one gate that combines restore/rollback drills with site-profile benchmarks.
 - [ ] Measure restore and rollback drills per site before federation is enabled.
 - [ ] Keep cross-site replication limited to approved rollups, summaries, or explicit bridges.
 - [x] Add restore/rollback snapshot comparison and report export for backup drills.

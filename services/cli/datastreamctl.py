@@ -230,6 +230,55 @@ def _write_backup_drill_matrix_report(report_dir: str, payload: dict[str, Any]) 
     return written
 
 
+def _write_local_phase_one_report(report_dir: str, payload: dict[str, Any]) -> list[Path]:
+    output_dir = Path(report_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "local-phase-one-summary.json"
+    summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    written: list[Path] = [summary_path]
+
+    backup_payload = payload.get("backup_drill")
+    if isinstance(backup_payload, dict):
+        backup_dir = output_dir / "backup-drill"
+        written.extend(_write_backup_drill_matrix_report(str(backup_dir), backup_payload))
+
+    benchmark_payload = payload.get("benchmark")
+    if isinstance(benchmark_payload, dict):
+        benchmark_dir = output_dir / "benchmark"
+        benchmark_dir.mkdir(parents=True, exist_ok=True)
+        benchmark_summary = benchmark_dir / "site-profile-matrix-summary.json"
+        benchmark_summary.write_text(json.dumps(benchmark_payload, indent=2), encoding="utf-8")
+        written.append(benchmark_summary)
+        for run in benchmark_payload.get("runs", []):
+            run_path = benchmark_dir / f"{run['site_id']}.json"
+            run_path.write_text(json.dumps(run, indent=2), encoding="utf-8")
+            written.append(run_path)
+    return written
+
+
+def _serialize_site_profile_matrix_result(result: Any) -> dict[str, Any]:
+    return {
+        "passed": result.passed,
+        "runs": [
+            {
+                "site_id": run.site_id,
+                "deployment_mode": run.deployment_mode,
+                "profile_path": run.profile_path,
+                "average_events_per_second": run.average_events_per_second,
+                "median_events_per_second": run.median_events_per_second,
+                "stdev_events_per_second": run.stdev_events_per_second,
+                "min_events_per_second": run.min_events_per_second,
+                "max_events_per_second": run.max_events_per_second,
+                "repeat_count": run.repeat_count,
+                "latency_p99_ms": run.latency_p99_ms,
+                "passed": run.passed,
+                "detail": run.detail,
+            }
+            for run in result.runs
+        ],
+    }
+
+
 def _run_release_gate_for_profile(
     profile_path: str,
     *,
@@ -709,6 +758,65 @@ def cmd_backup_drill_matrix(args: argparse.Namespace) -> int:
             for path in written_reports:
                 print(f"{'':6}report  {path}")
     return 0 if result["passed"] else 2
+
+
+def cmd_local_phase_one(args: argparse.Namespace) -> int:
+    site_profiles = [part.strip() for part in args.site_profiles.split(",") if part.strip()]
+    if not site_profiles:
+        raise ValueError("--site-profiles must contain at least one site profile path")
+    site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
+    tables = _parse_tables(args.tables)
+    backup_result = _run_backup_drill_matrix(
+        site_profiles,
+        backup_dir=args.backup_dir,
+        tables=tables,
+        restore_db=args.restore_db,
+    )
+    benchmark_result = run_site_profile_matrix(
+        Path(args.manifest),
+        Path(args.csv),
+        site_ids=site_ids,
+        events=args.events,
+        batch_size=args.batch_size,
+        warmup_events=args.warmup_events,
+        min_average_events_per_second=args.min_average_events_per_second,
+        repeat_count=args.repeat_count,
+    )
+    payload = {
+        "phase": "local-phase-one",
+        "site_profiles": site_profiles,
+        "manifest": str(args.manifest),
+        "baseline_csv": str(args.csv),
+        "backup_drill": backup_result,
+        "benchmark": _serialize_site_profile_matrix_result(benchmark_result),
+        "passed": backup_result["passed"] and benchmark_result.passed,
+    }
+    written_reports: list[Path] = []
+    if args.report_dir:
+        written_reports = _write_local_phase_one_report(args.report_dir, payload)
+
+    if args.json:
+        if written_reports:
+            payload = {**payload, "written_reports": [str(path) for path in written_reports]}
+        print(json.dumps(payload, indent=2))
+    else:
+        print("local phase one")
+        print("=" * 40)
+        _print_row("passed", str(payload["passed"]).lower())
+        _print_row("backup_passed", str(backup_result["passed"]).lower())
+        _print_row("benchmark_passed", str(benchmark_result.passed).lower())
+        _print_row("site_profiles", len(site_profiles))
+        if benchmark_result.runs:
+            for run in benchmark_result.runs:
+                print(
+                    f"{'':6}{run.site_id:<18}avg={run.average_events_per_second} "
+                    f"median={run.median_events_per_second} passed={str(run.passed).lower()}"
+                )
+        if written_reports:
+            _print_row("report_dir", args.report_dir)
+            for path in written_reports:
+                print(f"{'':6}report  {path}")
+    return 0 if payload["passed"] else 2
 
 
 def cmd_release_gate(args: argparse.Namespace) -> int:
@@ -1714,6 +1822,23 @@ def build_parser() -> argparse.ArgumentParser:
     backup_matrix.add_argument("--report-dir", default=None, help="Optional directory to write backup drill reports")
     backup_matrix.add_argument("--json", action="store_true")
     backup_matrix.set_defaults(func=cmd_backup_drill_matrix)
+
+    local_phase_one = sub.add_parser("local-phase-one", help="Run a local restore/rollback and benchmark phase gate")
+    local_phase_one.add_argument("--site-profiles", default="config/site-profiles/single-site.yaml,config/site-profiles/plant-local.yaml")
+    local_phase_one.add_argument("--manifest", default="config/project-manifest.yaml")
+    local_phase_one.add_argument("--csv", default="data/benchmarks/industrial_mixed_benchmark.csv")
+    local_phase_one.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites in the manifest")
+    local_phase_one.add_argument("--events", type=int, default=10_000)
+    local_phase_one.add_argument("--batch-size", type=int, default=256)
+    local_phase_one.add_argument("--warmup-events", type=int, default=0)
+    local_phase_one.add_argument("--repeat-count", type=int, default=1)
+    local_phase_one.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    local_phase_one.add_argument("--backup-dir", default=None)
+    local_phase_one.add_argument("--tables", default=None, help="Comma-separated table names")
+    local_phase_one.add_argument("--restore-db", default=None, help="Optional restore target database")
+    local_phase_one.add_argument("--report-dir", default=None, help="Optional directory to write phase reports")
+    local_phase_one.add_argument("--json", action="store_true")
+    local_phase_one.set_defaults(func=cmd_local_phase_one)
 
     release = sub.add_parser("release-gate", help="Run production readiness checks for one site profile")
     release.add_argument("site_profile", help="Path to the site profile YAML")

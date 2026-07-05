@@ -32,6 +32,7 @@ This is the executable version of the readiness gap report. Each item has an own
 | Observability and SLOs | Platform / Ops | Sustained lag, restore, and agent runtime SLOs are defined and measured | Pending |
 | Per-site benchmark baselines | QA / Ops | Each site profile has a repeatable benchmark baseline and variance window | In progress |
 | Packaging and installer maturity | Release / Ops | Signed release artifacts and install docs are complete enough for standard rollout | In progress |
+| Local phase-one gate | Ops / QA | A single local command runs restore/rollback drills and site-profile benchmarks together with a combined report | Done |
 
 ## D. Release Exit Criteria
 
