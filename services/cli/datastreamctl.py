@@ -39,7 +39,9 @@ from services.benchmarks.end_to_end_pipeline import run_benchmark as run_end_to_
 from services.benchmarks.flink_runtime_slice import format_result as format_flink_runtime_slice_result
 from services.benchmarks.flink_runtime_slice import run_benchmark as run_flink_runtime_slice_benchmark
 from services.benchmarks.production_pipeline import format_result as format_production_pipeline_result
+from services.benchmarks.production_pipeline import format_repeatability_result as format_production_pipeline_repeatability_result
 from services.benchmarks.production_pipeline import run_benchmark as run_production_pipeline_benchmark
+from services.benchmarks.production_pipeline import run_repeatability as run_production_pipeline_repeatability
 from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
 from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
 from services.benchmarks.semantic_graph_slice import format_result as format_semantic_graph_slice_result
@@ -1148,6 +1150,28 @@ def _parse_json_or_empty(value: str | None) -> dict[str, Any]:
     return parsed
 
 
+def _load_benchmark_baseline_metrics(path: str | None) -> dict[str, float | str | None]:
+    if not path:
+        return {
+            "label": "",
+            "events_per_second": None,
+            "latency_p99_ms": None,
+        }
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    label = str(payload.get("runtime_mode") or payload.get("label") or Path(path).stem)
+    events_per_second = payload.get("median_events_per_second")
+    if events_per_second is None:
+        events_per_second = payload.get("events_per_second")
+    latency_p99_ms = payload.get("median_latency_p99_ms")
+    if latency_p99_ms is None:
+        latency_p99_ms = payload.get("latency_p99_ms")
+    return {
+        "label": label,
+        "events_per_second": float(events_per_second) if events_per_second is not None else None,
+        "latency_p99_ms": float(latency_p99_ms) if latency_p99_ms is not None else None,
+    }
+
+
 def cmd_agent_runtime(args: argparse.Namespace) -> int:
     action = args.action
     if action == "contract":
@@ -2116,6 +2140,61 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("=" * 40)
             print(format_production_pipeline_result(result))
         return 0
+    if args.action == "session-repeatability":
+        baseline = _load_benchmark_baseline_metrics(args.baseline_report)
+        result = run_production_pipeline_repeatability(
+            Path(args.csv),
+            target_events=args.events,
+            batch_size=args.batch_size,
+            warmup_events=args.warmup_events,
+            window_limit=args.window_limit,
+            runtime_mode=args.runtime_mode,
+            wire_format=args.wire_format,
+            repeat_count=args.repeat_count,
+            baseline_label=str(baseline["label"] or ""),
+            baseline_events_per_second=baseline["events_per_second"],
+            baseline_latency_p99_ms=baseline["latency_p99_ms"],
+        )
+        payload = {
+            "csv_path": result.csv_path,
+            "runtime_mode": result.runtime_mode,
+            "wire_format": result.wire_format,
+            "repeat_count": result.repeat_count,
+            "average_events_per_second": result.average_events_per_second,
+            "median_events_per_second": result.median_events_per_second,
+            "stdev_events_per_second": result.stdev_events_per_second,
+            "min_events_per_second": result.min_events_per_second,
+            "max_events_per_second": result.max_events_per_second,
+            "average_latency_p99_ms": result.average_latency_p99_ms,
+            "median_latency_p99_ms": result.median_latency_p99_ms,
+            "stdev_latency_p99_ms": result.stdev_latency_p99_ms,
+            "min_latency_p99_ms": result.min_latency_p99_ms,
+            "max_latency_p99_ms": result.max_latency_p99_ms,
+            "baseline_label": result.baseline_label,
+            "baseline_events_per_second": result.baseline_events_per_second,
+            "baseline_latency_p99_ms": result.baseline_latency_p99_ms,
+            "delta_events_per_second": result.delta_events_per_second,
+            "delta_events_percent": result.delta_events_percent,
+            "delta_latency_p99_ms": result.delta_latency_p99_ms,
+            "delta_latency_percent": result.delta_latency_percent,
+            "runs": [
+                {
+                    "runtime_mode": run.runtime_mode,
+                    "execution_path": run.execution_path,
+                    "events_per_second": run.events_per_second,
+                    "latency_p99_ms": run.latency_p99_ms,
+                    "invalid_events": run.invalid_events,
+                }
+                for run in result.runs
+            ],
+        }
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("production pipeline session repeatability")
+            print("=" * 40)
+            print(format_production_pipeline_repeatability_result(result))
+        return 0
     if args.action == "end-to-end-pipeline":
         result = run_end_to_end_pipeline_benchmark(
             Path(args.csv),
@@ -2470,6 +2549,18 @@ def build_parser() -> argparse.ArgumentParser:
     production_pipeline.add_argument("--wire-format", choices=("json", "msgpack"), default="json")
     production_pipeline.add_argument("--json", action="store_true")
     production_pipeline.set_defaults(func=cmd_benchmark)
+    session_repeatability = benchmark_sub.add_parser("session-repeatability", help="Repeat the production pipeline benchmark and compare against an optional baseline report")
+    session_repeatability.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    session_repeatability.add_argument("--events", type=int, default=10_000)
+    session_repeatability.add_argument("--batch-size", type=int, default=256)
+    session_repeatability.add_argument("--warmup-events", type=int, default=0)
+    session_repeatability.add_argument("--window-limit", type=int, default=25)
+    session_repeatability.add_argument("--runtime-mode", choices=("python-fallback", "flink-local", "flink-production"), default="python-fallback")
+    session_repeatability.add_argument("--wire-format", choices=("json", "msgpack"), default="json")
+    session_repeatability.add_argument("--repeat-count", type=int, default=3)
+    session_repeatability.add_argument("--baseline-report", default=None, help="Optional JSON report from a prior benchmark session")
+    session_repeatability.add_argument("--json", action="store_true")
+    session_repeatability.set_defaults(func=cmd_benchmark)
     end_to_end_pipeline = benchmark_sub.add_parser("end-to-end-pipeline", help="Benchmark the end-to-end pipeline with selectable wire format")
     end_to_end_pipeline.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
     end_to_end_pipeline.add_argument("--events", type=int, default=10_000)

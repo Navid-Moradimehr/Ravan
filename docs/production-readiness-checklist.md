@@ -31,6 +31,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Local Kubernetes rehearsal exists for generated site bundles.
 - The diagnostic/runtime scaffold can be inspected locally through the CLI.
 - Local and site-oriented benchmark harnesses exist.
+- Production-pipeline repeatability and session-delta reporting exist.
 - Explicit `runtime.mode` contract exists for `python-fallback`, `flink-local`, and `flink-production`.
 - `datastreamd` now uses `runtime.mode` to select the default processor set.
 - Production-pipeline benchmark command exists so the selected runtime mode can be measured directly.

@@ -1,5 +1,21 @@
 # Implementation Log
 
+## 2026-07-05 - Benchmark Repeatability And Session Delta
+
+### Changed
+
+1. **Production-pipeline repeatability**
+   - Added a repeatability benchmark command that runs the selected production pipeline multiple times and reports mean, median, spread, and min/max throughput plus p99 latency.
+   - The command can compare the current session against a saved baseline report and prints absolute and percentage deltas.
+
+2. **Session-delta reporting**
+   - The repeatability report is meant to separate real regressions from single-run noise on the local machine.
+   - The report format is JSON-friendly so prior benchmark sessions can be archived and compared later.
+
+### Notes
+
+- This adds the reporting infrastructure for session comparison; it does not replace real target-site benchmark runs.
+
 ## 2026-07-05 - Local Kubernetes Rehearsal And Diagnostic Scaffold
 
 ### Changed

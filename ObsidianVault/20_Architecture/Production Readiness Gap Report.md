@@ -21,6 +21,7 @@
 - SWaT first-class simulator case
 - local Kubernetes rehearsal command for generated site bundles
 - diagnostic runtime scaffold command for read-only probes and supervised action requests
+- production-pipeline repeatability reporting with optional baseline comparison
 
 ## Still Missing
 
@@ -31,6 +32,7 @@
 - model evaluation/promotion lifecycle
 - diagnostic and supervised action productization beyond the scaffold
 - one more SWaT verification pass against the exact upstream workbook source used in public distribution
+- repeated benchmark sessions on the target host or real deployment topology
 
 ## Release Stance
 

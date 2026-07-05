@@ -1352,6 +1352,97 @@ class TestDatastreamctl:
         assert "runtime_mode=flink-production" in out
         assert "execution_path=flink_runtime_slice" in out
 
+    def test_benchmark_session_repeatability_compares_against_baseline(self, monkeypatch, tmp_path):
+        csv_path = tmp_path / "mock.csv"
+        csv_path.write_text(
+            "\n".join(
+                [
+                    "event_id,source_protocol,source_id,asset_id,tag,value,quality,unit,site,line,ts_source,schema_version,fault_type,scenario_id,ground_truth_severity,step",
+                    "evt-1,mqtt,site-a/mqtt/pump-1,Pump-1,Temperature,55.1,good,c,Factory-A,Line-1,2026-07-01T00:00:00Z,1,normal,mock-benchmark,normal,0",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        baseline_path = tmp_path / "baseline.json"
+        baseline_path.write_text(
+            json.dumps(
+                {
+                    "runtime_mode": "python-fallback",
+                    "median_events_per_second": 100.0,
+                    "median_latency_p99_ms": 1.5,
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            ctl,
+            "run_production_pipeline_repeatability",
+            lambda *args, **kwargs: SimpleNamespace(
+                csv_path=str(csv_path),
+                runtime_mode="python-fallback",
+                wire_format="json",
+                repeat_count=3,
+                runs=(
+                    SimpleNamespace(
+                        runtime_mode="python-fallback",
+                        execution_path="end_to_end_pipeline",
+                        events_per_second=110.0,
+                        latency_p99_ms=1.1,
+                        invalid_events=0,
+                    ),
+                    SimpleNamespace(
+                        runtime_mode="python-fallback",
+                        execution_path="end_to_end_pipeline",
+                        events_per_second=120.0,
+                        latency_p99_ms=1.0,
+                        invalid_events=0,
+                    ),
+                    SimpleNamespace(
+                        runtime_mode="python-fallback",
+                        execution_path="end_to_end_pipeline",
+                        events_per_second=115.0,
+                        latency_p99_ms=1.2,
+                        invalid_events=0,
+                    ),
+                ),
+                average_events_per_second=115.0,
+                median_events_per_second=115.0,
+                stdev_events_per_second=4.08,
+                min_events_per_second=110.0,
+                max_events_per_second=120.0,
+                average_latency_p99_ms=1.1,
+                median_latency_p99_ms=1.1,
+                stdev_latency_p99_ms=0.08,
+                min_latency_p99_ms=1.0,
+                max_latency_p99_ms=1.2,
+                baseline_label="baseline",
+                baseline_events_per_second=100.0,
+                baseline_latency_p99_ms=1.5,
+                delta_events_per_second=15.0,
+                delta_events_percent=15.0,
+                delta_latency_p99_ms=-0.4,
+                delta_latency_percent=-26.67,
+            ),
+        )
+        rc, out = self._run([
+            "benchmark",
+            "session-repeatability",
+            "--csv",
+            str(csv_path),
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+            "--repeat-count",
+            "3",
+            "--baseline-report",
+            str(baseline_path),
+        ])
+        assert rc == 0
+        assert "production pipeline session repeatability" in out
+        assert "delta_events_percent=15.0" in out
+        assert "median_events_per_second=115.0" in out
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

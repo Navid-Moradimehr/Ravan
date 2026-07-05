@@ -7,6 +7,22 @@
 - **Broker**: Kafka KRaft
 - **Historian**: TimescaleDB
 
+## Production Pipeline Session Repeatability
+
+- **Date**: 2026-07-05
+- **Scope**: repeated the `python-fallback` production pipeline three times over the mixed industrial CSV and compared the median against a single-run baseline saved from the same host
+
+### Latest Benchmark Run
+
+| Benchmark | Median events/sec | Median p99 ms | Notes |
+|-----------|-------------------|---------------|-------|
+| Production pipeline `python-fallback` repeatability | 42,885.88 | 0.0386 | repeat count 3, baseline 38,355.18 events/sec, delta +11.81% |
+
+### Interpretation
+
+- The repeatability command shows the current local session is above the saved baseline and the spread is still narrow enough to treat the result as stable for this host.
+- The benchmark still reflects a single-node development environment, so the improvement is a useful regression signal rather than a deployment guarantee.
+
 ## SWaT Simulator Case
 
 - **Date**: 2026-07-05
