@@ -1,5 +1,21 @@
 # Implementation Log
 
+## 2026-07-05 - SWaT Simulator Case
+
+### Changed
+
+1. **SWaT benchmark case**
+   - Added `swat` as a first-class real-world simulator case.
+   - The case synthesizes a small workbook, normalizes it through the SWaT converter, and runs it through the same replay benchmark as the other industrial scenarios.
+
+2. **Benchmark coverage**
+   - The expanded real-world simulator suite now includes SWaT alongside the existing mock and industrial replay cases.
+   - SWaT simulator run: 93,544.49 events/sec, p99 0.0168 ms.
+
+### Notes
+
+- This validates the SWaT parser and benchmark lane, but the public upstream SWaT workbook still deserves a direct end-to-end verification pass in a real download path.
+
 ## 2026-07-05 - Real Dataset Import And Benchmark Pass
 
 ### Changed

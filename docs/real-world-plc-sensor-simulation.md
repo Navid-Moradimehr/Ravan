@@ -86,5 +86,5 @@ Suggested order:
 
 - AI4I is now fetched from the public UCI archive, normalized, and benchmarked through the end-to-end pipeline.
 - NASA C-MAPSS is now fetched from the official NASA ZIP, normalized, and benchmarked through the end-to-end pipeline.
-- SWaT workbook and CSV normalization now exist in the repo, and the adapter has been benchmarked with a synthetic workbook fixture.
+- SWaT workbook and CSV normalization now exist in the repo, and the simulator suite now includes a first-class `swat` benchmark case.
 - The public SWaT download still needs one more verification pass against the exact upstream file we ship users to make sure the staged workbook path matches the upstream format in every environment.

@@ -17,6 +17,7 @@ def test_run_real_world_simulator_suite() -> None:
             "mock-normal",
             "mock-drift",
             "mock-spike",
+            "swat",
             "multi-plc-line",
             "burst-load",
             "dropout-reconnect",
@@ -25,11 +26,12 @@ def test_run_real_world_simulator_suite() -> None:
         ],
     )
 
-    assert len(result.cases) == 8
+    assert len(result.cases) == 9
     assert result.average_events_per_second > 0
     assert result.cases[0].events == 20
     assert "mock-normal" in format_result(result)
     assert "mock-spike" in format_result(result)
+    assert "swat" in format_result(result)
     assert "multi-plc-line" in format_result(result)
     assert "dropout-reconnect" in format_result(result)
     assert "multi-site-correlation" in format_result(result)

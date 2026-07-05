@@ -7,6 +7,22 @@
 - **Broker**: Kafka KRaft
 - **Historian**: TimescaleDB
 
+## SWaT Simulator Case
+
+- **Date**: 2026-07-05
+- **Scope**: added a first-class `swat` simulator case that normalizes a workbook-shaped SWaT fixture through the dataset converter before replaying it through the benchmark path
+
+### Latest Benchmark Run
+
+| Benchmark | Median events/sec | Median p99 ms | Notes |
+|-----------|-------------------|---------------|-------|
+| `swat` case | 93,544.49 | 0.0168 | workbook-shaped SWaT path normalized through the repo converter |
+
+### Interpretation
+
+- The SWaT lane behaves like the rest of the real-world simulator suite: it stays in the same throughput band as the other local industrial replay cases.
+- The remaining caveat is still the upstream public SWaT workbook verification, not the benchmark path itself.
+
 ## Industrial Dataset Rerun
 
 - **Date**: 2026-07-04

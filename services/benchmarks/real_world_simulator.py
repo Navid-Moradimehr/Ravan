@@ -4,6 +4,7 @@ import argparse
 import csv
 import math
 import random
+import zipfile
 import tempfile
 from dataclasses import dataclass
 from math import ceil
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import Iterable
 
 from services.benchmarks.mixed_replay import BenchmarkResult, format_result as format_replay_result, run_benchmark as run_mixed_replay_benchmark
+from services.datasets.benchmark_converter import convert_dataset
 from services.datasets.mock_generator import ALL_PRESETS, MockGeneratorConfig, generate_csv
 from services.edge_ingest.model import utc_now
 from services.scenarios.engine import ScenarioState, ScenarioType, apply_scenario
@@ -132,6 +134,75 @@ def _mock_case_csv(csv_path: Path, preset: str, scenario: str, events: int) -> N
         max_events=0,
     )
     generate_csv(config, csv_path, num_rows=rows)
+
+
+def _swat_case_csv(csv_path: Path, events: int) -> None:
+    xlsx_path = csv_path.with_suffix(".xlsx")
+    rows = [
+        ["Timestamp", "Label", "FIT101", "LIT101", "AIT201", "P101"],
+        ["2026-07-01T00:00:00Z", "normal", "1.5", "2.5", "3.5", "4.5"],
+        ["2026-07-01T00:00:01Z", "attack", "1.8", "2.7", "3.7", "4.9"],
+        ["2026-07-01T00:00:02Z", "normal", "1.6", "2.6", "3.6", "4.6"],
+    ]
+
+    def cell_ref(col_idx: int, row_idx: int) -> str:
+        col = ""
+        idx = col_idx + 1
+        while idx:
+            idx, rem = divmod(idx - 1, 26)
+            col = chr(65 + rem) + col
+        return f"{col}{row_idx}"
+
+    def row_xml(values: list[str], row_idx: int) -> str:
+        cells = []
+        for idx, value in enumerate(values):
+            ref = cell_ref(idx, row_idx)
+            if row_idx == 1:
+                cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{value}</t></is></c>')
+            else:
+                cells.append(f'<c r="{ref}"><v>{value}</v></c>')
+        return f'<row r="{row_idx}">{"".join(cells)}</row>'
+
+    sheet_rows = "".join(row_xml(row, idx + 1) for idx, row in enumerate(rows))
+    sheet_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>{sheet_rows}</sheetData>
+</worksheet>"""
+    workbook_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>
+</workbook>"""
+    rels_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>"""
+    root_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>"""
+    content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>"""
+
+    with zipfile.ZipFile(xlsx_path, "w") as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", root_rels)
+        zf.writestr("xl/workbook.xml", workbook_xml)
+        zf.writestr("xl/_rels/workbook.xml.rels", rels_xml)
+        zf.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+
+    convert_dataset(
+        xlsx_path,
+        csv_path,
+        preset="swat",
+        site_id="swat-site",
+        line="line-01",
+        source_prefix="swat",
+    )
 
 
 def _multi_plc_line_case_csv(csv_path: Path, events: int) -> None:
@@ -277,6 +348,9 @@ def _prepare_case_csv(case_id: str, csv_path: Path, events: int) -> None:
     if case_id == "multi-site-correlation":
         _multi_site_correlation_case_csv(csv_path, events)
         return
+    if case_id == "swat":
+        _swat_case_csv(csv_path, events)
+        return
     raise ValueError(f"unknown simulator case: {case_id}")
 
 
@@ -292,6 +366,7 @@ def run_suite(
         "mock-normal",
         "mock-drift",
         "mock-spike",
+        "swat",
         "industrial-benchmark",
         "multi-site-correlation",
     ]
@@ -369,7 +444,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cases",
         default=None,
-        help="Comma-separated case ids: mock-normal,mock-drift,mock-spike,multi-plc-line,burst-load,dropout-reconnect,multi-site-correlation,industrial-benchmark",
+        help="Comma-separated case ids: mock-normal,mock-drift,mock-spike,swat,multi-plc-line,burst-load,dropout-reconnect,multi-site-correlation,industrial-benchmark",
     )
     return parser
 

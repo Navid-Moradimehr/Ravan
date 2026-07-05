@@ -18,6 +18,7 @@
 - backup-drill matrix tooling for per-site restore/rollback measurement
 - AI4I and C-MAPSS public dataset import and benchmark conversion
 - SWaT workbook/CSV normalization path with benchmark coverage on a synthetic workbook fixture
+- SWaT first-class simulator case
 
 ## Still Missing
 
