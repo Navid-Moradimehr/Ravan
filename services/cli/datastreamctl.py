@@ -126,6 +126,16 @@ def _parse_tables(value: str | None) -> list[str] | None:
     return tables or None
 
 
+def _restore_threshold_seconds(deployment_mode: str) -> float:
+    if deployment_mode == "single-site":
+        return 30.0
+    if deployment_mode == "plant-local":
+        return 60.0
+    if deployment_mode == "federated":
+        return 120.0
+    return 45.0
+
+
 def _run_backup_drill(backup_dir: str | None, tables: list[str] | None, restore_db: str | None) -> dict[str, Any]:
     started_at = time.perf_counter()
     before_snapshot = collect_historian_snapshot()
@@ -171,7 +181,25 @@ def _run_backup_drill_matrix(
         profile = load_site_profile(site_profile)
         profile_backup_dir = backup_dir or profile.backups.directory
         profile_restore_db = restore_db or profile.backups.restore_test_database
+        restore_threshold_seconds = _restore_threshold_seconds(profile.deployment_mode)
+        backup_threshold_seconds = max(restore_threshold_seconds / 2.0, 10.0)
         drill = _run_backup_drill(profile_backup_dir, tables, profile_restore_db)
+        backup_elapsed_seconds = float(drill.get("backup_elapsed_seconds") or 0.0)
+        restore_elapsed_seconds = float(drill.get("restore_elapsed_seconds") or 0.0)
+        snapshot_match = bool(drill.get("snapshot_comparison") and drill["snapshot_comparison"].get("matched"))
+        backup_rto_passed = backup_elapsed_seconds <= backup_threshold_seconds
+        restore_rto_passed = restore_elapsed_seconds <= restore_threshold_seconds if drill["restore"] else False
+        rpo_seconds = 0.0 if snapshot_match else 1.0
+        rpo_threshold_seconds = 0.0
+        rpo_passed = snapshot_match and rpo_seconds <= rpo_threshold_seconds
+        accepted = bool(
+            drill["backup"].get("status") == "success"
+            and (drill["restore"] is None or drill["restore"].get("status") == "success")
+            and snapshot_match
+            and backup_rto_passed
+            and (drill["restore"] is None or restore_rto_passed)
+            and rpo_passed
+        )
         rows.append(
             {
                 "site_profile": site_profile,
@@ -182,15 +210,23 @@ def _run_backup_drill_matrix(
                 "restore_db": profile_restore_db,
                 "backup_status": drill["backup"].get("status", "unknown"),
                 "restore_status": drill["restore"].get("status", "skipped") if drill["restore"] else "skipped",
-                "backup_elapsed_seconds": drill.get("backup_elapsed_seconds", 0.0),
-                "restore_elapsed_seconds": drill.get("restore_elapsed_seconds", 0.0),
+                "backup_elapsed_seconds": backup_elapsed_seconds,
+                "restore_elapsed_seconds": restore_elapsed_seconds,
                 "total_elapsed_seconds": drill.get("total_elapsed_seconds", 0.0),
-                "snapshot_match": bool(drill.get("snapshot_comparison") and drill["snapshot_comparison"].get("matched")),
+                "snapshot_match": snapshot_match,
+                "backup_rto_threshold_seconds": backup_threshold_seconds,
+                "restore_rto_threshold_seconds": restore_threshold_seconds,
+                "rpo_threshold_seconds": rpo_threshold_seconds,
+                "rpo_seconds": rpo_seconds,
+                "backup_rto_passed": backup_rto_passed,
+                "restore_rto_passed": restore_rto_passed,
+                "rpo_passed": rpo_passed,
+                "accepted": accepted,
                 "details": drill,
             }
         )
     passed = all(
-        row["backup_status"] == "success" and row["restore_status"] == "success" and row["snapshot_match"]
+        row["accepted"]
         for row in rows
     )
     return {
@@ -237,6 +273,10 @@ def _write_local_phase_one_report(report_dir: str, payload: dict[str, Any]) -> l
     summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     written: list[Path] = [summary_path]
 
+    acceptance_path = output_dir / "local-phase-one-acceptance.json"
+    acceptance_path.write_text(json.dumps(payload.get("acceptance", []), indent=2), encoding="utf-8")
+    written.append(acceptance_path)
+
     backup_payload = payload.get("backup_drill")
     if isinstance(backup_payload, dict):
         backup_dir = output_dir / "backup-drill"
@@ -277,6 +317,46 @@ def _serialize_site_profile_matrix_result(result: Any) -> dict[str, Any]:
             for run in result.runs
         ],
     }
+
+
+def _serialize_local_phase_one_acceptance(backup_result: dict[str, Any], benchmark_result: Any) -> list[dict[str, Any]]:
+    benchmark_runs = {run.site_id: run for run in benchmark_result.runs}
+    acceptance: list[dict[str, Any]] = []
+    for backup_run in backup_result["runs"]:
+        benchmark_run = benchmark_runs.get(backup_run["site_id"])
+        benchmark_passed = bool(benchmark_run.passed) if benchmark_run else False
+        benchmark_threshold = float(benchmark_run.detail.split("threshold=")[1].split()[0]) if benchmark_run and "threshold=" in benchmark_run.detail else None
+        backup_rto_threshold_seconds = float(backup_run.get("backup_rto_threshold_seconds", 30.0))
+        restore_rto_threshold_seconds = float(backup_run.get("restore_rto_threshold_seconds", 60.0))
+        rpo_threshold_seconds = float(backup_run.get("rpo_threshold_seconds", 0.0))
+        backup_rto_passed = bool(backup_run.get("backup_rto_passed", backup_run["backup_elapsed_seconds"] <= backup_rto_threshold_seconds))
+        restore_rto_passed = bool(backup_run.get("restore_rto_passed", backup_run["restore_elapsed_seconds"] <= restore_rto_threshold_seconds))
+        rpo_passed = bool(backup_run.get("rpo_passed", backup_run.get("snapshot_match", False) and backup_run.get("rpo_seconds", 0.0) <= rpo_threshold_seconds))
+        accepted = bool(backup_run.get(
+            "accepted",
+            backup_rto_passed and restore_rto_passed and rpo_passed and backup_run.get("backup_status") == "success" and backup_run.get("restore_status") in {"success", "skipped"},
+        ))
+        acceptance.append(
+            {
+                "site_id": backup_run["site_id"],
+                "profile_id": backup_run["profile_id"],
+                "deployment_mode": backup_run["deployment_mode"],
+                "backup_rto_seconds": backup_run["backup_elapsed_seconds"],
+                "backup_rto_threshold_seconds": backup_rto_threshold_seconds,
+                "backup_rto_passed": backup_rto_passed,
+                "restore_rto_seconds": backup_run["restore_elapsed_seconds"],
+                "restore_rto_threshold_seconds": restore_rto_threshold_seconds,
+                "restore_rto_passed": restore_rto_passed,
+                "rpo_seconds": backup_run.get("rpo_seconds", 0.0),
+                "rpo_threshold_seconds": rpo_threshold_seconds,
+                "rpo_passed": rpo_passed,
+                "benchmark_average_events_per_second": benchmark_run.average_events_per_second if benchmark_run else None,
+                "benchmark_threshold_events_per_second": benchmark_threshold,
+                "benchmark_passed": benchmark_passed,
+                "passed": bool(accepted and benchmark_passed),
+            }
+        )
+    return acceptance
 
 
 def _run_release_gate_for_profile(
@@ -789,6 +869,7 @@ def cmd_local_phase_one(args: argparse.Namespace) -> int:
         "baseline_csv": str(args.csv),
         "backup_drill": backup_result,
         "benchmark": _serialize_site_profile_matrix_result(benchmark_result),
+        "acceptance": _serialize_local_phase_one_acceptance(backup_result, benchmark_result),
         "passed": backup_result["passed"] and benchmark_result.passed,
     }
     written_reports: list[Path] = []
@@ -806,6 +887,13 @@ def cmd_local_phase_one(args: argparse.Namespace) -> int:
         _print_row("backup_passed", str(backup_result["passed"]).lower())
         _print_row("benchmark_passed", str(benchmark_result.passed).lower())
         _print_row("site_profiles", len(site_profiles))
+        _print_row("acceptance_rows", len(payload["acceptance"]))
+        for row in payload["acceptance"]:
+            print(
+                f"{'':6}{row['site_id']:<18}backup_rto={row['backup_rto_seconds']}<={row['backup_rto_threshold_seconds']} "
+                f"restore_rto={row['restore_rto_seconds']}<={row['restore_rto_threshold_seconds']} "
+                f"rpo={row['rpo_seconds']}<={row['rpo_threshold_seconds']} benchmark={row['benchmark_average_events_per_second']}"
+            )
         if benchmark_result.runs:
             for run in benchmark_result.runs:
                 print(

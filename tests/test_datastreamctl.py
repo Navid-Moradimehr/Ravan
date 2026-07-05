@@ -235,7 +235,9 @@ class TestDatastreamctl:
         assert "local phase one" in out
         assert "backup_passed" in out
         assert "benchmark_passed" in out
+        assert "acceptance_rows" in out
         assert (report_dir / "local-phase-one-summary.json").exists()
+        assert (report_dir / "local-phase-one-acceptance.json").exists()
         assert (report_dir / "backup-drill" / "backup-drill-matrix-summary.json").exists()
         assert (report_dir / "benchmark" / "site-profile-matrix-summary.json").exists()
 

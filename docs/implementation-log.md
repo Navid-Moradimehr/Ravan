@@ -1,5 +1,21 @@
 # Implementation Log
 
+## 2026-07-05 - Restore Thresholds And Phase-One Acceptance
+
+### Changed
+
+1. **Restore drill thresholds**
+   - The backup drill matrix now reports per-site restore thresholds and a binary acceptance result for backup, restore, and rollback state.
+   - The local gate uses deployment-mode-specific thresholds so the output is not just raw elapsed time.
+
+2. **Phase-one acceptance report**
+   - The `local-phase-one` command now emits a combined acceptance artifact with per-site backup, restore, RTO proxy, and benchmark status.
+   - The report keeps the local rollback drill and benchmark gate together so operators can see one pass/fail summary per site.
+
+### Notes
+
+- The thresholds are still local-release thresholds, not customer site guarantees.
+
 ## 2026-07-05 - Local Phase-One Gate
 
 ### Changed
