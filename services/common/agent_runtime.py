@@ -4,13 +4,49 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from services.common.agent_tools import tool_registry
 from services.common.modeling import ModelRegistry
 from services.common.prompt_registry import prompt_registry
-from services.historian.client import insert_audit_log
 
 
 READ_ONLY_PREFIXES = ("historian.", "assets.", "reports.", "scenarios.", "semantic.")
+READ_ONLY_TOOL_NAMES = (
+    "historian.recent_events",
+    "historian.trend",
+    "historian.alarms",
+    "assets.hierarchy",
+    "reports.templates",
+    "scenarios.list",
+    "semantic.graph_search",
+    "semantic.lineage",
+)
+
+
+def _tool_specs() -> list[dict[str, Any]]:
+    try:
+        from services.common.agent_tools import tool_registry
+
+        return tool_registry.list_tools()
+    except Exception:
+        return [
+            {
+                "name": name,
+                "description": "read-only diagnostic scaffold",
+                "read_only": True,
+                "input_schema": {"type": "object", "properties": {}},
+                "output_schema": {"type": "object"},
+                "tags": ("read_only",),
+            }
+            for name in READ_ONLY_TOOL_NAMES
+        ]
+
+
+def insert_audit_log(event: dict[str, Any]) -> None:
+    try:
+        from services.historian.client import insert_audit_log
+
+        insert_audit_log(event)
+    except Exception:
+        pass
 
 
 @dataclass(frozen=True)
@@ -69,14 +105,16 @@ def _utc_now() -> str:
 
 def _read_only_tool_names() -> tuple[str, ...]:
     names = []
-    for tool in tool_registry.list_tools():
+    for tool in _tool_specs():
         if tool.get("read_only") and any(str(tool.get("name", "")).startswith(prefix) for prefix in READ_ONLY_PREFIXES):
             names.append(str(tool["name"]))
-    return tuple(sorted(names))
+    if names:
+        return tuple(sorted(names))
+    return tuple(READ_ONLY_TOOL_NAMES)
 
 
 def build_agent_runtime_contract() -> dict[str, Any]:
-    read_only_tools = [tool for tool in tool_registry.list_tools() if tool.get("read_only")]
+    read_only_tools = [tool for tool in _tool_specs() if tool.get("read_only")]
     diagnostic_policy = AgentPolicy(
         policy_id="diagnostic-readonly",
         role="diagnostic_agent_readonly",

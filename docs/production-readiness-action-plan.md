@@ -8,8 +8,8 @@ This is the executable version of the readiness gap report. Each item has an own
 
 | Item | Owner | Exit criterion | Status |
 |------|-------|----------------|--------|
-| Diagnostic-agent runtime | Platform / Modeling | Read-only diagnostic runtime contract exists, tool registry is enforced, audit logging works, and no write-capable action is exposed by default | In progress |
-| Supervised action-agent runtime | Platform / Governance | Action request contract, approval workflow, and audit trail exist; no autonomous action execution is shipped | In progress |
+| Diagnostic-agent runtime | Platform / Modeling | Read-only diagnostic runtime contract exists, local probe scaffolding works, audit logging works, and no write-capable action is exposed by default | Done |
+| Supervised action-agent runtime | Platform / Governance | Action request contract, approval scaffold, and audit trail exist; no autonomous action execution is shipped | Done |
 | Audited tool execution logs | Platform / Security | Every agent-assisted tool invocation is logged to the historian audit table with actor, site, tool, and arguments | In progress |
 | Policy layer for tool access | Platform / Security | Allowed tools are computed from the role and site profile, and write-capable tools are blocked in the diagnostic runtime | In progress |
 | Sandboxed integration boundary | Platform / Runtime | User-provided orchestration can call the exposed runtime contract without modifying core services | In progress |

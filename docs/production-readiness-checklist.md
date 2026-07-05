@@ -28,6 +28,8 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Project-manifest rollout acceptance command exists for combined release-gate and benchmark checks.
 - Open-weight and OpenAI-compatible model gateway abstraction exists.
 - Read-only agent infrastructure exists as a foundation.
+- Local Kubernetes rehearsal exists for generated site bundles.
+- The diagnostic/runtime scaffold can be inspected locally through the CLI.
 - Local and site-oriented benchmark harnesses exist.
 - Explicit `runtime.mode` contract exists for `python-fallback`, `flink-local`, and `flink-production`.
 - `datastreamd` now uses `runtime.mode` to select the default processor set.
@@ -70,8 +72,8 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Production-pipeline validation against the real Flink/Kafka/Timescale deployment topology.
 - Repeatability checks over several benchmark sessions to separate regression noise from actual performance loss.
 - Model evaluation lifecycle and promotion workflow.
-- Diagnostic-agent runtime.
-- Supervised action-agent runtime.
+- Diagnostic-agent productization beyond the scaffold.
+- Supervised action-agent productization beyond the scaffold.
 - Broader connector/vendor validation against actual devices.
 - Enterprise rollout validation across branches, plants, and subnets.
 - Further package cleanup is still possible, but the major runtime splits are in place.
@@ -92,7 +94,7 @@ These are the changes that matter most before calling the platform production-re
 1. Complete target-site sizing benchmarks on real broker and historian instances.
 2. Validate vendor connectors against real PLC and sensor traffic.
 3. Add model evaluation and promotion lifecycle controls.
-4. Finish the diagnostic-agent and supervised action-agent runtime paths.
+4. Finish the diagnostic-agent and supervised action-agent productization paths.
 5. Keep adding target-site broker/historian p99 probes so the CGR comparison eventually covers real plant latency, not only local replay latency.
 6. Treat benchmark session deltas as first-class evidence. A single local run can move 1-12 percent on the same machine, so use repeated runs and median/percentile tracking before calling a change a real regression.
 7. Keep the streaming hot path on Flink and reserve Spark for optional offline ETL and lakehouse jobs.

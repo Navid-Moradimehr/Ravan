@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import json
 from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
@@ -240,6 +241,182 @@ class TestDatastreamctl:
         assert (report_dir / "local-phase-one-acceptance.json").exists()
         assert (report_dir / "backup-drill" / "backup-drill-matrix-summary.json").exists()
         assert (report_dir / "benchmark" / "site-profile-matrix-summary.json").exists()
+
+    def test_local_phase_one_reports_multi_profile_summary(self, monkeypatch, tmp_path):
+        report_dir = tmp_path / "phase-one-multi"
+        plant_local_profile = REPO_ROOT / "config" / "site-profiles" / "plant-local.yaml"
+
+        monkeypatch.setattr(
+            ctl,
+            "_run_backup_drill_matrix",
+            lambda *args, **kwargs: {
+                "site_profiles": kwargs.get("site_profiles", []),
+                "runs": [
+                    {
+                        "site_profile": str(SITE_PROFILE),
+                        "profile_id": "single-site-demo",
+                        "site_id": "demo-site",
+                        "deployment_mode": "single-site",
+                        "backup_dir": "backups/demo-site",
+                        "restore_db": "restore_db",
+                        "backup_status": "success",
+                        "restore_status": "success",
+                        "backup_elapsed_seconds": 0.12,
+                        "restore_elapsed_seconds": 0.23,
+                        "total_elapsed_seconds": 0.45,
+                        "snapshot_match": True,
+                        "details": {"backup": {"status": "success"}, "restore": {"status": "success"}},
+                        "backup_rto_threshold_seconds": 30.0,
+                        "restore_rto_threshold_seconds": 30.0,
+                        "rpo_threshold_seconds": 0.0,
+                        "rpo_seconds": 0.0,
+                        "backup_rto_passed": True,
+                        "restore_rto_passed": True,
+                        "rpo_passed": True,
+                        "accepted": True,
+                    },
+                    {
+                        "site_profile": str(plant_local_profile),
+                        "profile_id": "plant-local-demo",
+                        "site_id": "plant-a",
+                        "deployment_mode": "plant-local",
+                        "backup_dir": "backups/plant-a",
+                        "restore_db": "restore_db",
+                        "backup_status": "success",
+                        "restore_status": "success",
+                        "backup_elapsed_seconds": 0.18,
+                        "restore_elapsed_seconds": 0.34,
+                        "total_elapsed_seconds": 0.61,
+                        "snapshot_match": True,
+                        "details": {"backup": {"status": "success"}, "restore": {"status": "success"}},
+                        "backup_rto_threshold_seconds": 60.0,
+                        "restore_rto_threshold_seconds": 60.0,
+                        "rpo_threshold_seconds": 0.0,
+                        "rpo_seconds": 0.0,
+                        "backup_rto_passed": True,
+                        "restore_rto_passed": True,
+                        "rpo_passed": True,
+                        "accepted": True,
+                    },
+                ],
+                "passed": True,
+            },
+        )
+        monkeypatch.setattr(
+            ctl,
+            "run_site_profile_matrix",
+            lambda *args, **kwargs: SimpleNamespace(
+                passed=True,
+                runs=(
+                    SimpleNamespace(
+                        site_id="demo-site",
+                        deployment_mode="single-site",
+                        profile_path=str(SITE_PROFILE),
+                        average_events_per_second=5_000.0,
+                        median_events_per_second=5_000.0,
+                        stdev_events_per_second=0.0,
+                        min_events_per_second=5_000.0,
+                        max_events_per_second=5_000.0,
+                        repeat_count=1,
+                        latency_p99_ms=0.02,
+                        passed=True,
+                        detail="threshold=1",
+                    ),
+                    SimpleNamespace(
+                        site_id="plant-a",
+                        deployment_mode="plant-local",
+                        profile_path=str(plant_local_profile),
+                        average_events_per_second=6_000.0,
+                        median_events_per_second=6_000.0,
+                        stdev_events_per_second=0.0,
+                        min_events_per_second=6_000.0,
+                        max_events_per_second=6_000.0,
+                        repeat_count=1,
+                        latency_p99_ms=0.03,
+                        passed=True,
+                        detail="threshold=1",
+                    ),
+                ),
+            ),
+        )
+        rc, out = self._run([
+            "local-phase-one",
+            "--site-profiles",
+            f"{SITE_PROFILE},{plant_local_profile}",
+            "--manifest",
+            str(PROJECT_MANIFEST),
+            "--csv",
+            str(REPO_ROOT / "data" / "benchmarks" / "industrial_mixed_benchmark.csv"),
+            "--site-ids",
+            "demo-site,plant-a",
+            "--events",
+            "12",
+            "--batch-size",
+            "4",
+            "--min-average-events-per-second",
+            "1",
+            "--report-dir",
+            str(report_dir),
+        ])
+        assert rc == 0
+        assert "profile_summaries" in out
+        assert "mode=single-site" in out
+        assert "mode=plant-local" in out
+        payload = json.loads((report_dir / "local-phase-one-summary.json").read_text(encoding="utf-8"))
+        assert payload["summary"]["site_profile_count"] == 2
+        assert payload["summary"]["passed_site_profiles"] == 2
+        assert payload["summary"]["deployment_modes"]["single-site"]["site_profiles"] == 1
+        assert payload["summary"]["deployment_modes"]["plant-local"]["site_profiles"] == 1
+
+    def test_local_kubernetes_rehearsal_validates_generated_bundles(self, tmp_path):
+        export_dir = tmp_path / "k8s-export"
+        report_dir = tmp_path / "k8s-report"
+        rc, out = self._run([
+            "local-kubernetes-rehearsal",
+            "--manifest",
+            str(PROJECT_MANIFEST),
+            "--site-ids",
+            "demo-site",
+            "--export-dir",
+            str(export_dir),
+            "--report-dir",
+            str(report_dir),
+        ])
+        assert rc == 0
+        assert "local kubernetes rehearsal" in out
+        assert "kubectl=" in out
+        assert (export_dir / "demo-site" / "kubernetes" / "deployment.yaml").exists()
+        assert (report_dir / "local-kubernetes-rehearsal-summary.json").exists()
+
+    def test_agent_runtime_contract_and_probe(self, monkeypatch):
+        import services.common.agent_runtime as agent_runtime
+
+        captured = []
+        monkeypatch.setattr(agent_runtime, "insert_audit_log", lambda event: captured.append(event) or event)
+
+        rc, out = self._run(["agent-runtime", "contract", "--json"])
+        assert rc == 0
+        assert '"role": "diagnostic_agent_readonly"' in out
+
+        rc, out = self._run([
+            "agent-runtime",
+            "diagnostic-probe",
+            "--actor-id",
+            "agent-1",
+            "--site-id",
+            "demo-site",
+            "--tool-name",
+            "historian.recent_events",
+            "--arguments",
+            '{"limit": 5}',
+            "--metadata",
+            '{"source": "test"}',
+            "--json",
+        ])
+        assert rc == 0
+        assert '"tool_name": "historian.recent_events"' in out
+        assert '"approved": true' in out
+        assert captured and captured[0]["action"] == "agent_tool_call"
 
     def test_release_gate_can_skip_network_and_run_backup(self, monkeypatch):
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})

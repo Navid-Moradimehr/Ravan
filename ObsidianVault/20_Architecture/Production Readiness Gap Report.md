@@ -19,6 +19,8 @@
 - AI4I and C-MAPSS public dataset import and benchmark conversion
 - SWaT workbook/CSV normalization path with benchmark coverage on a synthetic workbook fixture
 - SWaT first-class simulator case
+- local Kubernetes rehearsal command for generated site bundles
+- diagnostic runtime scaffold command for read-only probes and supervised action requests
 
 ## Still Missing
 
@@ -27,7 +29,7 @@
 - restore/rollback drills on multiple site profiles
 - real PLC/sensor vendor compatibility validation
 - model evaluation/promotion lifecycle
-- diagnostic and supervised action agents
+- diagnostic and supervised action productization beyond the scaffold
 - one more SWaT verification pass against the exact upstream workbook source used in public distribution
 
 ## Release Stance

@@ -12,13 +12,20 @@ from dataclasses import asdict
 import json
 import os
 import platform
+import shutil
+import subprocess
 import time
 import sys
+import tempfile
+import ast
 from typing import Any
 from pathlib import Path
 
+import yaml
+
 from services.common.project_manifest import load_project_manifest, validate_project_manifest
 from services.common.site_profiles import load_site_profile, validate_site_profile
+from services.common.agent_runtime import build_agent_runtime_contract
 from services.benchmarks.deployment_pack import format_result as format_deployment_pack_result
 from services.benchmarks.deployment_pack import format_matrix_result as format_deployment_pack_matrix_result
 from services.benchmarks.deployment_pack import run_benchmark as run_deployment_pack_benchmark
@@ -296,6 +303,20 @@ def _write_local_phase_one_report(report_dir: str, payload: dict[str, Any]) -> l
     return written
 
 
+def _write_local_kubernetes_rehearsal_report(report_dir: str, payload: dict[str, Any]) -> list[Path]:
+    output_dir = Path(report_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    summary_path = output_dir / "local-kubernetes-rehearsal-summary.json"
+    summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    written.append(summary_path)
+    for run in payload.get("runs", []):
+        run_path = output_dir / f"{run['site_id']}.json"
+        run_path.write_text(json.dumps(run, indent=2), encoding="utf-8")
+        written.append(run_path)
+    return written
+
+
 def _serialize_site_profile_matrix_result(result: Any) -> dict[str, Any]:
     return {
         "passed": result.passed,
@@ -357,6 +378,96 @@ def _serialize_local_phase_one_acceptance(backup_result: dict[str, Any], benchma
             }
         )
     return acceptance
+
+
+def _summarize_local_phase_one_acceptance(acceptance: list[dict[str, Any]]) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "site_profile_count": len(acceptance),
+        "passed_site_profiles": sum(1 for row in acceptance if row["passed"]),
+        "failed_site_profiles": sum(1 for row in acceptance if not row["passed"]),
+        "deployment_modes": {},
+    }
+    deployment_modes: dict[str, dict[str, Any]] = {}
+    for row in acceptance:
+        mode = row["deployment_mode"]
+        bucket = deployment_modes.setdefault(
+            mode,
+            {
+                "site_profiles": 0,
+                "passed_site_profiles": 0,
+                "failed_site_profiles": 0,
+                "site_ids": [],
+            },
+        )
+        bucket["site_profiles"] += 1
+        bucket["site_ids"].append(row["site_id"])
+        if row["passed"]:
+            bucket["passed_site_profiles"] += 1
+        else:
+            bucket["failed_site_profiles"] += 1
+    summary["deployment_modes"] = {
+        mode: {
+            "site_profiles": bucket["site_profiles"],
+            "passed_site_profiles": bucket["passed_site_profiles"],
+            "failed_site_profiles": bucket["failed_site_profiles"],
+            "site_ids": sorted(bucket["site_ids"]),
+        }
+        for mode, bucket in sorted(deployment_modes.items())
+    }
+    return summary
+
+
+def _validate_yaml_documents(path: Path) -> dict[str, Any]:
+    try:
+        raw_text = path.read_text(encoding="utf-8")
+        docs = [doc for doc in yaml.safe_load_all(raw_text) if doc is not None]
+    except Exception as exc:
+        return {
+            "path": str(path),
+            "valid": False,
+            "document_count": 0,
+            "kinds": [],
+            "error": str(exc),
+        }
+
+    kinds = []
+    for doc in docs:
+        if isinstance(doc, dict):
+            kinds.append(str(doc.get("kind", "")))
+    return {
+        "path": str(path),
+        "valid": True,
+        "document_count": len(docs),
+        "kinds": kinds,
+        "error": "",
+    }
+
+
+def _run_kubectl_dry_run(kustomize_dir: Path, *, kubectl: str = "kubectl") -> dict[str, Any]:
+    executable = shutil.which(kubectl)
+    if not executable:
+        return {
+            "available": False,
+            "command": kubectl,
+            "status": "skipped",
+            "returncode": None,
+            "stdout": "",
+            "stderr": "",
+        }
+    completed = subprocess.run(
+        [executable, "kustomize", str(kustomize_dir)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return {
+        "available": True,
+        "command": executable,
+        "status": "passed" if completed.returncode == 0 else "failed",
+        "returncode": completed.returncode,
+        "stdout": completed.stdout.strip(),
+        "stderr": completed.stderr.strip(),
+    }
 
 
 def _run_release_gate_for_profile(
@@ -499,6 +610,80 @@ def _run_rollout_acceptance_for_manifest(
         "sites": sites,
         "passed": passed,
         "report_dir": report_dir,
+    }
+
+
+def _run_local_kubernetes_rehearsal(
+    manifest_path: str,
+    *,
+    site_ids: list[str] | None = None,
+    export_dir: str | None = None,
+    kubectl: str = "kubectl",
+) -> dict[str, Any]:
+    manifest = load_project_manifest(manifest_path)
+    manifest_errors = validate_project_manifest(manifest)
+    selected_ids = site_ids if site_ids is not None else [site.site_id for site in manifest.sites]
+    rehearsal_root = Path(export_dir) if export_dir else Path(tempfile.mkdtemp(prefix="datastream-k8s-rehearsal-"))
+    rehearsal_root.mkdir(parents=True, exist_ok=True)
+
+    runs: list[dict[str, Any]] = []
+    for site in manifest.sites:
+        if site.site_id not in selected_ids:
+            continue
+        written = manifest.export_bundles(rehearsal_root, site_id=site.site_id, fmt="both", layout="kubernetes")
+        site_root = rehearsal_root / site.site_id
+        kube_dir = site_root / "kubernetes"
+        required_files = [
+            kube_dir / "configmap.yaml",
+            kube_dir / "site-profile-configmap.yaml",
+            kube_dir / "deployment.yaml",
+            kube_dir / "service.yaml",
+            kube_dir / "kustomization.yaml",
+            kube_dir / "README.md",
+            kube_dir / "helm" / "values.generated.yaml",
+            kube_dir / "helm" / "README.md",
+            kube_dir / "helm" / "install.sh",
+        ]
+        required_files_ok = all(path.exists() for path in required_files)
+        yaml_reports = []
+        yaml_valid = True
+        for path in [item for item in written if item.suffix in {".yaml", ".yml"}]:
+            report = _validate_yaml_documents(path)
+            yaml_reports.append(report)
+            yaml_valid = yaml_valid and report["valid"]
+        helm_values = kube_dir / "helm" / "values.generated.yaml"
+        if helm_values.exists():
+            report = _validate_yaml_documents(helm_values)
+            if report not in yaml_reports:
+                yaml_reports.append(report)
+            yaml_valid = yaml_valid and report["valid"]
+        kubectl_result = _run_kubectl_dry_run(kube_dir, kubectl=kubectl)
+        kubectl_passed = kubectl_result["status"] != "failed"
+        accepted = bool(not manifest_errors and required_files_ok and yaml_valid and kubectl_passed)
+        runs.append(
+            {
+                "site_id": site.site_id,
+                "profile_path": site.profile_path,
+                "export_dir": str(site_root),
+                "kubernetes_dir": str(kube_dir),
+                "required_files_ok": required_files_ok,
+                "yaml_valid": yaml_valid,
+                "yaml_reports": yaml_reports,
+                "kubectl": kubectl_result,
+                "accepted": accepted,
+                "written": [str(path) for path in written],
+            }
+        )
+
+    passed = not manifest_errors and all(run["accepted"] for run in runs)
+    return {
+        "project_id": manifest.project_id,
+        "name": manifest.name,
+        "manifest_errors": manifest_errors,
+        "selected_site_ids": selected_ids,
+        "export_root": str(rehearsal_root),
+        "runs": runs,
+        "passed": passed,
     }
 
 
@@ -872,6 +1057,7 @@ def cmd_local_phase_one(args: argparse.Namespace) -> int:
         "acceptance": _serialize_local_phase_one_acceptance(backup_result, benchmark_result),
         "passed": backup_result["passed"] and benchmark_result.passed,
     }
+    payload["summary"] = _summarize_local_phase_one_acceptance(payload["acceptance"])
     written_reports: list[Path] = []
     if args.report_dir:
         written_reports = _write_local_phase_one_report(args.report_dir, payload)
@@ -888,12 +1074,16 @@ def cmd_local_phase_one(args: argparse.Namespace) -> int:
         _print_row("benchmark_passed", str(benchmark_result.passed).lower())
         _print_row("site_profiles", len(site_profiles))
         _print_row("acceptance_rows", len(payload["acceptance"]))
+        _print_row("profile_summaries", payload["summary"]["site_profile_count"])
+        _print_row("profiles_passed", payload["summary"]["passed_site_profiles"])
         for row in payload["acceptance"]:
             print(
                 f"{'':6}{row['site_id']:<18}backup_rto={row['backup_rto_seconds']}<={row['backup_rto_threshold_seconds']} "
                 f"restore_rto={row['restore_rto_seconds']}<={row['restore_rto_threshold_seconds']} "
                 f"rpo={row['rpo_seconds']}<={row['rpo_threshold_seconds']} benchmark={row['benchmark_average_events_per_second']}"
             )
+        for mode, mode_summary in payload["summary"]["deployment_modes"].items():
+            print(f"{'':6}mode={mode:<14} sites={mode_summary['site_profiles']} passed={mode_summary['passed_site_profiles']} failed={mode_summary['failed_site_profiles']}")
         if benchmark_result.runs:
             for run in benchmark_result.runs:
                 print(
@@ -905,6 +1095,127 @@ def cmd_local_phase_one(args: argparse.Namespace) -> int:
             for path in written_reports:
                 print(f"{'':6}report  {path}")
     return 0 if payload["passed"] else 2
+
+
+def cmd_local_kubernetes_rehearsal(args: argparse.Namespace) -> int:
+    site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
+    payload = _run_local_kubernetes_rehearsal(
+        args.manifest,
+        site_ids=site_ids,
+        export_dir=args.export_dir,
+        kubectl=args.kubectl,
+    )
+    written_reports: list[Path] = []
+    if args.report_dir:
+        written_reports = _write_local_kubernetes_rehearsal_report(args.report_dir, payload)
+    if args.json:
+        if written_reports:
+            payload = {**payload, "written_reports": [str(path) for path in written_reports]}
+        print(json.dumps(payload, indent=2))
+    else:
+        print("local kubernetes rehearsal")
+        print("=" * 40)
+        _print_row("project_id", payload["project_id"])
+        _print_row("passed", str(payload["passed"]).lower())
+        _print_row("site_profiles", len(payload["runs"]))
+        _print_row("export_root", payload["export_root"])
+        for run in payload["runs"]:
+            kubectl_status = run["kubectl"]["status"]
+            print(
+                f"{'':6}{run['site_id']:<18}yaml={str(run['yaml_valid']).lower()} "
+                f"required={str(run['required_files_ok']).lower()} kubectl={kubectl_status} "
+                f"accepted={str(run['accepted']).lower()}"
+            )
+        if written_reports:
+            _print_row("report_dir", args.report_dir)
+            for path in written_reports:
+                print(f"{'':6}report  {path}")
+    return 0 if payload["passed"] else 2
+
+
+def _parse_json_or_empty(value: str | None) -> dict[str, Any]:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        try:
+            parsed = ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            parsed = yaml.safe_load(value)
+    if not isinstance(parsed, dict):
+        raise ValueError("JSON input must decode to an object")
+    return parsed
+
+
+def cmd_agent_runtime(args: argparse.Namespace) -> int:
+    action = args.action
+    if action == "contract":
+        payload = build_agent_runtime_contract()
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("agent runtime contract")
+            print("=" * 40)
+            _print_row("diagnostic_role", payload["diagnostic_policy"]["role"])
+            _print_row("diagnostic_tools", len(payload["diagnostic_policy"]["allowed_tools"]))
+            _print_row("action_role", payload["action_policy"]["role"])
+            _print_row("action_approval_required", str(payload["action_policy"]["approval_required"]).lower())
+        return 0
+
+    if action == "diagnostic-probe":
+        from services.common.agent_runtime import DiagnosticAgentRuntime
+
+        runtime = DiagnosticAgentRuntime(
+            actor_id=args.actor_id,
+            site_id=args.site_id,
+            approval_required=args.approval_required,
+        )
+        payload = runtime.record_tool_call(
+            call_id=args.call_id,
+            tool_name=args.tool_name,
+            arguments=_parse_json_or_empty(args.arguments),
+            result_summary=args.result_summary,
+            metadata=_parse_json_or_empty(args.metadata),
+        )
+        result = {
+            "allowed_tools": list(runtime.allowed_tools),
+            "record": payload.to_dict(),
+        }
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print("agent diagnostic probe")
+            print("=" * 40)
+            _print_row("actor_id", args.actor_id)
+            _print_row("tool_name", args.tool_name)
+            _print_row("approved", str(payload.approved).lower())
+            _print_row("allowed_tools", len(runtime.allowed_tools))
+        return 0
+
+    if action == "action-request":
+        from services.common.agent_runtime import SupervisedActionRuntime
+
+        runtime = SupervisedActionRuntime(actor_id=args.actor_id, site_id=args.site_id)
+        payload = runtime.request_action(
+            action_id=args.action_id,
+            action_name=args.action_name,
+            target_resource=args.target_resource,
+            requested_by=args.requested_by,
+            details=_parse_json_or_empty(args.details),
+        )
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("agent action request")
+            print("=" * 40)
+            _print_row("action_id", payload["action_id"])
+            _print_row("action_name", payload["action_name"])
+            _print_row("status", payload["status"])
+            _print_row("site_id", payload["site_id"])
+        return 0
+
+    raise ValueError(f"unknown agent runtime action: {action}")
 
 
 def cmd_release_gate(args: argparse.Namespace) -> int:
@@ -1883,6 +2194,33 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("doctor", help="Run health/diagnostic checks").set_defaults(func=cmd_doctor)
     sub.add_parser("config", help="Show effective control configuration").set_defaults(func=cmd_config)
 
+    agent_runtime = sub.add_parser("agent-runtime", help="Inspect the read-only diagnostic runtime and supervised action scaffold")
+    agent_runtime_sub = agent_runtime.add_subparsers(dest="action", required=True)
+    agent_contract = agent_runtime_sub.add_parser("contract", help="Show the current agent runtime contract")
+    agent_contract.add_argument("--json", action="store_true")
+    agent_contract.set_defaults(func=cmd_agent_runtime)
+    agent_probe = agent_runtime_sub.add_parser("diagnostic-probe", help="Record a read-only diagnostic tool call")
+    agent_probe.add_argument("--actor-id", default="diagnostic-agent")
+    agent_probe.add_argument("--site-id", default="")
+    agent_probe.add_argument("--tool-name", default="historian.recent_events")
+    agent_probe.add_argument("--call-id", default="probe-1")
+    agent_probe.add_argument("--arguments", default="{}")
+    agent_probe.add_argument("--result-summary", default="probe")
+    agent_probe.add_argument("--metadata", default="{}")
+    agent_probe.add_argument("--approval-required", action="store_true")
+    agent_probe.add_argument("--json", action="store_true")
+    agent_probe.set_defaults(func=cmd_agent_runtime)
+    agent_action = agent_runtime_sub.add_parser("action-request", help="Record a supervised action request")
+    agent_action.add_argument("--actor-id", default="supervised-action-agent")
+    agent_action.add_argument("--site-id", default="")
+    agent_action.add_argument("--action-id", default="action-1")
+    agent_action.add_argument("--action-name", default="feature-plan")
+    agent_action.add_argument("--target-resource", default="site:demo-site")
+    agent_action.add_argument("--requested-by", default="operator")
+    agent_action.add_argument("--details", default="{}")
+    agent_action.add_argument("--json", action="store_true")
+    agent_action.set_defaults(func=cmd_agent_runtime)
+
     site_profile = sub.add_parser("site-profile", help="Show or validate a site profile")
     site_profile_sub = site_profile.add_subparsers(dest="action", required=True)
     site_show = site_profile_sub.add_parser("show", help="Show parsed site profile values")
@@ -1927,6 +2265,15 @@ def build_parser() -> argparse.ArgumentParser:
     local_phase_one.add_argument("--report-dir", default=None, help="Optional directory to write phase reports")
     local_phase_one.add_argument("--json", action="store_true")
     local_phase_one.set_defaults(func=cmd_local_phase_one)
+
+    local_k8s = sub.add_parser("local-kubernetes-rehearsal", help="Validate generated Kubernetes bundles for a local release rehearsal")
+    local_k8s.add_argument("--manifest", default="config/project-manifest.yaml")
+    local_k8s.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites in the manifest")
+    local_k8s.add_argument("--export-dir", default=None, help="Directory where generated Kubernetes bundles are written")
+    local_k8s.add_argument("--kubectl", default="kubectl", help="kubectl executable to use for optional dry-run validation")
+    local_k8s.add_argument("--report-dir", default=None, help="Optional directory to write rehearsal reports")
+    local_k8s.add_argument("--json", action="store_true")
+    local_k8s.set_defaults(func=cmd_local_kubernetes_rehearsal)
 
     release = sub.add_parser("release-gate", help="Run production readiness checks for one site profile")
     release.add_argument("site_profile", help="Path to the site profile YAML")

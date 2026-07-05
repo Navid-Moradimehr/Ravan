@@ -1,5 +1,26 @@
 # Implementation Log
 
+## 2026-07-05 - Local Kubernetes Rehearsal And Diagnostic Scaffold
+
+### Changed
+
+1. **Multi-profile local acceptance**
+   - The local phase gate now reports per-deployment-mode summaries in addition to the per-site acceptance rows.
+   - The report payload keeps a compact aggregate summary so multi-profile runs are easier to compare across sessions.
+
+2. **Local Kubernetes rehearsal**
+   - Added a local Kubernetes rehearsal command that exports generated site bundles, validates the rendered YAML, and runs a client-side `kubectl kustomize` rehearsal.
+   - The rehearsal stays local and does not require a live cluster.
+
+3. **Diagnostic runtime scaffold**
+   - Added an `agent-runtime` control command for the read-only diagnostic contract and the supervised action request scaffold.
+   - The runtime scaffold now degrades gracefully when the historian client cannot be imported in a local environment.
+
+### Notes
+
+- The Kubernetes rehearsal validates the generated manifests, not production cluster scheduling or multi-node behavior.
+- The diagnostic scaffold remains infrastructure; shipping autonomous agents is still deferred.
+
 ## 2026-07-05 - Restore Thresholds And Phase-One Acceptance
 
 ### Changed

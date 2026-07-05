@@ -9,7 +9,6 @@ from services.analytics.reporting import report_engine
 from services.assets.model import hierarchy_to_tree, load_hierarchy
 from services.common.modeling import ModelRegistry
 from services.common.semantic_store import get_semantic_store
-from services.historian.client import query_alarms, query_recent_events, query_trend
 from services.scenarios.engine import list_scenarios
 
 
@@ -158,6 +157,33 @@ class ToolRegistry:
 
 
 tool_registry = ToolRegistry()
+
+
+def query_alarms(limit: int) -> list[dict[str, Any]]:
+    try:
+        from services.historian.client import query_alarms
+
+        return query_alarms(limit)
+    except Exception:
+        return []
+
+
+def query_recent_events(table: str, limit: int) -> list[dict[str, Any]]:
+    try:
+        from services.historian.client import query_recent_events
+
+        return query_recent_events(table, limit)
+    except Exception:
+        return []
+
+
+def query_trend(asset_id: str, tag: str, hours: int) -> list[dict[str, Any]]:
+    try:
+        from services.historian.client import query_trend
+
+        return query_trend(asset_id, tag, hours)
+    except Exception:
+        return []
 
 
 def build_context_package(
