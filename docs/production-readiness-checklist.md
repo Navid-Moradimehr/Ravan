@@ -56,6 +56,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 
 - Health checks and runtime diagnostics exist.
 - Backup and restore tooling exists.
+- Backup-drill matrix tooling exists so restore/rollback drills can be measured per site profile.
 - Metrics and observability paths exist.
 - Documentation exists for rollout, benchmark, and testing workflows.
 - Industrial benchmark comparison report exists for readiness interpretation.

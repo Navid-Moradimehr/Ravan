@@ -1,5 +1,20 @@
 # Implementation Log
 
+## 2026-07-05 - Backup Drill Matrix For Per-Site Measurement
+
+### Changed
+
+1. **Backup drill matrix**
+   - Added `backup-drill-matrix` to run historian backup/restore drills across multiple site profiles in one pass.
+   - The command records backup, restore, and total elapsed time per site profile so restore/RTO evidence can be collected consistently.
+
+2. **Readiness paperwork**
+   - Updated the production-readiness and hardening docs so the new measurement tooling is tracked separately from the still-pending real site measurements.
+
+### Notes
+
+- This closes the tooling gap for restore/rollback drill measurement, but it does not replace the need for actual target-site validation.
+
 ## 2026-07-04 - Universal Semantic Core And Graph Projection
 
 ### Changed

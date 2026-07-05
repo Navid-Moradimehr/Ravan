@@ -15,6 +15,7 @@
 - industrial benchmark fixture hardening
 - multi-site correlation simulator case
 - explicit `SEMANTIC_STORE_BACKEND=db` for plant-local and federated profiles
+- backup-drill matrix tooling for per-site restore/rollback measurement
 
 ## Still Missing
 

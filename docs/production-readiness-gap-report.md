@@ -32,6 +32,7 @@ This report summarizes the current state of the platform after the semantic-plan
 - Site-profile validation exists.
 - Release-gate and rollout-acceptance commands exist.
 - Backup and restore tooling exists.
+- Backup-drill matrix tooling now exists for repeated per-site restore/rollback measurements.
 - Helm and systemd export paths exist.
 
 ### Benchmarking and validation

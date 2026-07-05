@@ -12,6 +12,7 @@ from dataclasses import asdict
 import json
 import os
 import platform
+import time
 import sys
 from typing import Any
 from pathlib import Path
@@ -126,25 +127,77 @@ def _parse_tables(value: str | None) -> list[str] | None:
 
 
 def _run_backup_drill(backup_dir: str | None, tables: list[str] | None, restore_db: str | None) -> dict[str, Any]:
+    started_at = time.perf_counter()
     before_snapshot = collect_historian_snapshot()
+    backup_started_at = time.perf_counter()
+    backup_result = create_backup(backup_dir=backup_dir, tables=tables)
+    backup_elapsed_seconds = round(time.perf_counter() - backup_started_at, 4)
     result: dict[str, Any] = {
         "before_snapshot": before_snapshot,
-        "backup": create_backup(backup_dir=backup_dir, tables=tables),
+        "backup": backup_result,
+        "backup_elapsed_seconds": backup_elapsed_seconds,
         "restore": None,
         "backups": list_backups(backup_dir=backup_dir),
         "wal_g": get_walg_status(),
         "after_snapshot": None,
         "snapshot_comparison": None,
+        "restore_elapsed_seconds": None,
+        "total_elapsed_seconds": None,
     }
     if result["backup"].get("status") != "success":
+        result["total_elapsed_seconds"] = round(time.perf_counter() - started_at, 4)
         return result
     if restore_db:
+        restore_started_at = time.perf_counter()
         result["restore"] = restore_backup(result["backup"]["path"], restore_db)
+        result["restore_elapsed_seconds"] = round(time.perf_counter() - restore_started_at, 4)
         if result["restore"].get("status") == "success":
             after_snapshot = collect_historian_snapshot()
             result["after_snapshot"] = after_snapshot
             result["snapshot_comparison"] = compare_historian_snapshots(before_snapshot, after_snapshot)
+    result["total_elapsed_seconds"] = round(time.perf_counter() - started_at, 4)
     return result
+
+
+def _run_backup_drill_matrix(
+    site_profiles: list[str],
+    *,
+    backup_dir: str | None,
+    tables: list[str] | None,
+    restore_db: str | None,
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for site_profile in site_profiles:
+        profile = load_site_profile(site_profile)
+        profile_backup_dir = backup_dir or profile.backups.directory
+        profile_restore_db = restore_db or profile.backups.restore_test_database
+        drill = _run_backup_drill(profile_backup_dir, tables, profile_restore_db)
+        rows.append(
+            {
+                "site_profile": site_profile,
+                "profile_id": profile.profile_id,
+                "site_id": profile.site.id,
+                "deployment_mode": profile.deployment_mode,
+                "backup_dir": profile_backup_dir,
+                "restore_db": profile_restore_db,
+                "backup_status": drill["backup"].get("status", "unknown"),
+                "restore_status": drill["restore"].get("status", "skipped") if drill["restore"] else "skipped",
+                "backup_elapsed_seconds": drill.get("backup_elapsed_seconds", 0.0),
+                "restore_elapsed_seconds": drill.get("restore_elapsed_seconds", 0.0),
+                "total_elapsed_seconds": drill.get("total_elapsed_seconds", 0.0),
+                "snapshot_match": bool(drill.get("snapshot_comparison") and drill["snapshot_comparison"].get("matched")),
+                "details": drill,
+            }
+        )
+    passed = all(
+        row["backup_status"] == "success" and row["restore_status"] == "success" and row["snapshot_match"]
+        for row in rows
+    )
+    return {
+        "site_profiles": site_profiles,
+        "runs": rows,
+        "passed": passed,
+    }
 
 
 def _write_backup_drill_report(report_dir: str, payload: dict[str, Any]) -> list[Path]:
@@ -160,6 +213,20 @@ def _write_backup_drill_report(report_dir: str, payload: dict[str, Any]) -> list
         item_path = output_dir / f"{key}.json"
         item_path.write_text(json.dumps(payload[key], indent=2), encoding="utf-8")
         written.append(item_path)
+    return written
+
+
+def _write_backup_drill_matrix_report(report_dir: str, payload: dict[str, Any]) -> list[Path]:
+    output_dir = Path(report_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    summary_path = output_dir / "backup-drill-matrix-summary.json"
+    summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    written.append(summary_path)
+    for run in payload.get("runs", []):
+        run_path = output_dir / f"{run['site_id']}.json"
+        run_path.write_text(json.dumps(run, indent=2), encoding="utf-8")
+        written.append(run_path)
     return written
 
 
@@ -605,6 +672,43 @@ def cmd_backup_drill(args: argparse.Namespace) -> int:
             for path in written_reports:
                 print(f"{'':6}report  {path}")
     return 0 if ok else 2
+
+
+def cmd_backup_drill_matrix(args: argparse.Namespace) -> int:
+    site_profiles = [part.strip() for part in args.site_profiles.split(",") if part.strip()]
+    if not site_profiles:
+        raise ValueError("--site-profiles must contain at least one site profile path")
+    tables = _parse_tables(args.tables)
+    result = _run_backup_drill_matrix(
+        site_profiles,
+        backup_dir=args.backup_dir,
+        tables=tables,
+        restore_db=args.restore_db,
+    )
+    written_reports: list[Path] = []
+    if args.report_dir:
+        written_reports = _write_backup_drill_matrix_report(args.report_dir, result)
+
+    if args.json:
+        if written_reports:
+            result = {**result, "written_reports": [str(path) for path in written_reports]}
+        print(json.dumps(result, indent=2))
+    else:
+        print("backup drill matrix")
+        print("=" * 40)
+        _print_row("site_profiles", len(result["runs"]))
+        _print_row("passed", str(result["passed"]).lower())
+        for run in result["runs"]:
+            print(
+                f"{'':6}{run['site_id']:<18}backup={run['backup_status']:<8} restore={run['restore_status']:<8} "
+                f"backup_s={run['backup_elapsed_seconds']} restore_s={run['restore_elapsed_seconds']} "
+                f"snapshot_match={str(run['snapshot_match']).lower()}"
+            )
+        if written_reports:
+            _print_row("report_dir", args.report_dir)
+            for path in written_reports:
+                print(f"{'':6}report  {path}")
+    return 0 if result["passed"] else 2
 
 
 def cmd_release_gate(args: argparse.Namespace) -> int:
@@ -1601,6 +1705,15 @@ def build_parser() -> argparse.ArgumentParser:
     backup.add_argument("--report-dir", default=None, help="Optional directory to write backup drill reports")
     backup.add_argument("--json", action="store_true")
     backup.set_defaults(func=cmd_backup_drill)
+
+    backup_matrix = sub.add_parser("backup-drill-matrix", help="Run backup/restore drills across multiple site profiles")
+    backup_matrix.add_argument("--site-profiles", required=True, help="Comma-separated site profile YAML paths")
+    backup_matrix.add_argument("--backup-dir", default=None)
+    backup_matrix.add_argument("--tables", default=None, help="Comma-separated table names")
+    backup_matrix.add_argument("--restore-db", default=None, help="Optional restore target database")
+    backup_matrix.add_argument("--report-dir", default=None, help="Optional directory to write backup drill reports")
+    backup_matrix.add_argument("--json", action="store_true")
+    backup_matrix.set_defaults(func=cmd_backup_drill_matrix)
 
     release = sub.add_parser("release-gate", help="Run production readiness checks for one site profile")
     release.add_argument("site_profile", help="Path to the site profile YAML")

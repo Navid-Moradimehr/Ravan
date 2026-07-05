@@ -127,6 +127,45 @@ class TestDatastreamctl:
         assert (report_dir / "snapshot_comparison.json").exists()
         assert "report_dir" in out
 
+    def test_backup_drill_matrix_reports_per_site_results(self, monkeypatch, tmp_path):
+        report_dir = tmp_path / "backup-report-matrix"
+        plant_local_profile = REPO_ROOT / "config" / "site-profiles" / "plant-local.yaml"
+        expected_single_site = ctl.load_site_profile(SITE_PROFILE).site.id
+        expected_plant_local = ctl.load_site_profile(plant_local_profile).site.id
+
+        def fake_run_backup_drill(backup_dir, tables, restore_db):
+            return {
+                "before_snapshot": {"status": "success"},
+                "backup": {"status": "success", "path": f"{backup_dir}/backup.sql"},
+                "backup_elapsed_seconds": 0.1234,
+                "restore": {"status": "success", "database": restore_db},
+                "backups": [{"path": f"{backup_dir}/backup.sql"}],
+                "wal_g": {"installed": True},
+                "after_snapshot": {"status": "success"},
+                "snapshot_comparison": {"matched": True, "diffs": {}},
+                "restore_elapsed_seconds": 0.2345,
+                "total_elapsed_seconds": 0.5678,
+            }
+
+        monkeypatch.setattr(ctl, "_run_backup_drill", fake_run_backup_drill)
+        rc, out = self._run([
+            "backup-drill-matrix",
+            "--site-profiles",
+            f"{SITE_PROFILE},{plant_local_profile}",
+            "--restore-db",
+            "restore_db",
+            "--report-dir",
+            str(report_dir),
+        ])
+        assert rc == 0
+        assert "backup drill matrix" in out
+        assert "passed" in out
+        assert expected_single_site in out
+        assert expected_plant_local in out
+        assert (report_dir / "backup-drill-matrix-summary.json").exists()
+        assert (report_dir / f"{expected_single_site}.json").exists()
+        assert (report_dir / f"{expected_plant_local}.json").exists()
+
     def test_release_gate_can_skip_network_and_run_backup(self, monkeypatch):
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})

@@ -20,7 +20,7 @@ This is the executable version of the readiness gap report. Each item has an own
 |------|-------|----------------|--------|
 | Multi-node Kubernetes pilot | DevOps / Platform | Single-node deployment is proven on a local cluster and the same release starts cleanly on a multi-node test cluster | Pending |
 | Target-site broker/historian validation | Ops / QA | Benchmarks and soak tests run on the actual broker and historian topology used in rollout | Pending |
-| Restore and rollback drills | Ops / QA | At least two site profiles have measured restore and rollback drills with recorded RTO/RPO | Pending |
+| Restore and rollback drills | Ops / QA | At least two site profiles have measured restore and rollback drills with recorded RTO/RPO | In progress |
 | Vendor device validation | Edge / QA | MQTT, OPC UA, Modbus, and representative PLC/sensor devices are tested with real traffic | Pending |
 | Compatibility matrix expansion | Edge / Platform | Additional PLC/sensor families are covered and documented | Pending |
 
