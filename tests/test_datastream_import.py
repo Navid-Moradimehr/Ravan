@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import textwrap
+import zipfile
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -68,6 +69,27 @@ class TestImportCommands:
         assert rc == 0
         assert "already present" in out
 
+    def test_fetch_ai4i_zip_extracts_csv(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(imp, "DEFAULT_DATA_DIR", tmp_path)
+
+        def fake_download(url, dest, timeout=30.0):
+            with zipfile.ZipFile(dest, "w") as zf:
+                zf.writestr(
+                    "ai4i2020.csv",
+                    textwrap.dedent("""\
+                        UDI,Product ID,Type,Air temperature [K],Process temperature [K],Rotational speed [rpm],Torque [Nm],Tool wear [min],Machine failure,TWF,HDF,PWF,OSF,RNF
+                        1,L1,M,300,310,1500,40,10,0,0,0,0,0,0
+                    """),
+                )
+
+        monkeypatch.setattr(imp, "_http_download", fake_download)
+        rc, out = self._run(["fetch", "ai4i", "--force"])
+        assert rc == 0
+        staged = tmp_path / "ai4i2020.csv"
+        assert staged.exists()
+        assert staged.read_text(encoding="utf-8").startswith("UDI,Product ID")
+        assert "staged CSV" in out or "extracted CSVs" in out
+
     def test_status_runs(self, tmp_path, monkeypatch):
         monkeypatch.setattr(imp, "DEFAULT_DATA_DIR", tmp_path)
         (tmp_path / "ai4i2020.csv").write_text("present")
@@ -131,6 +153,33 @@ class TestImportCommands:
         content = output_path.read_text(encoding="utf-8")
         assert "S1" in content
         assert "plant-a" in content
+
+    def test_convert_cmapss_zip_creates_benchmark_csv(self, tmp_path):
+        input_path = tmp_path / "cmapss.zip"
+        with zipfile.ZipFile(input_path, "w") as zf:
+            zf.writestr(
+                "train_FD001.txt",
+                "1 1 0.1 0.2 0.3 " + " ".join(str(idx) for idx in range(1, 22)),
+            )
+        output_path = tmp_path / "cmapss-zip-out.csv"
+        rc, out = self._run(["convert", str(input_path), str(output_path), "--preset", "cmapss", "--site-id", "plant-a", "--line", "line-01", "--source-prefix", "cmapss"])
+        assert rc == 0
+        assert output_path.exists()
+        assert "converted preset=cmapss" in out
+        content = output_path.read_text(encoding="utf-8")
+        assert "S1" in content
+        assert "plant-a" in content
+
+    def test_fetch_swat_extract_skips_non_zip(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(imp, "DEFAULT_DATA_DIR", tmp_path)
+
+        def fake_download(url, dest, timeout=30.0):
+            Path(dest).write_bytes(b"not-a-zip")
+
+        monkeypatch.setattr(imp, "_http_download", fake_download)
+        rc, out = self._run(["fetch", "swat", "--force", "--extract"])
+        assert rc == 0
+        assert "not a zip archive" in out
 
 
 if __name__ == "__main__":

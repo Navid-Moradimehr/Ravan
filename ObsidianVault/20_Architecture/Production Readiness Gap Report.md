@@ -16,6 +16,8 @@
 - multi-site correlation simulator case
 - explicit `SEMANTIC_STORE_BACKEND=db` for plant-local and federated profiles
 - backup-drill matrix tooling for per-site restore/rollback measurement
+- AI4I and C-MAPSS public dataset import and benchmark conversion
+- SWaT workbook staging without importer crashes on non-zip extraction requests
 
 ## Still Missing
 

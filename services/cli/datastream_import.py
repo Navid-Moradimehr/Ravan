@@ -21,6 +21,7 @@ import json
 import os
 import sys
 import urllib.request
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -59,7 +60,7 @@ SOURCES: tuple[ImportSource, ...] = (
         name="NASA C-MAPSS turbofan degradation",
         category="synthetic",
         format="zip",
-        url="https://data.nasa.gov/download/ff5e-badge/ZIP",
+        url="https://data.nasa.gov/docs/legacy/CMAPSSData.zip",
         filename="cmAPSS.zip",
         size_note="~45 MB",
         license_note="NASA Open Data (US Gov public domain)",
@@ -137,15 +138,18 @@ def _http_download(url: str, dest: Path, timeout: float = 30.0) -> None:
 
 
 def _extract_csv_from_zip(zip_path: Path, out_dir: Path) -> list[Path]:
-    import zipfile
+    if not zipfile.is_zipfile(zip_path):
+        return []
 
     extracted: list[Path] = []
     with zipfile.ZipFile(zip_path) as zf:
         for member in zf.namelist():
             if member.lower().endswith(".csv"):
                 target = out_dir / Path(member).name
-                with zf.open(member) as src, open(target, "wb") as dst:
-                    dst.write(src.read())
+                with zf.open(member) as src:
+                    data = src.read()
+                with open(target, "wb") as dst:
+                    dst.write(data)
                 extracted.append(target)
     return extracted
 
@@ -226,12 +230,19 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     digest = _file_sha256(local)
     print(f"[{src.source_id}] saved {local} sha256={digest[:16]}...")
 
-    if src.format == "zip" and args.extract:
+    if zipfile.is_zipfile(local):
         extracted = _extract_csv_from_zip(local, DEFAULT_DATA_DIR)
         if extracted:
             print(f"[{src.source_id}] extracted CSVs:")
             for p in extracted:
                 print(f"  - {p}")
+            if src.source_id == "ai4i" and local.suffix.lower() != ".zip" and extracted[0] != local:
+                import shutil
+
+                shutil.copyfile(extracted[0], local)
+                print(f"[{src.source_id}] staged CSV to {local}")
+    elif args.extract:
+        print(f"[{src.source_id}] extract requested but {local} is not a zip archive")
     return 0
 
 

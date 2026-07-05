@@ -1,5 +1,30 @@
 # Implementation Log
 
+## 2026-07-05 - Real Dataset Import And Benchmark Pass
+
+### Changed
+
+1. **AI4I import path**
+   - Fixed the AI4I import flow so the public ZIP is extracted into the staged CSV path instead of leaving zip bytes behind.
+   - The AI4I dataset can now be converted into the benchmark replay format and measured through the end-to-end pipeline.
+
+2. **NASA C-MAPSS import path**
+   - Pointed the C-MAPSS source at the live NASA ZIP and taught the converter to read the train/test tables directly from the archive.
+   - The NASA dataset can now be normalized into the benchmark replay format without manual unpacking.
+
+3. **SWaT staging**
+   - The SWaT workbook can now be downloaded and staged locally without crashing the importer when extraction is requested on a non-zip file.
+
+4. **Benchmark coverage**
+   - Measured AI4I and C-MAPSS through the same end-to-end pipeline used for the simulator cases so the benchmark path now includes public real-world-shaped datasets.
+   - AI4I end-to-end run: 43,342.11 events/sec, p99 0.0313 ms.
+   - C-MAPSS end-to-end run: 41,598.31 events/sec, p99 0.0453 ms.
+
+### Notes
+
+- SWaT is staged but not yet normalized into the replay CSV format.
+- C-MAPSS benchmark throughput is lower than the synthetic industrial replay cases, which is expected because the dataset is much larger and denser.
+
 ## 2026-07-05 - Backup Drill Matrix For Per-Site Measurement
 
 ### Changed
