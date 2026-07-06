@@ -171,3 +171,17 @@ These are the changes that matter most before calling the platform production-re
 - rollout readiness summary
 - combined release-gate and benchmark acceptance report
 - [real-world PLC and sensor simulation sources](real-world-plc-sensor-simulation.md)
+
+
+## Production-Hardening Refactor (2026-07-06)
+
+Completed a six-phase architecture refactor for open-source production readiness:
+
+- [x] **Phase 1** — Edge ingest backpressure and overload handling (bounded MQTT queue, oversize/DLQ routing).
+- [x] **Phase 2** — Sink abstractions (`Sink` protocol, `CompositeSink`, `SinkRegistry`, historian + Kafka sinks).
+- [x] **Phase 3** — Normalized fan-out consumer decouples the edge publisher from the historian; event-id dedup; composite keying.
+- [x] **Phase 4** — Flink/Python runtime parity (ProcessedEventsSink, state-eviction fix, batched producer drain, composite key).
+- [x] **Phase 5** — Iceberg lakehouse sink on MinIO (ADR 0003).
+- [x] **Phase 6** — AI-enriched fan-out persistence, push-driven dashboard bus, schema governance.
+
+Each phase shipped as one conventional commit with code, tests, implementation-log entry, and Obsidian vault updates so the repo is green at every step.

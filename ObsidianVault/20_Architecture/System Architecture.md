@@ -55,3 +55,20 @@ endpoint datasets so the open-source platform can target different endpoints
   path.
 - **Processed / scored data**: `iot.processed` and `processed_events`
   (anomaly-scored, windowed) from the runtime processor / Flink job.
+
+
+## AI-Enriched Persistence
+
+The AI gateway consumes `iot.processed`, enriches batches via the LLM, and
+produces `iot.ai_enriched`. The `ai_enriched_fanout` consumer
+(`services/processor/ai_enriched_fanout.py`) persists those summaries to the
+historian `ai_enriched` table with at-least-once delivery, so the gateway stays
+decoupled from the endpoint dataset.
+
+## Push-Driven Dashboard Bus
+
+The dashboard SSE/WS stream was refreshed by a fixed 2-second DB poll. It is now
+push-driven: the `historian_broadcast_loop` waits on a refresh event that
+`enrich_batch` sets after each successful enrichment, waking subscribers
+immediately on change (with a 5-second fallback). This removes the constant DB
+load of periodic polling.

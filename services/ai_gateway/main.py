@@ -197,6 +197,9 @@ async def stop_replay() -> dict[str, Any]:
 
 # Historian SSE subscribers
 historian_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+# Push trigger for the historian broadcast loop: set when new enriched data lands
+# so the dashboard updates on change instead of on a fixed 2-second poll.
+historian_refresh_event: asyncio.Event = asyncio.Event()
 
 async def _broadcast_historian(payload: dict[str, Any]) -> None:
     dead: set[asyncio.Queue[dict[str, Any]]] = set()
@@ -261,7 +264,14 @@ async def historian_broadcast_loop() -> None:
             service_state.mark_degraded("historian broadcast failure", str(exc))
             import logging
             logging.getLogger(__name__).warning("historian broadcast loop error: %s", exc)
-        await asyncio.sleep(2.0)
+        # Push-driven: wake immediately when new data is signalled, with a
+        # bounded fallback so the snapshot still refreshes periodically even if
+        # no signal arrives.
+        try:
+            await asyncio.wait_for(historian_refresh_event.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            pass
+        historian_refresh_event.clear()
 
 
 async def consume_loop() -> None:
@@ -369,6 +379,9 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
     last_success_epoch.set(time.time())
     service_state.mark_ok()
     asyncio.create_task(_broadcast_telemetry())
+    # Signal the push-driven dashboard bus so subscribers refresh now instead of
+    # waiting for the next fixed-interval poll.
+    historian_refresh_event.set()
     return True
 
 

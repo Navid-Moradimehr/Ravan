@@ -1,6 +1,34 @@
 # Implementation Log
 
 
+## 2026-07-06 - AI-Enriched Persistence, Push Dashboard Bus, Schema Governance
+
+### Added
+
+1. **AI-enriched fan-out consumer**
+   - New `services/processor/ai_enriched_fanout.py` reads `iot.ai_enriched` and persists batches to the historian `ai_enriched` table, with at-least-once delivery (offsets committed after insert). The AI gateway previously produced to Kafka only; this consumer owns historian persistence.
+   - Registered as the `ai-fanout` service in `datastreamd` and included in all runtime modes.
+
+2. **Schema governance**
+   - Wired the `SchemaRegistry` with `processed_event` and `benchmark_event` schemas. Benchmark metadata (`fault_type`, `scenario_id`, `ground_truth_severity`, `step`) is now governed separately from the operational `industrial_event` schema so it does not leak into production validation.
+
+### Changed
+
+1. **Push-driven dashboard bus**
+   - The AI gateway's `historian_broadcast_loop` no longer polls the DB on a fixed 2-second interval. It now wakes immediately when new enriched data is signalled (`historian_refresh_event`), with a 5-second bounded fallback. `enrich_batch` sets the event after each successful enrichment, so subscribers refresh on change instead of on a timer.
+
+### Verified
+
+- `python -m pytest tests/test_ai_enriched_fanout.py tests/test_lakehouse_sink.py tests/test_sinks.py tests/test_flink_parity.py tests/test_edge_backpressure.py tests/test_normalized_fanout.py tests/test_edge_model.py tests/test_datastreamd.py`
+- Result: `48 passed`
+- Updated `test_datastreamd.py` runtime-mode selection to include the `ai-fanout` service.
+
+### Notes
+
+- Completes the 6-phase production-hardening refactor.
+- The operational event schema stays unchanged; benchmark metadata remains optional and rides on the event dict but is governed by its own schema entry.
+
+
 ## 2026-07-06 - Iceberg Lakehouse Sink
 
 ### Added

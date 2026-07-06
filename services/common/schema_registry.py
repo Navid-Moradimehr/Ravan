@@ -43,6 +43,28 @@ class SchemaRegistry:
             {"name": "unit", "type": "string", "required": False},
             {"name": "ts_source", "type": "datetime", "required": True},
         ])
+        self.register("processed_event", [
+            {"name": "event_id", "type": "string", "required": True},
+            {"name": "device_id", "type": "string", "required": True},
+            {"name": "asset_id", "type": "string", "required": True},
+            {"name": "tag", "type": "string", "required": True},
+            {"name": "value", "type": "float", "required": True},
+            {"name": "anomaly_score", "type": "float", "required": True},
+            {"name": "severity", "type": "string", "required": True},
+            {"name": "window_size", "type": "int", "required": True},
+            {"name": "timestamp", "type": "datetime", "required": True},
+        ])
+        # Benchmark metadata is governed separately from the operational event
+        # schema so it does not leak into production validation. These optional
+        # fields ride along on the event dict but are not required for an
+        # industrial event to be valid.
+        self.register("benchmark_event", [
+            {"name": "event_id", "type": "string", "required": True},
+            {"name": "fault_type", "type": "string", "required": False},
+            {"name": "scenario_id", "type": "string", "required": False},
+            {"name": "ground_truth_severity", "type": "string", "required": False},
+            {"name": "step", "type": "int", "required": False},
+        ])
 
     def register(self, schema_id: str, fields: list[dict[str, Any]]) -> SchemaVersion:
         import datetime
