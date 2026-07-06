@@ -57,3 +57,18 @@ MQTT/Schema but their differentiation (managed ops, multi-region, 80 connectors)
 is not our target. The genuinely useful, structure-compatible inspirations are
 the **app-layer** ones: schema compatibility enforcement, MQTT QoS/retained/LWT,
 delivery-chaos tests, Flink checkpoint config, and a Debezium CDC recipe.
+
+## Implementation Status (2026-07-06)
+
+All three high-value, low-effort inspirations are now implemented and committed:
+
+| # | Inspiration | Status | Tests | Commit |
+|---|-------------|--------|-------|--------|
+| 1 | Schema registry compatibility enforcement | Done | `tests/test_schema_registry_compat.py` (13) | `273bcdf` |
+| 2 | MQTT QoS / retained / Last-Will | Done | `tests/test_mqtt_qos_will.py` (5) | `a70d742` |
+| 3 | Delivery chaos / replay dedup | Done | `tests/test_delivery_chaos.py` (3) | `07fe7ab` |
+
+The medium-effort inspirations (Flink checkpoint config, Debezium CDC recipe, lag
+alerting) remain documented as future work; they are config/docs-only and do not
+require code changes. See [[20_Architecture/Schema Governance]],
+[[20_Architecture/Industrial Edge Pipeline]], [[20_Architecture/Sink Architecture]].
