@@ -1,99 +1,108 @@
-"""Tests for MQTT/AMQP outbound bridge."""
+from __future__ import annotations
+
 import json
-from fastapi.testclient import TestClient
-import sys
-sys.path.insert(0, "services/api_service")
-from main import app
-from services.api_service.auth import create_access_token
 
-client = TestClient(app)
-AUTH_HEADERS = {"Authorization": f"Bearer {create_access_token('user-1', 'operator')}"}
+from services.edge_ingest.outbound_bridge import OutboundBridge
 
 
-def test_get_bridge_config_not_set():
-    resp = client.get("/api/v1/outbound-bridge/config")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["enabled"] is False
-    assert data["config"] is None
+class _FakeMsg:
+    def __init__(self, value: bytes, topic: str = "iot.processed", partition: int = 0, offset: int = 7):
+        self._value = value
+        self._topic = topic
+        self._partition = partition
+        self._offset = offset
+
+    def value(self):
+        return self._value
+
+    def topic(self):
+        return self._topic
+
+    def partition(self):
+        return self._partition
+
+    def offset(self):
+        return self._offset
 
 
-def test_set_and_get_bridge_config():
-    config = {
-        "enabled": True,
-        "config": {
-            "mqtt_host": "test.mqtt.local",
-            "mqtt_port": 1883,
-            "mqtt_use_tls": False,
-            "mqtt_topic_template": "plant/{{asset_id}}/{{tag}}",
-            "amqp_url": "amqp://guest:guest@localhost:5672/%2F",
-            "amqp_exchange": "industrial.events",
-            "amqp_routing_key": "{{asset_id}}.{{tag}}"
-        }
-    }
-    resp = client.post("/api/v1/outbound-bridge/config", json=config, headers=AUTH_HEADERS)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["ok"] is True
-    assert data["enabled"] is True
+def _make_bridge(monkeypatch, mqtt_host="mqtt.local", amqp_url=None) -> tuple[OutboundBridge, list]:
+    bridge = OutboundBridge(mqtt_host=mqtt_host, amqp_url=amqp_url)
+    commits: list = []
 
-    resp = client.get("/api/v1/outbound-bridge/config")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["enabled"] is True
-    assert data["config"]["mqtt_host"] == "test.mqtt.local"
+    class FakeConsumer:
+        def commit(self, offset=None, asynchronous=True):
+            commits.append(offset)
+
+    bridge._consumer = FakeConsumer()
+    return bridge, commits
 
 
-def test_publish_without_bridge_fails():
-    # Reset state
-    client.post("/api/v1/outbound-bridge/config", json={
-        "enabled": False,
-        "config": {
-            "mqtt_host": None,
-            "mqtt_port": 1883,
-            "mqtt_use_tls": False,
-            "mqtt_topic_template": "industrial/{{asset_id}}/{{tag}}",
-            "amqp_url": None,
-            "amqp_exchange": "industrial.events",
-            "amqp_routing_key": "{{asset_id}}.{{tag}}"
-        }
-    })
-    resp = client.post("/api/v1/outbound-bridge/enable", params={"enabled": False}, headers=AUTH_HEADERS)
-    assert resp.status_code == 200
+def test_outbound_bridge_commits_on_successful_forward(monkeypatch):
+    bridge, commits = _make_bridge(monkeypatch)
+    monkeypatch.setattr(bridge, "_forward_mqtt", lambda event: True)
 
-    resp = client.post("/api/v1/outbound-bridge/publish", json={
-        "asset_id": "asset-01",
-        "tag": "temperature",
-        "value": 42.0
-    }, headers=AUTH_HEADERS)
-    assert resp.status_code == 400
+    msg = _FakeMsg(json.dumps({"asset_id": "Pump-01", "tag": "Temperature"}).encode("utf-8"))
+    bridge._handle_message(msg)
+
+    assert len(commits) == 1
+    assert commits[0].offset == 8  # offset + 1
+    assert commits[0].topic == "iot.processed"
+    assert commits[0].partition == 0
 
 
-def test_enable_disable_bridge():
-    client.post("/api/v1/outbound-bridge/config", json={
-        "enabled": True,
-        "config": {
-            "mqtt_host": "test.mqtt.local",
-            "mqtt_port": 1883,
-            "mqtt_use_tls": False,
-            "mqtt_topic_template": "industrial/{{asset_id}}/{{tag}}",
-            "amqp_url": None,
-            "amqp_exchange": "industrial.events",
-            "amqp_routing_key": "{{asset_id}}.{{tag}}"
-        }
-    }, headers=AUTH_HEADERS)
-    resp = client.post("/api/v1/outbound-bridge/enable", params={"enabled": False}, headers=AUTH_HEADERS)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["enabled"] is False
+def test_outbound_bridge_skips_commit_on_forward_failure(monkeypatch):
+    bridge, commits = _make_bridge(monkeypatch)
+    monkeypatch.setattr(bridge, "_forward_mqtt", lambda event: False)
 
-    resp = client.post("/api/v1/outbound-bridge/enable", params={"enabled": True}, headers=AUTH_HEADERS)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["enabled"] is True
+    msg = _FakeMsg(json.dumps({"asset_id": "Pump-01", "tag": "Temperature"}).encode("utf-8"))
+    bridge._handle_message(msg)
+
+    assert commits == []
 
 
-def test_render_topic():
-    sys.path.insert(0, "services/api_service")
-    from main import _render_topic
-    assert _render_topic("plant/{{asset_id}}/{{tag}}", {"asset_id": "A1", "tag": "T1"}) == "plant/A1/T1"
+def test_outbound_bridge_commits_poison_message(monkeypatch):
+    bridge, commits = _make_bridge(monkeypatch)
+    monkeypatch.setattr(bridge, "_forward_mqtt", lambda event: True)
+
+    msg = _FakeMsg(b"not-json{")
+    bridge._handle_message(msg)
+
+    assert len(commits) == 1
+    assert commits[0].offset == 8
+
+
+def test_outbound_bridge_requires_all_forwarders_to_succeed(monkeypatch):
+    bridge, commits = _make_bridge(monkeypatch, amqp_url="amqp://guest:guest@rabbit")
+    monkeypatch.setattr(bridge, "_forward_mqtt", lambda event: True)
+    monkeypatch.setattr(bridge, "_forward_amqp", lambda event: False)
+
+    msg = _FakeMsg(json.dumps({"asset_id": "Pump-01"}).encode("utf-8"))
+    bridge._handle_message(msg)
+
+    assert commits == []
+
+
+def test_outbound_bridge_consumer_disables_auto_commit():
+    bridge = OutboundBridge()
+    conf_seen: dict = {}
+
+    class FakeConsumer:
+        def __init__(self, conf):
+            conf_seen.update(conf)
+
+        def subscribe(self, topics):
+            pass
+
+    import services.edge_ingest.outbound_bridge as mod
+
+    orig = mod.Consumer
+    mod.Consumer = FakeConsumer
+    try:
+        bridge._start_consumer()
+    finally:
+        mod.Consumer = orig
+
+    assert conf_seen["enable.auto.commit"] is False
+    assert conf_seen["enable.auto.offset.store"] is False
+    assert conf_seen["group.id"] == "outbound-bridge"
+    assert conf_seen["auto.offset.reset"] == "latest"

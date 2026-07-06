@@ -48,13 +48,14 @@ class OutboundBridge:
             "bootstrap.servers": self.kafka_brokers,
             "group.id": "outbound-bridge",
             "auto.offset.reset": "latest",
-            "enable.auto.commit": True,
+            "enable.auto.commit": False,
+            "enable.auto.offset.store": False,
         }
         consumer = Consumer(conf)
         consumer.subscribe([self.source_topic])
         return consumer
 
-    def _forward_mqtt(self, event: dict[str, Any]) -> None:
+    def _forward_mqtt(self, event: dict[str, Any]) -> bool:
         if self._mqtt_client is None:
             try:
                 from paho.mqtt import client as mqtt
@@ -63,15 +64,16 @@ class OutboundBridge:
                 self._mqtt_client.connect(self.mqtt_host, self.mqtt_port, keepalive=30)
                 self._mqtt_client.loop_start()
             except Exception:
-                return
+                return False
         topic = self._render_template(self.mqtt_topic_template, event)
         payload = json.dumps(event, default=str).encode("utf-8")
         try:
             self._mqtt_client.publish(topic, payload=payload, qos=1)
+            return True
         except Exception:
-            pass
+            return False
 
-    def _forward_amqp(self, event: dict[str, Any]) -> None:
+    def _forward_amqp(self, event: dict[str, Any]) -> bool:
         if self._amqp_connection is None:
             try:
                 import pika
@@ -79,7 +81,7 @@ class OutboundBridge:
                 params = pika.URLParameters(self.amqp_url)
                 self._amqp_connection = pika.BlockingConnection(params)
             except Exception:
-                return
+                return False
         channel = self._amqp_connection.channel()
         routing_key = self._render_template(self.amqp_routing_key, event)
         body = json.dumps(event, default=str)
@@ -90,8 +92,9 @@ class OutboundBridge:
                 body=body.encode("utf-8"),
                 properties=pika.BasicProperties(content_type="application/json"),
             )
+            return True
         except Exception:
-            pass
+            return False
 
     def run(self) -> None:
         self._running = True
@@ -105,16 +108,44 @@ class OutboundBridge:
                     if msg.error().code() == KafkaError._PARTITION_EOF:
                         continue
                     break
-                try:
-                    event = json.loads(msg.value().decode("utf-8"))
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    continue
-                if self.mqtt_host:
-                    self._forward_mqtt(event)
-                if self.amqp_url:
-                    self._forward_amqp(event)
+                self._handle_message(msg)
         finally:
             self.stop()
+
+    def _handle_message(self, msg: Any) -> None:
+        """Forward one message and commit its offset only on success.
+
+        At-least-once semantics: if every configured forwarder reports success
+        the offset is committed synchronously so the consumer advances. If a
+        forward fails the commit is skipped and the message is re-delivered on
+        the next poll. A message that cannot be decoded is treated as poison
+        and committed past (retrying a malformed payload can never succeed).
+        """
+        try:
+            event = json.loads(msg.value().decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._commit(msg)
+            return
+        delivered = True
+        if self.mqtt_host:
+            delivered = self._forward_mqtt(event) and delivered
+        if self.amqp_url:
+            delivered = self._forward_amqp(event) and delivered
+        if delivered:
+            self._commit(msg)
+
+    def _commit(self, msg: Any) -> None:
+        from confluent_kafka import TopicPartition
+
+        if self._consumer is None:
+            return
+        try:
+            self._consumer.commit(
+                offset=TopicPartition(msg.topic(), msg.partition(), msg.offset() + 1),
+                asynchronous=False,
+            )
+        except Exception:
+            pass
 
     def stop(self) -> None:
         self._running = False
