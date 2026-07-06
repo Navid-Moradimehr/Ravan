@@ -1,5 +1,24 @@
 # Implementation Log
 
+## 2026-07-06 - Competitive Inspiration 3 (Delivery Chaos and Replay Dedup Coverage)
+
+### Added
+
+1. **Delivery chaos / replay dedup tests** in `tests/test_delivery_chaos.py` (3 cases)
+   - `test_at_least_once_redelivery_with_event_id_dedup_no_duplicates`: simulates a mid-batch consumer crash (offsets not committed) followed by Kafka rebalance redelivery; asserts the historian sink receives the same `event_id`s twice but every batch insert carries `ON CONFLICT (event_id) DO NOTHING`, so redelivery is a no-op rather than a duplicate row.
+   - `test_crash_before_commit_redelivers_uncommitted_message`: models a process death between poll and commit; asserts the offset is uncommitted, the message is redelivered on restart, and the offset commits only after the successful second attempt.
+   - `test_duplicate_event_ids_in_one_batch_are_deduped_by_sql`: two events with the same `event_id` in a single batch rely on the `ON CONFLICT (event_id) DO NOTHING` clause to resolve the duplicate at the DB constraint.
+
+### Verified
+
+- `python -m pytest tests/test_delivery_chaos.py` -> 3 passed
+- `python -m pytest tests/test_sinks.py tests/test_normalized_fanout.py tests/test_lakehouse_sink.py tests/test_ai_gateway_dedup.py` -> 22 passed (no regression)
+
+### Notes
+
+- Inspiration source: competitive comparison (pillar 06 - exactly-once end-to-end / chaos tests). Our delivery model is at-least-once (idempotent producers + acks=all + offset-commit-after-sink) with `event_id` dedup at the historian as the de-facto exactly-once strategy. These tests make that contract explicit and guard the redelivery path against regressions. No production code changed; this is test-only coverage of an existing guarantee.
+- The tests use a recording fake Kafka consumer (redelivers on `reset_to`) and a stubbed historian client (captures `execute_values` SQL + rows), so they run without a real broker or database.
+
 ## 2026-07-06 - Competitive Inspiration 2 (MQTT QoS, Retained, Last-Will)
 
 ### Added

@@ -51,3 +51,41 @@ open-source requirement that users may have different endpoint datasets.
   longer writes directly to the historian.
 - Phase 5: the `lakehouse` sink (`services/sinks/lakehouse.py`) writes normalized
   events to an Iceberg table on MinIO via `pyiceberg` + `pyarrow` (ADR 0003).
+
+## Delivery Semantics and Dedup (added 2026-07-06)
+
+> Competitive inspiration 3 (pillar 06 - exactly-once end-to-end / chaos tests).
+
+The fan-out consumer provides **at-least-once** delivery to sinks:
+
+1. Idempotent Kafka producers + `acks=all`.
+2. `enable.auto.commit=False` - offsets are committed **only after** the sink
+   `write_batch` + `flush` succeeds (see `normalized_fanout.py:flush()`).
+3. If the consumer crashes between poll and commit, Kafka rebalances and
+   redelivers from the last committed offset - so a sink may see the same
+   `event_id` more than once.
+
+The de-facto **exactly-once** strategy is `event_id` dedup at the historian:
+both `insert_industrial_event` and `insert_industrial_events` use
+`ON CONFLICT (event_id) DO NOTHING`, so a redelivered event is a no-op instead
+of a duplicate row. This is the open-source-friendly alternative to broker
+transactions / two-phase commit.
+
+### Chaos / replay tests
+
+`tests/test_delivery_chaos.py` (3 cases) makes this contract explicit:
+
+- Mid-batch crash + redelivery -> same `event_id`s written twice, but every
+  batch SQL carries `ON CONFLICT (event_id) DO NOTHING`.
+- Crash before commit -> offset uncommitted, message redelivered on restart,
+  offset commits only after the successful second attempt.
+- Duplicate `event_id` within one batch -> resolved by the DB constraint.
+
+The tests use a recording fake Kafka consumer (redelivers on `reset_to`) and a
+stubbed historian client, so they run without a real broker or database.
+
+## Related
+
+- [[20_Architecture/Schema Governance]]
+- [[20_Architecture/Industrial Edge Pipeline]]
+- `comparission.md` pillar 06
