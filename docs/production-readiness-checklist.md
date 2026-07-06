@@ -203,3 +203,13 @@ The competitive evaluation originally flagged three medium-effort inspirations a
 - [x] **Inspiration 4** — Flink checkpoint + state-backend config: exactly-once checkpoints, RocksDB state backend with incremental checkpoints, externalized retained cleanup. A job restart now resumes from the last checkpoint instead of losing keyed window state. Env-configurable; 10 tests in `tests/test_flink_checkpoint_config.py`.
 - [x] **Inspiration 5** — Prometheus alert rules: 9 alerts in 4 groups (consumer lag, DLQ/overflow/delivery/reconnect, historian write failures + slow queries, WebSocket delivery lag), all referencing metrics the services emit. Wired into `prometheus.yml` and mounted in compose. 7 tests in `tests/test_prometheus_alert_rules.py`.
 - [x] **Inspiration 6** — Debezium PostgreSQL CDC recipe: ready-to-register connector config, idempotent registration script, logical publication. Optional alternative ingest path for relational sources. Runbook in the vault. 7 tests in `tests/test_debezium_cdc_recipe.py`.
+
+### Test-drift reconciliation (2026-07-06)
+
+A full-suite run surfaced nine tests that drifted from earlier refactors (no functionality changed). All reconciled; full suite now 419 passed.
+
+- [x] **TLS tests** repointed at the refactored `connectors/{mqtt,opcua,modbus}.py` modules (3 tests).
+- [x] **Historian execute_values mocks** updated to accept the `page_size` kwarg (2 tests).
+- [x] **AI gateway service_state** switched from dict syntax to the `ServiceHealthState` object API; also fixed a silent degraded-state reset in `enrich_batch` where `mark_ok()` was called unconditionally after a fallback (1 test + 1 real bug).
+- [x] **UI mobile tests** aligned with the Next.js 14 `viewport` export and `sm:`/`md:`/`xl:` breakpoints (2 tests).
+- [x] **DLQ ingest test isolation**: `test_historian` env leak fixed via `monkeypatch.setenv`; `_get_producer` lru_cache cleared in the DLQ test (1 test).

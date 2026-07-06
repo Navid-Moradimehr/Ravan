@@ -7,7 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_mqtt_tls_env_vars_present_in_edge_ingest():
-    src = (REPO_ROOT / "services" / "edge_ingest" / "main.py").read_text()
+    src = (REPO_ROOT / "services" / "edge_ingest" / "connectors" / "mqtt.py").read_text()
     assert "MQTT_CA_CERT" in src
     assert "MQTT_CERTFILE" in src
     assert "MQTT_KEYFILE" in src
@@ -15,13 +15,13 @@ def test_mqtt_tls_env_vars_present_in_edge_ingest():
 
 
 def test_opcua_tls_env_vars_present_in_edge_ingest():
-    src = (REPO_ROOT / "services" / "edge_ingest" / "main.py").read_text()
+    src = (REPO_ROOT / "services" / "edge_ingest" / "connectors" / "opcua.py").read_text()
     assert "OPCUA_CERTIFICATE" in src
     assert "OPCUA_PRIVATE_KEY" in src
 
 
 def test_modbus_tls_env_vars_present_in_edge_ingest():
-    src = (REPO_ROOT / "services" / "edge_ingest" / "main.py").read_text()
+    src = (REPO_ROOT / "services" / "edge_ingest" / "connectors" / "modbus.py").read_text()
     assert "MODBUS_TLS" in src
     assert "MODBUS_CA_CERT" in src
     assert "ssl.create_default_context" in src

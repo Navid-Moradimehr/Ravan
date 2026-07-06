@@ -51,3 +51,31 @@
 4. ~~Consolidate `_publish_kafka` / `_publish_kafka_fresh`~~ DONE (2026-07-06).
 5. Make `/health` probe real dependencies.
 6. (Authz) Out of scope per current constraints, but GET reads of sensitive data are open.
+
+## Test-drift reconciliation (2026-07-06)
+
+A full-suite run found nine tests that drifted from earlier refactors. All
+reconciled; full suite now 419 passed.
+
+- **TLS tests** pointed at `edge_ingest/main.py` after the connector split
+  (commit 75e4b89) moved TLS wiring into `connectors/{mqtt,opcua,modbus}.py`.
+  Tests now read the connector modules.
+- **Historian tests** had `execute_values` mocks with the old positional
+  signature; the batch refactor added a `page_size` kwarg. Mocks updated.
+- **AI gateway test** used dict-style `service_state["..."]` access. Switched to
+  the `ServiceHealthState` object API.
+- **UI mobile tests** asserted a literal `width=device-width` meta string and
+  `lg:grid-cols-` classes; the UI uses the Next.js 14 `viewport` export and
+  `sm:`/`md:`/`xl:` breakpoints. Assertions relaxed to match.
+- **DLQ ingest test** failed only in the full suite due to two leaks:
+  `test_historian` set `TIMESCALE_HOST` via `os.environ` (now `monkeypatch.setenv`)
+  and `_get_producer` is `@lru_cache`d so a prior test's fake producer stayed
+  cached (the test now calls `cache_clear()`).
+
+### Bug found and fixed during reconciliation
+- `enrich_batch` marked the AI gateway degraded when the LLM fell back to a
+  deterministic summary, then unconditionally called `service_state.mark_ok()`
+  at the end of the happy path, silently clearing the degraded state. Added a
+  `used_fallback` guard so `mark_ok()` only runs when the LLM actually succeeded.
+  This is the only production-code change in this pass; it preserves the
+  degraded signal operators rely on.

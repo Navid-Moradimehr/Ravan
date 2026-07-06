@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import os
 from unittest.mock import MagicMock, patch
 
 from services.historian.client import _connection_string
 
 
-def test_connection_string_uses_env_vars() -> None:
-    os.environ["TIMESCALE_HOST"] = "testhost"
-    os.environ["TIMESCALE_PORT"] = "9999"
-    os.environ["TIMESCALE_DB"] = "testdb"
-    os.environ["TIMESCALE_USER"] = "testuser"
-    os.environ["TIMESCALE_PASSWORD"] = "testpass"
+def test_connection_string_uses_env_vars(monkeypatch) -> None:
+    monkeypatch.setenv("TIMESCALE_HOST", "testhost")
+    monkeypatch.setenv("TIMESCALE_PORT", "9999")
+    monkeypatch.setenv("TIMESCALE_DB", "testdb")
+    monkeypatch.setenv("TIMESCALE_USER", "testuser")
+    monkeypatch.setenv("TIMESCALE_PASSWORD", "testpass")
     conn = _connection_string()
     assert "testhost:9999/testdb" in conn
     assert "testuser:testpass" in conn
@@ -79,7 +78,7 @@ def test_insert_industrial_events_uses_execute_values(monkeypatch) -> None:
         def __exit__(self, *a):
             return False
 
-    def fake_execute_values(cur, query, rows):
+    def fake_execute_values(cur, query, rows, page_size=None):
         captured["query"] = query
         captured["rows"] = list(rows)
 
@@ -157,7 +156,7 @@ def test_insert_processed_events_uses_execute_values(monkeypatch) -> None:
         def __exit__(self, *a):
             return False
 
-    def fake_execute_values(cur, query, rows):
+    def fake_execute_values(cur, query, rows, page_size=None):
         captured["query"] = query
         captured["rows"] = list(rows)
 

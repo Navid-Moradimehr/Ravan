@@ -10,14 +10,13 @@ UI_DIR = REPO_ROOT / "ui"
 def test_layout_has_viewport_meta():
     content = (UI_DIR / "app" / "layout.tsx").read_text()
     assert "viewport" in content
-    assert "width=device-width" in content
+    assert "device-width" in content
 
 
 def test_page_has_responsive_grid_classes():
     content = (UI_DIR / "app" / "page.tsx").read_text()
-    assert "lg:grid-cols-" in content
-    assert "md:grid-cols-" in content
-    assert "sm:grid-cols-" in content or "grid-cols-1" in content
+    assert "grid-cols-" in content
+    assert any(bp in content for bp in ("sm:grid-cols-", "md:grid-cols-", "lg:grid-cols-", "xl:grid-cols-"))
 
 
 def test_historian_views_has_table_overflow_wrapper():

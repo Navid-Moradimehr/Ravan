@@ -131,6 +131,11 @@ def test_ingest_endpoint_routes_invalid_to_dlq(monkeypatch):
     monkeypatch.setitem(sys.modules, "confluent_kafka", fake)
 
     import services.api_service.main as api_main
+    from services.api_service import runtime as _runtime
+
+    # The producer helper is lru_cached; clear it so this test's FakeProducer
+    # is used instead of a producer cached by a prior test's monkeypatch.
+    _runtime._get_producer.cache_clear()
 
     async def call_it():
         return await api_main.ingest_event({"source_protocol": "api", "value": 1})

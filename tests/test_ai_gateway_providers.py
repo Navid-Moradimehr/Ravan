@@ -96,7 +96,7 @@ def test_ai_gateway_enrich_batch_falls_back_on_invalid_json(monkeypatch):
             captured["polled"] = True
 
     monkeypatch.setattr(gateway.llm_client, "summarize", fake_summarize)
-    gateway.service_state["last_error"] = None
+    gateway.service_state.mark_ok()
 
     asyncio.run(
         gateway.enrich_batch(
@@ -111,4 +111,4 @@ def test_ai_gateway_enrich_batch_falls_back_on_invalid_json(monkeypatch):
     assert captured["topic"] == gateway.settings.ai_enriched_topic
     assert captured["payload"]["summary"]
     assert captured["payload"]["summary"].count("deterministic_fallback") == 1
-    assert gateway.service_state["last_error"].startswith("LLM fallback active")
+    assert gateway.service_state.last_error.startswith("LLM fallback active")

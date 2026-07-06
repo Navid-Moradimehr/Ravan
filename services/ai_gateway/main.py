@@ -286,6 +286,7 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
 
     started = time.monotonic()
     content: str | None = None
+    used_fallback = False
     try:
         content = await llm_client.summarize(prompt, settings.llm_timeout_seconds)
         valid, errors, _payload = validate_industrial_summary(content)
@@ -297,6 +298,7 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
                 return False
             content = build_fallback_summary(payloads, f"output_validation_failed: {fallback_reason}")
             service_state.mark_degraded("llm fallback active", f"LLM fallback active: output validation failed: {fallback_reason}")
+            used_fallback = True
             asyncio.create_task(_broadcast_telemetry())
     except Exception as exc:
         if not settings.llm_allow_fallback:
@@ -306,6 +308,7 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
         fallback_reason = f"{type(exc).__name__}: {exc}"
         content = build_fallback_summary(payloads, fallback_reason)
         service_state.mark_degraded("llm fallback active", f"LLM fallback active: {fallback_reason}")
+        used_fallback = True
         asyncio.create_task(_broadcast_telemetry())
     finally:
         llm_latency.observe(time.monotonic() - started)
@@ -327,7 +330,8 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
     producer.poll(0)
     enriched_events.inc()
     last_success_epoch.set(time.time())
-    service_state.mark_ok()
+    if not used_fallback:
+        service_state.mark_ok()
     asyncio.create_task(_broadcast_telemetry())
     # Signal the push-driven dashboard bus so subscribers refresh now instead of
     # waiting for the next fixed-interval poll.
