@@ -34,3 +34,18 @@ CREATE TABLE IF NOT EXISTS industrial_events (
 
 CREATE INDEX IF NOT EXISTS industrial_events_asset_ts_idx ON industrial_events (asset_id, ts_source DESC);
 CREATE INDEX IF NOT EXISTS industrial_events_protocol_ts_idx ON industrial_events (source_protocol, ts_source DESC);
+
+-- Logical replication publication for Debezium CDC on the orders table.
+-- pgoutput + wal_level=logical (set on the postgres service) are required.
+-- The Debezium connector reads this publication via a logical slot.
+-- The connector can also auto-create this (publication.autocreate.mode=filtered),
+-- but defining it here keeps the prerequisite explicit and works without
+-- connector-side DDL privileges in restricted deployments.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication WHERE pubname = 'dbz_orders'
+    ) THEN
+        CREATE PUBLICATION dbz_orders FOR TABLE public.orders;
+    END IF;
+END $$;

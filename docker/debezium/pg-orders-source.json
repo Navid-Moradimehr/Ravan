@@ -1,0 +1,33 @@
+{
+  "name": "pg-orders-source",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "stream",
+    "database.password": "stream",
+    "database.dbname": "stream_engine",
+    "database.server.name": "pg",
+    "topic.prefix": "pg",
+    "table.include.list": "public.orders",
+    "schema.include.list": "public",
+    "plugin.name": "pgoutput",
+    "slot.name": "debezium_orders",
+    "publication.name": "dbz_orders",
+    "publication.autocreate.mode": "filtered",
+    "snapshot.mode": "initial",
+    "incremental.snapshot.mode": "incremental",
+    "incremental.snapshot.chunk.size": "1024",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "true",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+    "errors.tolerance": "none",
+    "errors.log.enable": "true",
+    "errors.log.include.messages": "true"
+  }
+}

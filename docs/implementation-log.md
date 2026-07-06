@@ -1,5 +1,33 @@
 # Implementation Log
 
+## 2026-07-06 - Competitive Inspiration 6 (Debezium PostgreSQL CDC Recipe)
+
+### Added
+
+1. **Debezium connector config** in `docker/debezium/pg-orders-source.json`
+   - PostgreSQL source connector on `public.orders` using `pgoutput`, logical slot `debezium_orders`, publication `dbz_orders`, incremental snapshots, and the `ExtractNewRecordState` SMT (unwrapped rows, tombstones dropped, deletes rewritten). JSON converters with schemas disabled to match the platform envelope style.
+
+2. **Registration script** `docker/debezium/register-connectors.sh`
+   - Idempotently registers every `*.json` connector config against the Kafka Connect REST API (default `localhost:18083`); deletes existing connectors first so the repo config is authoritative.
+
+3. **Logical publication** added to `docker/postgres/init.sql`
+   - `CREATE PUBLICATION dbz_orders FOR TABLE public.orders` (guarded by existence check). The `orders` table already had `REPLICA IDENTITY FULL`; the `postgres` service already ran `wal_level=logical`.
+
+4. **Runbook** in `ObsidianVault/40_Runbooks/Debezium CDC Ingest.md`
+   - When to use CDC, prerequisites, registration, produced topics, downstream integration notes. Documents that CDC is an optional alternative ingest path that does not replace the industrial event stream.
+
+5. **Tests** in `tests/test_debezium_cdc_recipe.py` (7 cases)
+   - Connector config validity/class/plugin/slot/publication/table, incremental snapshot, envelope unwrap SMT, register script references the config dir, init.sql creates the publication + replica identity, postgres service runs `wal_level=logical`, connect service is the Debezium image.
+
+### Verified
+
+- `python -m pytest tests/test_debezium_cdc_recipe.py` -> 7 passed
+- `pg-orders-source.json` parses as valid JSON; `docker-compose.yml` parses as valid YAML
+
+### Notes
+
+- Inspiration source: competitive comparison (pillar 04 - Debezium CDC). The Connect image and a CDC-ready Postgres were already present but had no ready connector config or publication. This makes CDC a one-command opt-in for open-source adopters who have a relational source to capture, without forcing it on users who only use the industrial event path. CDC topics (`pg.public.orders`) are not industrial events; routing them into the normalized stream is intentionally left to a user-specific mapping.
+
 ## 2026-07-06 - Competitive Inspiration 5 (Prometheus Alert Rules)
 
 ### Added
