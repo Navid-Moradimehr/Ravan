@@ -1,0 +1,53 @@
+# API System Audit (2026-07-06)
+
+## Findings
+
+### Connectivity / wiring
+- All routers are reachable: 8 sub-routers (connectors, digital_twin, oee,
+  pipelines, preview, schemas, backup, reports) are mounted via `design` and
+  `support` parent routers, which are included in `main.py`. Not orphaned.
+- API -> AI gateway telemetry uses an **in-process import**
+  (`from services.ai_gateway.main import _build_telemetry`) inside
+  `realtime._telemetry_broadcaster`. This reuses the function inside the API
+  process rather than calling the running AI gateway over HTTP. Works only
+  because both images ship the full `services/` tree.
+
+### Duplicate logic
+- **Historian REST API duplicated** across two services: the AI gateway exposes
+  `/historian/{events,trend,assets,scenarios,alarms,replay,stream}` with no auth,
+  overlapping the API service's `/api/v1/historian/*` router (which IS gated).
+- **API ingest dual-writes**: `runtime._do_ingest_event` writes to the historian
+  AND publishes to Kafka. With the Phase-3 fan-out consumer now also persisting
+  `industrial.normalized`, API-ingested events are written twice (dedup'd by the
+  event_id unique index, but still wasted work).
+- Two Kafka publish helpers in `runtime.py`: `_publish_kafka` (cached producer)
+  and `_publish_kafka_fresh` (new producer per call) - duplicate logic.
+
+### Bugs
+- `service_state["running"]` (item access) at `ai_gateway/main.py:120` and `:222`
+  will raise `TypeError` because `ServiceHealthState` is a dataclass with no
+  `__getitem__`. The SSE `/events` and `/historian/stream` endpoints crash on
+  first client connection.
+
+### Gating / authz
+- Global middleware only gates POST/PUT/PATCH/DELETE and only verifies the
+  bearer token is valid - no role/permission check. All GET is ungated.
+- Only `admin.py` uses `require_permission`; everything else is token-presence.
+
+### Health check
+- `/health` hardcodes `historian/kafka/ai_gateway = True` instead of probing.
+
+### Protocol usage
+- Edge protocols are correct: MQTT (paho pub/sub), OPC UA (asyncua), Modbus
+  (pymodbus TCP). Webhook notifications use HTTP POST + retry/backoff (good).
+- Real-time delivered via two mechanisms: WebSocket (`/ws/*`, API) and SSE
+  (`/events`, `/historian/stream`, AI gateway). The SSE ones are broken by the
+  bug above.
+
+## Recommended fixes (priority order)
+1. ~~Fix `service_state["running"]` -> `service_state.running`~~ DONE (2026-07-06).
+2. Remove AI gateway's duplicate `/historian/*` REST surface (or gate it).
+3. ~~Remove the direct historian write from `runtime._do_ingest_event`~~ DONE (2026-07-06).
+4. ~~Consolidate `_publish_kafka` / `_publish_kafka_fresh`~~ DONE (2026-07-06).
+5. Make `/health` probe real dependencies.
+6. (Authz) Out of scope per current constraints, but GET reads of sensitive data are open.

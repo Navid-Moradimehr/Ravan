@@ -117,7 +117,7 @@ async def events() -> StreamingResponse:
         telemetry_subscribers.add(queue)
         try:
             yield f"data: {json.dumps(await _build_telemetry(), default=str)}\n\n"
-            while service_state["running"]:
+            while service_state.running:
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=30.0)
                     yield f"data: {json.dumps(payload, default=str)}\n\n"
@@ -219,7 +219,7 @@ async def historian_stream() -> StreamingResponse:
         try:
             # Send initial snapshot
             yield f"data: {json.dumps({'type': 'init', 'alarms': query_alarms(20), 'events': query_recent_events('industrial_events', 20)}, default=str)}\n\n"
-            while service_state["running"]:
+            while service_state.running:
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=5.0)
                     yield f"data: {json.dumps(payload, default=str)}\n\n"

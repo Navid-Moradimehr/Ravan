@@ -1,5 +1,28 @@
 # Implementation Log
 
+## 2026-07-06 - API System Fixes Batch 1 (SSE, Ingest Dual-Write, Producer)
+
+### Changed
+
+1. **SSE crash fix (ai_gateway)**
+   - `service_state["running"]` -> `service_state.running` in the `/events` and `/historian/stream` SSE loops (`main.py:120,222`). The item access raised `TypeError` because `ServiceHealthState` is a dataclass with no `__getitem__`; the SSE endpoints crashed on first client connection.
+
+2. **API ingest no longer dual-writes to the historian**
+   - Removed the direct `insert_industrial_event` call from `runtime._do_ingest_event`. The API now only validates and publishes to Kafka; the normalized fan-out consumer owns historian persistence (consistency with the Phase-3 decoupling).
+
+3. **Consolidated Kafka producer helpers**
+   - Removed the duplicate `_publish_kafka_fresh` (which created a new `Producer` per DLQ publish) and routed the DLQ path through the cached `_publish_kafka` / `_get_producer`.
+
+### Verified
+
+- `python -m pytest tests/test_api_runtime_fixes.py`
+- Result: `3 passed`
+- Updated `tests/test_realworld_fixes_2.py` to assert the API no longer writes to the historian directly.
+
+### Notes
+
+- The 3 failures in `test_realworld_fixes_2.py` are the pre-existing psycopg2 `_psycopg` DLL load issue in this environment, unrelated to these changes.
+
 
 ## 2026-07-06 - AI-Enriched Persistence, Push Dashboard Bus, Schema Governance
 

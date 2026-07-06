@@ -37,9 +37,9 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     except Exception:
         from edge_ingest.model import validate_event, to_json_bytes, utc_now  # type: ignore
     try:
-        from services.historian.client import insert_industrial_event, insert_dead_letter  # type: ignore
+        from services.historian.client import insert_dead_letter  # type: ignore
     except Exception:
-        from historian.client import insert_industrial_event, insert_dead_letter  # type: ignore
+        from historian.client import insert_dead_letter  # type: ignore
 
     brokers = resolve_kafka_brokers("localhost:19092")
     normalized_topic = os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized")
@@ -65,7 +65,7 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     event_id = str(_uuid.uuid4())
     if dlq is not None:
         try:
-            _publish_kafka_fresh(brokers, dlq_topic, str(payload.get("source_id", "api")).encode(), to_json_bytes(dlq))
+            _publish_kafka(brokers, dlq_topic, str(payload.get("source_id", "api")).encode(), to_json_bytes(dlq))
         except Exception:
             pass
         try:
@@ -91,10 +91,9 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
         return {"status": "rejected", "event_id": dlq.event_id, "reason": "validation_failed"}
 
     event_dict = event_model.model_dump(mode="json")
-    try:
-        insert_industrial_event(event_dict)
-    except Exception:
-        pass
+    # Historian persistence is owned by the normalized fan-out consumer, which
+    # reads industrial.normalized and writes via the sink layer. The API only
+    # validates and publishes; it no longer dual-writes to the historian.
     try:
         from services.common.semantic_store import SemanticLineageRecord, get_semantic_store
 
@@ -136,14 +135,6 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
 
 def _publish_kafka(brokers: str, topic: str, key: bytes, value: bytes) -> None:
     producer = _get_producer(brokers)
-    producer.produce(topic, key=key, value=value)
-    producer.flush(5)
-
-
-def _publish_kafka_fresh(brokers: str, topic: str, key: bytes, value: bytes) -> None:
-    from confluent_kafka import Producer
-
-    producer = Producer({"bootstrap.servers": brokers, "client.id": "api-ingest"})
     producer.produce(topic, key=key, value=value)
     producer.flush(5)
 

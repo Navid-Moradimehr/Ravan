@@ -43,8 +43,9 @@ def test_ai_gateway_imports_settings_from_correct_module():
 def test_ingest_endpoint_publishes_kafka_and_passes_dict(monkeypatch):
     """Importing the api_service module should not require Kafka to be up.
 
-    We patch confluent_kafka.Producer to capture publishes and patch the historian
-    insert to capture what is passed to it.
+    We patch confluent_kafka.Producer to capture publishes. Since the fan-out
+    consumer now owns historian persistence, the API ingest must NOT call
+    insert_industrial_event directly.
     """
     published: list[tuple[str, bytes, bytes]] = []
 
@@ -104,11 +105,9 @@ def test_ingest_endpoint_publishes_kafka_and_passes_dict(monkeypatch):
     topics = {p[0] for p in published}
     assert "industrial.raw" in topics
     assert "industrial.normalized" in topics
-    # Historian received a dict (not a Pydantic model).
-    assert captured, "historian insert was never called"
-    assert isinstance(captured[0], dict)
-    assert captured[0]["asset_id"] == "Pump-07"
-    assert captured[0]["tag"] == "DischargePressure"
+    # The API no longer dual-writes to the historian; persistence is owned by
+    # the normalized fan-out consumer.
+    assert not captured, "API ingest must not write to the historian directly"
 
 
 def test_ingest_endpoint_routes_invalid_to_dlq(monkeypatch):
