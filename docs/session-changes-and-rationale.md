@@ -220,3 +220,57 @@ not workarounds in downstream tests.
 - `uv.lock` and `ui/next-env.d.ts` working-tree changes discarded as spurious.
 - The single production-code change (`used_fallback` guard) preserves the
   existing enriched-event output; it only corrects the health signal.
+
+
+---
+
+## Data pipeline integrity hardening (2026-07-06)
+
+Follow-on session implementing the five findings recorded in
+`docs/data-pipeline-audit-and-plan.md`. Each change ships as its own commit
+with tests; the platform stayed green and committed throughout.
+
+### 1. processed_events duplicate-write protection — `bee8953`
+`processed_events` inserts (single + batch) lacked `ON CONFLICT (event_id) DO
+NOTHING`, unlike `industrial_events` and `dead_letter_events`. Under at-least-
+once Kafka delivery, processor/Flink retries could insert duplicate processed
+rows. The unique index `processed_events_event_id_uniq` already existed, so the
+conflict target is valid. **Why:** close the last dedup gap so all three
+historian tables reject duplicate event_ids idempotently.
+
+### 2. Runtime processor dual-write gate — `b6eca10`
+The Python processor always wrote to the historian, while the Flink job
+defaults its historian sink OFF behind `FLINK_PERSIST_PROCESSED_EVENTS`. Added
+`should_persist_processed()` (`RUNTIME_PERSIST_PROCESSED_EVENTS`, default `1`)
+and extracted `_flush_processed_batch()` to module level for testability. When
+the gate is off, historian writes are skipped but offsets still commit after a
+successful produce. **Why:** symmetric control across execution modes; open-
+source users with lakehouse-only or no-Timescale endpoints can run the
+processor as a pure topic fan-out.
+
+### 3. Compose topic auto-provisioning — `8ea9d29`
+Added a `kafka-init` one-shot service (`apache/kafka:4.1.2`, depends on
+`kafka: service_healthy`, `restart: no`) that runs `kafka-topics.sh --create
+--if-not-exists` for all six canonical topics at 3 partitions. **Why:** topics
+were only created by PowerShell helper scripts, so Linux/container-only and
+fresh `docker compose up` deployments started with no topics, risking
+partition mis-resolution on early subscribe and no DLQ retention guarantees.
+
+### 4. Broken init-SQL mounts + stale schema cleanup — `ffc4e07`
+Tracing the divergent schemas revealed both DB services mounted paths under
+`./postgres/` that do not exist (the files live in `docker/postgres/`). Docker
+Compose silently binds an empty dir for a missing source, so fresh stacks ran
+with **no schema at all**. Fixed both mounts, deleted the stale
+`postgres/init-timescale.sql`, and reconciled `create-topics.ps1` with the
+canonical topic set. **Why:** a missing schema is a silent startup failure —
+the highest-impact defect found this session.
+
+### 5. Outbound bridge at-least-once delivery — `5c8dc71`
+The bridge consumed `iot.processed` with `enable.auto.commit=True` and both
+forwarders swallowed exceptions with bare `except: pass`. A crash between poll
+and forward, or a silent forward failure, permanently lost the message
+(at-most-once). Set `enable.auto.commit=False`; forwarders now return `bool`;
+`_handle_message` commits the offset only after every configured forwarder
+reports success, otherwise skips the commit so the message is re-delivered.
+Undecodable payloads are committed past (poison handling). **Why:** an egress
+bridge must not silently drop industrial events.

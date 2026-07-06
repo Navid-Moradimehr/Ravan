@@ -1,5 +1,50 @@
 # Implementation Log
 
+## 2026-07-06 - Data Pipeline Integrity Hardening (Audit Findings 1-5)
+
+Implemented the five findings from `docs/data-pipeline-audit-and-plan.md`.
+Each is an isolated, tested commit; the suite stayed green throughout
+(429 passed, 0 failed). See `docs/session-changes-and-rationale.md` for the
+full rationale.
+
+### Added
+1. **processed_events dedup** (`bee8953`) — `ON CONFLICT (event_id) DO NOTHING`
+   on the single and batch `processed_events` inserts in
+   `services/historian/client.py`, closing the last historian dedup gap.
+2. **Runtime processor dual-write gate** (`b6eca10`) —
+   `RUNTIME_PERSIST_PROCESSED_EVENTS` (default `1`) in
+   `services/processor/runtime_processor.py`; extracted `_flush_processed_batch`
+   to module level. Off = pure topic fan-out (offsets still commit).
+3. **Compose topic auto-provisioning** (`8ea9d29`) — `kafka-init` one-shot
+   service in `docker/docker-compose.yml` creates all six canonical topics
+   idempotently (3 partitions, replication-factor 1).
+4. **Outbound bridge at-least-once** (`5c8dc71`) —
+   `services/edge_ingest/outbound_bridge.py`: `enable.auto.commit=False`;
+   forwarders return `bool`; commit offset only after all forwarders succeed.
+
+### Fixed
+1. **Broken init-SQL bind mounts** (`ffc4e07`) — `timescaledb` and `postgres`
+   services referenced `./postgres/...` paths that do not exist (files are in
+   `docker/postgres/`). Docker Compose silently mounted empty dirs, so fresh
+   stacks ran with no schema. Corrected both mounts. This was the highest-
+   impact defect found this session.
+2. **Stale schema removed** (`ffc4e07`) — deleted `postgres/init-timescale.sql`
+   (lacked unique indexes); its two tests now reference the canonical
+   `docker/postgres/init-timescale-full.sql`.
+3. **Topic script divergence** (`ffc4e07`) — `scripts/create-topics.ps1`
+   reconciled with the canonical topic set and partition counts.
+
+### Changed
+- `README.md` quickstart notes topics are auto-created by `kafka-init`.
+
+### Tests
+- +1 historian ON CONFLICT test, +4 processor gate tests, +5 compose topic
+  tests, +5 outbound bridge tests. All 429 pass.
+
+### Constraints honored
+- No functionality change beyond the fixes; defaults preserved.
+- No security/authn/authz changes (standing constraint).
+
 ## 2026-07-06 - Competitive Inspiration 6 (Debezium PostgreSQL CDC Recipe)
 
 ### Added

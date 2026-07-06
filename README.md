@@ -42,7 +42,7 @@ The recommended production install is native on Windows Server / industrial PCs 
 
 1. Copy `.env.example` to `.env` and adjust ports/model settings.
 2. Start infrastructure: `docker compose -f docker/docker-compose.yml up -d`.
-3. Create topics: `powershell -ExecutionPolicy Bypass -File scripts/create-topics.ps1`.
+3. Topics are auto-created by the `kafka-init` service on first `up`. To create them manually (non-compose broker), run `powershell -ExecutionPolicy Bypass -File scripts/create-topics.ps1`.
 4. Run the generator: `python services/ingestion/mock_generator.py`.
 5. Run the AI gateway locally or through Docker Compose.
 6. Start the dashboard locally: `cd ui; npm run dev`.

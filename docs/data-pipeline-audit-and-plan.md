@@ -253,3 +253,50 @@ out of scope unless requested.)
 - Single schema truth = `docker/postgres/init-timescale-full.sql`.
 - Outbound-bridge failures retry (at-least-once); no DLQ unless requested.
 - No security/authn/authz changes (standing constraint).
+
+
+---
+
+## Remediation status — implemented (2026-07-06)
+
+All five findings are implemented, tested, and committed individually. The
+full test suite stayed green throughout (final: 429 passed, 0 failed).
+
+| Finding | Commit | Result |
+|---|---|---|
+| 1 — processed_events dedup | `bee8953` | `ON CONFLICT (event_id) DO NOTHING` added to single + batch inserts; +1 test |
+| 2 — processor dual-write gate | `b6eca10` | `RUNTIME_PERSIST_PROCESSED_EVENTS` (default `1`); `_flush_processed_batch` extracted to module level; +4 tests |
+| 3 — compose topic init | `8ea9d29` | `kafka-init` one-shot service creates all 6 topics idempotently; +5 tests |
+| 4 — divergent schema/script cleanup | `ffc4e07` | **Expanded:** fixed broken init-SQL mounts (see below); removed stale `postgres/init-timescale.sql`; reconciled topic scripts |
+| 5 — outbound bridge at-least-once | `5c8dc71` | `enable.auto.commit=False`; forwarders return bool; commit only on success; +5 tests |
+
+### Finding 4 — higher-impact bug found during remediation
+
+The audit flagged divergent SQL schemas, but tracing the compose bind mounts
+revealed a more serious defect: both database services referenced paths under
+`./postgres/` that **do not exist on disk**. The real schema files live in
+`docker/postgres/`. Docker Compose silently binds an empty directory for a
+missing source path, so a fresh `docker compose up` ran the `timescaledb` and
+`postgres` services with **no init schema** — no hypertables, no unique dedup
+indexes, and no `orders` table for the Debezium CDC demo.
+
+Fixes applied:
+- `timescaledb` service mount corrected to `./docker/postgres/init-timescale-full.sql`.
+- `postgres` service mount corrected to `./docker/postgres/init.sql`.
+- `postgres/init-timescale.sql` deleted (stale; lacked unique indexes). The two
+  schema tests that referenced it now point at the canonical schema.
+- `docker/postgres/init.sql` **retained** — it is the Debezium `orders` CDC demo
+  schema (a separate database/purpose), not a duplicate of the historian schema.
+- `scripts/create-topics.ps1` reconciled with the canonical topic set: added
+  `industrial.raw`/`industrial.normalized`/`industrial.dlq`, fixed
+  `iot.ai_enriched` to 3 partitions to match `kafka-init`. Connect-internal
+  compact topics kept (legitimately Connect-specific).
+
+### Canonical schema / topic source of truth
+
+- Historian schema: `docker/postgres/init-timescale-full.sql` (unique indexes
+  `_event_id_uniq` on industrial/processed/dead-letter events; hypertables).
+- Debezium CDC demo schema: `docker/postgres/init.sql`.
+- Topic provisioning: `docker/docker-compose.yml` `kafka-init` service is the
+  canonical, platform-agnostic source; `scripts/create-industrial-topics.ps1`
+  and `scripts/create-topics.ps1` are manual fallbacks now aligned with it.

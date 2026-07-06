@@ -33,6 +33,19 @@ calls `producer.flush(10)`.
 - `FLINK_PERSIST_PROCESSED_EVENTS` (default off)
 - `FLINK_PROCESSED_BATCH_SIZE` (default 512)
 
+## Symmetric Python-side gate (2026-07-06)
+
+The Python runtime processor now has a matching env var so both execution
+modes can toggle historian persistence independently (commit `b6eca10`):
+
+- `RUNTIME_PERSIST_PROCESSED_EVENTS` (default **on** - preserves prior
+  Python-processor behavior; set `0` for a pure topic fan-out).
+
+The flush logic was extracted to `runtime_processor._flush_processed_batch`
+(module level) so the gate is unit-tested directly. When the gate is off the
+processor still commits offsets after a successful produce, so it keeps making
+progress without writing to the historian.
+
 ## Checkpoint and State-Backend Config (added 2026-07-06)
 
 > Competitive inspiration 4 (pillar 02 - Flink stateful depth).

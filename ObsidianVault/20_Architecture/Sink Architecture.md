@@ -66,10 +66,16 @@ The fan-out consumer provides **at-least-once** delivery to sinks:
    `event_id` more than once.
 
 The de-facto **exactly-once** strategy is `event_id` dedup at the historian:
-both `insert_industrial_event` and `insert_industrial_events` use
-`ON CONFLICT (event_id) DO NOTHING`, so a redelivered event is a no-op instead
-of a duplicate row. This is the open-source-friendly alternative to broker
-transactions / two-phase commit.
+all three historian tables reject duplicate event_ids via
+`ON CONFLICT (event_id) DO NOTHING` on their single and batch inserts -
+`industrial_events`, `processed_events`, and `dead_letter_events`. A
+redelivered event is a no-op instead of a duplicate row. This is the
+open-source-friendly alternative to broker transactions / two-phase commit.
+
+> **2026-07-06:** `processed_events` previously lacked this guard and was the
+> last dedup gap; it is now closed (commit `bee8953`). The unique indexes
+> backing the conflict (`*_event_id_uniq`) live in
+> `docker/postgres/init-timescale-full.sql`.
 
 ### Chaos / replay tests
 
@@ -83,6 +89,17 @@ transactions / two-phase commit.
 
 The tests use a recording fake Kafka consumer (redelivers on `reset_to`) and a
 stubbed historian client, so they run without a real broker or database.
+
+### Outbound bridge (egress at-least-once)
+
+The outbound bridge (`services/edge_ingest/outbound_bridge.py`) forwards
+`iot.processed` to external MQTT/AMQP endpoints. As of `5c8dc71` it runs with
+`enable.auto.commit=False` and commits an offset **only after every configured
+forwarder reports success**. The MQTT/AMQP forwarders return a `bool` instead
+of swallowing exceptions, so a forward failure skips the commit and the
+message is redelivered on the next poll (at-least-once). Undecodable payloads
+are committed past (poison-message handling) so a malformed record cannot
+stall the partition forever.
 
 ## Related
 
