@@ -22,6 +22,12 @@ class Settings:
     mqtt_host: str = os.getenv("MQTT_HOST", "localhost")
     mqtt_port: int = int(os.getenv("MQTT_PORT", "1883"))
     mqtt_topic: str = os.getenv("MQTT_TOPIC", "factory/+/+/+")
+    mqtt_qos: int = int(os.getenv("MQTT_QOS", "1"))
+    mqtt_retained_available: bool = os.getenv("MQTT_RETAINED", "true").strip().lower() in ("1", "true", "yes", "on")
+    mqtt_will_topic: str = os.getenv("MQTT_WILL_TOPIC", "")
+    mqtt_will_payload: str = os.getenv("MQTT_WILL_PAYLOAD", "")
+    mqtt_will_qos: int = int(os.getenv("MQTT_WILL_QOS", "1"))
+    mqtt_will_retain: bool = os.getenv("MQTT_WILL_RETAIN", "false").strip().lower() in ("1", "true", "yes", "on")
     opcua_endpoint: str = os.getenv("OPCUA_ENDPOINT", "opc.tcp://localhost:4840/freeopcua/server/")
     opcua_nodes: tuple[str, ...] = tuple(
         item.strip()

@@ -210,6 +210,12 @@ services:
       OPCUA_ENDPOINT: opc.tcp://opcua-sim:4840/freeopcua/server/
       MODBUS_HOST: modbus-sim
       MODBUS_PORT: 5020
+      MQTT_QOS: ${MQTT_QOS:-1}
+      MQTT_RETAINED: ${MQTT_RETAINED:-true}
+      MQTT_WILL_TOPIC: ${MQTT_WILL_TOPIC:-factory/edge-ingest/status}
+      MQTT_WILL_PAYLOAD: ${MQTT_WILL_PAYLOAD:-{"status":"offline"}}
+      MQTT_WILL_QOS: ${MQTT_WILL_QOS:-1}
+      MQTT_WILL_RETAIN: ${MQTT_WILL_RETAIN:-false}
       INDUSTRIAL_RAW_TOPIC: industrial.raw
       INDUSTRIAL_NORMALIZED_TOPIC: industrial.normalized
       INDUSTRIAL_DLQ_TOPIC: industrial.dlq

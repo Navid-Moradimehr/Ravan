@@ -57,6 +57,12 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
     Kafka directly there couples broker backpressure to the MQTT client. We
     instead enqueue decoded payloads onto a bounded :class:`asyncio.Queue` and
     drain it on the event loop.
+
+    MQTT delivery options are configurable via ``Settings``: QoS level for the
+    subscription, and an optional Last Will and Testament so an ungraceful
+    adapter disconnect is signalled to downstream consumers. Retained-message
+    availability is declared so operators know whether the broker retains the
+    last known good value per topic.
     """
 
     queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue(maxsize=settings.mqtt_queue_size)
@@ -88,7 +94,7 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
 
     def on_connect(client: mqtt.Client, _userdata: object, _flags: dict[str, Any], reason_code: int, _properties: object = None) -> None:
         if reason_code == 0:
-            client.subscribe(settings.mqtt_topic)
+            client.subscribe(settings.mqtt_topic, qos=settings.mqtt_qos)
         else:
             adapter_errors.labels(protocol="mqtt").inc()
 
@@ -116,6 +122,18 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="edge-ingest-mqtt")
     client.on_connect = on_connect
     client.on_message = on_message
+
+    # Last Will and Testament: if the adapter disconnects ungracefully the
+    # broker publishes the will so downstream consumers learn the adapter is
+    # down instead of silently missing data. Only configured when a will topic
+    # is supplied; retained on request so late subscribers also see it.
+    if settings.mqtt_will_topic:
+        client.will_set(
+            topic=settings.mqtt_will_topic,
+            payload=settings.mqtt_will_payload.encode("utf-8") if settings.mqtt_will_payload else None,
+            qos=settings.mqtt_will_qos,
+            retain=settings.mqtt_will_retain,
+        )
     mqtt_ca_cert = os.getenv("MQTT_CA_CERT", "")
     mqtt_certfile = os.getenv("MQTT_CERTFILE", "")
     mqtt_keyfile = os.getenv("MQTT_KEYFILE", "")

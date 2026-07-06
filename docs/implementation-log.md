@@ -1,5 +1,37 @@
 # Implementation Log
 
+## 2026-07-06 - Competitive Inspiration 2 (MQTT QoS, Retained, Last-Will)
+
+### Added
+
+1. **MQTT delivery options** in `services/edge_ingest/settings.py`
+   - `mqtt_qos` (default 1) - subscription QoS level.
+   - `mqtt_retained_available` (default true) - declares whether the broker retains the last known good value per topic.
+   - `mqtt_will_topic` / `mqtt_will_payload` / `mqtt_will_qos` / `mqtt_will_retain` - Last Will and Testament options; empty will topic disables the LWT.
+
+2. **QoS on subscribe** in `services/edge_ingest/connectors/mqtt.py`
+   - `client.subscribe(settings.mqtt_topic, qos=settings.mqtt_qos)` so the broker enforces the configured delivery guarantee instead of defaulting to QoS 0.
+
+3. **Last-Will configuration** in `services/edge_ingest/connectors/mqtt.py`
+   - When `mqtt_will_topic` is set, `client.will_set(...)` is called before `connect()` so an ungraceful adapter disconnect is signalled to downstream consumers. Empty payload is sent as `None` (zero-length body).
+
+4. **Docker Compose env defaults** in `docker/docker-compose.yml`
+   - Edge-ingest service now exposes `MQTT_QOS`, `MQTT_RETAINED`, and the four `MQTT_WILL_*` vars with override defaults so operators discover them.
+
+5. **Tests** in `tests/test_mqtt_qos_will.py` (5 cases)
+   - Settings defaults, subscribe uses configured QoS, LWT configured when topic set, no LWT by default, empty will payload sent as None. Uses a recording fake paho client (no real broker).
+
+### Verified
+
+- `python -m pytest tests/test_mqtt_qos_will.py` -> 5 passed
+- `python -m pytest tests/test_edge_backpressure.py` -> 5 passed (no regression)
+- `py_compile` on `mqtt.py` and `settings.py` -> ok
+- `docker-compose.yml` parses as valid YAML
+
+### Notes
+
+- Inspiration source: competitive comparison (pillar 05 - MQTT 5.0 maturity). Compatible with our existing paho client and mosquitto broker; no protocol or infra change required. The edge publisher/sim path is unchanged (it still publishes at QoS 1) - this inspiration targets the ingest subscriber side.
+
 ## 2026-07-06 - Competitive Inspiration 1 (Schema Registry Compatibility Enforcement)
 
 ### Added
