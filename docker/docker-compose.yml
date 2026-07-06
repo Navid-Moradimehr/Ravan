@@ -108,6 +108,42 @@ services:
       KAFKA_BROKERS: kafka:9092
       IOT_TOPIC: iot.raw
       PROCESSED_TOPIC: iot.processed
+      INDUSTRIAL_NORMALIZED_TOPIC: industrial.normalized
+
+  fanout:
+    build:
+      context: ..
+      dockerfile: services/processor/Dockerfile
+    command: ["python", "-m", "services.processor.normalized_fanout"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    environment:
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      KAFKA_BROKERS: kafka:9092
+      INDUSTRIAL_NORMALIZED_TOPIC: industrial.normalized
+      FANOUT_GROUP_ID: normalized-fanout
+      SINKS: ${FANOUT_SINKS:-historian}
+
+  ai-fanout:
+    build:
+      context: ..
+      dockerfile: services/processor/Dockerfile
+    command: ["python", "-m", "services.processor.ai_enriched_fanout"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    environment:
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      KAFKA_BROKERS: kafka:9092
+      AI_ENRICHED_TOPIC: iot.ai_enriched
+      AI_ENRICHED_FANOUT_GROUP_ID: ai-enriched-fanout
 
   mqtt-broker:
     image: eclipse-mosquitto:2.0
