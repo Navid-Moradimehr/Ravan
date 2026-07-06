@@ -121,7 +121,7 @@ def main() -> None:
         raise RuntimeError("pyflink is required to run the distributed runtime job")
 
     brokers = resolve_kafka_brokers("localhost:19092")
-    input_topic = os.getenv("IOT_TOPIC", "iot.raw")
+    input_topic = os.getenv("IOT_TOPIC", os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized"))
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
     window_limit = max(1, int(os.getenv("RUNTIME_WINDOW_LIMIT", "25")))
     parallelism = int(os.getenv("FLINK_PARALLELISM", "4"))

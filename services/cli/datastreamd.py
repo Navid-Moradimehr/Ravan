@@ -85,6 +85,13 @@ SERVICE_SPECS: tuple[ServiceSpec, ...] = (
         health_url="",
         depends_on=(),
     ),
+    ServiceSpec(
+        name="fanout",
+        module="services.processor.normalized_fanout",
+        description="Normalized fan-out consumer (industrial.normalized -> sinks)",
+        health_url="",
+        depends_on=(),
+    ),
 )
 
 SPEC_BY_NAME = {s.name: s for s in SERVICE_SPECS}
@@ -94,10 +101,10 @@ DEFAULT_ORDER = [s.name for s in SERVICE_SPECS]
 def _services_for_runtime_mode(runtime_mode: str | None) -> list[str]:
     mode = (runtime_mode or "python-fallback").strip().lower()
     if mode == "flink-production":
-        return ["api", "ai", "edge", "flink-job"]
+        return ["api", "ai", "edge", "fanout", "flink-job"]
     if mode == "flink-local":
-        return ["api", "ai", "edge", "flink-job", "mock"]
-    return ["api", "ai", "edge", "processor", "mock"]
+        return ["api", "ai", "edge", "fanout", "flink-job", "mock"]
+    return ["api", "ai", "edge", "processor", "fanout", "mock"]
 
 
 @dataclass

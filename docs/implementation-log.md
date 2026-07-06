@@ -1,6 +1,41 @@
 # Implementation Log
 
 
+## 2026-07-06 - Normalized Fan-Out Consumer And Historian Decoupling
+
+### Added
+
+1. **Normalized fan-out consumer**
+   - New `services/processor/normalized_fanout.py` reads `industrial.normalized` and writes batches to the configured `CompositeSink` (historian, lakehouse, downstream Kafka). Offsets are committed only after a sink batch succeeds, giving at-least-once delivery to endpoint datasets.
+   - Registered as the `fanout` service in `datastreamd` and included in all runtime modes.
+
+2. **Event-id deduplication**
+   - Added `setup_unique_indexes()` idempotent helper and `ON CONFLICT (event_id) DO NOTHING` to the historian industrial-event inserts so replayed batches (from at-least-once delivery) become no-ops instead of duplicates.
+   - Added the matching unique indexes to `docker/postgres/init-timescale-full.sql`.
+
+### Changed
+
+1. **Edge publisher no longer writes directly to the historian**
+   - Removed the historian buffer/flush path from `EdgePublisher`. The publisher now produces only to Kafka topics; the normalized fan-out consumer owns historian persistence. This decouples the edge path from a specific endpoint dataset.
+
+2. **Processor and Flink consume the normalized topic**
+   - `runtime_processor` and `iot_anomaly_job` now default to `industrial.normalized` (overridable via `IOT_TOPIC`). The normalized envelope is a superset of the legacy fields, so parsing is unaffected.
+
+3. **Removed cruft**
+   - Deleted the empty `docker/postgres/init-timescale.sql` directory.
+
+### Verified
+
+- `python -m pytest tests/test_edge_backpressure.py tests/test_sinks.py tests/test_normalized_fanout.py tests/test_edge_model.py tests/test_datastreamd.py`
+- Result: `34 passed`
+- Updated `test_datastreamd.py` runtime-mode selection to include the `fanout` service.
+
+### Notes
+
+- `iot.raw` is still produced (legacy compatibility) but is now deprecated; the processor and fan-out consume `industrial.normalized`.
+- Phase 3 of the production-hardening refactor.
+
+
 ## 2026-07-06 - Sink Abstractions For Endpoint-Dataset Fan-Out
 
 ### Added

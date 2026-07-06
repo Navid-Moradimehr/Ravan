@@ -183,6 +183,7 @@ def insert_industrial_event(event: dict[str, Any]) -> None:
                         value, quality, unit, site, line, schema_version,
                         fault_type, scenario_id, ground_truth_severity, step
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (event_id) DO NOTHING
                     """,
                     (
                         _coalesce_timestamp(event.get("ts_ingest")),
@@ -241,6 +242,7 @@ def insert_industrial_events(events: list[dict[str, Any]]) -> None:
             value, quality, unit, site, line, schema_version,
             fault_type, scenario_id, ground_truth_severity, step
         ) VALUES %s
+        ON CONFLICT (event_id) DO NOTHING
         """,
         rows,
     )
@@ -944,6 +946,35 @@ def insert_audit_log(event: dict[str, Any]) -> dict[str, Any]:
 # Data retention and compression policies
 import logging
 logger = logging.getLogger(__name__)
+
+
+def setup_unique_indexes() -> None:
+    """Create idempotent unique indexes for event-id deduplication.
+
+    The edge publisher now writes only to Kafka; the normalized fan-out consumer
+    persists to the historian. With at-least-once delivery, replayed batches can
+    re-insert the same ``event_id``. A unique index plus ``ON CONFLICT DO
+    NOTHING`` turns those replays into no-ops instead of duplicate rows. This is
+    idempotent (``IF NOT EXISTS``) and safe to call on startup.
+    """
+    unique_indexes = {
+        "industrial_events": "industrial_events_event_id_uniq",
+        "processed_events": "processed_events_event_id_uniq",
+        "dead_letter_events": "dead_letter_events_event_id_uniq",
+    }
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for table, index_name in unique_indexes.items():
+                try:
+                    cur.execute(
+                        f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} "
+                        f"ON {table} (event_id);"
+                    )
+                    logger.info("unique index ensured for %s", table)
+                except psycopg2.Error as exc:
+                    logger.warning("could not ensure unique index for %s: %s", table, exc)
+                    conn.rollback()
+        conn.commit()
 
 
 def setup_retention_policies() -> None:

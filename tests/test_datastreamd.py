@@ -37,9 +37,9 @@ class TestSupervisorSpecs:
             d.SPEC_BY_NAME.pop("testdep", None)
 
     def test_runtime_mode_service_selection(self):
-        assert d._services_for_runtime_mode("python-fallback") == ["api", "ai", "edge", "processor", "mock"]
-        assert d._services_for_runtime_mode("flink-local") == ["api", "ai", "edge", "flink-job", "mock"]
-        assert d._services_for_runtime_mode("flink-production") == ["api", "ai", "edge", "flink-job"]
+        assert d._services_for_runtime_mode("python-fallback") == ["api", "ai", "edge", "processor", "fanout", "mock"]
+        assert d._services_for_runtime_mode("flink-local") == ["api", "ai", "edge", "fanout", "flink-job", "mock"]
+        assert d._services_for_runtime_mode("flink-production") == ["api", "ai", "edge", "fanout", "flink-job"]
 
     def test_resolve_order_dedupes(self):
         order = d._resolve_order(["api", "ai", "api"])

@@ -24,6 +24,7 @@ SELECT create_hypertable('industrial_events', 'time', if_not_exists => TRUE, mig
 
 CREATE INDEX IF NOT EXISTS industrial_events_asset_ts_idx ON industrial_events (asset_id, time DESC);
 CREATE INDEX IF NOT EXISTS industrial_events_protocol_ts_idx ON industrial_events (source_protocol, time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS industrial_events_event_id_uniq ON industrial_events (event_id);
 
 CREATE TABLE IF NOT EXISTS processed_events (
     time TIMESTAMPTZ NOT NULL,
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS processed_events (
 SELECT create_hypertable('processed_events', 'time', if_not_exists => TRUE, migrate_data => TRUE);
 CREATE INDEX IF NOT EXISTS processed_events_asset_ts_idx ON processed_events (asset_id, time DESC);
 CREATE INDEX IF NOT EXISTS processed_events_severity_ts_idx ON processed_events (severity, time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS processed_events_event_id_uniq ON processed_events (event_id);
 
 CREATE TABLE IF NOT EXISTS ai_enriched (
     time TIMESTAMPTZ NOT NULL,
@@ -80,3 +82,4 @@ CREATE TABLE IF NOT EXISTS dead_letter_events (
 
 SELECT create_hypertable('dead_letter_events', 'time', if_not_exists => TRUE, migrate_data => TRUE);
 CREATE INDEX IF NOT EXISTS dead_letter_events_origin_ts_idx ON dead_letter_events (origin, time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS dead_letter_events_event_id_uniq ON dead_letter_events (event_id);

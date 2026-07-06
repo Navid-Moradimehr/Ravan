@@ -42,8 +42,6 @@ def _make_publisher(monkeypatch, producer_cls):
     from services.edge_ingest import publisher as publisher_mod
 
     monkeypatch.setattr(publisher_mod, "Producer", producer_cls)
-    monkeypatch.setattr(publisher_mod, "insert_industrial_event", lambda e: None)
-    monkeypatch.setattr(publisher_mod, "insert_industrial_events", lambda events: None)
     return publisher_mod, publisher_mod.EdgePublisher(Settings(max_message_bytes=1048576), batch_size=64)
 
 

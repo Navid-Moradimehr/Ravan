@@ -44,5 +44,8 @@ open-source requirement that users may have different endpoint datasets.
 ## Status
 
 - Phase 2: protocol, composite, registry, historian + kafka sinks introduced
-  and unit-tested. Not yet wired into the processor.
-- Phase 3 wires the normalized fan-out consumer to the composite sink.
+  and unit-tested.
+- Phase 3: the normalized fan-out consumer (`services/processor/normalized_fanout.py`)
+  reads `industrial.normalized` and writes to the composite sink with at-least-once
+  delivery (offsets committed only after sink success). The edge publisher no
+  longer writes directly to the historian.
