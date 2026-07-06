@@ -118,3 +118,108 @@ def test_rolling_window_state_uses_rolling_sums() -> None:
     assert temperature_avg == 70.0
     assert vibration_avg == 0.0
     assert size == 2
+
+
+def test_runtime_processor_persist_gate_default_on(monkeypatch) -> None:
+    from services.processor import runtime_processor as rp
+
+    assert rp.should_persist_processed() is True
+    monkeypatch.setenv("RUNTIME_PERSIST_PROCESSED_EVENTS", "0")
+    assert rp.should_persist_processed() is False
+    monkeypatch.setenv("RUNTIME_PERSIST_PROCESSED_EVENTS", "false")
+    assert rp.should_persist_processed() is False
+
+
+def test_runtime_processor_flush_skips_historian_when_gate_off() -> None:
+    """With the persist gate off, historian writes are skipped but offsets commit."""
+    from services.processor import runtime_processor as rp
+
+    batch_calls: list[list[dict]] = []
+    single_calls: list[dict] = []
+    committed: list[list] = []
+
+    buffer = [{"event_id": "e1"}, {"event_id": "e2"}]
+    offsets = [("iot.raw", 0, 4), ("iot.raw", 0, 5)]
+
+    rp._flush_processed_batch(
+        buffer,
+        offsets,
+        force=True,
+        db_batch_size=1024,
+        db_flush_seconds=1.0,
+        last_db_flush=0.0,
+        persist_processed=False,
+        insert_batch=batch_calls.append,
+        insert_single=single_calls.append,
+        commit_offsets=committed.append,
+    )
+
+    assert batch_calls == []
+    assert single_calls == []
+    # Offsets are still committed so the consumer advances.
+    assert len(committed) == 1
+    # Committed offsets are offset+1 (next position).
+    assert committed[0][0].offset == 5
+    assert committed[0][1].offset == 6
+    assert buffer == []
+    assert offsets == []
+
+
+def test_runtime_processor_flush_writes_historian_when_gate_on() -> None:
+    """With the persist gate on, the historian batch write runs and offsets commit."""
+    from services.processor import runtime_processor as rp
+
+    batch_calls: list[list[dict]] = []
+    committed: list[list] = []
+
+    buffer = [{"event_id": "e1"}]
+    offsets = [("iot.raw", 0, 9)]
+
+    rp._flush_processed_batch(
+        buffer,
+        offsets,
+        force=True,
+        db_batch_size=1024,
+        db_flush_seconds=1.0,
+        last_db_flush=0.0,
+        persist_processed=True,
+        insert_batch=batch_calls.append,
+        insert_single=lambda e: None,
+        commit_offsets=committed.append,
+    )
+
+    assert len(batch_calls) == 1
+    assert batch_calls[0] == [{"event_id": "e1"}]
+    assert len(committed) == 1
+    assert committed[0][0].offset == 10
+
+
+def test_runtime_processor_flush_holds_when_below_threshold() -> None:
+    """Below batch size and within flush interval, nothing is flushed."""
+    from services.processor import runtime_processor as rp
+
+    batch_calls: list[list[dict]] = []
+    committed: list[list] = []
+
+    buffer = [{"event_id": "e1"}]
+    offsets = [("iot.raw", 0, 0)]
+
+    import time as _time
+
+    new_flush = rp._flush_processed_batch(
+        buffer,
+        offsets,
+        force=False,
+        db_batch_size=1024,
+        db_flush_seconds=1.0,
+        last_db_flush=_time.monotonic(),
+        persist_processed=True,
+        insert_batch=batch_calls.append,
+        insert_single=lambda e: None,
+        commit_offsets=committed.append,
+    )
+
+    assert batch_calls == []
+    assert committed == []
+    assert buffer == [{"event_id": "e1"}]
+    assert new_flush is not None

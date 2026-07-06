@@ -21,6 +21,71 @@ PRUNE_EVERY_N_MESSAGES = 128
 logger = logging.getLogger(__name__)
 
 
+def should_persist_processed() -> bool:
+    """Whether the runtime processor writes processed events to the historian.
+
+    Mirrors the Flink job's ``FLINK_PERSIST_PROCESSED_EVENTS`` gate so both
+    execution paths can be toggled independently. Defaults to enabled to
+    preserve the historical Python-processor behavior; set
+    ``RUNTIME_PERSIST_PROCESSED_EVENTS=0`` to keep the processor as a pure
+    topic fan-out (offsets are still committed after a successful produce).
+    """
+    return os.getenv("RUNTIME_PERSIST_PROCESSED_EVENTS", "1").strip().lower() in {"1", "true", "yes"}
+
+
+def _flush_processed_batch(
+    buffer: list[dict[str, object]],
+    offsets: list[tuple[str, int, int]],
+    *,
+    force: bool,
+    db_batch_size: int,
+    db_flush_seconds: float,
+    last_db_flush: float,
+    persist_processed: bool,
+    insert_batch,
+    insert_single,
+    commit_offsets,
+) -> float:
+    """Flush the processed-event buffer, optionally persisting to the historian.
+
+    Returns the updated ``last_db_flush`` monotonic timestamp. When
+    ``persist_processed`` is False the historian write is skipped entirely but
+    offsets are still committed after the buffered batch is drained, so the
+    processor keeps making progress as a pure topic fan-out.
+    """
+    if not buffer:
+        return last_db_flush
+    elapsed = time.monotonic() - last_db_flush
+    if not force and len(buffer) < db_batch_size and elapsed < db_flush_seconds:
+        return last_db_flush
+
+    batch = buffer[:]
+    pending_offsets = offsets[:]
+    buffer.clear()
+    offsets.clear()
+    write_failed = False
+    if persist_processed:
+        try:
+            insert_batch(batch)
+        except Exception as exc:  # pragma: no cover - logged failure path
+            logger.warning("historian processed-event batch write failed: %s", exc)
+            write_failed = True
+            for event in batch:
+                try:
+                    insert_single(event)
+                except Exception as inner_exc:
+                    logger.warning("historian processed-event fallback write failed: %s", inner_exc)
+                    write_failed = True
+    if (not write_failed) and pending_offsets:
+        try:
+            commit_offsets(
+                [TopicPartition(topic, partition, offset + 1) for topic, partition, offset in pending_offsets]
+            )
+        except Exception as exc:  # pragma: no cover - coordinator/runtime failure path
+            logger.warning("processor offset commit failed: %s", exc)
+    return time.monotonic()
+
+
 def _prune_windows(
     windows: dict[str, RollingWindowState],
     last_seen: dict[str, float],
@@ -65,39 +130,22 @@ def main() -> None:
     processed_offsets: list[tuple[str, int, int]] = []
     last_db_flush = time.monotonic()
 
+    persist_processed = should_persist_processed()
+
     def flush_processed_buffer(force: bool = False) -> None:
         nonlocal last_db_flush
-        if not processed_buffer:
-            return
-        elapsed = time.monotonic() - last_db_flush
-        if not force and len(processed_buffer) < db_batch_size and elapsed < db_flush_seconds:
-            return
-
-        batch = processed_buffer[:]
-        offsets = processed_offsets[:]
-        processed_buffer.clear()
-        processed_offsets.clear()
-        write_failed = False
-        try:
-            insert_processed_events(batch)
-        except Exception as exc:  # pragma: no cover - logged failure path
-            logger.warning("historian processed-event batch write failed: %s", exc)
-            write_failed = True
-            for event in batch:
-                try:
-                    insert_processed_event(event)
-                except Exception as inner_exc:
-                    logger.warning("historian processed-event fallback write failed: %s", inner_exc)
-                    write_failed = True
-        if not write_failed and offsets:
-            try:
-                consumer.commit(
-                    offsets=[TopicPartition(topic, partition, offset + 1) for topic, partition, offset in offsets],
-                    asynchronous=False,
-                )
-            except Exception as exc:  # pragma: no cover - coordinator/runtime failure path
-                logger.warning("processor offset commit failed: %s", exc)
-        last_db_flush = time.monotonic()
+        last_db_flush = _flush_processed_batch(
+            processed_buffer,
+            processed_offsets,
+            force=force,
+            db_batch_size=db_batch_size,
+            db_flush_seconds=db_flush_seconds,
+            last_db_flush=last_db_flush,
+            persist_processed=persist_processed,
+            insert_batch=insert_processed_events,
+            insert_single=insert_processed_event,
+            commit_offsets=lambda offsets: consumer.commit(offsets=offsets, asynchronous=False),
+        )
 
     def stop(_signum: int, _frame: object) -> None:
         nonlocal running
