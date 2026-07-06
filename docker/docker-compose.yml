@@ -22,6 +22,26 @@ services:
       timeout: 5s
       retries: 10
 
+  kafka-init:
+    image: apache/kafka:4.1.2
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        for topic in industrial.raw industrial.normalized industrial.dlq iot.raw iot.processed iot.ai_enriched; do
+          /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
+            --topic "$$topic" \
+            --bootstrap-server kafka:9092 \
+            --partitions 3 \
+            --replication-factor 1 || true
+        done
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+
   kafka-ui:
     image: ghcr.io/kafbat/kafka-ui:latest
     depends_on:
