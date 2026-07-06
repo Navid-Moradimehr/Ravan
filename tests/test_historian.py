@@ -196,3 +196,69 @@ def test_insert_processed_events_uses_execute_values(monkeypatch) -> None:
     assert "processed_events" in captured["query"]
     assert len(captured["rows"]) == 1
     assert captured["committed"] is True
+
+
+def test_insert_processed_events_uses_on_conflict(monkeypatch) -> None:
+    from services.historian import client
+
+    captured: dict[str, object] = {}
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            captured["committed"] = True
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_execute_values(cur, query, rows, page_size=None):
+        captured["query"] = query
+        captured["rows"] = list(rows)
+
+    monkeypatch.setattr(client, "get_connection", lambda: FakeConn())
+    monkeypatch.setattr(client, "execute_values", fake_execute_values)
+
+    client.insert_processed_events(
+        [
+            {
+                "timestamp": "2026-06-27T10:01:00+00:00",
+                "event_id": "evt-dedup",
+                "device_id": "Pump-01",
+                "asset_id": "Pump-01",
+                "tag": "Temperature",
+                "value": 66.4,
+                "unit": "c",
+                "site_id": "demo-site",
+                "source_protocol": "mqtt",
+                "quality": "good",
+                "schema_version": 1,
+                "temperature_c": 66.4,
+                "vibration_mm_s": 0.0,
+                "pressure_bar": 0.0,
+                "processed_at": "2026-06-27T10:01:01+00:00",
+                "window_size": 8,
+                "temperature_avg_c": 61.2,
+                "vibration_avg_mm_s": 3.4,
+                "anomaly_score": 0.7,
+                "severity": "warning",
+                "triggered_rules": ["high_temp"],
+                "baseline": {"anomaly_score": 44},
+                "evaluation": {"correct": True},
+            }
+        ]
+    )
+
+    assert "ON CONFLICT (event_id) DO NOTHING" in captured["query"]
+    assert captured["committed"] is True

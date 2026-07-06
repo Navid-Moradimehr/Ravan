@@ -261,6 +261,7 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                         processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
                         anomaly_score, severity, triggered_rules, baseline, evaluation
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (event_id) DO NOTHING
                     """,
                     (
                         _coalesce_timestamp(event.get("timestamp")),
@@ -335,6 +336,7 @@ def insert_processed_events(events: list[dict[str, Any]]) -> None:
             processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
             anomaly_score, severity, triggered_rules, baseline, evaluation
         ) VALUES %s
+        ON CONFLICT (event_id) DO NOTHING
         """,
         rows,
     )
