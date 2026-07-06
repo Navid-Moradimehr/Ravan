@@ -1,5 +1,32 @@
 # Implementation Log
 
+## 2026-07-06 - Competitive Inspiration 5 (Prometheus Alert Rules)
+
+### Added
+
+1. **Alert rules** in `docker/prometheus/alert_rules.yml` (4 groups, 9 alerts)
+   - Consumer lag: `ConsumerLagHigh` (warning, >1000 msgs/2m), `ConsumerLagCritical` (critical, >10000 msgs/5m) on `datastream_broker_consumer_lag_messages`.
+   - Delivery health: `DLQRateHigh` (>1/sec for 5m on `edge_ingest_dlq_total`), `EdgeOverflowSustained` (`edge_ingest_overflow_total`), `KafkaDeliveryFailures` (critical, `edge_ingest_delivery_failures_total`), `AdapterReconnectStorm` (`edge_ingest_reconnects_total`).
+   - Historian: `HistorianWriteFailures` (critical, `historian_write_total{status="failed"}`), `HistorianQuerySlow` (p95 > 1s on `datastream_historian_query_latency_seconds`).
+   - Realtime: `WebSocketDeliveryLagHigh` (p95 > 5s on `datastream_websocket_delivery_lag_seconds`).
+   - Every alert references only metrics the services actually emit, so no rule silently never fires due to metric-name drift.
+
+2. **`rule_files`** wired into `docker/prometheus/prometheus.yml`.
+
+3. **Rules file mount** added to the `prometheus` service in `docker/docker-compose.yml` (`./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro`).
+
+4. **Tests** in `tests/test_prometheus_alert_rules.py` (7 cases)
+   - Valid YAML, every alert has name/expr/for/severity/summary, every expr references a known metric, consumer-lag + historian-failure alerts exist, prometheus.yml registers the rules file, compose mounts the rules read-only.
+
+### Verified
+
+- `python -m pytest tests/test_prometheus_alert_rules.py` -> 7 passed
+- `alert_rules.yml` and `prometheus.yml` and `docker-compose.yml` all parse as valid YAML
+
+### Notes
+
+- Inspiration source: competitive comparison (pillar 07 - lag/health monitoring). The platform already emitted the metrics but had zero alert rules, so backlog grew silently. These are conservative open-source baselines; operators tune SUSTAINED windows and severity to their SLOs and can route Prometheus alerts to an Alertmanager (or the existing API-level AlertManager) via webhook. The API AlertManager (Apprise + escalation engine) is a separate application-layer alert system; both layers are complementary.
+
 ## 2026-07-06 - Competitive Inspiration 4 (Flink Checkpoint and State-Backend Config)
 
 ### Added

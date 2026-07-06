@@ -1,0 +1,116 @@
+# Prometheus alerting rules for the Data Stream platform.
+#
+# Alerts target the metrics the services actually emit (see
+# services/common/runtime_metrics.py, services/edge_ingest/publisher.py,
+# services/historian/client.py). Thresholds are intentionally conservative for
+# an open-source baseline; operators should tune SUSTAINED window lengths and
+# severity to their SLOs.
+
+groups:
+  - name: datastream-consumer-lag
+    interval: 15s
+    rules:
+      # Sustained consumer lag means a consumer group is falling behind the
+      # broker. The platform emits per service/topic/partition lag via
+      # set_consumer_lag(); this is the primary backlog signal.
+      - alert: ConsumerLagHigh
+        expr: sum by (service, topic) (datastream_broker_consumer_lag_messages) > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer lag is high for {{ $labels.service }} on {{ $labels.topic }}"
+          description: "Backlog exceeds 1000 messages for 2 minutes. The {{ $labels.service }} consumer is not keeping up with {{ $labels.topic }}."
+
+      - alert: ConsumerLagCritical
+        expr: sum by (service, topic) (datastream_broker_consumer_lag_messages) > 10000
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Consumer lag is critical for {{ $labels.service }} on {{ $labels.topic }}"
+          description: "Backlog exceeds 10000 messages for 5 minutes. {{ $labels.service }} is severely behind on {{ $labels.topic }}; investigate the consumer or scale it."
+
+  - name: datastream-delivery-health
+    interval: 15s
+    rules:
+      # DLQ rate climbing means records are being rejected/malformed faster than
+      # is healthy. A non-zero rate is expected in production, but sustained
+      # growth indicates a schema or source-quality regression.
+      - alert: DLQRateHigh
+        expr: sum(rate(edge_ingest_dlq_total[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DLQ rate is high"
+          description: "More than 1 record/sec routed to the DLQ for 5 minutes. Check source data quality and schema validation."
+
+      # Producer backpressure overflow means the bounded decoupling queue is
+      # saturated and messages are being dropped to the DLQ by the producer path.
+      - alert: EdgeOverflowSustained
+        expr: sum(rate(edge_ingest_overflow_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Edge ingest overflow sustained"
+          description: "The edge ingest bounded queue is saturated and routing to DLQ for 5 minutes. The broker or producer cannot keep up; consider scaling or raising EDGE_MQTT_QUEUE_SIZE."
+
+      # Kafka delivery-report failures mean produces are failing at the broker.
+      - alert: KafkaDeliveryFailures
+        expr: sum(rate(edge_ingest_delivery_failures_total[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kafka delivery failures"
+          description: "Kafka delivery reports are failing for 2 minutes. Check broker health, replication, and producer acks config."
+
+      # Adapter reconnect storms indicate an unstable source connection.
+      - alert: AdapterReconnectStorm
+        expr: sum(rate(edge_ingest_reconnects_total[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Adapter reconnect storm"
+          description: "An edge adapter is reconnecting more than once every 2 seconds for 5 minutes. Check the source endpoint/network."
+
+  - name: datastream-historian
+    interval: 15s
+    rules:
+      # Historian write failures mean events are not being persisted; the fan-out
+      # commits offsets only after sink success, so sustained write failures stall
+      # the pipeline.
+      - alert: HistorianWriteFailures
+        expr: sum(rate(historian_write_total{status="failed"}[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Historian write failures"
+          description: "Historian writes are failing for 2 minutes. Events are not being persisted; the fan-out may stall. Check TimescaleDB health and connection pool."
+
+      # Slow historian queries degrade dashboards and the AI gateway reads.
+      - alert: HistorianQuerySlow
+        expr: histogram_fraction(0.95, sum by (table, operation) (rate(datastream_historian_query_latency_seconds_bucket[5m]))) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Historian queries are slow (p95 > 1s)"
+          description: "p95 historian query latency on {{ $labels.table }} / {{ $labels.operation }} exceeds 1 second for 5 minutes. Check indexes and hypertable chunking."
+
+  - name: datastream-realtime
+    interval: 15s
+    rules:
+      # WebSocket delivery lag degrades the live dashboard experience.
+      - alert: WebSocketDeliveryLagHigh
+        expr: histogram_fraction(0.95, sum by (channel) (rate(datastream_websocket_delivery_lag_seconds_bucket[5m]))) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket delivery lag is high (p95 > 5s)"
+          description: "p95 WebSocket delivery lag on {{ $labels.channel }} exceeds 5 seconds for 5 minutes. The dashboard is falling behind real time."
