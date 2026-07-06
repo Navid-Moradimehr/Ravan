@@ -15,6 +15,7 @@ try:  # pragma: no cover - exercised in the Flink container, not the lightweight
     from pyflink.datastream.connectors.base import DeliveryGuarantee
     from pyflink.datastream.functions import KeyedProcessFunction
     from pyflink.datastream.state import ListStateDescriptor, ValueStateDescriptor
+    from pyflink.datastream.functions import SinkFunction
 
     PYFLINK_AVAILABLE = True
 except ModuleNotFoundError:  # pragma: no cover - repo/test environments without Flink packages
@@ -30,8 +31,12 @@ except ModuleNotFoundError:  # pragma: no cover - repo/test environments without
     DeliveryGuarantee = None  # type: ignore[assignment]
     ListStateDescriptor = None  # type: ignore[assignment]
     ValueStateDescriptor = None  # type: ignore[assignment]
+    SinkFunction = None  # type: ignore[assignment]
 
     class KeyedProcessFunction:  # type: ignore[no-redef]
+        pass
+
+    class SinkFunction:  # type: ignore[no-redef]
         pass
 
     PYFLINK_AVAILABLE = False
@@ -39,6 +44,7 @@ except ModuleNotFoundError:  # pragma: no cover - repo/test environments without
 from services.common.brokers import resolve_kafka_brokers
 
 from services.common.runtime_event import RuntimeEventRecord
+from services.common.stream_scope import stream_partition_key
 from services.processor.runtime_pipeline import build_runtime_event_payload
 
 
@@ -83,15 +89,22 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
         temperature_sum += event.temperature_c
         vibration_sum += event.vibration_mm_s
 
+        evicted = False
         if len(samples) > self.window_limit:
-            evicted = samples.pop(0)
-            temperature_str, vibration_str = evicted
+            evicted_sample = samples.pop(0)
+            temperature_str, vibration_str = evicted_sample
             temperature_sum -= float(temperature_str)
             vibration_sum -= float(vibration_str)
+            evicted = True
 
-        self._sample_state.clear()
-        for sample in samples:
-            self._sample_state.add(sample)
+        # Flink ListState has no single update(); only rewrite the list when an
+        # eviction changed it. Otherwise appending the new sample is enough.
+        if evicted:
+            self._sample_state.clear()
+            for sample in samples:
+                self._sample_state.add(sample)
+        else:
+            self._sample_state.add(current_sample)
 
         self._temperature_sum_state.update(temperature_sum)
         self._vibration_sum_state.update(vibration_sum)
@@ -108,12 +121,70 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
         yield json.dumps(payload, separators=(",", ":"))
 
 
+
+class ProcessedEventsSink(SinkFunction):
+    """Persist processed events to the historian for Flink/Python parity.
+
+    The Python runtime processor writes processed_events to the historian
+    directly. The Flink job previously only wrote to the ``iot.processed``
+    Kafka topic, so Flink-mode deployments lost historian persistence. This
+    sink batches processed payloads and writes them through the shared
+    historian client, restoring parity. It only activates when
+    ``FLINK_PERSIST_PROCESSED_EVENTS=1`` (the historian client is only
+    importable inside the Flink container).
+    """
+
+    def __init__(self, batch_size: int = 512) -> None:
+        self._batch_size = batch_size
+        self._buffer: list[dict] = []
+        self._insert_batch = None
+        self._insert_single = None
+
+    def _ensure_client(self) -> None:
+        if self._insert_batch is not None:
+            return
+        from services.historian.client import insert_processed_event, insert_processed_events
+
+        self._insert_batch = insert_processed_events
+        self._insert_single = insert_processed_event
+
+    def invoke(self, value: str, context: object = None) -> None:  # type: ignore[override]
+        try:
+            payload = json.loads(value)
+        except json.JSONDecodeError:
+            return
+        self._buffer.append(payload)
+        if len(self._buffer) >= self._batch_size:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self._buffer:
+            return
+        self._ensure_client()
+        batch = self._buffer[:]
+        self._buffer.clear()
+        try:
+            self._insert_batch(batch)
+        except Exception:
+            for event in batch:
+                try:
+                    self._insert_single(event)
+                except Exception:
+                    pass
+
+
 def _partition_key(raw: str) -> str:
+    """Composite partition key matching the platform-wide stream scope.
+
+    Uses the same 7-field key (project|site|line|protocol|source|asset|tag) as
+    the edge publisher so the Flink key-by aligns with Kafka partitioning and
+    keeps all samples for one asset+tag co-located in one task manager.
+    """
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError:
         return "unknown"
-    return str(payload.get("asset_id") or payload.get("device_id") or "unknown")
+    return stream_partition_key(payload).decode("utf-8")
 
 
 def main() -> None:
@@ -184,6 +255,11 @@ def main() -> None:
     keyed = stream.key_by(_partition_key)
     processed = keyed.process(IndustrialRuntimeProcessFunction(window_limit), output_type=Types.STRING())
     processed.sink_to(sink)
+
+    # Optionally persist processed events to the historian for Flink/Python
+    # parity. The historian client is only importable inside the Flink container.
+    if os.getenv("FLINK_PERSIST_PROCESSED_EVENTS", "").strip().lower() in {"1", "true", "yes"}:
+        processed.add_sink(ProcessedEventsSink(batch_size=int(os.getenv("FLINK_PROCESSED_BATCH_SIZE", "512"))))
 
     env.execute("iot-anomaly-processor")
 

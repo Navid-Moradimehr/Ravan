@@ -1,6 +1,35 @@
 # Implementation Log
 
 
+## 2026-07-06 - Flink And Python Runtime Parity
+
+### Added
+
+1. **ProcessedEventsSink (Flink)**
+   - Added a `ProcessedEventsSink` Flink `SinkFunction` to `iot_anomaly_job.py` that batches processed payloads and persists them to the historian via the shared client, restoring parity with the Python runtime processor.
+   - Activates when `FLINK_PERSIST_PROCESSED_EVENTS=1` (the historian client is only importable inside the Flink container). Falls back to per-event insert on batch failure.
+
+### Changed
+
+1. **Flink state eviction**
+   - The keyed-state window no longer clears and re-adds the full list state on every element. It only rewrites the list when an eviction occurred; otherwise it appends the new sample. This avoids an O(window) state rewrite per event.
+2. **Composite partition key**
+   - `_partition_key` now uses the platform-wide 7-field composite scope (project|site|line|protocol|source|asset|tag) instead of asset-only, so Flink key-by aligns with Kafka partitioning and co-locates all samples for one asset+tag.
+3. **Batched producer drain**
+   - The Python runtime processor now drains delivery reports (`producer.poll(0)`) every 128 messages instead of on every message, removing a per-message syscall that throttled high-throughput ingest. Shutdown is still covered by `producer.flush(10)`.
+
+### Verified
+
+- `python -m pytest tests/test_flink_parity.py tests/test_edge_backpressure.py tests/test_sinks.py tests/test_normalized_fanout.py tests/test_edge_model.py tests/test_datastreamd.py`
+- Result: `39 passed`
+- Covers composite keying, ProcessedEventsSink batch/flush/fallback, and malformed-input handling.
+
+### Notes
+
+- These changes bring the Flink and Python runtime paths to the same persistence and partitioning contract.
+- Phase 4 of the production-hardening refactor.
+
+
 ## 2026-07-06 - Normalized Fan-Out Consumer And Historian Decoupling
 
 ### Added

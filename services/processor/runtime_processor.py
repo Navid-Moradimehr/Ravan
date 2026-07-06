@@ -159,7 +159,11 @@ def main() -> None:
                 key=event.partition_key(),
                 value=to_json_bytes(processed_event),
             )
-            producer.poll(0)
+            # Drain delivery reports periodically instead of on every message;
+            # per-message poll(0) is a syscall that throttles high-throughput
+            # ingest. The producer.flush(10) in the finally block covers shutdown.
+            if processed % PRUNE_EVERY_N_MESSAGES == 0:
+                producer.poll(0)
             processed_buffer.append(processed_event)
             processed_offsets.append((message.topic(), message.partition(), message.offset()))
             flush_processed_buffer()
