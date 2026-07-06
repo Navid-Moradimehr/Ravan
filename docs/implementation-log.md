@@ -1,6 +1,30 @@
 # Implementation Log
 
 
+## 2026-07-06 - Sink Abstractions For Endpoint-Dataset Fan-Out
+
+### Added
+
+1. **Sink protocol and composite**
+   - New `services/sinks/` package introduces a `Sink` Protocol (`write_batch`, `flush`, `close`), a `CompositeSink` that fans one batch to many sinks while isolating per-sink failures, and a `SinkRegistry.from_env()` that builds a composite from the `SINKS` env var.
+   - Sinks decouple *what is produced* (normalized/validated events) from *where it lands*, so the open-source platform can target different endpoint datasets (historian, lakehouse, downstream Kafka) without changing processor code.
+
+2. **Concrete sinks**
+   - `TimescaleHistorianSink` writes normalized industrial events to the historian via the shared client, with per-event fallback when a batch insert fails.
+   - `KafkaSink` forwards normalized events to a downstream Kafka topic using the composite partition key.
+
+### Verified
+
+- `python -m pytest tests/test_sinks.py`
+- Result: `11 passed`
+- Covers composite fan-out, failure isolation, flush/close propagation, context manager, registry env building, historian batch + per-event fallback, and Kafka sink forwarding with composite keys.
+
+### Notes
+
+- Introduced and unit-tested only; no wiring into the processor yet (Phase 3).
+- Phase 2 of the production-hardening refactor.
+
+
 ## 2026-07-06 - Edge Ingest Backpressure And Overload Handling
 
 ### Added
