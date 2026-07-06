@@ -1,5 +1,33 @@
 # Implementation Log
 
+## 2026-07-06 - Competitive Inspiration 1 (Schema Registry Compatibility Enforcement)
+
+### Added
+
+1. **Schema compatibility enforcement** in `services/common/schema_registry.py`
+   - Standard registry-style compatibility modes: `BACKWARD`, `FORWARD`, `FULL`, `NONE` constants plus `COMPATIBILITY_MODES`.
+   - `IncompatibleSchemaError` raised when a new version violates the configured mode.
+   - `set_compatibility(schema_id, mode)` / `get_compatibility(schema_id)` for per-schema policy (default `BACKWARD`).
+   - `register()` now accepts optional `compatibility` (per-call override) and `enforce` (bypass for bootstrap/forced migration) keyword arguments.
+   - `_check_compatibility()` validates: required-field removal, field type change, optional->required transition (backward), and adding a required field (forward).
+   - `list_schemas()` now reports the active `compatibility` mode per schema.
+
+2. **Tests** in `tests/test_schema_registry_compat.py` (13 cases)
+   - BACKWARD (allow optional add; reject required removal, type change, optional->required), FORWARD (reject required add; allow optional add), FULL (both directions), NONE (allow anything), `enforce=False` bypass, per-call compatibility override, mode validation, list-schemas compatibility field, and default-schema bootstrap.
+
+### Changed
+
+1. **`register()` signature** — now keyword-only `compatibility` and `enforce` params; existing callers (API router, bootstrap) keep working because bootstrap paths register v1 with no prior version (no enforcement triggered) and the API router registers custom schemas against a fresh subject.
+
+### Verified
+
+- `python -m pytest tests/test_schema_registry_compat.py` -> 13 passed
+- `python -m pytest tests/test_ai_enriched_fanout.py::test_schema_registry_has_processed_and_benchmark_schemas` -> 1 passed
+
+### Notes
+
+- Inspiration source: competitive comparison (pillar 10 - schema registry safe evolution). Compatible with our open-source "validate in app code" stance (ADR 0002) and the in-memory registry; no external registry infrastructure required.
+
 ## 2026-07-06 - API System Fix 5 (Real Health Probes)
 
 ### Added
