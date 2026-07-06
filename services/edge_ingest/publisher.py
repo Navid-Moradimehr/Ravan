@@ -21,6 +21,12 @@ adapter_errors = Counter("edge_ingest_adapter_errors_total", "Adapter errors", [
 adapter_reconnects = Counter("edge_ingest_reconnects_total", "Adapter reconnect attempts", ["protocol"])
 last_success_epoch = Gauge("edge_ingest_last_success_epoch", "Last successful ingest timestamp", ["protocol"])
 ingest_latency = Histogram("edge_ingest_latency_seconds", "Source-to-ingest latency", ["protocol"])
+delivery_failures = Counter(
+    "edge_ingest_delivery_failures_total", "Kafka delivery report failures", ["topic"]
+)
+overflow_total = Counter(
+    "edge_ingest_overflow_total", "Records routed to DLQ by producer backpressure/oversize", ["reason"]
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +45,7 @@ class EdgePublisher:
                 "linger.ms": 10,
                 "compression.type": "lz4",
                 "queue.buffering.max.messages": 100000,
+                "message.max.bytes": settings.max_message_bytes,
             }
         )
         self._batch_size = batch_size
@@ -47,11 +54,57 @@ class EdgePublisher:
         self._historian_buffer: list[dict[str, Any]] = []
         self._last_flush = time.time()
 
+    @staticmethod
+    def _delivery_report(err: Any, msg: Any) -> None:
+        if err is not None:
+            delivery_failures.labels(topic=msg.topic() if msg is not None else "unknown").inc()
+            logger.warning("kafka delivery failed: %s", err)
+
+    def _produce_safe(self, topic: str, key: bytes, value: bytes, origin: str = "unknown") -> None:
+        if len(value) > self.settings.max_message_bytes:
+            self._route_oversize(topic, key, value, origin)
+            return
+        while True:
+            try:
+                self.producer.produce(topic, key=key, value=value, on_delivery=self._delivery_report)
+                return
+            except BufferError:
+                # Internal queue full: drain delivery reports and retry so the
+                # caller experiences natural backpressure instead of crashing.
+                self.producer.poll(0.5)
+            except Exception as exc:
+                self._route_oversize(topic, key, value, origin, error=type(exc).__name__)
+                return
+
+    def _route_oversize(
+        self, topic: str, key: bytes, value: bytes, origin: str, error: str = "message_too_large"
+    ) -> None:
+        overflow_total.labels(reason=error).inc()
+        dlq_total.labels(protocol="producer").inc()
+        dlq_payload = {
+            "source_protocol": "producer",
+            "source_id": origin,
+            "error": error,
+            "payload": value.decode("utf-8", errors="replace")[:4096],
+            "ts_ingest": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "schema_version": 1,
+        }
+        try:
+            self.producer.produce(
+                self.settings.dlq_topic,
+                key=key,
+                value=to_json_bytes(dlq_payload),
+                on_delivery=self._delivery_report,
+            )
+        except Exception:
+            self.producer.poll(0.5)
+
     def publish_raw(self, protocol: str, source_id: str, payload: dict[str, Any]) -> None:
-        self.producer.produce(
+        self._produce_safe(
             self.settings.raw_topic,
-            key=f"{protocol}:{source_id}".encode("utf-8"),
-            value=to_json_bytes(payload),
+            f"{protocol}:{source_id}".encode("utf-8"),
+            to_json_bytes(payload),
+            origin=f"{protocol}:{source_id}",
         )
 
     def publish_event(self, payload: dict[str, Any]) -> None:
@@ -91,7 +144,7 @@ class EdgePublisher:
 
     def _flush_buffer(self) -> None:
         for topic, key, value in self._buffer:
-            self.producer.produce(topic, key=key, value=value)
+            self._produce_safe(topic, key, value, origin="batch")
         self._buffer.clear()
         self.producer.poll(0)
         self._last_flush = time.time()

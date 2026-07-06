@@ -10,6 +10,8 @@
 - LLM batch severity totals
 - CDC event count and lag
 - Service health status
+- Edge ingest Kafka delivery failures (`edge_ingest_delivery_failures_total`, by topic)
+- Edge ingest overflow / DLQ routing (`edge_ingest_overflow_total`, by reason: `message_too_large`, `mqtt_queue_full`)
 
 ## Dashboard Surface
 

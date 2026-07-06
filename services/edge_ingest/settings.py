@@ -35,3 +35,5 @@ class Settings:
     modbus_port: int = int(os.getenv("MODBUS_PORT", "5020"))
     poll_seconds: float = float(os.getenv("EDGE_POLL_SECONDS", "1"))
     historian_batch_size: int = int(os.getenv("EDGE_HISTORIAN_BATCH_SIZE", "1024"))
+    mqtt_queue_size: int = int(os.getenv("EDGE_MQTT_QUEUE_SIZE", "10000"))
+    max_message_bytes: int = int(os.getenv("EDGE_MAX_MESSAGE_BYTES", "1048576"))

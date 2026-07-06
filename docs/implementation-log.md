@@ -1,5 +1,30 @@
 # Implementation Log
 
+
+## 2026-07-06 - Edge Ingest Backpressure And Overload Handling
+
+### Added
+
+1. **Producer backpressure handling**
+   - `EdgePublisher` now produces through `_produce_safe`, which retries on `BufferError` (internal queue full) after draining delivery reports, and routes oversize messages (above `EDGE_MAX_MESSAGE_BYTES`) to the DLQ instead of crashing.
+   - Added `message.max.bytes` to the producer config and two new counters: `edge_ingest_delivery_failures_total` and `edge_ingest_overflow_total`.
+
+2. **MQTT bounded decoupling queue**
+   - The MQTT connector no longer produces to Kafka directly from the paho network thread. Decoded payloads are enqueued onto a bounded `asyncio.Queue` (size `EDGE_MQTT_QUEUE_SIZE`) and drained on the event loop, decoupling broker backpressure from the MQTT client.
+   - When the queue saturates, `enqueue_mqtt_message` routes the message to the DLQ and bumps the overflow counter so the loss is observable.
+   - Added `mqtt_queue_size` and `max_message_bytes` settings.
+
+### Verified
+
+- `python -m pytest tests/test_edge_backpressure.py`
+- Result: `5 passed`
+- Covers BufferError retry, oversize→DLQ routing, delivery-failure counter, MQTT queue-full→DLQ, and under-capacity enqueue.
+
+### Notes
+
+- No functional change to the happy path; this only hardens failure/overload modes.
+- Phase 1 of the production-hardening refactor.
+
 ## 2026-07-05 - Benchmark Repeatability And Session Delta
 
 ### Changed
