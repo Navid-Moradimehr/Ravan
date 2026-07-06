@@ -298,27 +298,42 @@ async def tls_info() -> dict[str, Any]:
 
 @app.get("/health")
 async def health() -> HealthResponse:
-    """Health check with service dependency status."""
+    """Health check with real dependency probes.
+
+    Each dependency (kafka, historian, ai_gateway) is probed over the network
+    with a short timeout so a slow/dead dependency surfaces as ``False`` without
+    hanging the endpoint. The overall status is ``degraded`` if any probed
+    dependency is down or the service is in a degraded state.
+    """
     import time
+
+    from services.api_service.health_probes import (
+        probe_ai_gateway,
+        probe_historian,
+        probe_kafka,
+    )
+
     start = time.time()
     try:
         from services.api_service.auth import auth_security_status
     except ImportError:
         from auth import auth_security_status  # type: ignore
-    services = {
-        "historian": True,  # Would check actual DB connectivity
-        "kafka": True,
-        "ai_gateway": True,
-    }
-    uptime = int(time.time() - start + 1)
+
+    kafka_ok = await asyncio.to_thread(probe_kafka)
+    historian_ok = await asyncio.to_thread(probe_historian)
+    ai_ok = await asyncio.to_thread(probe_ai_gateway)
+
     auth_status = auth_security_status()
-    status = "ok" if not service_state.degraded else "degraded"
+    dep_down = not (kafka_ok and historian_ok and ai_ok)
+    status = "degraded" if (service_state.degraded or dep_down) else "ok"
     return HealthResponse(
         status=status,
         version="1.0.0",
-        uptime_seconds=uptime,
+        uptime_seconds=int(time.time() - start + 1),
         services={
-            **services,
+            "historian": historian_ok,
+            "kafka": kafka_ok,
+            "ai_gateway": ai_ok,
             "auth": auth_status["jwt_secret_configured"],
             "auth_strong": auth_status["jwt_secret_strong_enough"],
             "degraded": service_state.degraded,

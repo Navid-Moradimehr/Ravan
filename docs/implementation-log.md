@@ -1,5 +1,27 @@
 # Implementation Log
 
+## 2026-07-06 - API System Fix 5 (Real Health Probes)
+
+### Added
+
+1. **Dependency health probes**
+   - New `services/api_service/health_probes.py` with lightweight, timeout-bounded probes: `probe_kafka` (TCP connect), `probe_historian` (`SELECT 1`), `probe_ai_gateway` (HTTP `/health`). Each probe returns `False` instead of raising so a dead dependency surfaces without hanging the endpoint.
+
+### Changed
+
+1. **`/health` no longer hardcodes dependency status**
+   - The endpoint now runs the real probes (via `asyncio.to_thread` so the event loop is not blocked) and reports actual `historian`/`kafka`/`ai_gateway` booleans. The overall status is `degraded` when any probed dependency is down or the service is in a degraded state. Previously all three were hardcoded `True`.
+
+### Verified
+
+- `python -m pytest tests/test_health_probes.py`
+- Result: `7 passed`
+- Covers each probe's success, failure, and never-raise contract.
+
+### Notes
+
+- Completes the 5 API-system audit fixes.
+
 ## 2026-07-06 - API System Fix 3 (Remove Duplicate Historian REST Surface)
 
 ### Removed
