@@ -1,5 +1,25 @@
 # Implementation Log
 
+## 2026-07-06 - API System Fix 3 (Remove Duplicate Historian REST Surface)
+
+### Removed
+
+1. **AI gateway duplicate historian REST API**
+   - Removed the ungated `/historian/{events,trend,assets,scenarios,alarms,replay}` REST surface from the AI gateway. These duplicated the gated `/api/v1/historian/*` surface owned by the API service. The AI gateway now exposes only its AI-specific endpoints (`/telemetry`, `/events` SSE, `/historian/stream` SSE, `/health`, `/metrics`).
+   - Removed the now-unused `query_trend`, `load_hierarchy`, `hierarchy_to_tree`, `list_scenarios`, and `pathlib` imports.
+   - The push-based `/historian/stream` SSE and `/events` SSE telemetry stream remain (they are real-time push, not duplicate REST reads).
+
+### Verified
+
+- `python -m pytest tests/test_ai_gateway_dedup.py`
+- Result: `3 passed`
+- Confirmed no UI or test references the removed gateway endpoints.
+
+### Notes
+
+- Historian REST reads are now served exclusively by the gated API service.
+- The replay control surface (`replay_state`) was only ever used by the now-removed endpoints and had no consumer; removed with them.
+
 ## 2026-07-06 - API System Fixes Batch 1 (SSE, Ingest Dual-Write, Producer)
 
 ### Changed
