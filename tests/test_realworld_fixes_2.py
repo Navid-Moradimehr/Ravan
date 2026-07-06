@@ -148,13 +148,13 @@ def test_ingest_endpoint_routes_invalid_to_dlq(monkeypatch):
 
 
 def test_processed_events_schema_has_real_tag_columns():
-    sql = _source("postgres/init-timescale.sql")
-    assert "asset_id TEXT" in sql
-    assert "tag TEXT" in sql
+    sql = _source("docker/postgres/init-timescale-full.sql")
+    assert "asset_id TEXT NOT NULL" in sql
+    assert "tag TEXT NOT NULL" in sql
     assert "value DOUBLE PRECISION" in sql
     assert "unit TEXT" in sql
-    # Idempotent migration present for existing DBs.
-    assert "ADD COLUMN IF NOT EXISTS tag TEXT" in sql
+    # Canonical schema declares tag natively (no legacy ALTER migration).
+    assert "CREATE UNIQUE INDEX IF NOT EXISTS processed_events_event_id_uniq" in sql
 
 
 def test_insert_processed_event_builds_correct_tuple(monkeypatch):

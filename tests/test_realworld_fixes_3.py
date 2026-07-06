@@ -48,13 +48,13 @@ def test_compression_segmentby_matches_table_columns():
 
 
 def test_schema_has_dead_letter_table_and_processed_columns():
-    sql = _source("postgres/init-timescale.sql")
+    sql = _source("docker/postgres/init-timescale-full.sql")
     assert "CREATE TABLE IF NOT EXISTS dead_letter_events" in sql
     assert "payload JSONB" in sql
     assert "origin TEXT" in sql
     assert "create_hypertable('dead_letter_events'" in sql
-    # processed_events still has the pass-2 columns.
-    assert "ADD COLUMN IF NOT EXISTS tag TEXT" in sql
+    # Canonical schema declares tag natively plus a dead-letter dedup index.
+    assert "CREATE UNIQUE INDEX IF NOT EXISTS dead_letter_events_event_id_uniq" in sql
 
 
 def test_insert_helpers_use_retry():

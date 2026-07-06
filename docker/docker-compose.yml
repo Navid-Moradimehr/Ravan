@@ -65,7 +65,7 @@ services:
       - "15432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stream -d stream_engine"]
       interval: 10s
@@ -356,7 +356,7 @@ services:
       - "15433:5432"
     volumes:
       - timescale-data:/var/lib/postgresql/data
-      - ./postgres/init-timescale-full.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      - ./docker/postgres/init-timescale-full.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stream -d stream_engine"]
       interval: 10s
