@@ -49,3 +49,5 @@ open-source requirement that users may have different endpoint datasets.
   reads `industrial.normalized` and writes to the composite sink with at-least-once
   delivery (offsets committed only after sink success). The edge publisher no
   longer writes directly to the historian.
+- Phase 5: the `lakehouse` sink (`services/sinks/lakehouse.py`) writes normalized
+  events to an Iceberg table on MinIO via `pyiceberg` + `pyarrow` (ADR 0003).

@@ -1,6 +1,33 @@
 # Implementation Log
 
 
+## 2026-07-06 - Iceberg Lakehouse Sink
+
+### Added
+
+1. **Lakehouse sink**
+   - New `services/sinks/lakehouse.py` `LakehouseSink` writes normalized industrial events to an Apache Iceberg table on MinIO (S3-compatible) via `pyiceberg` + `pyarrow`. The table is created on first use if it does not exist; each batch appends as an Arrow-backed data file.
+   - Configurable via `LAKEHOUSE_*` env vars (catalog, namespace, table, warehouse, S3 endpoint/keys, batch size). Registered as the `lakehouse` sink name in `SinkRegistry`.
+   - `pyiceberg` and `pyarrow` are imported lazily, so the sink degrades gracefully (logs + skips) when lakehouse support is not installed.
+
+2. **Dependencies**
+   - Added `pyiceberg[s3fs]` and `pyarrow` to `requirements.txt`.
+
+3. **ADR 0003**
+   - Recorded the Iceberg-over-MinIO decision in `ObsidianVault/50_ADR/0003-use-iceberg-for-lakehouse.md`.
+
+### Verified
+
+- `python -m pytest tests/test_lakehouse_sink.py tests/test_sinks.py tests/test_flink_parity.py tests/test_edge_backpressure.py tests/test_normalized_fanout.py tests/test_edge_model.py tests/test_datastreamd.py`
+- Result: `45 passed`
+- Covers env construction, buffering, graceful flush without pyiceberg, and registry wiring.
+
+### Notes
+
+- The lakehouse sink is optional (`SINKS=lakehouse`); MinIO already ships under the `extended` docker profile.
+- Phase 5 of the production-hardening refactor.
+
+
 ## 2026-07-06 - Flink And Python Runtime Parity
 
 ### Added
