@@ -68,7 +68,17 @@ All three high-value, low-effort inspirations are now implemented and committed:
 | 2 | MQTT QoS / retained / Last-Will | Done | `tests/test_mqtt_qos_will.py` (5) | `a70d742` |
 | 3 | Delivery chaos / replay dedup | Done | `tests/test_delivery_chaos.py` (3) | `07fe7ab` |
 
-The medium-effort inspirations (Flink checkpoint config, Debezium CDC recipe, lag
-alerting) remain documented as future work; they are config/docs-only and do not
-require code changes. See [[20_Architecture/Schema Governance]],
-[[20_Architecture/Industrial Edge Pipeline]], [[20_Architecture/Sink Architecture]].
+The three medium-effort inspirations were also implemented after confirming
+positive production impact:
+
+| # | Inspiration | Status | Tests | Commit |
+|---|-------------|--------|-------|--------|
+| 4 | Flink checkpoint + RocksDB state backend | Done | `tests/test_flink_checkpoint_config.py` (10) | `4317330` |
+| 5 | Prometheus alert rules (lag, delivery, historian, realtime) | Done | `tests/test_prometheus_alert_rules.py` (7) | `45d2528` |
+| 6 | Debezium PostgreSQL CDC connector recipe | Done | `tests/test_debezium_cdc_recipe.py` (7) | `9b8b7e4` |
+
+All six inspirations shipped as conventional commits with code, tests,
+implementation-log entries, and vault updates. See [[20_Architecture/Schema Governance]],
+[[20_Architecture/Industrial Edge Pipeline]], [[20_Architecture/Sink Architecture]],
+[[20_Architecture/Flink Python Parity]], [[60_Observability/Metrics]],
+[[40_Runbooks/Debezium CDC Ingest]].

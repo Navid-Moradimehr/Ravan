@@ -20,4 +20,5 @@ docker/prometheus/data/
 Thumbs.db
 .datastream/
 .refs/
+data/semantic/
 rust/fastpath/target/

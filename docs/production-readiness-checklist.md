@@ -195,3 +195,11 @@ After comparing the platform against a similar managed streaming product (`compa
 - [x] **Inspiration 3** — Delivery chaos / replay dedup coverage: tests that simulate a mid-batch consumer crash + Kafka redelivery and assert the at-least-once fan-out plus `ON CONFLICT (event_id) DO NOTHING` dedup produces no duplicate historian rows. 3 tests in `tests/test_delivery_chaos.py`.
 
 Each inspiration shipped as one conventional commit with code, tests, implementation-log entry, and vault updates.
+
+### Medium-effort inspirations (also implemented)
+
+The competitive evaluation originally flagged three medium-effort inspirations as config/docs-only future work. All three had positive production impact and are now implemented:
+
+- [x] **Inspiration 4** — Flink checkpoint + state-backend config: exactly-once checkpoints, RocksDB state backend with incremental checkpoints, externalized retained cleanup. A job restart now resumes from the last checkpoint instead of losing keyed window state. Env-configurable; 10 tests in `tests/test_flink_checkpoint_config.py`.
+- [x] **Inspiration 5** — Prometheus alert rules: 9 alerts in 4 groups (consumer lag, DLQ/overflow/delivery/reconnect, historian write failures + slow queries, WebSocket delivery lag), all referencing metrics the services emit. Wired into `prometheus.yml` and mounted in compose. 7 tests in `tests/test_prometheus_alert_rules.py`.
+- [x] **Inspiration 6** — Debezium PostgreSQL CDC recipe: ready-to-register connector config, idempotent registration script, logical publication. Optional alternative ingest path for relational sources. Runbook in the vault. 7 tests in `tests/test_debezium_cdc_recipe.py`.
