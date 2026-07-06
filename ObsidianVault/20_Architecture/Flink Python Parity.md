@@ -32,3 +32,50 @@ calls `producer.flush(10)`.
 
 - `FLINK_PERSIST_PROCESSED_EVENTS` (default off)
 - `FLINK_PROCESSED_BATCH_SIZE` (default 512)
+
+## Checkpoint and State-Backend Config (added 2026-07-06)
+
+> Competitive inspiration 4 (pillar 02 - Flink stateful depth).
+
+The Flink job previously used in-memory (hashmap) state with
+`AT_LEAST_ONCE` delivery and bare `enable_checkpointing(interval)`. On a job
+failure or restart it lost all keyed window state and replayed from the source.
+
+`configure_checkpoints()` now sets a production-grade checkpoint + state-backend
+profile via `CheckpointSettings` (read from env vars):
+
+- **Mode**: exactly-once (default) - aligned checkpoints, no duplicate output on
+  failover.
+- **State backend**: RocksDB (default) - off-heap keyed state, so window state is
+  not bounded by task-manager RAM and the job scales horizontally.
+- **Incremental checkpoints**: on by default when RocksDB is selected - only
+  changed state is persisted, cutting checkpoint size and time.
+- **Externalized retained checkpoints**: a cancelled/stopped job keeps its last
+  checkpoint so a restart resumes from it instead of a cold start.
+- **Min pause / max concurrent / timeout**: tuned defaults (500ms / 1 / 600s).
+
+### Environment variables
+
+| Var | Default | Notes |
+|-----|---------|-------|
+| `FLINK_CHECKPOINT_INTERVAL_MS` | 10000 | 0 disables checkpointing |
+| `FLINK_CHECKPOINT_MODE` | exactly_once | at_least_once alternative |
+| `FLINK_CHECKPOINT_TIMEOUT_MS` | 600000 | |
+| `FLINK_CHECKPOINT_MIN_PAUSE_MS` | 500 | |
+| `FLINK_CHECKPOINT_MAX_CONCURRENT` | 1 | |
+| `FLINK_CHECKPOINT_EXTERNALIZED_CLEANUP` | retain | delete alternative |
+| `FLINK_CHECKPOINT_UNALIGNED` | false | true helps backpressure |
+| `FLINK_STATE_BACKEND` | rocksdb | hashmap alternative |
+| `FLINK_INCREMENTAL_CHECKPOINTS` | true (rocksdb) | false (hashmap) |
+
+`CheckpointSettings` + `checkpoint_settings()` are pure-Python and unit-tested
+without PyFlink. `configure_checkpoints()` runs only inside the Flink container
+(`PYFLINK_AVAILABLE` guard). RocksDB ships with the Flink 1.20 base image; no
+extra jar is required.
+
+Tests: `tests/test_flink_checkpoint_config.py` (10 cases).
+
+## Related
+
+- [[20_Architecture/Sink Architecture]]
+- `comparission.md` pillar 02

@@ -1,5 +1,28 @@
 # Implementation Log
 
+## 2026-07-06 - Competitive Inspiration 4 (Flink Checkpoint and State-Backend Config)
+
+### Added
+
+1. **Checkpoint + state-backend configuration** in `services/processor/iot_anomaly_job.py`
+   - `CheckpointSettings` dataclass + `checkpoint_settings()` factory reading env vars: `FLINK_CHECKPOINT_INTERVAL_MS`, `FLINK_CHECKPOINT_MODE` (exactly_once/at_least_once), `FLINK_CHECKPOINT_TIMEOUT_MS`, `FLINK_CHECKPOINT_MIN_PAUSE_MS`, `FLINK_CHECKPOINT_MAX_CONCURRENT`, `FLINK_CHECKPOINT_EXTERNALIZED_CLEANUP` (retain/delete), `FLINK_CHECKPOINT_UNALIGNED`, `FLINK_STATE_BACKEND` (rocksdb/hashmap), `FLINK_INCREMENTAL_CHECKPOINTS`.
+   - `configure_checkpoints(env, settings)` applies the settings to the Flink `StreamExecutionEnvironment` via the PyFlink API (guarded by `PYFLINK_AVAILABLE`): exact-once mode, externalized retained checkpoints, RocksDB state backend with incremental checkpoints.
+   - Defaults favour production-grade stateful streaming: exactly-once, RocksDB + incremental checkpoints, externalized retained cleanup, 10s interval. A job restart now resumes from the last successful checkpoint instead of losing keyed state or replaying from the source.
+
+### Changed
+
+1. **`main()` checkpoint bootstrap** - the bare `env.enable_checkpointing(interval)` is replaced by `configure_checkpoints(env, checkpoint_settings())`, which sets mode, timeout, min-pause, max-concurrent, externalized cleanup, unaligned flag, and the RocksDB backend.
+
+### Verified
+
+- `python -m pytest tests/test_flink_checkpoint_config.py` -> 10 passed
+- `python -m pytest tests/test_flink_parity.py` -> 5 passed (no regression)
+- `py_compile` on `iot_anomaly_job.py` -> ok
+
+### Notes
+
+- Inspiration source: competitive comparison (pillar 02 - Flink stateful depth). Previously the job used in-memory state with `AT_LEAST_ONCE` delivery and bare checkpointing; on failure it lost all keyed window state. RocksDB + incremental checkpoints + externalized retained checkpoints make the stateful job restart-safe and scalable beyond task-manager RAM. Config-only relative to runtime; the `configure_checkpoints` body runs only inside the Flink container (PyFlink is not installed in the test venv).
+
 ## 2026-07-06 - Competitive Inspiration 3 (Delivery Chaos and Replay Dedup Coverage)
 
 ### Added

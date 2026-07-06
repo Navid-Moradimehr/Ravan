@@ -45,7 +45,120 @@ from services.common.brokers import resolve_kafka_brokers
 
 from services.common.runtime_event import RuntimeEventRecord
 from services.common.stream_scope import stream_partition_key
+from dataclasses import dataclass
 from services.processor.runtime_pipeline import build_runtime_event_payload
+
+
+@dataclass
+class CheckpointSettings:
+    """Checkpoint + state-backend configuration for the Flink job.
+
+    Pure-Python so it can be unit-tested without the PyFink runtime. The values
+    are applied to the :class:`StreamExecutionEnvironment` inside the
+    ``PYFLINK_AVAILABLE`` guard in :func:`configure_checkpoints`.
+
+    Defaults favour production-grade stateful streaming: RocksDB state backend
+    with incremental checkpoints and an externalized retained checkpoint, so a
+    job restart resumes from the last successful checkpoint instead of losing
+    keyed state or replaying from the source.
+    """
+
+    interval_ms: int
+    mode: str  # "exactly_once" | "at_least_once"
+    timeout_ms: int
+    min_pause_ms: int
+    max_concurrent: int
+    externalized_cleanup: str  # "retain" | "delete"
+    unaligned: bool
+    state_backend: str  # "rocksdb" | "hashmap"
+    incremental_checkpoints: bool
+
+
+def checkpoint_settings() -> CheckpointSettings:
+    """Read checkpoint/state-backend options from the environment.
+
+    Environment variables:
+    - FLINK_CHECKPOINT_INTERVAL_MS (default 10000)
+    - FLINK_CHECKPOINT_MODE: exactly_once | at_least_once (default exactly_once)
+    - FLINK_CHECKPOINT_TIMEOUT_MS (default 600000)
+    - FLINK_CHECKPOINT_MIN_PAUSE_MS (default 500)
+    - FLINK_CHECKPOINT_MAX_CONCURRENT (default 1)
+    - FLINK_CHECKPOINT_EXTERNALIZED_CLEANUP: retain | delete (default retain)
+    - FLINK_CHECKPOINT_UNALIGNED: true | false (default false)
+    - FLINK_STATE_BACKEND: rocksdb | hashmap (default rocksdb)
+    - FLINK_INCREMENTAL_CHECKPOINTS: true | false (default true when rocksdb)
+    """
+    def _bool(name: str, default: bool) -> bool:
+        return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
+
+    mode = os.getenv("FLINK_CHECKPOINT_MODE", "exactly_once").strip().lower()
+    if mode not in {"exactly_once", "at_least_once"}:
+        mode = "exactly_once"
+    state_backend = os.getenv("FLINK_STATE_BACKEND", "rocksdb").strip().lower()
+    if state_backend not in {"rocksdb", "hashmap"}:
+        state_backend = "rocksdb"
+    cleanup = os.getenv("FLINK_CHECKPOINT_EXTERNALIZED_CLEANUP", "retain").strip().lower()
+    if cleanup not in {"retain", "delete"}:
+        cleanup = "retain"
+    incremental = _bool("FLINK_INCREMENTAL_CHECKPOINTS", default=(state_backend == "rocksdb"))
+    return CheckpointSettings(
+        interval_ms=int(os.getenv("FLINK_CHECKPOINT_INTERVAL_MS", "10000")),
+        mode=mode,
+        timeout_ms=int(os.getenv("FLINK_CHECKPOINT_TIMEOUT_MS", "600000")),
+        min_pause_ms=int(os.getenv("FLINK_CHECKPOINT_MIN_PAUSE_MS", "500")),
+        max_concurrent=int(os.getenv("FLINK_CHECKPOINT_MAX_CONCURRENT", "1")),
+        externalized_cleanup=cleanup,
+        unaligned=_bool("FLINK_CHECKPOINT_UNALIGNED", False),
+        state_backend=state_backend,
+        incremental_checkpoints=incremental,
+    )
+
+
+def configure_checkpoints(env, settings: CheckpointSettings) -> None:
+    """Apply checkpoint + state-backend settings to a Flink execution env.
+
+    Runs only when PyFlink is available (i.e. inside the Flink container). The
+    Python-fallback test environment never calls this.
+    """
+    if not PYFLINK_AVAILABLE:  # pragma: no cover - guarded at call site
+        return
+    from pyflink.datastream import CheckpointConfig  # noqa: WPS433
+    from pyflink.common import CheckpointingMode  # noqa: WPS433
+
+    if settings.interval_ms <= 0:
+        return
+
+    mode_enum = (
+        CheckpointingMode.EXACTLY_ONCE
+        if settings.mode == "exactly_once"
+        else CheckpointingMode.AT_LEAST_ONCE
+    )
+    env.enable_checkpointing(settings.interval_ms, mode_enum)
+
+    cfg = env.get_checkpoint_config()
+    cfg.set_checkpoint_timeout(settings.timeout_ms)
+    cfg.set_min_pause_between_checkpoints(settings.min_pause_ms)
+    cfg.set_max_concurrent_checkpoints(settings.max_concurrent)
+    cfg.enable_unaligned_checkpoints(settings.unaligned)
+    if settings.externalized_cleanup == "retain":
+        cfg.enable_externalized_checkpoints(CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION)
+    else:
+        cfg.enable_externalized_checkpoints(CheckpointConfig.ExternalizedCheckpointCleanup.DELETE_ON_CANCELLATION)
+
+    # RocksDB state backend enables incremental checkpoints and off-heap state,
+    # so keyed state survives restarts and is not bounded by task-manager RAM.
+    if settings.state_backend == "rocksdb":
+        env.enable_incremental_checkpointing = settings.incremental_checkpoints
+        try:
+            from pyflink.datastream import RocksDBStateBackend  # noqa: WPS433
+            env.set_state_backend(RocksDBStateBackend())
+        except Exception:  # pragma: no cover - older/newer PyFink API variants
+            try:
+                from pyflink.datastream import StateBackend  # noqa: WPS433
+                env.set_state_backend(StateBackend("rocksdb"))
+            except Exception:  # pragma: no cover
+                pass
+
 
 
 class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
@@ -196,7 +309,6 @@ def main() -> None:
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
     window_limit = max(1, int(os.getenv("RUNTIME_WINDOW_LIMIT", "25")))
     parallelism = int(os.getenv("FLINK_PARALLELISM", "4"))
-    checkpoint_interval_ms = int(os.getenv("FLINK_CHECKPOINT_INTERVAL_MS", "10000"))
     starting_offsets = os.getenv("FLINK_STARTING_OFFSETS", "latest").strip().lower()
 
     connector_jars = [
@@ -218,8 +330,7 @@ def main() -> None:
 
     env = StreamExecutionEnvironment.get_execution_environment(configuration)
     env.set_parallelism(parallelism)
-    if checkpoint_interval_ms > 0:
-        env.enable_checkpointing(checkpoint_interval_ms)
+    configure_checkpoints(env, checkpoint_settings())
 
     source = (
         KafkaSource.builder()
