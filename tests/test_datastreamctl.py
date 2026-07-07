@@ -458,6 +458,26 @@ class TestDatastreamctl:
         assert rc == 0
         assert "project release gate" in out
 
+    def test_project_manifest_release_gate_writes_report_dir(self, monkeypatch, tmp_path):
+        report_dir = tmp_path / "release-gate"
+        monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
+        monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
+        monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
+        monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": True})
+        rc, out = self._run([
+            "project-manifest",
+            "release-gate",
+            str(PROJECT_MANIFEST),
+            "--skip-network",
+            "--report-dir",
+            str(report_dir),
+        ])
+        assert rc == 0
+        assert (report_dir / "release-gate-summary.json").exists()
+        assert (report_dir / "metadata-plane.json").exists()
+        assert (report_dir / "governance.json").exists()
+        assert "report_dir" in out
+
     def test_project_manifest_rollout_acceptance_runs(self, monkeypatch):
         monkeypatch.setattr(
             ctl,
@@ -580,6 +600,11 @@ class TestDatastreamctl:
         assert (report_dir / "rollout-acceptance-summary.json").exists()
         assert (report_dir / "demo-site.json").exists()
         assert (report_dir / "plant-a.json").exists()
+        assert (report_dir / "metadata-plane.json").exists()
+        assert (report_dir / "governance.json").exists()
+        assert (report_dir / "asset-registry.json").exists()
+        assert (report_dir / "event-catalog.json").exists()
+        assert (report_dir / "lineage.json").exists()
         assert "report_dir" in out
 
     def test_project_manifest_export_runs(self, tmp_path):
@@ -1226,6 +1251,38 @@ class TestDatastreamctl:
         assert "semantic store write benchmark" in out
         assert "writes_per_second=" in out
         assert "lineage_count=20" in out
+
+    def test_benchmark_metadata_plane_snapshot_runs(self, monkeypatch, tmp_path):
+        asset_config = tmp_path / "assets.yaml"
+        asset_config.write_text("sites: []", encoding="utf-8")
+        project_manifest = tmp_path / "project.yaml"
+        project_manifest.write_text("schema_version: 1\nproject_id: demo\nname: demo\nsites: []\n", encoding="utf-8")
+        monkeypatch.setattr(
+            ctl,
+            "run_metadata_artifacts_benchmark",
+            lambda *args, **kwargs: SimpleNamespace(
+                iterations=100,
+                warmup_iterations=10,
+                elapsed_seconds=0.01,
+                snapshots_per_second=10_000.0,
+                bundle_counts={"metadata_plane_assets": 1, "metadata_plane_topics": 6, "schema_count": 3},
+            ),
+        )
+        rc, out = self._run([
+            "benchmark",
+            "metadata-plane-snapshot",
+            "--iterations",
+            "100",
+            "--warmup-iterations",
+            "10",
+            "--asset-config",
+            str(asset_config),
+            "--project-manifest",
+            str(project_manifest),
+        ])
+        assert rc == 0
+        assert "metadata plane snapshot benchmark" in out
+        assert "snapshots_per_second=" in out
 
     def test_benchmark_end_to_end_pipeline_runs(self, monkeypatch, tmp_path):
         csv_path = tmp_path / "mock.csv"

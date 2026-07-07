@@ -36,6 +36,9 @@ Keep the current industrial app intact, but project it onto a universal semantic
 - Governance snapshot:
   - schema, model, prompt, and dataset registries are summarized in a lifecycle view
   - promotion workflow remains out of scope until the platform has a real governance engine
+- Metadata artifacts:
+  - release-gate and rollout-acceptance now persist the logical metadata plane and governance snapshots as JSON report artifacts
+  - a benchmark exists for snapshot construction so metadata overhead stays visible
 - Operational memory:
   - alerts, annotations, OEE shifts, report inventory, and backup readiness are exposed through one read-only operator-state surface
   - work orders, approvals, and maintenance plans remain user-owned until a later phase
@@ -62,3 +65,4 @@ The manufacturing model stays as a domain pack. The platform core should remain 
 - The asset registry snapshot is a projection of the existing hierarchy, not a second source of truth for plant topology.
 - The event catalog is a contract view, not a substitute for the project manifest.
 - The governance snapshot is a lifecycle summary, not a new workflow system.
+- The metadata artifact bundle is an archive format, not a new storage engine.

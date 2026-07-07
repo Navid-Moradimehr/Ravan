@@ -36,6 +36,8 @@ from services.benchmarks.cgr_stream_slice import format_result as format_cgr_str
 from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
 from services.benchmarks.end_to_end_pipeline import format_result as format_end_to_end_pipeline_result
 from services.benchmarks.end_to_end_pipeline import run_benchmark as run_end_to_end_pipeline_benchmark
+from services.benchmarks.metadata_artifacts import format_result as format_metadata_artifacts_result
+from services.benchmarks.metadata_artifacts import run_benchmark as run_metadata_artifacts_benchmark
 from services.benchmarks.flink_runtime_slice import format_result as format_flink_runtime_slice_result
 from services.benchmarks.flink_runtime_slice import run_benchmark as run_flink_runtime_slice_benchmark
 from services.benchmarks.production_pipeline import format_result as format_production_pipeline_result
@@ -62,6 +64,7 @@ from services.historian.backup import (
     list_backups,
     restore_backup,
 )
+from services.common.metadata_artifacts import build_metadata_artifact_bundle, write_metadata_artifact_bundle
 
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
 DEFAULT_AI_BASE = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080")
@@ -740,6 +743,8 @@ def _write_rollout_acceptance_report(report_dir: str, payload: dict[str, Any]) -
         site_path.write_text(json.dumps(site, indent=2), encoding="utf-8")
         written.append(site_path)
 
+    metadata_bundle = build_metadata_artifact_bundle(site_id=None)
+    written.extend(write_metadata_artifact_bundle(output_dir, metadata_bundle))
     return written
 
 
@@ -1511,13 +1516,30 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
             "sites": checks,
             "passed": passed,
         }
+        written_reports: list[Path] = []
+        if getattr(args, "report_dir", None):
+            output_dir = Path(args.report_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            metadata_bundle = build_metadata_artifact_bundle(site_id=None)
+            written_reports.extend(write_metadata_artifact_bundle(output_dir, metadata_bundle))
+            summary_path = output_dir / "release-gate-summary.json"
+            summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            written_reports.append(summary_path)
+            for item in checks:
+                site_path = output_dir / f"{item['site_id']}.json"
+                site_path.write_text(json.dumps(item, indent=2), encoding="utf-8")
+                written_reports.append(site_path)
         if args.json:
+            if written_reports:
+                payload = {**payload, "written_reports": [str(path) for path in written_reports]}
             print(json.dumps(payload, indent=2))
         else:
             print("project release gate")
             print("=" * 40)
             _print_row("project_id", manifest.project_id)
             _print_row("name", manifest.name)
+            if written_reports:
+                _print_row("report_dir", args.report_dir)
             for item in checks:
                 mark = "OK" if item["passed"] else "FAIL"
                 print(f"{mark:<6}{item['site_id']:<22}{item['profile_path']}")
@@ -2128,6 +2150,29 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("=" * 40)
             print(format_semantic_store_write_result(result))
         return 0
+    if args.action == "metadata-plane-snapshot":
+        result = run_metadata_artifacts_benchmark(
+            iterations=args.iterations,
+            warmup_iterations=args.warmup_iterations,
+            asset_config=Path(args.asset_config),
+            project_manifest_path=Path(args.project_manifest),
+        )
+        if args.json:
+            print(json.dumps(
+                {
+                    "iterations": result.iterations,
+                    "warmup_iterations": result.warmup_iterations,
+                    "elapsed_seconds": result.elapsed_seconds,
+                    "snapshots_per_second": result.snapshots_per_second,
+                    "bundle_counts": result.bundle_counts,
+                },
+                indent=2,
+            ))
+        else:
+            print("metadata plane snapshot benchmark")
+            print("=" * 40)
+            print(format_metadata_artifacts_result(result))
+        return 0
     if args.action == "production-pipeline":
         result = run_production_pipeline_benchmark(
             Path(args.csv),
@@ -2455,6 +2500,7 @@ def build_parser() -> argparse.ArgumentParser:
     project_release.add_argument("--ai-base", default=DEFAULT_AI_BASE)
     project_release.add_argument("--backup-dir", default=None)
     project_release.add_argument("--restore-db", default=None)
+    project_release.add_argument("--report-dir", default=None, help="Optional directory to write JSON release-gate reports")
     project_release.add_argument("--skip-network", action="store_true")
     project_release.add_argument("--skip-backup", action="store_true")
     project_release.add_argument("--json", action="store_true")
@@ -2578,6 +2624,13 @@ def build_parser() -> argparse.ArgumentParser:
     semantic_store_write.add_argument("--warmup-iterations", type=int, default=100)
     semantic_store_write.add_argument("--json", action="store_true")
     semantic_store_write.set_defaults(func=cmd_benchmark)
+    metadata_snapshot = benchmark_sub.add_parser("metadata-plane-snapshot", help="Benchmark metadata-plane snapshot construction")
+    metadata_snapshot.add_argument("--iterations", type=int, default=100)
+    metadata_snapshot.add_argument("--warmup-iterations", type=int, default=10)
+    metadata_snapshot.add_argument("--asset-config", default=str(Path("config/assets.yaml")))
+    metadata_snapshot.add_argument("--project-manifest", default=str(Path("config/project-manifest.yaml")))
+    metadata_snapshot.add_argument("--json", action="store_true")
+    metadata_snapshot.set_defaults(func=cmd_benchmark)
     production_pipeline = benchmark_sub.add_parser("production-pipeline", help="Benchmark the selected production runtime mode")
     production_pipeline.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
     production_pipeline.add_argument("--events", type=int, default=10_000)

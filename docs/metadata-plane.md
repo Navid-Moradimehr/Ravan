@@ -85,11 +85,14 @@ Governance is also exposed as a lightweight lifecycle snapshot:
 - `services/api_service/routers/event_catalog.py`
 - `services/common/governance_plane.py`
 - `services/api_service/routers/governance.py`
+- `services/common/metadata_artifacts.py`
 - `/api/v1/metadata`
 - `/api/v1/metadata/operational`
 - `/api/v1/metadata/assets`
 - `/api/v1/metadata/events`
 - `/api/v1/metadata/governance`
 - `/api/v1/lineage`
+- `data/metadata/*.json` report artifacts written by release-gate and rollout-acceptance commands
 
+The logical metadata plane can be persisted as JSON artifacts for release gates and benchmark archives, but it still does not become a separate service or database.
 The implementation aggregates existing registries and catalogs. It does not introduce a second persistence system.

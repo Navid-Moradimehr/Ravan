@@ -129,6 +129,26 @@ Added a lightweight read-only governance snapshot for schema, model, prompt, and
 ### Validation
 - Focused pytest run passed: 12 passed.
 
+## 2026-07-07 - Metadata Artifact Persistence and Benchmark
+
+Added durable JSON metadata-artifact bundles for release-gate and rollout-acceptance archives, plus a benchmark path for measuring snapshot construction overhead.
+
+### Added
+1. **Metadata artifact bundle** (`services/common/metadata_artifacts.py`) â€” builds and writes JSON bundles for the metadata plane, governance, asset registry, event catalog, and lineage snapshots.
+2. **Metadata artifact benchmark** (`services/benchmarks/metadata_artifacts.py`) â€” measures snapshot construction throughput so metadata overhead stays visible like the runtime benchmarks.
+3. **CLI automation** (`services/cli/datastreamctl.py`) â€” `project-manifest release-gate` and `project-manifest rollout-acceptance` now persist metadata-artifact bundles alongside release reports, and `benchmark metadata-plane-snapshot` measures snapshot construction cost.
+4. **Tests** (`tests/test_metadata_artifacts.py`, updated `tests/test_datastreamctl.py`) â€” verifies report-dir output and benchmark command behavior.
+
+### Updated
+- `docs/metadata-plane.md`
+- `docs/platform-semantic-core.md`
+- `docs/production-readiness-checklist.md`
+- `ObsidianVault/20_Architecture/Platform Core and Semantic Plane.md`
+- `ObsidianVault/20_Architecture/System Architecture.md`
+
+### Validation
+- Focused pytest run passed: 10 tests in the metadata-artifacts slice and 6 tests in the release-gate/benchmark slice.
+
 ## 2026-07-07 - Operational Memory Boundary
 
 Added a read-only operational memory snapshot on top of existing alert,
