@@ -97,4 +97,5 @@ Governance is also exposed as a lightweight lifecycle snapshot:
 The logical metadata plane can be persisted as JSON artifacts for release gates and benchmark archives, but it still does not become a separate service or database.
 The schema registry now also has optional file-backed state via `SCHEMA_REGISTRY_PATH`, so compatibility history can survive process restarts without adding a new metadata service.
 The model registry and prompt registry now also support optional file-backed state through `MODEL_REGISTRY_PATH` and `PROMPT_REGISTRY_PATH`, which keeps AI role bindings and prompt templates durable in single-node and Docker Compose installs.
+The dataset catalog now also supports optional file-backed state through `DATASET_CATALOG_PATH`, so benchmark and release-candidate dataset listings can remain stable across restarts without becoming a separate data-service boundary.
 The implementation aggregates existing registries and catalogs. It does not introduce a second persistence system.

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+import importlib
 from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +13,8 @@ import pytest
 from services.cli import datastreamctl as ctl
 from services.datasets.runtime_catalog import (
     DATASET_SOURCES,
+    DatasetCatalog,
+    DatasetSource,
     get_dataset_source,
     list_dataset_sources,
 )
@@ -44,6 +47,45 @@ class TestRuntimeCatalog:
 
     def test_mock_is_unlicensed(self):
         assert get_dataset_source("mock").licensed is False
+
+    def test_catalog_persists_and_recovers_state(self, tmp_path):
+        state_path = tmp_path / "dataset-catalog.json"
+        catalog = DatasetCatalog(state_path=state_path)
+        catalog.register(
+            DatasetSource(
+                dataset_id="custom-pack",
+                name="Custom Benchmark Pack",
+                category="benchmark",
+                signals="Synthetic mixed tags for release validation",
+                best_use="Regression and smoke testing",
+                licensed=False,
+            )
+        )
+
+        reloaded = DatasetCatalog(state_path=state_path)
+        assert reloaded.get_source("custom-pack") is not None
+        assert reloaded.get_source("custom-pack").name == "Custom Benchmark Pack"
+
+    def test_catalog_path_is_honored_from_env(self, monkeypatch, tmp_path):
+        state_path = tmp_path / "dataset-catalog-env.json"
+        monkeypatch.setenv("DATASET_CATALOG_PATH", str(state_path))
+
+        import services.datasets.runtime_catalog as runtime_catalog
+
+        reloaded_module = importlib.reload(runtime_catalog)
+        reloaded_module.dataset_catalog.register(
+            DatasetSource(
+                dataset_id="env-pack",
+                name="Env Benchmark Pack",
+                category="benchmark",
+                signals="Synthetic load for reproducible testing",
+                best_use="Benchmarking",
+                licensed=False,
+            )
+        )
+
+        reloaded = DatasetCatalog(state_path=state_path)
+        assert reloaded.get_source("env-pack") is not None
 
 
 class TestDatastreamctl:

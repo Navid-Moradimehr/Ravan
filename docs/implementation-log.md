@@ -427,6 +427,28 @@ Extended the governance metadata layer so model bindings and prompt templates ca
 
 Model bindings and prompt templates are governance metadata, not separate runtime services. Keeping them in-process preserves the open-source deployment model while making the metadata plane durable enough for repeatable local production installs.
 
+## 2026-07-07 - Dataset Catalog Persistence Boundary
+
+Extended the dataset registry so benchmark and release-candidate catalog entries can persist to local JSON state when configured.
+
+### What changed
+
+1. **`services/datasets/runtime_catalog.py`**
+   - Added a lightweight `DatasetCatalog` wrapper with optional `DATASET_CATALOG_PATH` wiring.
+   - The catalog still defaults to the baked-in dataset list, but registered additions now survive restart when a path is provided.
+
+2. **Tests**
+   - Extended `tests/test_datastreamctl.py` with catalog reload coverage for a persisted custom dataset entry.
+
+### Verification
+
+- `uv run pytest tests/test_schema_registry_compat.py tests/test_modeling_contracts.py tests/test_datastreamctl.py` -> 81 passed
+- `python -m compileall services tests` -> clean
+
+### Why this belongs here
+
+The dataset catalog is metadata about available benchmark and validation inputs, not a user data store. Persisting it inside the metadata plane keeps the release story reproducible without introducing a separate catalog service.
+
 ## 2026-07-06 - API System Fix 5 (Real Health Probes)
 
 ### Added
