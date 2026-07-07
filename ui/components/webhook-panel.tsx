@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { formatErrorMessage, requestJson } from "@/lib/http";
-import { useToast } from "@/components/toaster";
+import { showToast } from "@/components/toaster";
 
 async function getWebhooks(): Promise<{ webhooks?: Record<string, any> }> {
   return requestJson<{ webhooks?: Record<string, any> }>("/api/webhooks");
@@ -29,21 +29,20 @@ async function testWebhook(hookId: string) {
 export function WebhookPanel() {
   const [url, setUrl] = useState("");
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const webhooks = useQuery({ queryKey: ["webhooks"], queryFn: getWebhooks });
   const add = useMutation({
     mutationFn: addWebhook,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["webhooks"] });
       setUrl("");
-      toast({
+      showToast({
         title: "Webhook added",
         description: "The destination is now enabled for alarm and anomaly events.",
         variant: "success",
       });
     },
     onError: (error) => {
-      toast({
+      showToast({
         title: "Webhook failed",
         description: formatErrorMessage(error, "The webhook could not be saved."),
         variant: "error",
@@ -53,14 +52,14 @@ export function WebhookPanel() {
   const test = useMutation({
     mutationFn: testWebhook,
     onSuccess: (_, hookId) => {
-      toast({
+      showToast({
         title: "Webhook test sent",
         description: `A test payload was delivered to ${hookId}.`,
         variant: "success",
       });
     },
     onError: (error) => {
-      toast({
+      showToast({
         title: "Webhook test failed",
         description: formatErrorMessage(error, "The test payload could not be delivered."),
         variant: "error",

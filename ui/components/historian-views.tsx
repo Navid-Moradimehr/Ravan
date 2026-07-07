@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeHistorianStream, subscribeEventsWebSocket, type HistorianStreamPayload } from "@/lib/api";
 import { formatErrorMessage } from "@/lib/http";
-import { useToast } from "@/components/toaster";
+import { showToast } from "@/components/toaster";
 
 function TrendChart({ data }: { data: { time: string; value: number }[] }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
@@ -76,7 +76,6 @@ export function HistorianDashboard() {
   const [selectedScenario, setSelectedScenario] = useState("normal");
   const [selectedDataset, setSelectedDataset] = useState("ai4i");
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   // WebSocket-driven state for alarms and events
   const [streamAlarms, setStreamAlarms] = useState<any[]>([]);
@@ -138,14 +137,14 @@ export function HistorianDashboard() {
     mutationFn: () => startReplay(selectedDataset, selectedScenario),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["historian", "replay"] });
-      toast({
+      showToast({
         title: "Replay started",
         description: `Dataset ${selectedDataset} is now replaying scenario ${selectedScenario}.`,
         variant: "success",
       });
     },
     onError: (error) => {
-      toast({
+      showToast({
         title: "Replay start failed",
         description: formatErrorMessage(error, "Replay could not be started."),
         variant: "error",
@@ -156,14 +155,14 @@ export function HistorianDashboard() {
     mutationFn: stopReplay,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["historian", "replay"] });
-      toast({
+      showToast({
         title: "Replay stopped",
         description: "The ground-truth playback has been halted.",
         variant: "success",
       });
     },
     onError: (error) => {
-      toast({
+      showToast({
         title: "Replay stop failed",
         description: formatErrorMessage(error, "Replay could not be stopped."),
         variant: "error",

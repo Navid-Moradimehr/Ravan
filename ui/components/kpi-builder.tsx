@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatErrorMessage, requestJson } from "@/lib/http";
-import { useToast } from "@/components/toaster";
+import { showToast } from "@/components/toaster";
 
 type KPIFormula = {
   kpi_id: string;
@@ -53,19 +53,18 @@ export function KPIBuilder() {
   });
 
   const query = useQuery({ queryKey: ["kpis"], queryFn: getKPIs });
-  const { toast } = useToast();
   const create = useMutation({
     mutationFn: createKPI,
     onSuccess: () => {
       query.refetch();
-      toast({
+      showToast({
         title: "KPI saved",
         description: "The new KPI definition is available for evaluation.",
         variant: "success",
       });
     },
     onError: (error) => {
-      toast({
+      showToast({
         title: "KPI save failed",
         description: formatErrorMessage(error, "The KPI could not be saved."),
         variant: "error",
@@ -76,14 +75,14 @@ export function KPIBuilder() {
     mutationFn: deleteKPI,
     onSuccess: () => {
       query.refetch();
-      toast({
+      showToast({
         title: "KPI deleted",
         description: "The KPI definition was removed.",
         variant: "success",
       });
     },
     onError: (error) => {
-      toast({
+      showToast({
         title: "KPI delete failed",
         description: formatErrorMessage(error, "The KPI could not be deleted."),
         variant: "error",

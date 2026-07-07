@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatErrorMessage, requestJson } from "@/lib/http";
-import { useToast } from "@/components/toaster";
+import { showToast } from "@/components/toaster";
 
 async function getNotifications(): Promise<{ notifications?: Record<string, any> }> {
   return requestJson<{ notifications?: Record<string, any> }>("/api/notifications");
@@ -28,7 +28,6 @@ export function NotificationPanel() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [slackUrl, setSlackUrl] = useState("");
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const notifications = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
   const add = useMutation({
     mutationFn: addNotification,
@@ -37,14 +36,14 @@ export function NotificationPanel() {
       setEmail("");
       setWebhookUrl("");
       setSlackUrl("");
-      toast({
+      showToast({
         title: "Notification channel added",
         description: "The alert destination is now available for alarms and anomalies.",
         variant: "success",
       });
     },
     onError: (error) => {
-      toast({
+      showToast({
         title: "Notification failed",
         description: formatErrorMessage(error, "The notification channel could not be saved."),
         variant: "error",

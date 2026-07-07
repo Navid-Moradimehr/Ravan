@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatErrorMessage, requestJson } from "@/lib/http";
-import { useToast } from "@/components/toaster";
+import { showToast } from "@/components/toaster";
 
 // Self-Service BI: run ad-hoc SQL, save queries, export CSV
 async function runQuery(sql: string, params: any[] = []) {
@@ -44,7 +44,6 @@ function downloadCsv(rows: any[], filename: string) {
 export function SqlQueryPanel() {
   const [sql, setSql] = useState("SELECT * FROM industrial_events ORDER BY time DESC LIMIT 10");
   const [savedQueries, setSavedQueries] = useState<string[]>(["SELECT * FROM industrial_events ORDER BY time DESC LIMIT 10"]);
-  const { toast } = useToast();
   const query = useMutation({ mutationFn: (sql: string) => runQuery(sql) });
 
   const data = query.data ?? [];
@@ -56,19 +55,19 @@ export function SqlQueryPanel() {
 
     try {
       const rows = await query.mutateAsync(sql);
-      toast({
+      showToast({
         title: "Query completed",
         description: `${rows.length} rows returned from the historian.`,
         variant: "success",
       });
     } catch (error) {
-      toast({
+      showToast({
         title: "Query failed",
         description: formatErrorMessage(error, "Unable to execute SQL against the historian."),
         variant: "error",
       });
     }
-  }, [query, savedQueries, sql, toast]);
+  }, [query, savedQueries, sql]);
 
   return (
     <Card className="app-card">

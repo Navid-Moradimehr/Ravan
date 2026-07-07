@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Providers } from "./providers";
+import { ToastHost } from "@/components/toaster";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className="font-sans antialiased">
         <Providers>{children}</Providers>
+        <ToastHost />
       </body>
     </html>
   );
