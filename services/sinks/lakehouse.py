@@ -131,5 +131,15 @@ class LakehouseSink:
         except Exception as exc:  # pragma: no cover - lakehouse runtime failure
             logger.warning("lakehouse append failed: %s", exc)
 
+    def flush_strict(self) -> None:
+        if not self._buffer:
+            return
+        self._ensure_table()
+        import pyarrow as pa
+
+        arrow_table = pa.Table.from_pylist(self._buffer)
+        self._table.append(arrow_table)
+        self._buffer.clear()
+
     def close(self) -> None:
         self.flush()

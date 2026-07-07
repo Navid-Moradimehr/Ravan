@@ -63,9 +63,9 @@ def main() -> None:
         buffer.clear()
         offsets.clear()
 
-        accepted = sink.write_batch(batch)
+        accepted = sink.write_batch_strict(batch)
         logger.debug("fan-out wrote %d events (%d accepted)", len(batch), accepted)
-        sink.flush()
+        sink.flush_strict()
 
         # Commit offsets only after the sink batch succeeded (at-least-once).
         if pending_offsets:

@@ -68,12 +68,14 @@ class KafkaSink:
             self._producer.produce(self._topic, key=key, value=to_json_bytes(event))
             self._pending += 1
             if self._pending >= self._batch_size:
-                self._producer.poll(0)
-                self._pending = 0
+                self.flush()
         return len(events)
 
     def flush(self) -> None:
-        self._producer.poll(0)
+        remaining = self._producer.flush(10)
+        self._pending = int(remaining or 0)
+        if self._pending:
+            raise RuntimeError(f"kafka sink delivery incomplete: {self._pending} messages pending")
 
     def close(self) -> None:
-        self._producer.flush(10)
+        self.flush()

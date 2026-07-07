@@ -77,3 +77,28 @@ def test_runtime_has_single_publish_helper():
     assert not hasattr(runtime, "_publish_kafka_fresh"), (
         "_publish_kafka_fresh duplicate still present"
     )
+
+
+def test_runtime_returns_published_event_id_and_publish_failed_status(monkeypatch):
+    from services.api_service import runtime
+
+    monkeypatch.setattr(runtime, "resolve_kafka_brokers", lambda default="x": "localhost:19092")
+    monkeypatch.setattr(runtime, "_publish_kafka", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+
+    result = runtime._do_ingest_event(
+        {
+            "source_protocol": "api",
+            "source_id": "unit-test",
+            "asset_id": "Pump-01",
+            "tag": "Temperature",
+            "value": 42.0,
+            "quality": "good",
+            "unit": "C",
+            "site": "demo-site",
+            "line": "line-01",
+        }
+    )
+
+    assert result["status"] == "publish_failed"
+    assert result["event_id"]
+    assert "kafka_publish_failed" in result["warning"]

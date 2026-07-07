@@ -7,6 +7,28 @@
 - **Broker**: Kafka KRaft
 - **Historian**: TimescaleDB
 
+## Production And Site Repeatability
+
+- **Date**: 2026-07-07
+- **Scope**: repeated the production-pipeline session benchmark for `python-fallback`, `flink-local`, and `flink-production`, then repeated the site-profile matrix over the two manifest site profiles with 10k events, 256 batch size, zero warmup, and repeat count 3
+
+### Latest Benchmark Run
+
+| Benchmark | Median events/sec | Median p99 ms | Notes |
+|-----------|-------------------|---------------|-------|
+| Production pipeline `python-fallback` repeatability | 42,041.10 | 0.0549 | repeat count 3, baseline 38,355.18 events/sec, delta +9.61% |
+| Production pipeline `flink-local` repeatability | 45,570.07 | 0.0452 | repeat count 3, baseline 51,261.99 events/sec, delta -11.10% |
+| Production pipeline `flink-production` repeatability | 49,472.16 | 0.0516 | repeat count 3, baseline 43,251.30 events/sec, delta +14.38% |
+| Site profile matrix `demo-site` repeatability | 87,300.50 | 0.0281 | repeat count 3, baseline 90,922.74 events/sec, delta -3.98% |
+| Site profile matrix `plant-a` repeatability | 84,941.94 | 0.0291 | repeat count 3, baseline 91,818.77 events/sec, delta -7.49% |
+
+### Interpretation
+
+- The `python-fallback` repeatability pass is still above the saved local baseline, but the p99 is higher than the prior repeatability note on this host.
+- `flink-production` is the fastest of the three production-pipeline modes in this pass, while `flink-local` dipped below the latest recorded local baseline.
+- Both manifest site profiles still pass the repeatability matrix, but the repeated medians and p99s are lower and noisier than the previous local matrix run.
+- These are still single-node local measurements, so they are useful for regression tracking and repeatability, not deployment sizing.
+
 ## Production Pipeline Session Repeatability
 
 - **Date**: 2026-07-05

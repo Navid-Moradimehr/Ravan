@@ -93,6 +93,60 @@ def test_composite_sink_isolates_sink_failure():
     assert accepted == 1  # only the healthy sink accepted
 
 
+def test_composite_sink_strict_write_raises_on_sink_failure():
+    failing = RecordingSink(fail=True)
+    healthy = RecordingSink()
+    composite = CompositeSink([failing, healthy])
+
+    with pytest.raises(RuntimeError):
+        composite.write_batch_strict([{"event_id": "1"}])
+
+    assert healthy.written == [{"event_id": "1"}]
+
+
+def test_composite_sink_strict_write_raises_on_partial_acceptance():
+    class PartialSink(RecordingSink):
+        name = "partial"
+
+        def write_batch(self, events):
+            self.written.extend(events[:1])
+            return 1
+
+    composite = CompositeSink([PartialSink()])
+
+    with pytest.raises(RuntimeError, match="accepted 1/2"):
+        composite.write_batch_strict([{"event_id": "1"}, {"event_id": "2"}])
+
+
+def test_composite_sink_strict_flush_raises_on_failure():
+    class FlushFailSink(RecordingSink):
+        name = "flush-fail"
+
+        def flush(self):
+            raise RuntimeError("flush failed")
+
+    composite = CompositeSink([FlushFailSink()])
+
+    with pytest.raises(RuntimeError, match="flush failed"):
+        composite.flush_strict()
+
+
+def test_composite_sink_strict_flush_uses_sink_strict_hook():
+    class StrictOnlySink(RecordingSink):
+        name = "strict-only"
+
+        def flush(self):
+            self.flushed = True
+
+        def flush_strict(self):
+            raise RuntimeError("strict failure")
+
+    composite = CompositeSink([StrictOnlySink()])
+
+    with pytest.raises(RuntimeError, match="strict failure"):
+        composite.flush_strict()
+
+
 def test_composite_sink_flush_and_close_propagate():
     a = RecordingSink()
     b = RecordingSink()
@@ -181,6 +235,7 @@ def test_historian_sink_falls_back_per_event(monkeypatch):
 def test_kafka_sink_builds_and_writes(monkeypatch):
     """KafkaSink forwards events to a downstream topic using the composite key."""
     produced: list[tuple[str, bytes, bytes]] = []
+    flush_calls = {"n": 0}
 
     class FakeProducer:
         def __init__(self, *a, **k):
@@ -193,6 +248,7 @@ def test_kafka_sink_builds_and_writes(monkeypatch):
             return 0
 
         def flush(self, timeout=None):
+            flush_calls["n"] += 1
             return 0
 
     fake = types.ModuleType("confluent_kafka")
@@ -241,3 +297,31 @@ def test_kafka_sink_builds_and_writes(monkeypatch):
     assert all(topic == "industrial.fanout" for topic, _, _ in produced)
     # Composite key includes the asset, so the two distinct assets differ.
     assert produced[0][1] != produced[1][1]
+    assert flush_calls["n"] >= 2
+
+
+def test_kafka_sink_flush_raises_when_messages_remain(monkeypatch):
+    class FakeProducer:
+        def __init__(self, *a, **k):
+            pass
+
+        def produce(self, *a, **k):
+            pass
+
+        def flush(self, timeout=None):
+            return 1
+
+    fake = types.ModuleType("confluent_kafka")
+    fake.Producer = FakeProducer
+    monkeypatch.setitem(sys.modules, "confluent_kafka", fake)
+
+    import importlib
+
+    from services.sinks import kafka_sink as kafka_sink_mod
+
+    importlib.reload(kafka_sink_mod)
+
+    sink = kafka_sink_mod.KafkaSink(brokers="localhost:19092", topic="industrial.fanout", batch_size=10)
+
+    with pytest.raises(RuntimeError, match="delivery incomplete"):
+        sink.flush()

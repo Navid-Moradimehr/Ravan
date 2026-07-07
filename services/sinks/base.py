@@ -73,12 +73,47 @@ class CompositeSink:
                 logger.warning("sink %s write_batch failed: %s", getattr(sink, "name", sink), exc)
         return accepted
 
+    def write_batch_strict(self, events: list[dict[str, Any]]) -> int:
+        """Write to every configured sink and fail if any endpoint rejects data."""
+        if not events:
+            return 0
+        accepted = 0
+        failures: list[str] = []
+        for sink in self._sinks:
+            sink_name = str(getattr(sink, "name", sink))
+            try:
+                sink_accepted = sink.write_batch(events)
+                accepted += sink_accepted
+                if sink_accepted != len(events):
+                    failures.append(f"{sink_name} accepted {sink_accepted}/{len(events)}")
+            except Exception as exc:
+                failures.append(f"{sink_name}: {exc}")
+        if failures:
+            raise RuntimeError("; ".join(failures))
+        return accepted
+
     def flush(self) -> None:
         for sink in self._sinks:
             try:
                 sink.flush()
             except Exception as exc:  # pragma: no cover
                 logger.warning("sink %s flush failed: %s", getattr(sink, "name", sink), exc)
+
+    def flush_strict(self) -> None:
+        """Flush every configured sink and fail if any endpoint fails."""
+        failures: list[str] = []
+        for sink in self._sinks:
+            sink_name = str(getattr(sink, "name", sink))
+            try:
+                strict_flush = getattr(sink, "flush_strict", None)
+                if callable(strict_flush):
+                    strict_flush()
+                else:
+                    sink.flush()
+            except Exception as exc:
+                failures.append(f"{sink_name}: {exc}")
+        if failures:
+            raise RuntimeError("; ".join(failures))
 
     def close(self) -> None:
         for sink in self._sinks:

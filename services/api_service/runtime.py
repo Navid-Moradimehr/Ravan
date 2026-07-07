@@ -62,7 +62,6 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     }
 
     event_model, dlq = validate_event(payload)
-    event_id = str(_uuid.uuid4())
     if dlq is not None:
         try:
             _publish_kafka(brokers, dlq_topic, str(payload.get("source_id", "api")).encode(), to_json_bytes(dlq))
@@ -129,8 +128,12 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
         _publish_kafka(brokers, normalized_topic, key, normalized_bytes)
         _publish_kafka(brokers, legacy_topic, key, legacy_bytes)
     except Exception as e:
-        return {"status": "stored_only", "event_id": event_id, "warning": f"kafka_publish_failed: {e}"}
-    return {"status": "ingested", "event_id": event_id}
+        return {
+            "status": "publish_failed",
+            "event_id": str(event_dict.get("event_id", payload["event_id"])),
+            "warning": f"kafka_publish_failed: {e}",
+        }
+    return {"status": "ingested", "event_id": str(event_dict.get("event_id", payload["event_id"]))}
 
 
 def _publish_kafka(brokers: str, topic: str, key: bytes, value: bytes) -> None:
