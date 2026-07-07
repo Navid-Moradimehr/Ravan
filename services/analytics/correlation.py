@@ -24,14 +24,12 @@ try:
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
-    logger.warning("pandas not installed. Correlation analysis will be limited.")
 
 try:
     import networkx as nx
     NETWORKX_AVAILABLE = True
 except ImportError:
     NETWORKX_AVAILABLE = False
-    logger.warning("networkx not installed. Graph analysis will be limited.")
 
 try:
     from scipy import stats

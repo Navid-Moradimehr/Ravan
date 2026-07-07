@@ -25,7 +25,6 @@ try:
     APPRISE_AVAILABLE = True
 except ImportError:
     APPRISE_AVAILABLE = False
-    logger.warning("Apprise not installed. Notifications will be logged only.")
 
 
 class NotificationPayload(BaseModel):
