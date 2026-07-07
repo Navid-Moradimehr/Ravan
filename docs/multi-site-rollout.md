@@ -152,6 +152,11 @@ Every site should publish the same baseline operational signals:
 - broker health
 - UI/API health
 
+The current implementation now exposes a read-only `site-observability`
+snapshot through `/api/v1/observability/site`. It reports site health, backup
+readiness, and deployment-mode SLO targets without replacing Prometheus or
+Grafana.
+
 ### Source Isolation
 
 Inside one site, the platform should keep each PLC, gateway, and sensor network separate at the transport and storage boundaries.
@@ -232,6 +237,7 @@ Success criteria:
 
 - a plant operator can tell if the issue is local, site-wide, or central
 - dashboards separate service health from data-path health
+- rollout tooling can inspect the site-observability snapshot during release gates
 
 ### Phase 5: Cross-Site Aggregation
 

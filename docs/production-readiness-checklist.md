@@ -30,6 +30,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Read-only agent infrastructure exists as a foundation.
 - Logical metadata plane snapshot exists and unifies schema, model, prompt, dataset, retrieval, semantic, and lineage metadata without adding a new runtime service.
 - Logical operational-memory snapshot exists and aggregates alerts, annotations, shifts, reports, and backup readiness without adding a MES-like workflow engine.
+- Logical site-observability snapshot exists and reports broker, historian, AI, backup, and API health with SLO targets for each deployment mode.
 - Local Kubernetes rehearsal exists for generated site bundles.
 - The diagnostic/runtime scaffold can be inspected locally through the CLI.
 - Local and site-oriented benchmark harnesses exist.

@@ -26,6 +26,29 @@ summaries behind one read-only inspection surface.
 ### Validation
 - Focused pytest run passed: 18 passed.
 
+## 2026-07-07 - Site Observability Snapshot
+
+Added a read-only site-observability snapshot that pulls together broker,
+historian, AI gateway, backup readiness, and API health into one rollout-facing
+view with deployment-mode SLO targets.
+
+### Added
+1. **Site observability snapshot** (`services/common/site_observability.py`) —
+   logical observability contract for a site.
+2. **Observability API** (`services/api_service/routers/observability.py`) —
+   `/api/v1/observability/site` exposes the snapshot.
+3. **Site observability tests** (`tests/test_site_observability.py`) — verifies
+   snapshot behavior and route exposure.
+
+### Updated
+- `docs/multi-site-rollout.md`
+- `docs/site-observability.md`
+- `docs/production-readiness-checklist.md`
+- `ObsidianVault/20_Architecture/System Architecture.md`
+
+### Validation
+- Focused pytest run passed: 20 passed.
+
 ## 2026-07-07 - Operational Memory Boundary
 
 Added a read-only operational memory snapshot on top of existing alert,

@@ -17,6 +17,8 @@ Postgres --> Debezium --> CDC topics   keyed state + rules            LLM summar
 - Next.js dashboard provides a control-room view over the local platform.
 - The logical metadata plane is read-only and aggregates platform registries and catalogs without creating a new service boundary.
 - Operational memory is read-only for now and exposes alerts, annotations, shifts, reports, and backup readiness without turning the platform into a MES.
+- Site observability is a separate rollout-facing snapshot that reports broker,
+  historian, AI gateway, backup readiness, and API health with SLO targets.
 
 
 ## Normalized Fan-Out Data Flow
