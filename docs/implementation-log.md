@@ -49,6 +49,28 @@ view with deployment-mode SLO targets.
 ### Validation
 - Focused pytest run passed: 20 passed.
 
+## 2026-07-07 - Backup Ownership Contract
+
+Extended the site profile backup policy with explicit backup-owner and
+restore-drill-owner fields and threaded them into backup drill matrix reports
+and release-gate payloads.
+
+### Added
+1. **Backup ownership fields** (`services/common/site_profiles.py`) â€” optional
+   owner metadata on the site backup policy, exported to env and YAML.
+2. **Backup drill report ownership** (`services/cli/datastreamctl.py`) â€” backup
+   drill matrix rows and release-gate payloads now include backup and
+   restore-drill ownership plus cadence details.
+3. **Sample profile updates** (`config/site-profiles/*.yaml`) â€” the built-in
+   site profiles now show how to populate the new ownership fields.
+
+### Updated
+- `docs/multi-site-rollout.md`
+- `docs/production-readiness-checklist.md`
+
+### Validation
+- Focused pytest slices passed: 21 passed in the datastreamctl/site-profile slice and 7 passed in the API/metadata slice.
+
 ## 2026-07-07 - Operational Memory Boundary
 
 Added a read-only operational memory snapshot on top of existing alert,

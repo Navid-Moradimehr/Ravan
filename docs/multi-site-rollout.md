@@ -216,6 +216,13 @@ Operationally, the manifest is now useful in three ways:
 - `datastreamctl project-manifest release-gate` validates the entire fleet topology site by site
 - `datastreamd --project-manifest` can start the runtime for one selected site from the company contract
 
+The site profile contract now makes backup ownership explicit:
+
+- `backups.schedule` is the operator-visible cadence
+- `backups.owner` identifies the team responsible for scheduled backups
+- `backups.restore_drill_owner` identifies the team responsible for restore drills
+- backup drill reports include those fields so release gates can show ownership alongside RTO/RPO timing
+
 Recommended deployment pattern:
 
 - use `flat` for CI artifacts and manual inspection
@@ -268,6 +275,7 @@ Before a production pilot, require:
 - clean install on Windows and Linux
 - documented site configuration bundle
 - documented backup/restore procedure
+- backup cadence and restore-drill ownership per site
 - site-local rollback plan
 - benchmark results on realistic mock data
 - soak tests for ingest, processing, historian, and AI fallback
@@ -283,6 +291,7 @@ Before a production pilot, require:
 - backup/restore workflow for historian state
 - runtime health checks and diagnostics
 - topic and service wiring
+- backup cadence and restore-drill ownership tracking in the site contract and rollout reports
 
 ### User responsibilities
 

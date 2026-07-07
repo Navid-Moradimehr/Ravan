@@ -42,6 +42,8 @@ class BackupPolicy:
     schedule: str
     retention_days: int
     restore_test_database: str | None
+    owner: str = ""
+    restore_drill_owner: str = ""
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,8 @@ class SiteProfile:
             "DATASTREAM_BACKUP_DIR": self.backups.directory,
             "DATASTREAM_BACKUP_SCHEDULE": self.backups.schedule,
             "DATASTREAM_BACKUP_RETENTION_DAYS": str(self.backups.retention_days),
+            "DATASTREAM_BACKUP_OWNER": self.backups.owner,
+            "DATASTREAM_RESTORE_DRILL_OWNER": self.backups.restore_drill_owner,
             "DATASTREAM_FEDERATION_ENABLED": "true" if self.federation.enabled else "false",
             "DATASTREAM_FEDERATION_EXPORT_MODE": self.federation.export_mode,
             "DATASTREAM_CENTRAL_ENDPOINT": self.federation.central_endpoint or "",
@@ -137,6 +141,8 @@ def load_site_profile(path: Path | str) -> SiteProfile:
             schedule=str(backups.get("schedule", "daily")).strip(),
             retention_days=int(backups.get("retention_days", 7)),
             restore_test_database=str(backups.get("restore_test_database")).strip() if backups.get("restore_test_database") else None,
+            owner=str(backups.get("owner", "")).strip(),
+            restore_drill_owner=str(backups.get("restore_drill_owner", "")).strip(),
         ),
         federation=FederationProfile(
             enabled=_as_bool(federation.get("enabled", False)),

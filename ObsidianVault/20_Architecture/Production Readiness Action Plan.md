@@ -24,6 +24,7 @@ This note turns the readiness gap report into a checklist with owners and exit c
 - Restore and rollback drills
   - Owner: Ops / QA
   - Exit: measured restore and rollback timings for at least two site profiles
+  - Ownership: each site profile should declare who owns scheduled backups and who owns restore drills
 - Vendor device validation
   - Owner: Edge / QA
   - Exit: real or near-real PLC/sensor traffic exercises the connectors

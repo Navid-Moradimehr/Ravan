@@ -145,7 +145,13 @@ def _restore_threshold_seconds(deployment_mode: str) -> float:
     return 45.0
 
 
-def _run_backup_drill(backup_dir: str | None, tables: list[str] | None, restore_db: str | None) -> dict[str, Any]:
+def _run_backup_drill(
+    backup_dir: str | None,
+    tables: list[str] | None,
+    restore_db: str | None,
+    *,
+    backup_policy: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     started_at = time.perf_counter()
     before_snapshot = collect_historian_snapshot()
     backup_started_at = time.perf_counter()
@@ -162,6 +168,7 @@ def _run_backup_drill(backup_dir: str | None, tables: list[str] | None, restore_
         "snapshot_comparison": None,
         "restore_elapsed_seconds": None,
         "total_elapsed_seconds": None,
+        "backup_policy": backup_policy or {},
     }
     if result["backup"].get("status") != "success":
         result["total_elapsed_seconds"] = round(time.perf_counter() - started_at, 4)
@@ -193,6 +200,17 @@ def _run_backup_drill_matrix(
         restore_threshold_seconds = _restore_threshold_seconds(profile.deployment_mode)
         backup_threshold_seconds = max(restore_threshold_seconds / 2.0, 10.0)
         drill = _run_backup_drill(profile_backup_dir, tables, profile_restore_db)
+        drill.setdefault(
+            "backup_policy",
+            {
+                "schedule": profile.backups.schedule,
+                "retention_days": profile.backups.retention_days,
+                "owner": profile.backups.owner,
+                "restore_drill_owner": profile.backups.restore_drill_owner,
+                "restore_test_database": profile.backups.restore_test_database,
+                "directory": profile.backups.directory,
+            },
+        )
         backup_elapsed_seconds = float(drill.get("backup_elapsed_seconds") or 0.0)
         restore_elapsed_seconds = float(drill.get("restore_elapsed_seconds") or 0.0)
         snapshot_match = bool(drill.get("snapshot_comparison") and drill["snapshot_comparison"].get("matched"))
@@ -217,6 +235,10 @@ def _run_backup_drill_matrix(
                 "deployment_mode": profile.deployment_mode,
                 "backup_dir": profile_backup_dir,
                 "restore_db": profile_restore_db,
+                "backup_owner": profile.backups.owner,
+                "restore_drill_owner": profile.backups.restore_drill_owner,
+                "backup_schedule": profile.backups.schedule,
+                "backup_retention_days": profile.backups.retention_days,
                 "backup_status": drill["backup"].get("status", "unknown"),
                 "restore_status": drill["restore"].get("status", "skipped") if drill["restore"] else "skipped",
                 "backup_elapsed_seconds": backup_elapsed_seconds,
@@ -370,6 +392,10 @@ def _serialize_local_phase_one_acceptance(backup_result: dict[str, Any], benchma
                 "restore_rto_seconds": backup_run["restore_elapsed_seconds"],
                 "restore_rto_threshold_seconds": restore_rto_threshold_seconds,
                 "restore_rto_passed": restore_rto_passed,
+                "backup_owner": backup_run.get("backup_policy", {}).get("owner", ""),
+                "restore_drill_owner": backup_run.get("backup_policy", {}).get("restore_drill_owner", ""),
+                "backup_schedule": backup_run.get("backup_policy", {}).get("schedule", ""),
+                "backup_retention_days": backup_run.get("backup_policy", {}).get("retention_days", 0),
                 "rpo_seconds": backup_run.get("rpo_seconds", 0.0),
                 "rpo_threshold_seconds": rpo_threshold_seconds,
                 "rpo_passed": rpo_passed,
@@ -500,6 +526,17 @@ def _run_release_gate_for_profile(
     if not skip_backup:
         restore_target = restore_db or profile.backups.restore_test_database
         drill_result = _run_backup_drill(backup_dir or profile.backups.directory, None, restore_target)
+        drill_result.setdefault(
+            "backup_policy",
+            {
+                "schedule": profile.backups.schedule,
+                "retention_days": profile.backups.retention_days,
+                "owner": profile.backups.owner,
+                "restore_drill_owner": profile.backups.restore_drill_owner,
+                "restore_test_database": profile.backups.restore_test_database,
+                "directory": profile.backups.directory,
+            },
+        )
         backup_ok = drill_result["backup"].get("status") == "success"
         restore_ok = drill_result["restore"] is None or drill_result["restore"].get("status") == "success"
         checks.append(("backup drill", backup_ok, drill_result["backup"].get("error", "ok")))
@@ -1018,6 +1055,8 @@ def cmd_backup_drill_matrix(args: argparse.Namespace) -> int:
             print(
                 f"{'':6}{run['site_id']:<18}backup={run['backup_status']:<8} restore={run['restore_status']:<8} "
                 f"backup_s={run['backup_elapsed_seconds']} restore_s={run['restore_elapsed_seconds']} "
+                f"owner={run.get('backup_owner', '') or 'unassigned'} "
+                f"restore_owner={run.get('restore_drill_owner', '') or 'unassigned'} "
                 f"snapshot_match={str(run['snapshot_match']).lower()}"
             )
         if written_reports:

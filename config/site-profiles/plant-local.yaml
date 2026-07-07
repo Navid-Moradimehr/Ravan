@@ -24,6 +24,8 @@ backups:
   schedule: daily
   retention_days: 30
   restore_test_database: stream_engine_restore_plant_a
+  owner: plant-a-ops
+  restore_drill_owner: qa-ops
 
 federation:
   enabled: false
