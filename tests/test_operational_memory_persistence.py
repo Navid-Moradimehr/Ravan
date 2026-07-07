@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import sys
+from types import ModuleType, SimpleNamespace
 
 
 def test_collaboration_store_persists_and_recovers_state(tmp_path, monkeypatch):
@@ -97,3 +99,57 @@ def test_report_templates_path_is_honored_from_env(tmp_path, monkeypatch):
 
     reloaded_again = importlib.reload(reloaded)
     assert any(template["template_id"] == "env-report" for template in reloaded_again.report_engine.list_templates())
+
+
+def test_report_templates_rehydrate_schedules_on_startup(tmp_path, monkeypatch):
+    from services.analytics.reporting import ReportEngine, ReportTemplate
+
+    calls = []
+
+    class DummyJob:
+        def __init__(self, kind: str):
+            self.kind = kind
+            self.at_value = None
+
+        def at(self, value: str):
+            self.at_value = value
+            return self
+
+        def do(self, func, *args, **kwargs):
+            calls.append((self.kind, self.at_value, args, kwargs))
+            return self
+
+    class DummyEvery:
+        @property
+        def day(self):
+            return DummyJob("day")
+
+        @property
+        def hour(self):
+            return DummyJob("hour")
+
+        @property
+        def monday(self):
+            return DummyJob("monday")
+
+    dummy_schedule = ModuleType("schedule")
+    dummy_schedule.every = lambda: DummyEvery()
+    monkeypatch.setitem(sys.modules, "schedule", dummy_schedule)
+    monkeypatch.setattr("services.analytics.reporting.SCHEDULE_AVAILABLE", True)
+
+    template_store = tmp_path / "report-templates-schedule.json"
+    engine = ReportEngine(output_dir=str(tmp_path / "reports"), template_store_path=str(template_store))
+    engine.register_template(
+        ReportTemplate(
+            template_id="scheduled-report",
+            name="Scheduled Report",
+            description="Persistence test",
+            query="SELECT 1",
+            format="json",
+            schedule="daily",
+        )
+    )
+
+    restarted = ReportEngine(output_dir=str(tmp_path / "reports"), template_store_path=str(template_store))
+    assert "scheduled-report" in restarted._scheduled_jobs
+    assert calls

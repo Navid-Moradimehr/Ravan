@@ -68,6 +68,7 @@ class ReportEngine:
         self._scheduled_jobs: dict[str, Any] = {}
         if self._template_store_path and self._template_store_path.exists():
             self._load_templates()
+        self._rehydrate_schedules()
 
     def register_template(self, template: ReportTemplate) -> None:
         """Register a report template."""
@@ -288,6 +289,13 @@ class ReportEngine:
         payload = {"templates": [asdict(t) for t in self._templates.values()]}
         tmp_path.write_text(json.dumps(payload, indent=2, default=str, sort_keys=True), encoding="utf-8")
         tmp_path.replace(self._template_store_path)
+
+    def _rehydrate_schedules(self) -> None:
+        if not SCHEDULE_AVAILABLE:
+            return
+        for template in self._templates.values():
+            if template.enabled and template.schedule:
+                self.schedule_report(template.template_id, template.schedule)
 
 
 # Global report engine

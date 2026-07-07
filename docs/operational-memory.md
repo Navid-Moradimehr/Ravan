@@ -13,7 +13,7 @@ Operational memory is the operator-facing layer for state that is not historian 
 - backup and restore readiness
 
 This layer is read-only in the current release. It is meant to stabilize the contract now so later workflow features can plug into it without changing the platform core.
-The underlying alert, collaboration, and report-template stores can also be made file-backed with opt-in local state paths, so the snapshot can survive restarts in single-node deployments without turning operational memory into a workflow system.
+The underlying alert, collaboration, and report-template stores can also be made file-backed with opt-in local state paths, so the snapshot can survive restarts in single-node deployments without turning operational memory into a workflow system. Report schedules are rehydrated from the persisted template store when the schedule library is available, so recurring exports do not vanish after restart.
 
 ## What It Is Not
 

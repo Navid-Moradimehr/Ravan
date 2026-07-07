@@ -501,6 +501,28 @@ Extended the operational-memory sources so annotations, alert lifecycle state, a
 
 Operational memory is still read-only at the API level. Persisting the underlying operator-facing state keeps restarts from erasing useful context without turning the platform into a workflow/MES system.
 
+## 2026-07-07 - Report Schedule Rehydration
+
+Made persisted report templates restore their recurring schedules on startup when the optional scheduling library is installed.
+
+### What changed
+
+1. **`services/analytics/reporting.py`**
+   - Added schedule rehydration after loading persisted templates.
+   - Replayed daily/hourly/weekly schedules into the existing scheduler when available.
+
+2. **Tests**
+   - Extended `tests/test_operational_memory_persistence.py` with a startup-rehydration test using a fake schedule module.
+
+### Verification
+
+- `uv run pytest tests/test_operational_memory_persistence.py tests/test_operational_memory.py` -> 7 passed
+- `python -m compileall services tests` -> clean
+
+### Why this belongs here
+
+Scheduled exports are part of the report subsystem, not a separate workflow engine. Rehydrating persisted schedules keeps the recurring export behavior restart-safe while staying inside the current architecture.
+
 ## 2026-07-06 - API System Fix 5 (Real Health Probes)
 
 ### Added

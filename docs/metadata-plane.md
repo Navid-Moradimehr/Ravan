@@ -56,6 +56,7 @@ Operational Memory is documented now so future features can fit the same boundar
 
 Operational memory now has a read-only snapshot surface over alerts, annotations, shifts, reports, and backups, but it does not yet own work orders or maintenance workflows.
 The underlying alert, annotation, and report-template stores can be made file-backed for durable local installs, so the snapshot reflects restart-safe operator state without adding an operational workflow engine.
+Report schedules are rehydrated from persisted templates when scheduling support is available, so the release story can keep recurring exports without promoting the feature into a workflow engine.
 
 Lineage is exposed twice on purpose:
 
