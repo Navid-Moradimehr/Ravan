@@ -28,6 +28,8 @@ Keep the current industrial app intact, but project it onto a universal semantic
 - Metadata plane:
   - schema registry, model registry, prompt registry, dataset catalog, retrieval catalog, and semantic-store summaries are exposed through one logical inspection surface
   - metadata is treated as platform memory, separate from historian telemetry and separate from the semantic graph
+- Lineage:
+  - a dedicated read-only `/api/v1/lineage` snapshot exposes an OpenLineage-style view over semantic lineage without moving ownership out of the semantic plane
 - Operational memory:
   - alerts, annotations, OEE shifts, report inventory, and backup readiness are exposed through one read-only operator-state surface
   - work orders, approvals, and maintenance plans remain user-owned until a later phase
@@ -50,3 +52,4 @@ The manufacturing model stays as a domain pack. The platform core should remain 
 - The semantic plane should default to the database backend when the historian is available and fall back to file-backed mode only for offline development.
 - Benchmark tests should validate the real industrial-shaped flows the platform is expected to handle, even when those flows are still simulated locally.
 - Multi-site correlation should be benchmarked as its own workload shape because it stresses both isolation and cross-site reasoning.
+- The dedicated lineage snapshot is an operator-facing projection, not a second lineage store.

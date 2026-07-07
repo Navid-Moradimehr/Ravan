@@ -71,6 +71,24 @@ and release-gate payloads.
 ### Validation
 - Focused pytest slices passed: 21 passed in the datastreamctl/site-profile slice and 7 passed in the API/metadata slice.
 
+## 2026-07-07 - Lineage Snapshot Contract
+
+Added a dedicated read-only lineage snapshot over the existing semantic lineage store without creating a new persistence layer or microservice.
+
+### Added
+1. **Lineage snapshot contract** (`services/common/lineage_contract.py`) â€” builds an OpenLineage-style summary over semantic lineage records with per-kind, per-site, per-dataset, per-model-version, and per-processing-version counts.
+2. **Lineage API** (`services/api_service/routers/lineage.py`) â€” `/api/v1/lineage` returns the read-only snapshot through the existing API service.
+3. **Lineage contract tests** (`tests/test_lineage_contract.py`) â€” verifies the snapshot shape and route exposure.
+
+### Updated
+- `docs/platform-semantic-core.md`
+- `docs/metadata-plane.md`
+- `docs/production-readiness-checklist.md`
+- `ObsidianVault/20_Architecture/Platform Core and Semantic Plane.md`
+
+### Validation
+- Focused pytest run passed: 7 passed.
+
 ## 2026-07-07 - Operational Memory Boundary
 
 Added a read-only operational memory snapshot on top of existing alert,

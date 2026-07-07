@@ -24,6 +24,7 @@ def test_split_domain_routes_registered():
         "/api/v1/metadata",
         "/api/v1/metadata/operational",
         "/api/v1/observability/site",
+        "/api/v1/lineage",
         "/api/v1/search/catalog",
         "/api/v1/search/plan",
         "/api/v1/search/semantic",

@@ -53,13 +53,21 @@ Operational Memory is documented now so future features can fit the same boundar
 
 Operational memory now has a read-only snapshot surface over alerts, annotations, shifts, reports, and backups, but it does not yet own work orders or maintenance workflows.
 
+Lineage is exposed twice on purpose:
+
+- the metadata plane keeps lineage previews and counts as part of platform memory
+- the dedicated `/api/v1/lineage` snapshot gives operators and integrations a normalized read-only lineage view without forcing them through the semantic write API
+
 ## Current Implementation
 
 - `services/common/metadata_plane.py`
 - `services/api_service/routers/metadata.py`
 - `services/common/operational_memory.py`
 - `services/api_service/routers/operational_memory.py`
+- `services/common/lineage_contract.py`
+- `services/api_service/routers/lineage.py`
 - `/api/v1/metadata`
 - `/api/v1/metadata/operational`
+- `/api/v1/lineage`
 
 The implementation aggregates existing registries and catalogs. It does not introduce a second persistence system.

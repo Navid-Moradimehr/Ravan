@@ -8,6 +8,7 @@ The platform now exposes a universal semantic substrate alongside the existing i
 - Ontology packs: a stable platform-core pack plus a manufacturing pack that preserves the current app vocabulary.
 - Semantic projection: the current `Site -> Area -> Line -> Cell -> Asset -> Tag` hierarchy can now be projected into a graph without changing the source model.
 - API surface: `/api/v1/semantic/core` and `/api/v1/semantic/graph`.
+- Dedicated lineage snapshot: `/api/v1/lineage` exposes a read-only OpenLineage-style view over the semantic lineage store.
 - Graph query surface: `/api/v1/semantic/graph/search`, `/api/v1/semantic/graph/entities/{entity_id}`, and `/api/v1/semantic/graph/relationships/{relationship_id}`.
 - Persistent store: the semantic graph now persists to Postgres/Timescale when available, with `data/semantic/semantic-store.json` kept as an offline fallback for tests and local development.
 - Write surface: ontology packs, entities, relationships, documents, workflows, observations, and lineage can be created through the semantic API.
@@ -16,6 +17,7 @@ The platform now exposes a universal semantic substrate alongside the existing i
 - Benchmark: a semantic-store write benchmark that measures persistence throughput separately from read/query paths.
 - Retrieval and modeling context now include semantic-graph documents and ontology-pack context so the AI layer can consume the ontology directly.
 - Logical metadata plane: schema registry, model registry, prompt registry, dataset catalog, retrieval catalog, and semantic-store summaries are exposed through one inspection surface without adding a new microservice.
+- The metadata plane now includes lineage previews, while the dedicated lineage endpoint provides a normalized snapshot for operators and downstream tooling.
 - Operational memory snapshot: alerts, annotations, OEE shifts, reports, and backup readiness are exposed as a logical operator-state surface without turning the platform into a MES.
 
 ## Design Rule
