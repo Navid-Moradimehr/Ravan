@@ -28,6 +28,7 @@ Keep the current industrial app intact, but project it onto a universal semantic
 - Metadata plane:
   - schema registry, model registry, prompt registry, dataset catalog, retrieval catalog, and semantic-store summaries are exposed through one logical inspection surface
   - metadata is treated as platform memory, separate from historian telemetry and separate from the semantic graph
+  - the schema registry now has optional file-backed state for local and release-gate deployments, but it still remains an in-process platform boundary rather than a separate service
 - Lineage:
   - a dedicated read-only `/api/v1/lineage` snapshot exposes an OpenLineage-style view over semantic lineage without moving ownership out of the semantic plane
 - Asset registry and event catalog:
@@ -59,6 +60,7 @@ The manufacturing model stays as a domain pack. The platform core should remain 
 - The digital twin should stay a projection, not the source of truth.
 - Lineage should be recorded at ingest time and when semantic writes happen so AI and simulation can later reconstruct provenance.
 - The semantic plane should default to the database backend when the historian is available and fall back to file-backed mode only for offline development.
+- The schema registry should stay lightweight and in-process, but optional file-backed state is useful for durable single-node installs and repeatable release artifacts.
 - Benchmark tests should validate the real industrial-shaped flows the platform is expected to handle, even when those flows are still simulated locally.
 - Multi-site correlation should be benchmarked as its own workload shape because it stresses both isolation and cross-site reasoning.
 - The dedicated lineage snapshot is an operator-facing projection, not a second lineage store.

@@ -18,7 +18,10 @@ Compatibility modes (standard registry semantics):
 from __future__ import annotations
 
 import datetime
-from dataclasses import dataclass, field
+import json
+import os
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 BACKWARD = "backward"
@@ -54,11 +57,20 @@ class SchemaVersion:
 class SchemaRegistry:
     """In-memory schema registry with version history and compatibility checks."""
 
-    def __init__(self, default_compatibility: str = BACKWARD) -> None:
+    def __init__(
+        self,
+        default_compatibility: str = BACKWARD,
+        state_path: str | os.PathLike[str] | None = None,
+    ) -> None:
         self._schemas: dict[str, list[SchemaVersion]] = {}
         self._compatibility: dict[str, str] = {}
         self._default_compatibility = default_compatibility
-        self._register_defaults()
+        self._state_path = Path(state_path) if state_path else None
+        if self._state_path and self._state_path.exists():
+            self._load_state()
+        else:
+            self._register_defaults()
+            self._persist_state()
 
     def _register_defaults(self) -> None:
         # Bootstrap the base schemas. Each is the first version for its subject,
@@ -100,6 +112,7 @@ class SchemaRegistry:
         if mode not in COMPATIBILITY_MODES:
             raise ValueError(f"unknown compatibility mode: {mode}")
         self._compatibility[schema_id] = mode
+        self._persist_state()
 
     def get_compatibility(self, schema_id: str) -> str:
         return self._compatibility.get(schema_id, self._default_compatibility)
@@ -141,6 +154,7 @@ class SchemaRegistry:
             created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         )
         versions.append(sv)
+        self._persist_state()
         return sv
 
     @staticmethod
@@ -214,6 +228,46 @@ class SchemaRegistry:
                 errors.append(f"Missing required field: {name}")
         return {"valid": len(errors) == 0, "errors": errors}
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "default_compatibility": self._default_compatibility,
+            "compatibility": dict(self._compatibility),
+            "schemas": {
+                schema_id: [version.to_dict() for version in versions]
+                for schema_id, versions in self._schemas.items()
+            },
+        }
+
+    def _load_state(self) -> None:
+        try:
+            payload = json.loads(self._state_path.read_text(encoding="utf-8"))
+        except Exception as exc:  # pragma: no cover - defensive bootstrap path
+            raise ValueError(f"failed to load schema registry state from {self._state_path}") from exc
+
+        self._default_compatibility = payload.get("default_compatibility", self._default_compatibility)
+        self._compatibility = dict(payload.get("compatibility", {}))
+        self._schemas = {}
+        for schema_id, versions in payload.get("schemas", {}).items():
+            self._schemas[schema_id] = [
+                SchemaVersion(
+                    schema_id=item["schema_id"],
+                    version=item["version"],
+                    fields=list(item.get("fields", [])),
+                    created_at=item.get("created_at", ""),
+                )
+                for item in versions
+            ]
+
+    def _persist_state(self) -> None:
+        if not self._state_path:
+            return
+        self._state_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self._state_path.with_suffix(self._state_path.suffix + ".tmp")
+        tmp_path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
+        tmp_path.replace(self._state_path)
+
+
+SCHEMA_REGISTRY_PATH = os.environ.get("SCHEMA_REGISTRY_PATH")
 
 # Global registry
-schema_registry = SchemaRegistry()
+schema_registry = SchemaRegistry(state_path=SCHEMA_REGISTRY_PATH)

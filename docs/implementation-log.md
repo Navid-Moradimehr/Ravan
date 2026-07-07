@@ -378,6 +378,29 @@ full rationale.
 
 - Inspiration source: competitive comparison (pillar 10 - schema registry safe evolution). Compatible with our open-source "validate in app code" stance (ADR 0002) and the in-memory registry; no external registry infrastructure required.
 
+## 2026-07-07 - Schema Registry Persistence Boundary
+
+Made the schema registry optionally file-backed without changing the default single-process behavior.
+
+### What changed
+
+1. **`services/common/schema_registry.py`**
+   - Added optional `state_path` support and `SCHEMA_REGISTRY_PATH` env wiring.
+   - The registry now bootstraps defaults, then persists schema versions and compatibility mode to a JSON state file when configured.
+   - Registry mutations (`register`, `set_compatibility`) now flush state through an atomic temp-file replace.
+
+2. **Tests**
+   - Extended `tests/test_schema_registry_compat.py` with a reload/persistence case that verifies version history and compatibility survive a restart.
+
+### Verification
+
+- `uv run pytest tests/test_schema_registry_compat.py` -> 14 passed
+- `python -m compileall services tests` -> clean
+
+### Why this belongs here
+
+This keeps the schema registry inside the platform core boundary while making it durable enough for release artifacts and local production deployments. It improves compatibility governance without introducing a new service or changing the Kafka-centered architecture.
+
 ## 2026-07-06 - API System Fix 5 (Real Health Probes)
 
 ### Added

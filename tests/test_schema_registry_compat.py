@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from services.common.schema_registry import (
@@ -145,3 +147,23 @@ def test_default_schemas_bootstrap_without_enforcement():
         ),
     )
     assert sv.version == 2
+
+
+def test_schema_registry_persists_and_recovers_state(tmp_path):
+    state_path = tmp_path / "schema-registry.json"
+
+    reg = SchemaRegistry(state_path=state_path)
+    reg.register("custom", _fields(("a", "string", True)), enforce=False)
+    reg.set_compatibility("custom", FULL)
+    reg.register("custom", _fields(("a", "string", True), ("b", "string", False)))
+
+    assert state_path.exists()
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    assert payload["compatibility"]["custom"] == FULL
+    assert payload["schemas"]["custom"][-1]["version"] == 2
+
+    reloaded = SchemaRegistry(state_path=state_path)
+    assert reloaded.get_compatibility("custom") == FULL
+    assert reloaded.get("custom").version == 2
+    assert reloaded.get("custom", 1).fields == _fields(("a", "string", True))
+    assert reloaded.get("industrial_event").version == 1

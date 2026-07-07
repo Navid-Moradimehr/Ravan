@@ -199,7 +199,7 @@ Each phase shipped as one conventional commit with code, tests, implementation-l
 
 After comparing the platform against a similar managed streaming product (`comparission.md`), three app-layer inspirations were implemented (Redpanda intentionally excluded; we use Kafka in KRaft mode). Full evaluation in `ObsidianVault/10_PRD/Competitive Comparison Evaluation.md`:
 
-- [x] **Inspiration 1** — Schema registry compatibility enforcement: `BACKWARD`/`FORWARD`/`FULL`/`NONE` modes on the in-memory registry so breaking schema evolution is rejected at registration time (default `BACKWARD`). 13 tests in `tests/test_schema_registry_compat.py`.
+- [x] **Inspiration 1** — Schema registry compatibility enforcement: `BACKWARD`/`FORWARD`/`FULL`/`NONE` modes on the registry so breaking schema evolution is rejected at registration time (default `BACKWARD`). Optional file-backed state via `SCHEMA_REGISTRY_PATH` keeps compatibility history across restarts. 14 tests in `tests/test_schema_registry_compat.py`.
 - [x] **Inspiration 2** — MQTT QoS, retained availability, and Last-Will support in the edge-ingest connector. Configurable via `MQTT_QOS`, `MQTT_RETAINED`, and `MQTT_WILL_*` env vars. 5 tests in `tests/test_mqtt_qos_will.py`.
 - [x] **Inspiration 3** — Delivery chaos / replay dedup coverage: tests that simulate a mid-batch consumer crash + Kafka redelivery and assert the at-least-once fan-out plus `ON CONFLICT (event_id) DO NOTHING` dedup produces no duplicate historian rows. 3 tests in `tests/test_delivery_chaos.py`.
 

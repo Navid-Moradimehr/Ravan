@@ -27,6 +27,21 @@ Add standard compatibility-mode enforcement on `register()`:
 check (used for the built-in v1 bootstrap). Per-schema mode via
 `set_compatibility`; per-call override via the `compatibility` kwarg.
 
+## Persistence
+
+The registry remains an in-process platform component, but it can now be given
+an optional file path through `SCHEMA_REGISTRY_PATH` so the schema/version
+history survives restarts in single-node or Docker Compose deployments.
+
+This is intentionally lightweight:
+
+- no new metadata database
+- no separate registry service
+- no change to the default in-memory behavior when the path is unset
+
+State is serialized as JSON and written atomically so release-gate artifacts and
+local production installs see the same schema history after a restart.
+
 ## Data flow impact
 
 ```
@@ -49,8 +64,9 @@ operators get safe evolution without deploying Confluent/Apicurio.
 
 ## Tests
 
-`tests/test_schema_registry_compat.py` - 13 cases covering each mode, the
-bypass flag, per-call override, mode validation, and bootstrap behavior.
+`tests/test_schema_registry_compat.py` - 14 cases covering each mode, the
+bypass flag, per-call override, mode validation, bootstrap behavior, and
+optional persistence/reload behavior.
 
 ## Related
 
