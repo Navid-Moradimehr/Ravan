@@ -1,5 +1,31 @@
 # Implementation Log
 
+## 2026-07-07 - Logical Metadata Plane Foundation
+
+Added a lightweight logical metadata plane without introducing a new microservice.
+The change aggregates the existing schema registry, model registry, prompt
+registry, dataset catalog, semantic core, retrieval catalog, and semantic-store
+summaries behind one read-only inspection surface.
+
+### Added
+1. **Metadata plane snapshot** (`services/common/metadata_plane.py`) —
+   logical aggregation of platform knowledge with explicit platform-core vs
+   user-owned boundaries and the three memory layers documented in code.
+2. **Metadata inspection API** (`services/api_service/routers/metadata.py`) —
+   `/api/v1/metadata` exposes the same snapshot through the existing API
+   service.
+3. **Metadata contract tests** (`tests/test_metadata_plane.py`) — verifies the
+   snapshot assembles the current registries and remains read-only.
+
+### Updated
+- `docs/platform-semantic-core.md`
+- `docs/production-readiness-checklist.md`
+- `docs/metadata-plane.md`
+- `ObsidianVault/20_Architecture/Platform Core and Semantic Plane.md`
+
+### Validation
+- Focused pytest run passed: 16 passed.
+
 ## 2026-07-06 - Data Pipeline Integrity Hardening (Audit Findings 1-5)
 
 Implemented the five findings from `docs/data-pipeline-audit-and-plan.md`.

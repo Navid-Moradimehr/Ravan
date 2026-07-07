@@ -15,6 +15,7 @@ Postgres --> Debezium --> CDC topics   keyed state + rules            LLM summar
 - FastAPI AI Gateway owns OpenAI-compatible and open-weight LLM calls with async batching.
 - Prometheus and Grafana expose platform health and latency.
 - Next.js dashboard provides a control-room view over the local platform.
+- The logical metadata plane is read-only and aggregates platform registries and catalogs without creating a new service boundary.
 
 
 ## Normalized Fan-Out Data Flow

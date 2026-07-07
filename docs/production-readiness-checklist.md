@@ -28,6 +28,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Project-manifest rollout acceptance command exists for combined release-gate and benchmark checks.
 - Open-weight and OpenAI-compatible model gateway abstraction exists.
 - Read-only agent infrastructure exists as a foundation.
+- Logical metadata plane snapshot exists and unifies schema, model, prompt, dataset, retrieval, semantic, and lineage metadata without adding a new runtime service.
 - Local Kubernetes rehearsal exists for generated site bundles.
 - The diagnostic/runtime scaffold can be inspected locally through the CLI.
 - Local and site-oriented benchmark harnesses exist.

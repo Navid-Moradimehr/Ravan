@@ -25,6 +25,9 @@ Keep the current industrial app intact, but project it onto a universal semantic
   - semantic store write slice
 - AI context:
   - semantic graph entities, relationships, and ontology packs are now included in retrieval/modeling context packages
+- Metadata plane:
+  - schema registry, model registry, prompt registry, dataset catalog, retrieval catalog, and semantic-store summaries are exposed through one logical inspection surface
+  - metadata is treated as platform memory, separate from historian telemetry and separate from the semantic graph
 - Benchmark realism:
   - benchmark tests now use the mixed industrial CSV fixture and protocol-shaped simulator cases instead of tiny hand-written samples
 - Distributed rollout:
