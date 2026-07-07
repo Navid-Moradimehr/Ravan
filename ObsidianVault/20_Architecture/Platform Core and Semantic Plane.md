@@ -32,6 +32,7 @@ Keep the current industrial app intact, but project it onto a universal semantic
   - the model registry and prompt registry also support optional file-backed state for durable single-node installs, without changing their in-process ownership boundary
   - the dataset catalog also supports optional file-backed state for durable benchmark and release-candidate listings, again without becoming a separate data service
   - the external asset CRUD surface also supports optional file-backed state for user-owned topology edits and tags, but it remains a user-owned boundary rather than a new platform service
+  - the operational-memory backing stores for annotations, alert lifecycle state, and report templates also support optional file-backed state, while the API layer stays read-only
 - Lineage:
   - a dedicated read-only `/api/v1/lineage` snapshot exposes an OpenLineage-style view over semantic lineage without moving ownership out of the semantic plane
 - Asset registry and event catalog:
@@ -67,6 +68,7 @@ The manufacturing model stays as a domain pack. The platform core should remain 
 - The model registry and prompt registry should stay lightweight and in-process, but optional file-backed state is useful for durable single-node installs and repeatable release artifacts.
 - The dataset catalog should stay lightweight and in-process, but optional file-backed state is useful for durable single-node installs and repeatable release artifacts.
 - The asset CRUD surface should stay lightweight and user-owned, but optional file-backed state is useful for durable single-node installs and repeatable release artifacts.
+- The operational-memory backing stores should stay lightweight and user-owned, but optional file-backed state is useful for durable single-node installs and repeatable release artifacts.
 - Benchmark tests should validate the real industrial-shaped flows the platform is expected to handle, even when those flows are still simulated locally.
 - Multi-site correlation should be benchmarked as its own workload shape because it stresses both isolation and cross-site reasoning.
 - The dedicated lineage snapshot is an operator-facing projection, not a second lineage store.

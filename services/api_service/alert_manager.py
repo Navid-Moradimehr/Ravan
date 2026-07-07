@@ -6,8 +6,11 @@ For production, integrate with Prometheus Alertmanager.
 """
 from __future__ import annotations
 
+import json
+import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 try:
@@ -39,9 +42,12 @@ class AlertState:
 class AlertManager:
     """Manage alert lifecycle with acknowledgment workflow."""
 
-    def __init__(self):
+    def __init__(self, state_path: str | os.PathLike[str] | None = None):
+        self._state_path = Path(state_path) if state_path else None
         self._alerts: dict[str, dict[str, Any]] = {}
         self._acknowledgments: list[dict[str, Any]] = []
+        if self._state_path and self._state_path.exists():
+            self._load_state()
 
     def create_alert(
         self,
@@ -72,6 +78,7 @@ class AlertManager:
             "source_event_id": source_event_id,
         }
         self._alerts[alert_id] = alert
+        self._persist_state()
 
         # Send notification via Apprise + webhook
         notifier.notify(NotificationPayload(
@@ -131,6 +138,7 @@ class AlertManager:
             "severity": alert["severity"],
             "note": note,
         })
+        self._persist_state()
 
         return alert
 
@@ -151,6 +159,7 @@ class AlertManager:
             "alert_id": alert_id,
             "reason": reason,
         })
+        self._persist_state()
 
         return alert
 
@@ -178,6 +187,7 @@ class AlertManager:
             "tag": alert["tag"],
             "note": note,
         })
+        self._persist_state()
 
         return alert
 
@@ -237,6 +247,24 @@ class AlertManager:
 
         return round(total_minutes / len(resolved), 2)
 
+    def _load_state(self) -> None:
+        try:
+            payload = json.loads(self._state_path.read_text(encoding="utf-8"))
+        except Exception as exc:  # pragma: no cover - defensive bootstrap path
+            raise ValueError(f"failed to load alert manager state from {self._state_path}") from exc
+        self._alerts = dict(payload.get("alerts", {}))
+        self._acknowledgments = list(payload.get("acknowledgments", []))
+
+    def _persist_state(self) -> None:
+        if not self._state_path:
+            return
+        self._state_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self._state_path.with_suffix(self._state_path.suffix + ".tmp")
+        payload = {"alerts": self._alerts, "acknowledgments": self._acknowledgments}
+        tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        tmp_path.replace(self._state_path)
+
 
 # Global alert manager instance
-alert_manager = AlertManager()
+ALERT_MANAGER_PATH = os.environ.get("ALERT_MANAGER_PATH")
+alert_manager = AlertManager(state_path=ALERT_MANAGER_PATH)

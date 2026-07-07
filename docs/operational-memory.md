@@ -13,6 +13,7 @@ Operational memory is the operator-facing layer for state that is not historian 
 - backup and restore readiness
 
 This layer is read-only in the current release. It is meant to stabilize the contract now so later workflow features can plug into it without changing the platform core.
+The underlying alert, collaboration, and report-template stores can also be made file-backed with opt-in local state paths, so the snapshot can survive restarts in single-node deployments without turning operational memory into a workflow system.
 
 ## What It Is Not
 
@@ -35,4 +36,4 @@ Those remain user-owned until a later phase.
 - `/api/v1/metadata/operational`
 
 The snapshot reuses existing alert, annotation, OEE, report, and backup surfaces.
-
+Those surfaces now have optional file-backed durability hooks for local installs, but the operational-memory API remains a read-only projection over them.

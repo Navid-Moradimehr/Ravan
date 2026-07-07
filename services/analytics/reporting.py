@@ -17,7 +17,7 @@ import io
 import json
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Callable
@@ -56,18 +56,24 @@ class ReportTemplate:
 class ReportEngine:
     """Engine for generating and scheduling reports."""
 
-    def __init__(self, output_dir: str | None = None):
+    def __init__(self, output_dir: str | None = None, template_store_path: str | None = None):
         if output_dir is None:
             output_dir = os.path.join(os.path.dirname(__file__), "..", "..", "reports")
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        if template_store_path is None:
+            template_store_path = os.getenv("REPORT_TEMPLATE_STORE_PATH")
+        self._template_store_path = Path(template_store_path) if template_store_path else None
         self._templates: dict[str, ReportTemplate] = {}
         self._scheduled_jobs: dict[str, Any] = {}
+        if self._template_store_path and self._template_store_path.exists():
+            self._load_templates()
 
     def register_template(self, template: ReportTemplate) -> None:
         """Register a report template."""
         self._templates[template.template_id] = template
         logger.info(f"Registered report template: {template.name}")
+        self._persist_templates()
 
     def generate_report(
         self,
@@ -252,9 +258,41 @@ class ReportEngine:
             ),
         ]
 
+    def _load_templates(self) -> None:
+        try:
+            payload = json.loads(self._template_store_path.read_text(encoding="utf-8"))
+        except Exception as exc:  # pragma: no cover - defensive bootstrap path
+            raise ValueError(f"failed to load report templates from {self._template_store_path}") from exc
+
+        self._templates = {}
+        for item in payload.get("templates", []):
+            template = ReportTemplate(
+                template_id=item["template_id"],
+                name=item["name"],
+                description=item.get("description", ""),
+                query=item.get("query", ""),
+                format=item.get("format", "csv"),
+                schedule=item.get("schedule"),
+                recipients=list(item.get("recipients", [])),
+                enabled=bool(item.get("enabled", True)),
+                last_run=item.get("last_run"),
+                next_run=item.get("next_run"),
+            )
+            self._templates[template.template_id] = template
+
+    def _persist_templates(self) -> None:
+        if not self._template_store_path:
+            return
+        self._template_store_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self._template_store_path.with_suffix(self._template_store_path.suffix + ".tmp")
+        payload = {"templates": [asdict(t) for t in self._templates.values()]}
+        tmp_path.write_text(json.dumps(payload, indent=2, default=str, sort_keys=True), encoding="utf-8")
+        tmp_path.replace(self._template_store_path)
+
 
 # Global report engine
-report_engine = ReportEngine()
+REPORT_TEMPLATE_STORE_PATH = os.getenv("REPORT_TEMPLATE_STORE_PATH")
+report_engine = ReportEngine(template_store_path=REPORT_TEMPLATE_STORE_PATH)
 
 # Load default templates
 for template in report_engine.get_default_templates():

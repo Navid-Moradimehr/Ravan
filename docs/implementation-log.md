@@ -472,6 +472,35 @@ Made the external asset CRUD surface optionally file-backed so user-owned asset 
 
 The asset CRUD surface is user-owned topology state. Keeping it lightweight and file-backed by opt-in preserves the open-source deployment model while preventing user edits from disappearing after a restart.
 
+## 2026-07-07 - Operational Memory Persistence Boundary
+
+Extended the operational-memory sources so annotations, alert lifecycle state, and report templates can persist to local JSON state when configured.
+
+### What changed
+
+1. **`services/api_service/collaboration.py`**
+   - Added optional `COLLABORATION_STORE_PATH` wiring.
+   - Annotation add/delete now persist atomically when the path is configured.
+
+2. **`services/api_service/alert_manager.py`**
+   - Added optional `ALERT_MANAGER_PATH` wiring.
+   - Alert lifecycle mutations now persist alerts and acknowledgment history atomically when configured.
+
+3. **`services/analytics/reporting.py`**
+   - Added optional `REPORT_TEMPLATE_STORE_PATH` wiring for durable report template metadata.
+
+4. **Tests**
+   - Added `tests/test_operational_memory_persistence.py` for reload coverage across all three stores.
+
+### Verification
+
+- `uv run pytest tests/test_operational_memory_persistence.py tests/test_operational_memory.py` -> 6 passed
+- `python -m compileall services tests` -> clean
+
+### Why this belongs here
+
+Operational memory is still read-only at the API level. Persisting the underlying operator-facing state keeps restarts from erasing useful context without turning the platform into a workflow/MES system.
+
 ## 2026-07-06 - API System Fix 5 (Real Health Probes)
 
 ### Added
