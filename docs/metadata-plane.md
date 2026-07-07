@@ -65,6 +65,7 @@ Asset metadata is exposed twice as well:
 
 - the metadata plane keeps the current asset hierarchy as platform knowledge
 - the dedicated `/api/v1/metadata/assets` snapshot gives operators a flattened registry view for validation and rollout checks
+- the external asset CRUD surface now has optional file-backed state via `ASSET_STORE_PATH` or `ASSET_REGISTRY_PATH`, so user edits persist across restarts in single-node installs without turning the asset store into a new service
 
 Governance is also exposed as a lightweight lifecycle snapshot:
 

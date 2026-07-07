@@ -449,6 +449,29 @@ Extended the dataset registry so benchmark and release-candidate catalog entries
 
 The dataset catalog is metadata about available benchmark and validation inputs, not a user data store. Persisting it inside the metadata plane keeps the release story reproducible without introducing a separate catalog service.
 
+## 2026-07-07 - Asset CRUD Persistence Boundary
+
+Made the external asset CRUD surface optionally file-backed so user-owned asset edits and tags survive restart in single-node deployments.
+
+### What changed
+
+1. **`services/assets/model.py`**
+   - Promoted the asset CRUD helpers into the real module used by the router.
+   - Added `AssetNode`, `AssetStore`, and optional `ASSET_STORE_PATH` / `ASSET_REGISTRY_PATH` wiring.
+   - CRUD mutations now persist atomically when a state path is configured.
+
+2. **Tests**
+   - Added `tests/test_asset_store.py` for persistence/reload coverage and router compatibility.
+
+### Verification
+
+- `uv run pytest tests/test_asset_store.py tests/test_metadata_catalogs.py` -> 5 passed
+- `python -m compileall services tests` -> clean
+
+### Why this belongs here
+
+The asset CRUD surface is user-owned topology state. Keeping it lightweight and file-backed by opt-in preserves the open-source deployment model while preventing user edits from disappearing after a restart.
+
 ## 2026-07-06 - API System Fix 5 (Real Health Probes)
 
 ### Added

@@ -17,6 +17,7 @@ The platform now exposes a universal semantic substrate alongside the existing i
 - Benchmark: a semantic-store write benchmark that measures persistence throughput separately from read/query paths.
 - Retrieval and modeling context now include semantic-graph documents and ontology-pack context so the AI layer can consume the ontology directly.
 - Logical metadata plane: schema registry, model registry, prompt registry, dataset catalog, retrieval catalog, and semantic-store summaries are exposed through one inspection surface without adding a new microservice. The registries can also be made file-backed for durable single-node installs without changing the service topology.
+- Asset CRUD now also supports optional file-backed state, which keeps user-owned topology edits durable in single-node installs without changing the semantic-core boundary.
 - The metadata plane now includes lineage previews, while the dedicated lineage endpoint provides a normalized snapshot for operators and downstream tooling.
 - The metadata plane also now includes the asset registry snapshot and canonical event catalog so rollout validation can inspect both configured assets and Kafka contracts from one place.
 - The metadata plane now exposes a lightweight governance snapshot for schema/model/prompt lifecycle without introducing a workflow engine.

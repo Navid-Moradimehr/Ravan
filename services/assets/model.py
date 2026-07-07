@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 from services.common.cache import ttl_cache
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -156,6 +158,153 @@ def load_hierarchy(path: Path | str) -> AssetHierarchy:
         data = yaml.safe_load(f)
     return AssetHierarchy(
         sites={s["id"]: _load_site(s) for s in data.get("sites", [])}
+    )
+
+
+@dataclass
+class AssetNode:
+    id: str
+    name: str
+    type: str
+    parent_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    tags: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.type,
+            "parent_id": self.parent_id,
+            "metadata": self.metadata,
+            "tags": self.tags,
+        }
+
+
+class AssetStore:
+    def __init__(self, state_path: str | os.PathLike[str] | None = None) -> None:
+        self._state_path = Path(state_path) if state_path else None
+        self._assets: dict[str, dict[str, Any]] = {}
+        if self._state_path and self._state_path.exists():
+            self._load_state()
+
+    def add_asset(self, asset: AssetNode) -> None:
+        self._assets[asset.id] = asset.to_dict()
+        self._persist_state()
+
+    def get_asset(self, asset_id: str) -> AssetNode | None:
+        data = self._assets.get(asset_id)
+        if not data:
+            return None
+        return AssetNode(**data)
+
+    def update_asset(self, asset_id: str, **kwargs) -> AssetNode | None:
+        if asset_id not in self._assets:
+            return None
+        self._assets[asset_id].update(kwargs)
+        self._persist_state()
+        return AssetNode(**self._assets[asset_id])
+
+    def delete_asset(self, asset_id: str) -> bool:
+        if asset_id in self._assets:
+            del self._assets[asset_id]
+            self._persist_state()
+            return True
+        return False
+
+    def add_tag_to_asset(
+        self,
+        asset_id: str,
+        tag_id: str,
+        name: str,
+        unit: str,
+        min_val: float,
+        max_val: float,
+        warning_low: float | None = None,
+        warning_high: float | None = None,
+        critical_low: float | None = None,
+        critical_high: float | None = None,
+        sampling_rate_hz: float = 1.0,
+    ) -> dict[str, Any] | None:
+        if asset_id not in self._assets:
+            return None
+        tag = {
+            "id": tag_id,
+            "name": name,
+            "unit": unit,
+            "min": min_val,
+            "max": max_val,
+            "warning_low": warning_low,
+            "warning_high": warning_high,
+            "critical_low": critical_low,
+            "critical_high": critical_high,
+            "sampling_rate_hz": sampling_rate_hz,
+        }
+        self._assets[asset_id]["tags"].append(tag)
+        self._persist_state()
+        return tag
+
+    def _load_state(self) -> None:
+        try:
+            payload = json.loads(self._state_path.read_text(encoding="utf-8"))
+        except Exception as exc:  # pragma: no cover - defensive bootstrap path
+            raise ValueError(f"failed to load asset store state from {self._state_path}") from exc
+        self._assets = dict(payload.get("assets", {}))
+
+    def _persist_state(self) -> None:
+        if not self._state_path:
+            return
+        self._state_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self._state_path.with_suffix(self._state_path.suffix + ".tmp")
+        tmp_path.write_text(json.dumps({"assets": self._assets}, indent=2, sort_keys=True), encoding="utf-8")
+        tmp_path.replace(self._state_path)
+
+
+ASSET_STORE_PATH = os.environ.get("ASSET_STORE_PATH") or os.environ.get("ASSET_REGISTRY_PATH")
+asset_store = AssetStore(state_path=ASSET_STORE_PATH)
+
+
+def add_asset(asset: AssetNode) -> None:
+    asset_store.add_asset(asset)
+
+
+def get_asset(asset_id: str) -> AssetNode | None:
+    return asset_store.get_asset(asset_id)
+
+
+def update_asset(asset_id: str, **kwargs) -> AssetNode | None:
+    return asset_store.update_asset(asset_id, **kwargs)
+
+
+def delete_asset(asset_id: str) -> bool:
+    return asset_store.delete_asset(asset_id)
+
+
+def add_tag_to_asset(
+    asset_id: str,
+    tag_id: str,
+    name: str,
+    unit: str,
+    min_val: float,
+    max_val: float,
+    warning_low: float | None = None,
+    warning_high: float | None = None,
+    critical_low: float | None = None,
+    critical_high: float | None = None,
+    sampling_rate_hz: float = 1.0,
+) -> dict[str, Any] | None:
+    return asset_store.add_tag_to_asset(
+        asset_id=asset_id,
+        tag_id=tag_id,
+        name=name,
+        unit=unit,
+        min_val=min_val,
+        max_val=max_val,
+        warning_low=warning_low,
+        warning_high=warning_high,
+        critical_low=critical_low,
+        critical_high=critical_high,
+        sampling_rate_hz=sampling_rate_hz,
     )
 
 
