@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any, Iterable
 
 
@@ -37,17 +40,28 @@ class ModelRegistry:
     diagnostic or action agents can consume later.
     """
 
-    def __init__(self, bindings: Iterable[ModelBinding] | None = None):
+    def __init__(
+        self,
+        bindings: Iterable[ModelBinding] | None = None,
+        state_path: str | os.PathLike[str] | None = None,
+    ):
         self._bindings: dict[str, ModelBinding] = {}
-        if bindings is None:
+        self._state_path = Path(state_path) if state_path else None
+        if self._state_path and self._state_path.exists():
+            self._load_state()
+        elif bindings is None:
             self._register_defaults()
+            self._persist_state()
         else:
             for binding in bindings:
                 self.register(binding)
+            self._persist_state()
 
     @classmethod
-    def from_env(cls) -> "ModelRegistry":
-        return cls()
+    def from_env(cls, state_path: str | os.PathLike[str] | None = None) -> "ModelRegistry":
+        if state_path is None:
+            state_path = os.getenv("MODEL_REGISTRY_PATH")
+        return cls(state_path=state_path)
 
     @classmethod
     def from_site_profile(cls, profile: Any) -> "ModelRegistry":
@@ -155,6 +169,7 @@ class ModelRegistry:
 
     def register(self, binding: ModelBinding) -> None:
         self._bindings[binding.role] = binding
+        self._persist_state()
 
     def get(self, role: str) -> ModelBinding | None:
         return self._bindings.get(role)
@@ -187,3 +202,33 @@ class ModelRegistry:
             "roles": self.list_bindings(),
             "validation_errors": self.validate(),
         }
+
+    def _load_state(self) -> None:
+        try:
+            payload = json.loads(self._state_path.read_text(encoding="utf-8"))
+        except Exception as exc:  # pragma: no cover - defensive bootstrap path
+            raise ValueError(f"failed to load model registry state from {self._state_path}") from exc
+
+        self._bindings = {}
+        for item in payload.get("bindings", []):
+            binding = ModelBinding(
+                role=item["role"],
+                provider=item.get("provider", ""),
+                endpoint_url=item.get("endpoint_url", ""),
+                model_id=item.get("model_id", ""),
+                request_format=item.get("request_format", "chat"),
+                local_only=bool(item.get("local_only", False)),
+                enabled=bool(item.get("enabled", True)),
+                capabilities=tuple(item.get("capabilities", ())),
+                notes=item.get("notes", ""),
+            )
+            self._bindings[binding.role] = binding
+
+    def _persist_state(self) -> None:
+        if not self._state_path:
+            return
+        self._state_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = self._state_path.with_suffix(self._state_path.suffix + ".tmp")
+        payload = {"bindings": [binding.to_dict() for binding in self._bindings.values()]}
+        tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        tmp_path.replace(self._state_path)

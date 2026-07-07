@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from services.common.agent_tools import build_context_package, tool_registry
 from services.common.agent_runtime import DiagnosticAgentRuntime, build_agent_runtime_contract
-from services.common.modeling import ModelRegistry
+from services.common.modeling import ModelBinding, ModelRegistry
 from services.common.semantic_core import SemanticEntity, SemanticGraph
 from services.common.prompt_registry import prompt_registry
 from services.common.structured_output import validate_industrial_summary
@@ -24,6 +24,75 @@ def test_prompt_registry_renders_industrial_prompt():
     prompt = prompt_registry.render("industrial-summary-v1", batch_json="[]")
     assert "valid JSON" in prompt
     assert "critical_devices" in prompt
+
+
+def test_model_registry_persists_and_recovers_state(tmp_path):
+    state_path = tmp_path / "model-registry.json"
+
+    registry = ModelRegistry(state_path=state_path)
+    registry.register(
+        ModelBinding(
+            role="custom-summary",
+            provider="local",
+            endpoint_url="http://localhost:1234/v1",
+            model_id="demo-model",
+            request_format="chat",
+            local_only=True,
+            enabled=True,
+            capabilities=("llm", "summary"),
+            notes="custom test binding",
+        )
+    )
+
+    reloaded = ModelRegistry(state_path=state_path)
+    assert reloaded.get("custom-summary") is not None
+    assert reloaded.get("custom-summary").model_id == "demo-model"
+    assert reloaded.get("summarization").model_id
+
+
+def test_model_registry_from_env_uses_state_path(monkeypatch, tmp_path):
+    state_path = tmp_path / "model-registry-env.json"
+    monkeypatch.setenv("MODEL_REGISTRY_PATH", str(state_path))
+
+    registry = ModelRegistry.from_env()
+    registry.register(
+        ModelBinding(
+            role="custom-env",
+            provider="local",
+            endpoint_url="http://localhost:1234/v1",
+            model_id="env-model",
+            request_format="chat",
+            local_only=True,
+            enabled=True,
+            capabilities=("llm",),
+        )
+    )
+
+    reloaded = ModelRegistry.from_env()
+    assert reloaded.get("custom-env") is not None
+    assert reloaded.get("custom-env").model_id == "env-model"
+
+
+def test_prompt_registry_persists_and_recovers_state(tmp_path):
+    from services.common.prompt_registry import PromptRegistry, PromptTemplate
+
+    state_path = tmp_path / "prompt-registry.json"
+
+    registry = PromptRegistry(state_path=state_path)
+    registry.register(
+        PromptTemplate(
+            template_id="custom-diagnostic-v1",
+            version="1.0.0",
+            role="diagnostic_agent_readonly",
+            template="Read only: $context_json",
+            output_schema={"type": "object"},
+            notes="test template",
+        )
+    )
+
+    reloaded = PromptRegistry(state_path=state_path)
+    assert reloaded.get("custom-diagnostic-v1") is not None
+    assert reloaded.render("custom-diagnostic-v1", context_json="{}") == "Read only: {}"
 
 
 def test_structured_output_validation_accepts_expected_shape():

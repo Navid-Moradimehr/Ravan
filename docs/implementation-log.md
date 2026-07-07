@@ -401,6 +401,32 @@ Made the schema registry optionally file-backed without changing the default sin
 
 This keeps the schema registry inside the platform core boundary while making it durable enough for release artifacts and local production deployments. It improves compatibility governance without introducing a new service or changing the Kafka-centered architecture.
 
+## 2026-07-07 - Model and Prompt Registry Persistence Boundary
+
+Extended the governance metadata layer so model bindings and prompt templates can persist to local JSON state when configured.
+
+### What changed
+
+1. **`services/common/modeling.py`**
+   - Added optional `state_path` support and `MODEL_REGISTRY_PATH` wiring.
+   - Default role bindings still bootstrap in-process, but custom bindings now survive restart when a path is provided.
+
+2. **`services/common/prompt_registry.py`**
+   - Added optional `state_path` support and `PROMPT_REGISTRY_PATH` wiring.
+   - Prompt templates now persist atomically to JSON when configured.
+
+3. **Tests**
+   - Extended `tests/test_modeling_contracts.py` with registry reload checks for both model and prompt registries.
+
+### Verification
+
+  - `uv run pytest tests/test_schema_registry_compat.py tests/test_modeling_contracts.py` -> 25 passed
+- `python -m compileall services tests` -> clean
+
+### Why this belongs here
+
+Model bindings and prompt templates are governance metadata, not separate runtime services. Keeping them in-process preserves the open-source deployment model while making the metadata plane durable enough for repeatable local production installs.
+
 ## 2026-07-06 - API System Fix 5 (Real Health Probes)
 
 ### Added
