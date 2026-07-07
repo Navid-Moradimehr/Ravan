@@ -35,6 +35,9 @@ def main() -> None:
     batch_size = max(1, int(os.getenv("FANOUT_BATCH_SIZE", "1024")))
     flush_seconds = float(os.getenv("FANOUT_FLUSH_SECONDS", "1.0"))
     progress_every = int(os.getenv("FANOUT_PROGRESS_EVERY", "1000"))
+    # Use latest by default so a restart does not replay the full backlog.
+    # Operators can set FANOUT_AUTO_OFFSET_RESET=earliest for explicit replays.
+    auto_offset_reset = os.getenv("FANOUT_AUTO_OFFSET_RESET", "latest")
     running = True
 
     sink = SinkRegistry.from_env()
@@ -92,7 +95,7 @@ def main() -> None:
         {
             "bootstrap.servers": brokers,
             "group.id": group_id,
-            "auto.offset.reset": os.getenv("FANOUT_AUTO_OFFSET_RESET", "earliest"),
+            "auto.offset.reset": auto_offset_reset,
             "enable.auto.commit": False,
             "enable.auto.offset.store": False,
         }

@@ -998,6 +998,14 @@ def setup_retention_policies() -> None:
                 "processed_events": "asset_id, tag",
                 "ai_enriched": "source, model",
             }
+
+            def _log_policy_message(prefix: str, table: str, exc: psycopg2.Error) -> None:
+                message = str(exc).lower()
+                if "already exists" in message or "already enabled" in message:
+                    logger.debug("%s for %s already exists", prefix, table)
+                else:
+                    logger.warning("%s for %s failed: %s", prefix, table, exc)
+
             for table in ["industrial_events", "processed_events", "ai_enriched"]:
                 try:
                     cur.execute(f"""
@@ -1008,7 +1016,7 @@ def setup_retention_policies() -> None:
                     """)
                     logger.info(f"Compression enabled for {table}")
                 except psycopg2.Error as e:
-                    logger.warning(f"Compression may already be enabled for {table}: {e}")
+                    _log_policy_message("Compression", table, e)
                     conn.rollback()
 
                 # Add compression policy (compress after 7 days)
@@ -1018,7 +1026,7 @@ def setup_retention_policies() -> None:
                     """)
                     logger.info(f"Compression policy added for {table}")
                 except psycopg2.Error as e:
-                    logger.warning(f"Compression policy may already exist for {table}: {e}")
+                    _log_policy_message("Compression policy", table, e)
                     conn.rollback()
 
                 # Add retention policy
@@ -1029,7 +1037,7 @@ def setup_retention_policies() -> None:
                     """)
                     logger.info(f"Retention policy ({retention_days} days) added for {table}")
                 except psycopg2.Error as e:
-                    logger.warning(f"Retention policy may already exist for {table}: {e}")
+                    _log_policy_message("Retention policy", table, e)
                     conn.rollback()
 
         conn.commit()

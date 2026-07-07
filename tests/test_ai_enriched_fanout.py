@@ -137,6 +137,15 @@ def test_ai_enriched_fanout_persists_and_commits(monkeypatch):
     ]
 
 
+def test_ai_enriched_fanout_defaults_to_latest_offset_reset():
+    import inspect
+
+    from services.processor import ai_enriched_fanout as fanout_mod
+
+    source = inspect.getsource(fanout_mod.main)
+    assert 'AI_ENRICHED_AUTO_OFFSET_RESET", "latest"' in source
+
+
 def test_schema_registry_has_processed_and_benchmark_schemas():
     """The registry now governs processed and benchmark schemas separately."""
     from services.common.schema_registry import schema_registry

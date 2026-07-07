@@ -30,6 +30,9 @@ def main() -> None:
     input_topic = os.getenv("AI_ENRICHED_TOPIC", "iot.ai_enriched")
     group_id = os.getenv("AI_ENRICHED_FANOUT_GROUP_ID", "ai-enriched-fanout")
     progress_every = int(os.getenv("AI_ENRICHED_PROGRESS_EVERY", "1000"))
+    # Default to latest so a container restart does not replay the entire topic.
+    # Set AI_ENRICHED_AUTO_OFFSET_RESET=earliest for deliberate reprocessing.
+    auto_offset_reset = os.getenv("AI_ENRICHED_AUTO_OFFSET_RESET", "latest")
     running = True
 
     def stop(_signum: int, _frame: object) -> None:
@@ -43,7 +46,7 @@ def main() -> None:
         {
             "bootstrap.servers": brokers,
             "group.id": group_id,
-            "auto.offset.reset": os.getenv("AI_ENRICHED_AUTO_OFFSET_RESET", "earliest"),
+            "auto.offset.reset": auto_offset_reset,
             "enable.auto.commit": False,
             "enable.auto.offset.store": False,
         }
