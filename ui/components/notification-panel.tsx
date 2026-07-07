@@ -8,21 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatErrorMessage, requestJson } from "@/lib/http";
+import { useToast } from "@/components/toaster";
 
-async function getNotifications() {
-  const response = await fetch("/api/notifications", { cache: "no-store" });
-  if (!response.ok) throw new Error(`Failed: ${response.status}`);
-  return response.json();
+async function getNotifications(): Promise<{ notifications?: Record<string, any> }> {
+  return requestJson<{ notifications?: Record<string, any> }>("/api/notifications");
 }
 
 async function addNotification(config: any) {
-  const response = await fetch("/api/notifications", {
+  return requestJson("/api/notifications", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
   });
-  if (!response.ok) throw new Error(`Failed: ${response.status}`);
-  return response.json();
 }
 
 export function NotificationPanel() {
@@ -30,6 +28,7 @@ export function NotificationPanel() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [slackUrl, setSlackUrl] = useState("");
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const notifications = useQuery({ queryKey: ["notifications"], queryFn: getNotifications });
   const add = useMutation({
     mutationFn: addNotification,
@@ -38,6 +37,18 @@ export function NotificationPanel() {
       setEmail("");
       setWebhookUrl("");
       setSlackUrl("");
+      toast({
+        title: "Notification channel added",
+        description: "The alert destination is now available for alarms and anomalies.",
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Notification failed",
+        description: formatErrorMessage(error, "The notification channel could not be saved."),
+        variant: "error",
+      });
     },
   });
 
@@ -97,6 +108,12 @@ export function NotificationPanel() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {notifications.isError ? (
+          <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-text-primary">
+            {formatErrorMessage(notifications.error, "Notification channels could not be loaded.")}
+          </p>
+        ) : null}
 
         <div className="space-y-2">
           {Object.entries(notifs).map(([id, config]: [string, any]) => (

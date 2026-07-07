@@ -6,6 +6,8 @@ import { Calculator, Plus, Trash2, Save } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatErrorMessage, requestJson } from "@/lib/http";
+import { useToast } from "@/components/toaster";
 
 type KPIFormula = {
   kpi_id: string;
@@ -21,25 +23,19 @@ type KPIFormula = {
 };
 
 async function getKPIs(): Promise<KPIFormula[]> {
-  const res = await fetch("/api/v1/kpis", { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch KPIs");
-  return res.json();
+  return requestJson("/api/v1/kpis");
 }
 
 async function createKPI(kpi: KPIFormula): Promise<{ ok: boolean }> {
-  const res = await fetch("/api/v1/kpis", {
+  return requestJson("/api/v1/kpis", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(kpi),
   });
-  if (!res.ok) throw new Error("Failed to create KPI");
-  return res.json();
 }
 
 async function deleteKPI(kpi_id: string): Promise<{ ok: boolean }> {
-  const res = await fetch(`/api/v1/kpis/${kpi_id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error("Failed to delete KPI");
-  return res.json();
+  return requestJson(`/api/v1/kpis/${kpi_id}`, { method: "DELETE" });
 }
 
 export function KPIBuilder() {
@@ -57,8 +53,43 @@ export function KPIBuilder() {
   });
 
   const query = useQuery({ queryKey: ["kpis"], queryFn: getKPIs });
-  const create = useMutation({ mutationFn: createKPI, onSuccess: () => query.refetch() });
-  const remove = useMutation({ mutationFn: deleteKPI, onSuccess: () => query.refetch() });
+  const { toast } = useToast();
+  const create = useMutation({
+    mutationFn: createKPI,
+    onSuccess: () => {
+      query.refetch();
+      toast({
+        title: "KPI saved",
+        description: "The new KPI definition is available for evaluation.",
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "KPI save failed",
+        description: formatErrorMessage(error, "The KPI could not be saved."),
+        variant: "error",
+      });
+    },
+  });
+  const remove = useMutation({
+    mutationFn: deleteKPI,
+    onSuccess: () => {
+      query.refetch();
+      toast({
+        title: "KPI deleted",
+        description: "The KPI definition was removed.",
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "KPI delete failed",
+        description: formatErrorMessage(error, "The KPI could not be deleted."),
+        variant: "error",
+      });
+    },
+  });
 
   const addTag = useCallback(() => setForm((f) => ({ ...f, input_tags: [...f.input_tags, ""] })), []);
   const removeTag = useCallback((i: number) => setForm((f) => ({ ...f, input_tags: f.input_tags.filter((_, idx) => idx !== i) })), []);
@@ -108,6 +139,11 @@ export function KPIBuilder() {
 
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-text-secondary">Registered KPIs</h4>
+          {query.isError ? (
+            <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-text-primary">
+              {formatErrorMessage(query.error, "KPI definitions could not be loaded.")}
+            </p>
+          ) : null}
           {query.data?.map((kpi) => (
             <div key={kpi.kpi_id} className="flex items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 py-2">
               <div className="space-y-0.5">

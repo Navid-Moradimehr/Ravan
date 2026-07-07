@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { HttpError, readResponseError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -13,15 +14,15 @@ export async function POST(request: Request) {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      const error = await response.text();
-      return NextResponse.json({ error }, { status: response.status });
+      const error = await readResponseError(response);
+      return NextResponse.json({ error: error.message, details: error.details }, { status: error.status });
     }
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 502 }
-    );
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message, details: error.details }, { status: error.status });
+    }
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 502 });
   }
 }

@@ -34,10 +34,13 @@ export function useTelemetryEvents(wsBaseUrl: string = "ws://localhost:8020") {
           setIsConnected(true);
           setError(null);
         },
-        onDisconnect: () => setIsConnected(false),
+        onDisconnect: () => {
+          setIsConnected(false);
+          setError(new Error("Telemetry stream disconnected. Reconnecting in the background."));
+        },
         onError: () => {
           setIsConnected(false);
-          setError(new Error("WebSocket connection failed"));
+          setError(new Error("Telemetry stream failed to connect. Reconnecting in the background."));
         },
       },
       wsBaseUrl

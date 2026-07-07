@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { HttpError, readResponseError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +8,7 @@ const TIMESCALE_API_BASE = process.env.TIMESCALE_API_BASE ?? "http://localhost:8
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init });
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    throw await readResponseError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -59,10 +60,10 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 502 },
-    );
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message, details: error.details }, { status: error.status });
+    }
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 502 });
   }
 }
 
@@ -80,10 +81,10 @@ export async function POST(request: Request) {
       });
       return NextResponse.json(data);
     } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Unknown error" },
-        { status: 502 },
-      );
+      if (error instanceof HttpError) {
+        return NextResponse.json({ error: error.message, details: error.details }, { status: error.status });
+      }
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 502 });
     }
   }
 
@@ -98,11 +99,11 @@ export async function DELETE(request: Request) {
     try {
       const data = await fetchJson<unknown>(`${TIMESCALE_API_BASE}/historian/replay`, { method: "DELETE" });
       return NextResponse.json(data);
-    } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Unknown error" },
-        { status: 502 },
-      );
+  } catch (error) {
+      if (error instanceof HttpError) {
+        return NextResponse.json({ error: error.message, details: error.details }, { status: error.status });
+      }
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 502 });
     }
   }
 

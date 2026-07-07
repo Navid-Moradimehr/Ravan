@@ -8,6 +8,7 @@ import { ObservabilityPanels } from "@/components/observability-panels";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createObservabilityFallback, getObservability } from "@/lib/api";
+import { AlertTriangle } from "lucide-react";
 
 export default function ObservabilityPage() {
   const observability = useQuery({
@@ -36,6 +37,20 @@ export default function ObservabilityPage() {
           <StatCard label="DLQ total" value={String(snapshot.summary.dlq_total ?? 0)} icon={Gauge} tone="error" />
           <StatCard label="Prometheus" value={String(snapshot.prometheus?.status ?? "unknown")} icon={Gauge} tone="info" />
         </section>
+
+        {observability.isError ? (
+          <Card className="app-card overflow-hidden border-warning/30 bg-warning/5">
+            <CardContent className="flex items-start gap-3 p-4">
+              <AlertTriangle className="mt-0.5 size-4 text-warning" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-text-primary">Live observability is degraded</p>
+                <p className="text-sm leading-6 text-text-secondary">
+                  The page is rendering a fallback snapshot because one or more observability sources were unavailable.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <SectionHeader
           title="Observability panels"

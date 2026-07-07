@@ -1,3 +1,5 @@
+import { requestJson } from "@/lib/http";
+
 export type PipelineNode = {
   name: string;
   status: "active" | "starting" | "degraded" | "offline";
@@ -107,11 +109,7 @@ export type ReplayStatus = {
 };
 
 export async function getHistorianEvents(table: string, limit: number = 100): Promise<HistorianEvent[]> {
-  const response = await fetch(`/api/historian/events?table=${encodeURIComponent(table)}&limit=${limit}`, {
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`Historian events request failed: ${response.status}`);
-  return response.json();
+  return requestJson(`/api/historian/events?table=${encodeURIComponent(table)}&limit=${limit}`);
 }
 
 export async function getHistorianTrend(
@@ -119,52 +117,37 @@ export async function getHistorianTrend(
   tag: string,
   hours: number = 1,
 ): Promise<HistorianTrendPoint[]> {
-  const response = await fetch(
+  return requestJson(
     `/api/historian/trend?asset_id=${encodeURIComponent(assetId)}&tag=${encodeURIComponent(tag)}&hours=${hours}`,
-    { cache: "no-store" },
   );
-  if (!response.ok) throw new Error(`Historian trend request failed: ${response.status}`);
-  return response.json();
 }
 
 export async function getAssetHierarchy(): Promise<AssetHierarchyNode[]> {
-  const response = await fetch("/api/historian/assets", { cache: "no-store" });
-  if (!response.ok) throw new Error(`Asset hierarchy request failed: ${response.status}`);
-  return response.json();
+  return requestJson("/api/historian/assets");
 }
 
 export async function getScenarios(): Promise<ScenarioInfo[]> {
-  const response = await fetch("/api/historian/scenarios", { cache: "no-store" });
-  if (!response.ok) throw new Error(`Scenarios request failed: ${response.status}`);
-  return response.json();
+  return requestJson("/api/historian/scenarios");
 }
 
 export async function getAlarms(limit: number = 50): Promise<AlarmEvent[]> {
-  const response = await fetch(`/api/historian/alarms?limit=${limit}`, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Alarms request failed: ${response.status}`);
-  return response.json();
+  return requestJson(`/api/historian/alarms?limit=${limit}`);
 }
 
 export async function getReplayStatus(): Promise<ReplayStatus> {
-  const response = await fetch("/api/historian/replay", { cache: "no-store" });
-  if (!response.ok) throw new Error(`Replay status request failed: ${response.status}`);
-  return response.json();
+  return requestJson("/api/historian/replay");
 }
 
 export async function startReplay(dataset: string, scenario: string): Promise<{ ok: boolean }> {
-  const response = await fetch("/api/historian/replay", {
+  return requestJson("/api/historian/replay", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dataset, scenario }),
   });
-  if (!response.ok) throw new Error(`Start replay request failed: ${response.status}`);
-  return response.json();
 }
 
 export async function stopReplay(): Promise<{ ok: boolean }> {
-  const response = await fetch("/api/historian/replay", { method: "DELETE" });
-  if (!response.ok) throw new Error(`Stop replay request failed: ${response.status}`);
-  return response.json();
+  return requestJson("/api/historian/replay", { method: "DELETE" });
 }
 
 export type HistorianStreamPayload = {
@@ -387,21 +370,9 @@ export function createObservabilityFallback(): ObservabilitySnapshot {
 
 export async function getTelemetry(): Promise<Telemetry> {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-  const response = await fetch(`${baseUrl}/telemetry`, { cache: "no-store" });
-
-  if (!response.ok) {
-    throw new Error(`Telemetry request failed: ${response.status}`);
-  }
-
-  return response.json();
+  return requestJson(`${baseUrl}/telemetry`);
 }
 
 export async function getObservability(): Promise<ObservabilitySnapshot> {
-  const response = await fetch("/api/observability", { cache: "no-store" });
-
-  if (!response.ok) {
-    throw new Error(`Observability request failed: ${response.status}`);
-  }
-
-  return response.json();
+  return requestJson("/api/observability");
 }

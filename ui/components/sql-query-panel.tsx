@@ -7,16 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { formatErrorMessage, requestJson } from "@/lib/http";
+import { useToast } from "@/components/toaster";
 
 // Self-Service BI: run ad-hoc SQL, save queries, export CSV
 async function runQuery(sql: string, params: any[] = []) {
-  const response = await fetch("/api/query", {
+  return requestJson<any[]>("/api/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql, params }),
   });
-  if (!response.ok) throw new Error(`Query failed: ${response.status}`);
-  return response.json();
 }
 
 function downloadCsv(rows: any[], filename: string) {
@@ -44,10 +44,31 @@ function downloadCsv(rows: any[], filename: string) {
 export function SqlQueryPanel() {
   const [sql, setSql] = useState("SELECT * FROM industrial_events ORDER BY time DESC LIMIT 10");
   const [savedQueries, setSavedQueries] = useState<string[]>(["SELECT * FROM industrial_events ORDER BY time DESC LIMIT 10"]);
+  const { toast } = useToast();
   const query = useMutation({ mutationFn: (sql: string) => runQuery(sql) });
 
   const data = query.data ?? [];
   const columns = data.length ? Object.keys(data[0]) : [];
+  const handleRunQuery = useCallback(async () => {
+    if (!savedQueries.includes(sql)) {
+      setSavedQueries((current) => [...current, sql]);
+    }
+
+    try {
+      const rows = await query.mutateAsync(sql);
+      toast({
+        title: "Query completed",
+        description: `${rows.length} rows returned from the historian.`,
+        variant: "success",
+      });
+    } catch (error) {
+      toast({
+        title: "Query failed",
+        description: formatErrorMessage(error, "Unable to execute SQL against the historian."),
+        variant: "error",
+      });
+    }
+  }, [query, savedQueries, sql, toast]);
 
   return (
     <Card className="app-card">
@@ -74,7 +95,7 @@ export function SqlQueryPanel() {
             placeholder="SELECT * FROM industrial_events LIMIT 10"
           />
           <div className="flex items-center gap-2">
-            <Button onClick={() => { if (!savedQueries.includes(sql)) setSavedQueries([...savedQueries, sql]); query.mutate(sql); }} disabled={query.isPending} className="inline-flex items-center gap-2">
+            <Button onClick={handleRunQuery} disabled={query.isPending} className="inline-flex items-center gap-2">
               <Play className="size-4" />
               {query.isPending ? "Running..." : "Run Query"}
             </Button>
@@ -86,6 +107,11 @@ export function SqlQueryPanel() {
             )}
             {query.isError && <Badge variant="outline" className="border-error/30 bg-error/10 text-error">Error</Badge>}
           </div>
+          {query.isError ? (
+            <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-text-primary">
+              {formatErrorMessage(query.error, "The query could not be completed.")}
+            </p>
+          ) : null}
         </div>
 
         {data.length > 0 && (

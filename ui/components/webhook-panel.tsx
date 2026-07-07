@@ -7,38 +7,64 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { formatErrorMessage, requestJson } from "@/lib/http";
+import { useToast } from "@/components/toaster";
 
-async function getWebhooks() {
-  const response = await fetch("/api/webhooks", { cache: "no-store" });
-  if (!response.ok) throw new Error(`Failed: ${response.status}`);
-  return response.json();
+async function getWebhooks(): Promise<{ webhooks?: Record<string, any> }> {
+  return requestJson<{ webhooks?: Record<string, any> }>("/api/webhooks");
 }
 
 async function addWebhook(config: any) {
-  const response = await fetch("/api/webhooks", {
+  return requestJson("/api/webhooks", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
   });
-  if (!response.ok) throw new Error(`Failed: ${response.status}`);
-  return response.json();
 }
 
 async function testWebhook(hookId: string) {
-  const response = await fetch(`/api/webhooks/test/${hookId}`, { method: "POST" });
-  if (!response.ok) throw new Error(`Failed: ${response.status}`);
-  return response.json();
+  return requestJson(`/api/webhooks/test/${hookId}`, { method: "POST" });
 }
 
 export function WebhookPanel() {
   const [url, setUrl] = useState("");
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const webhooks = useQuery({ queryKey: ["webhooks"], queryFn: getWebhooks });
   const add = useMutation({
     mutationFn: addWebhook,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["webhooks"] });
       setUrl("");
+      toast({
+        title: "Webhook added",
+        description: "The destination is now enabled for alarm and anomaly events.",
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Webhook failed",
+        description: formatErrorMessage(error, "The webhook could not be saved."),
+        variant: "error",
+      });
+    },
+  });
+  const test = useMutation({
+    mutationFn: testWebhook,
+    onSuccess: (_, hookId) => {
+      toast({
+        title: "Webhook test sent",
+        description: `A test payload was delivered to ${hookId}.`,
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Webhook test failed",
+        description: formatErrorMessage(error, "The test payload could not be delivered."),
+        variant: "error",
+      });
     },
   });
 
@@ -67,6 +93,12 @@ export function WebhookPanel() {
           </Button>
         </div>
 
+        {webhooks.isError ? (
+          <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-text-primary">
+            {formatErrorMessage(webhooks.error, "Webhook definitions could not be loaded.")}
+          </p>
+        ) : null}
+
         <div className="space-y-2">
           {Object.entries(hooks).map(([id, config]: [string, any]) => (
             <div key={id} className="flex items-center justify-between rounded-lg border border-border-subtle p-3">
@@ -79,7 +111,7 @@ export function WebhookPanel() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" onClick={() => testWebhook(id)}>
+                <Button variant="ghost" size="sm" onClick={() => test.mutate(id)} disabled={test.isPending}>
                   <TestTube className="size-4" />
                 </Button>
                 <Button variant="ghost" size="sm" className="text-error">

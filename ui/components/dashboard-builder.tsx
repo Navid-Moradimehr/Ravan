@@ -31,6 +31,7 @@ export function DashboardBuilder() {
   const [panels, setPanels] = useState<DashboardPanel[]>(defaultPanels);
   const [showAdd, setShowAdd] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -39,6 +40,7 @@ export function DashboardBuilder() {
         setPanels(JSON.parse(saved) as DashboardPanel[]);
       }
     } catch {
+      setStorageWarning("Saved dashboard layout could not be loaded in this browser. The default layout is being used.");
       setPanels(defaultPanels);
     } finally {
       setHydrated(true);
@@ -48,7 +50,12 @@ export function DashboardBuilder() {
   const savePanels = useCallback((next: DashboardPanel[]) => {
     setPanels(next);
     if (hydrated) {
-      localStorage.setItem("dashboard_panels", JSON.stringify(next));
+      try {
+        localStorage.setItem("dashboard_panels", JSON.stringify(next));
+        setStorageWarning(null);
+      } catch {
+        setStorageWarning("Dashboard layout changes could not be saved in this browser.");
+      }
     }
   }, [hydrated]);
 
@@ -98,6 +105,11 @@ export function DashboardBuilder() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
+        {storageWarning ? (
+          <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text-primary">
+            {storageWarning}
+          </p>
+        ) : null}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {panels.map((panel) => (
             <div key={panel.id} className="relative rounded-lg border border-border-subtle p-4 bg-surface-2">

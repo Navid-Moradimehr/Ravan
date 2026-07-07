@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeHistorianStream, subscribeEventsWebSocket, type HistorianStreamPayload } from "@/lib/api";
+import { formatErrorMessage } from "@/lib/http";
+import { useToast } from "@/components/toaster";
 
 function TrendChart({ data }: { data: { time: string; value: number }[] }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
@@ -74,6 +76,7 @@ export function HistorianDashboard() {
   const [selectedScenario, setSelectedScenario] = useState("normal");
   const [selectedDataset, setSelectedDataset] = useState("ai4i");
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // WebSocket-driven state for alarms and events
   const [streamAlarms, setStreamAlarms] = useState<any[]>([]);
@@ -131,8 +134,49 @@ export function HistorianDashboard() {
   const scenariosQuery = useQuery({ queryKey: ["historian", "scenarios"], queryFn: getScenarios });
   const replayQuery = useQuery({ queryKey: ["historian", "replay"], queryFn: getReplayStatus, refetchInterval: 10000 });
 
-  const startReplayMutation = useMutation({ mutationFn: () => startReplay(selectedDataset, selectedScenario), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["historian", "replay"] }); } });
-  const stopReplayMutation = useMutation({ mutationFn: stopReplay, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["historian", "replay"] }); } });
+  const startReplayMutation = useMutation({
+    mutationFn: () => startReplay(selectedDataset, selectedScenario),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["historian", "replay"] });
+      toast({
+        title: "Replay started",
+        description: `Dataset ${selectedDataset} is now replaying scenario ${selectedScenario}.`,
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Replay start failed",
+        description: formatErrorMessage(error, "Replay could not be started."),
+        variant: "error",
+      });
+    },
+  });
+  const stopReplayMutation = useMutation({
+    mutationFn: stopReplay,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["historian", "replay"] });
+      toast({
+        title: "Replay stopped",
+        description: "The ground-truth playback has been halted.",
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Replay stop failed",
+        description: formatErrorMessage(error, "Replay could not be stopped."),
+        variant: "error",
+      });
+    },
+  });
+
+  const queryErrors = [
+    trendQuery.isError ? `Trend: ${formatErrorMessage(trendQuery.error, "Unable to load trend data.")}` : null,
+    assetsQuery.isError ? `Assets: ${formatErrorMessage(assetsQuery.error, "Unable to load the asset hierarchy.")}` : null,
+    scenariosQuery.isError ? `Scenarios: ${formatErrorMessage(scenariosQuery.error, "Unable to load scenarios.")}` : null,
+    replayQuery.isError ? `Replay: ${formatErrorMessage(replayQuery.error, "Unable to load replay status.")}` : null,
+  ].filter((item): item is string => Boolean(item));
 
   const alarmsData = streamAlarms;
   const eventsData = streamEvents;
@@ -140,7 +184,28 @@ export function HistorianDashboard() {
   const isEventsLoading = !isStreamConnected && streamEvents.length === 0;
 
   return (
-    <div className="space-y-5">
+      <div className="space-y-5">
+      {queryErrors.length ? (
+        <Card className="app-card overflow-hidden border-error/30 bg-error/5">
+          <CardHeader className="app-card-header rounded-none border-b border-error/20 px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <AlertTriangle className="size-4 text-error" />
+              Historian data unavailable
+            </CardTitle>
+            <CardDescription className="text-text-secondary">
+              Some live historian views could not be loaded. The rest of the page remains available.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 p-4 text-sm text-text-primary">
+            {queryErrors.map((message) => (
+              <div key={message} className="rounded-lg border border-error/20 bg-background/80 px-3 py-2">
+                {message}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card className="app-card overflow-hidden">
         <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold"><Play className="size-4 text-accent" />Scenario & Replay</CardTitle>
