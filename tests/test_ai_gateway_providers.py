@@ -111,4 +111,7 @@ def test_ai_gateway_enrich_batch_falls_back_on_invalid_json(monkeypatch):
     assert captured["topic"] == gateway.settings.ai_enriched_topic
     assert captured["payload"]["summary"]
     assert captured["payload"]["summary"].count("deterministic_fallback") == 1
+    assert captured["payload"]["event_type"] == "ai.summary.generated"
+    assert captured["payload"]["event_version"] == 1
+    assert captured["payload"]["source_event_ids"]
     assert gateway.service_state.last_error.startswith("LLM fallback active")

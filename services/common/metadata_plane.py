@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from services.common.modeling import ModelRegistry
+from services.common.dataset_builder import build_dataset_builder_snapshot
 from services.common.asset_registry import build_asset_registry_snapshot
 from services.common.event_catalog import build_event_catalog_snapshot
 from services.common.operational_memory import build_operational_memory_snapshot
@@ -54,6 +55,27 @@ SEMANTIC_MEMORY = {
     "sources": ("semantic.core", "semantic.graph", "semantic.ontology_packs", "semantic.lineage"),
 }
 
+DATA_PLANE = {
+    "name": "Data Plane",
+    "description": "Ingestion, Kafka, processing, and storage paths that move operational events through the platform.",
+    "status": "implemented",
+    "sources": ("edge.ingest", "kafka", "runtime.processor", "historian", "lakehouse"),
+}
+
+CONTROL_PLANE = {
+    "name": "Control Plane",
+    "description": "Metadata, schema registry, lineage, catalog, governance, and policy contracts.",
+    "status": "implemented",
+    "sources": ("metadata", "schema registry", "lineage", "event catalog", "dataset builder", "governance"),
+}
+
+INTELLIGENCE_PLANE = {
+    "name": "Intelligence Plane",
+    "description": "AI gateway, retrieval, semantic reasoning, and curated AI outputs.",
+    "status": "implemented",
+    "sources": ("ai gateway", "retrieval", "semantic core", "ai events"),
+}
+
 OPERATIONAL_MEMORY = {
     "name": "Operational Memory",
     "description": "Maintenance, operator actions, shifts, recipes, work orders, approvals, and incident history.",
@@ -100,8 +122,12 @@ def build_metadata_plane_snapshot(
     operational_snapshot = build_operational_memory_snapshot()
     asset_registry = build_asset_registry_snapshot(asset_config=asset_config)
     event_catalog = build_event_catalog_snapshot()
+    dataset_builder = build_dataset_builder_snapshot()
 
     sections = (
+        MetadataPlaneSection(**DATA_PLANE),
+        MetadataPlaneSection(**CONTROL_PLANE),
+        MetadataPlaneSection(**INTELLIGENCE_PLANE),
         MetadataPlaneSection(**HISTORICAL_MEMORY),
         MetadataPlaneSection(**SEMANTIC_MEMORY),
         MetadataPlaneSection(**OPERATIONAL_MEMORY),
@@ -114,6 +140,11 @@ def build_metadata_plane_snapshot(
             "platform_core": list(PLATFORM_CORE_OWNERSHIP),
             "user_owned": list(USER_OWNED_BOUNDARIES),
         },
+        "planes": {
+            "data": DATA_PLANE,
+            "control": CONTROL_PLANE,
+            "intelligence": INTELLIGENCE_PLANE,
+        },
         "memory_layers": [section.to_dict() for section in sections],
         "registries": {
             "asset_registry": asset_registry,
@@ -122,6 +153,7 @@ def build_metadata_plane_snapshot(
             "prompts": prompt_registry.list_templates(),
             "datasets": [dataset.__dict__ for dataset in list_dataset_sources()],
         },
+        "dataset_builder": dataset_builder,
         "catalogs": {
             "semantic_core": build_semantic_core_catalog(),
             "retrieval": build_retrieval_catalog(asset_config=asset_config),
@@ -150,11 +182,14 @@ def build_metadata_plane_snapshot(
             "semantic_store_backend": semantic_snapshot.get("path", ""),
             "asset_registry_entries": asset_registry["entry_count"],
             "event_catalog_topics": event_catalog["counts"]["canonical_topics"],
+            "dataset_builder_contract": dataset_builder["contracts"]["logical_contract"],
         },
         "notes": [
             "Historian answers what happened.",
             "Metadata answers what exists and how it is governed.",
             "Semantic layer answers how things are related.",
+            "The control plane carries contracts and governance, not historian telemetry.",
+            "The intelligence plane consumes curated data and semantic context instead of raw historian tables directly.",
             "Operational memory is documented now but remains largely user-owned in the current release.",
         ],
     }

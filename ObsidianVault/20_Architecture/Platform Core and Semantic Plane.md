@@ -27,6 +27,9 @@ Keep the current industrial app intact, but project it onto a universal semantic
   - semantic graph entities, relationships, and ontology packs are now included in retrieval/modeling context packages
 - Metadata plane:
   - schema registry, model registry, prompt registry, dataset catalog, retrieval catalog, and semantic-store summaries are exposed through one logical inspection surface
+  - the platform is now framed as Data Plane, Control Plane, and Intelligence Plane so future changes stay aligned with the current architecture
+  - the control plane includes the event catalog, lineage, governance, and dataset-builder contract
+  - the intelligence plane includes the AI gateway and versioned AI event outputs
   - metadata is treated as platform memory, separate from historian telemetry and separate from the semantic graph
   - the schema registry now has optional file-backed state for local and release-gate deployments, but it still remains an in-process platform boundary rather than a separate service
   - the model registry and prompt registry also support optional file-backed state for durable single-node installs, without changing their in-process ownership boundary
@@ -78,3 +81,5 @@ The manufacturing model stays as a domain pack. The platform core should remain 
 - The governance snapshot is a lifecycle summary, not a new workflow system.
 - The governance snapshot should also surface agent-governance contracts so future integrations can remain auditable without becoming a built-in autonomous agent platform.
 - The metadata artifact bundle is an archive format, not a new storage engine.
+- AI outputs are first-class Kafka events, so future prediction and recommendation outputs can follow the same path without turning the AI gateway into a dashboard-only side effect.
+- The dataset-builder contract remains logical for now so curated, versioned datasets can be created without exposing raw historian data directly.

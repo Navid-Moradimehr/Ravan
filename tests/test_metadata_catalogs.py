@@ -25,6 +25,10 @@ def test_event_catalog_snapshot_lists_canonical_topics() -> None:
     assert "industrial.normalized" in topic_names
     assert "iot.processed" in topic_names
     assert snapshot["counts"]["canonical_topics"] >= 6
+    assert "industrial" in snapshot["counts"]["categories"]
+    assert "ai" in snapshot["counts"]["categories"]
+    assert snapshot["counts"]["ai_event_contracts"] >= 3
+    assert snapshot["ai_event_contracts"][0]["event_type"] == "ai.summary.generated"
     assert snapshot["project_topics"]
 
 

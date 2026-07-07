@@ -13,9 +13,12 @@ Postgres --> Debezium --> CDC topics   keyed state + rules            LLM summar
 - PyFlink owns the distributed keyed-state runtime path.
 - The Python processor stays available as the local fallback and benchmark harness with the same enrichment contract.
 - FastAPI AI Gateway owns OpenAI-compatible and open-weight LLM calls with async batching.
+- AI outputs are versioned Kafka events, not dashboard-only side effects.
 - Prometheus and Grafana expose platform health and latency.
 - Next.js dashboard provides a control-room view over the local platform.
 - The logical metadata plane is read-only and aggregates platform registries and catalogs without creating a new service boundary.
+- The control plane is the logical boundary for metadata, schema, lineage, governance, and dataset-builder contracts.
+- The intelligence plane is the logical boundary for AI summaries, predictions, retrieval, and future recommendation events.
 - The dedicated lineage snapshot is a read-only projection over semantic lineage, kept separate from the semantic write path.
 - Asset registry and event catalog snapshots are also read-only projections, not separate databases or services.
 - The governance snapshot stays read-only and summarizes lifecycle readiness without creating a workflow engine.
@@ -68,7 +71,7 @@ endpoint datasets so the open-source platform can target different endpoints
 ## AI-Enriched Persistence
 
 The AI gateway consumes `iot.processed`, enriches batches via the LLM, and
-produces `iot.ai_enriched`. The `ai_enriched_fanout` consumer
+produces `iot.ai_enriched` as a versioned AI event. The `ai_enriched_fanout` consumer
 (`services/processor/ai_enriched_fanout.py`) persists those summaries to the
 historian `ai_enriched` table with at-least-once delivery, so the gateway stays
 decoupled from the endpoint dataset.

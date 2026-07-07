@@ -18,8 +18,15 @@ The metadata plane is the single inspection surface for platform knowledge:
 - event catalog
 - governance snapshot
 - operational memory snapshot
+- dataset-builder contract
 
 It is intentionally read-only for now.
+
+## Logical Planes
+
+- Data Plane: ingestion, Kafka, processing, historian writes, and optional lakehouse sinks.
+- Control Plane: metadata, schema registry, lineage, event catalog, governance, and dataset-builder contracts.
+- Intelligence Plane: AI gateway, retrieval, semantic layer, and versioned AI outputs.
 
 ## Ownership Boundaries
 
@@ -90,6 +97,7 @@ Governance is also exposed as a lightweight lifecycle snapshot:
 - `services/common/governance_plane.py`
 - `services/api_service/routers/governance.py`
 - `services/common/metadata_artifacts.py`
+- `services/common/dataset_builder.py`
 - `/api/v1/metadata`
 - `/api/v1/metadata/operational`
 - `/api/v1/metadata/assets`
@@ -102,4 +110,5 @@ The logical metadata plane can be persisted as JSON artifacts for release gates 
 The schema registry now also has optional file-backed state via `SCHEMA_REGISTRY_PATH`, so compatibility history can survive process restarts without adding a new metadata service.
 The model registry and prompt registry now also support optional file-backed state through `MODEL_REGISTRY_PATH` and `PROMPT_REGISTRY_PATH`, which keeps AI role bindings and prompt templates durable in single-node and Docker Compose installs.
 The dataset catalog now also supports optional file-backed state through `DATASET_CATALOG_PATH`, so benchmark and release-candidate dataset listings can remain stable across restarts without becoming a separate data-service boundary.
+The dataset-builder contract is still logical only; it describes how curated, versioned datasets should be created for AI, benchmarking, and replay without exposing raw historian data directly.
 The implementation aggregates existing registries and catalogs. It does not introduce a second persistence system.

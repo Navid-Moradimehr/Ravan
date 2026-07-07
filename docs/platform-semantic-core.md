@@ -17,6 +17,9 @@ The platform now exposes a universal semantic substrate alongside the existing i
 - Benchmark: a semantic-store write benchmark that measures persistence throughput separately from read/query paths.
 - Retrieval and modeling context now include semantic-graph documents and ontology-pack context so the AI layer can consume the ontology directly.
 - Logical metadata plane: schema registry, model registry, prompt registry, dataset catalog, retrieval catalog, and semantic-store summaries are exposed through one inspection surface without adding a new microservice. The registries can also be made file-backed for durable single-node installs without changing the service topology.
+  - the platform is now framed as Data Plane, Control Plane, and Intelligence Plane so future changes stay aligned with the current architecture
+  - the control plane includes the event catalog, lineage, governance, and dataset-builder contract
+  - the intelligence plane includes the AI gateway and versioned AI event outputs
 - Asset CRUD now also supports optional file-backed state, which keeps user-owned topology edits durable in single-node installs without changing the semantic-core boundary.
 - The metadata plane now includes lineage previews, while the dedicated lineage endpoint provides a normalized snapshot for operators and downstream tooling.
 - The metadata plane also now includes the asset registry snapshot and canonical event catalog so rollout validation can inspect both configured assets and Kafka contracts from one place.
@@ -37,3 +40,5 @@ Operational memory is separate again: it answers what the operator is dealing wi
 - Existing industrial functionality remains intact.
 - The digital twin is still a projection layer, not the semantic source of truth.
 - The semantic graph is the first step toward a knowledge-graph backbone for future AI, simulation, and reasoning workloads.
+- AI outputs are first-class Kafka events, so future prediction and recommendation outputs can follow the same path without turning the AI gateway into a dashboard-only side effect.
+- The dataset-builder contract remains logical for now so curated, versioned datasets can be created without exposing raw historian data directly.

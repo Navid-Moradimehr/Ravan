@@ -207,6 +207,7 @@ This turns machine events into human-readable operational context.
 **Main outputs**
 
 - `iot.ai_enriched`
+- versioned AI summary events with source IDs, prompt version, model version, and batch metadata
 - natural-language summaries
 - latency and batch metrics
 
@@ -215,12 +216,14 @@ This turns machine events into human-readable operational context.
 - keeps the pipeline running even when AI is down
 - adds operator-friendly context instead of only raw metrics
 - works with local or remote OpenAI-compatible endpoints and local open-weight model servers
+- publishes AI summaries back into Kafka so downstream consumers can replay, archive, or benchmark the AI layer independently of the UI
 
 **How users interact with it**
 
 - operators read summaries in the UI
 - admins configure model endpoints and keys
 - developers can point it to LM Studio, Ollama, vLLM, TGI, llama.cpp, Triton, or cloud APIs
+- future prediction and recommendation outputs can follow the same event contract
 
 ### 6) Historian
 

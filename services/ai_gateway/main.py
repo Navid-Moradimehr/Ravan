@@ -21,6 +21,8 @@ from services.ai_gateway.providers import (
     build_fallback_summary,
     build_industrial_prompt,
 )
+from services.common.ai_event_contract import build_ai_summary_event, DEFAULT_AI_PROMPT_TEMPLATE_ID
+from services.common.prompt_registry import prompt_registry
 from services.common.structured_output import validate_industrial_summary
 from services.common.service_health import ServiceHealthState
 from services.common.runtime_metrics import set_consumer_lag
@@ -287,6 +289,8 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
     started = time.monotonic()
     content: str | None = None
     used_fallback = False
+    prompt_template = prompt_registry.get(DEFAULT_AI_PROMPT_TEMPLATE_ID)
+    prompt_version = prompt_template.version if prompt_template is not None else "1.0.0"
     try:
         content = await llm_client.summarize(prompt, settings.llm_timeout_seconds)
         valid, errors, _payload = validate_industrial_summary(content)
@@ -316,16 +320,17 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
     if content is None:
         return False
 
-    enriched_payload = {
-        "source": "ai-gateway",
-        "provider": settings.llm_provider,
-        "model": settings.llm_model_id,
-        "endpoint": settings.llm_endpoint_url,
-        "batch_size": len(payloads),
-        "summary": content,
-        "events": payloads,
-        "latency_seconds": round(time.monotonic() - started, 3),
-    }
+    enriched_payload = build_ai_summary_event(
+        payloads,
+        summary=content,
+        provider=settings.llm_provider,
+        model_id=settings.llm_model_id,
+        endpoint=settings.llm_endpoint_url,
+        prompt_template_id=DEFAULT_AI_PROMPT_TEMPLATE_ID,
+        prompt_version=prompt_version,
+        used_fallback=used_fallback,
+        latency_seconds=time.monotonic() - started,
+    )
     producer.produce(settings.ai_enriched_topic, value=json.dumps(enriched_payload).encode("utf-8"))
     producer.poll(0)
     enriched_events.inc()

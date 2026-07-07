@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from services.common.ai_event_contract import AI_EVENT_CONTRACTS
 from services.common.project_manifest import load_project_manifest
 
 
@@ -13,6 +14,7 @@ class EventCatalogEntry:
     topic: str
     stage: str
     description: str
+    category: str = "industrial"
     owner: str = "platform"
     producers: tuple[str, ...] = field(default_factory=tuple)
     consumers: tuple[str, ...] = field(default_factory=tuple)
@@ -28,6 +30,7 @@ CANONICAL_EVENT_TOPICS: tuple[EventCatalogEntry, ...] = (
         topic="industrial.raw",
         stage="raw",
         description="Unvalidated industrial envelopes from edge adapters.",
+        category="industrial",
         producers=("edge.ingest", "rest.ingest"),
         consumers=("validation", "normalization"),
         site_scoped=True,
@@ -37,6 +40,7 @@ CANONICAL_EVENT_TOPICS: tuple[EventCatalogEntry, ...] = (
         topic="industrial.normalized",
         stage="normalized",
         description="Validated canonical industrial events ready for fan-out and processing.",
+        category="industrial",
         producers=("validation", "normalization"),
         consumers=("historian.sink", "runtime.processor", "flink.job", "semantic.lineage"),
         site_scoped=True,
@@ -46,6 +50,7 @@ CANONICAL_EVENT_TOPICS: tuple[EventCatalogEntry, ...] = (
         topic="industrial.dlq",
         stage="dlq",
         description="Rejected or oversized industrial events requiring operator review.",
+        category="industrial",
         producers=("validation", "edge.ingest", "rest.ingest"),
         consumers=("dlq.review", "replay", "operations"),
         site_scoped=True,
@@ -55,6 +60,7 @@ CANONICAL_EVENT_TOPICS: tuple[EventCatalogEntry, ...] = (
         topic="iot.raw",
         stage="compatibility",
         description="Legacy compatibility stream for older processor contracts.",
+        category="industrial",
         producers=("edge.ingest",),
         consumers=("runtime.processor", "flink.job"),
         site_scoped=True,
@@ -64,6 +70,7 @@ CANONICAL_EVENT_TOPICS: tuple[EventCatalogEntry, ...] = (
         topic="iot.processed",
         stage="processed",
         description="Windowed and scored telemetry produced by stream processing.",
+        category="industrial",
         producers=("runtime.processor", "flink.job"),
         consumers=("ai.gateway", "historian.fanout", "dashboard"),
         site_scoped=True,
@@ -72,7 +79,8 @@ CANONICAL_EVENT_TOPICS: tuple[EventCatalogEntry, ...] = (
     EventCatalogEntry(
         topic="iot.ai_enriched",
         stage="enriched",
-        description="LLM-enriched summaries and annotations for downstream operators.",
+        description="Versioned AI summaries and annotations for downstream operators.",
+        category="ai",
         producers=("ai.gateway",),
         consumers=("ai.fanout", "historian.ai_enriched", "dashboard"),
         site_scoped=True,
@@ -111,12 +119,15 @@ def build_event_catalog_snapshot(
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "canonical_topics": [entry.to_dict() for entry in CANONICAL_EVENT_TOPICS],
+        "ai_event_contracts": [contract.to_dict() for contract in AI_EVENT_CONTRACTS],
         "project_topics": manifest_topics,
         "topic_names": manifest_topic_names,
         "counts": {
             "canonical_topics": len(CANONICAL_EVENT_TOPICS),
+            "ai_event_contracts": len(AI_EVENT_CONTRACTS),
             "project_topics": len(manifest_topics),
             "site_scoped_topics": sum(1 for topic in CANONICAL_EVENT_TOPICS if topic.site_scoped),
+            "categories": sorted({topic.category for topic in CANONICAL_EVENT_TOPICS}),
         },
         "contracts": {
             "logical_catalog": True,

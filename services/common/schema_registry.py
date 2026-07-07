@@ -107,6 +107,38 @@ class SchemaRegistry:
             {"name": "ground_truth_severity", "type": "string", "required": False},
             {"name": "step", "type": "int", "required": False},
         ])
+        self._register_ai_event_schemas()
+
+    def _register_ai_event_schemas(self) -> None:
+        ai_common_fields = [
+            {"name": "event_id", "type": "string", "required": True},
+            {"name": "event_type", "type": "string", "required": True},
+            {"name": "event_version", "type": "int", "required": True},
+            {"name": "generated_at", "type": "datetime", "required": True},
+            {"name": "provider", "type": "string", "required": True},
+            {"name": "model_id", "type": "string", "required": True},
+            {"name": "model_version", "type": "string", "required": True},
+            {"name": "prompt_template_id", "type": "string", "required": True},
+            {"name": "prompt_version", "type": "string", "required": True},
+            {"name": "source_event_ids", "type": "array", "required": True},
+            {"name": "source_event_count", "type": "int", "required": True},
+            {"name": "batch_size", "type": "int", "required": True},
+            {"name": "severity_counts", "type": "object", "required": False},
+        ]
+        self.register("ai_summary_event", [
+            *ai_common_fields,
+            {"name": "summary", "type": "string", "required": True},
+        ])
+        self.register("ai_prediction_event", [
+            *ai_common_fields,
+            {"name": "predictions", "type": "array", "required": True},
+            {"name": "confidence", "type": "float", "required": False},
+        ])
+        self.register("ai_recommendation_event", [
+            *ai_common_fields,
+            {"name": "recommendations", "type": "array", "required": True},
+            {"name": "confidence", "type": "float", "required": False},
+        ])
 
     def set_compatibility(self, schema_id: str, mode: str) -> None:
         if mode not in COMPATIBILITY_MODES:

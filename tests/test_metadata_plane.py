@@ -24,6 +24,10 @@ def test_metadata_plane_snapshot_aggregates_existing_registries(tmp_path) -> Non
     assert any(binding["role"] == "summarization" for binding in registries["models"]["roles"])
     assert registries["prompts"]
     assert registries["datasets"]
+    assert snapshot["planes"]["data"]["name"] == "Data Plane"
+    assert snapshot["planes"]["control"]["name"] == "Control Plane"
+    assert snapshot["planes"]["intelligence"]["name"] == "Intelligence Plane"
+    assert snapshot["dataset_builder"]["contracts"]["logical_contract"] is True
 
     assert snapshot["catalogs"]["semantic_core"]["platform_primitives"]
     assert snapshot["catalogs"]["retrieval"]["sources"]
@@ -46,3 +50,4 @@ def test_metadata_plane_api_route_returns_snapshot(tmp_path, monkeypatch) -> Non
     assert body["plane"] == "logical-metadata-plane"
     assert body["semantic_store"]["lineage_count"] >= 0
     assert body["contracts"]["metadata_is_logical"] is True
+    assert body["dataset_builder"]["contracts"]["logical_contract"] is True
