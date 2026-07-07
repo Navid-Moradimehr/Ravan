@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from services.common.modeling import ModelRegistry
+from services.common.operational_memory import build_operational_memory_snapshot
 from services.common.prompt_registry import prompt_registry
 from services.common.retrieval import build_retrieval_catalog
 from services.common.schema_registry import schema_registry
@@ -94,6 +95,7 @@ def build_metadata_plane_snapshot(
     lineage = list(semantic_snapshot.get("lineage", []))
     model_registry = _model_registry_for(site_profile_path)
     schema_summaries = schema_registry.list_schemas()
+    operational_snapshot = build_operational_memory_snapshot()
 
     sections = (
         MetadataPlaneSection(**HISTORICAL_MEMORY),
@@ -126,6 +128,15 @@ def build_metadata_plane_snapshot(
             "lineage_count": len(lineage),
             "recent_lineage": lineage[:10],
         },
+        "operational_memory": {
+            "sections": operational_snapshot["sections"],
+            "alerts": operational_snapshot["alerts"],
+            "annotations_count": len(operational_snapshot["annotations"]),
+            "shifts": operational_snapshot["shifts"],
+            "reports": operational_snapshot["reports"],
+            "backups": operational_snapshot["backups"],
+            "contracts": operational_snapshot["contracts"],
+        },
         "contracts": {
             "schema_compatibility_modes": sorted({schema["compatibility"] for schema in schema_summaries}),
             "metadata_is_read_only": True,
@@ -139,4 +150,3 @@ def build_metadata_plane_snapshot(
             "Operational memory is documented now but remains largely user-owned in the current release.",
         ],
     }
-

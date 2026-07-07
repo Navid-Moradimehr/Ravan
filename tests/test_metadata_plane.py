@@ -27,6 +27,7 @@ def test_metadata_plane_snapshot_aggregates_existing_registries(tmp_path) -> Non
     assert snapshot["catalogs"]["semantic_core"]["platform_primitives"]
     assert snapshot["catalogs"]["retrieval"]["sources"]
     assert snapshot["semantic_store"]["ontology_pack_count"] >= 1
+    assert snapshot["operational_memory"]["alerts"]["statistics"]["total_alerts"] >= 0
     assert snapshot["contracts"]["metadata_is_read_only"] is True
 
 
@@ -43,4 +44,3 @@ def test_metadata_plane_api_route_returns_snapshot(tmp_path, monkeypatch) -> Non
     assert body["plane"] == "logical-metadata-plane"
     assert body["semantic_store"]["lineage_count"] >= 0
     assert body["contracts"]["metadata_is_logical"] is True
-

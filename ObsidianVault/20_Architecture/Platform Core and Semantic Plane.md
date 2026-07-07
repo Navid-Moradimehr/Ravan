@@ -28,6 +28,9 @@ Keep the current industrial app intact, but project it onto a universal semantic
 - Metadata plane:
   - schema registry, model registry, prompt registry, dataset catalog, retrieval catalog, and semantic-store summaries are exposed through one logical inspection surface
   - metadata is treated as platform memory, separate from historian telemetry and separate from the semantic graph
+- Operational memory:
+  - alerts, annotations, OEE shifts, report inventory, and backup readiness are exposed through one read-only operator-state surface
+  - work orders, approvals, and maintenance plans remain user-owned until a later phase
 - Benchmark realism:
   - benchmark tests now use the mixed industrial CSV fixture and protocol-shaped simulator cases instead of tiny hand-written samples
 - Distributed rollout:

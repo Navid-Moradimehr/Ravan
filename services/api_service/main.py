@@ -223,6 +223,7 @@ from services.api_service.routers.modeling import router as modeling_router
 from services.api_service.routers.search import router as search_router
 from services.api_service.routers.retrieval import router as retrieval_router
 from services.api_service.routers.metadata import router as metadata_router
+from services.api_service.routers.operational_memory import router as operational_memory_router
 from services.api_service.routers.semantic import router as semantic_router
 from services.api_service.routers.external import router as external_router
 from services.api_service.routers.support import router as support_router
@@ -236,6 +237,7 @@ app.include_router(modeling_router)
 app.include_router(search_router)
 app.include_router(retrieval_router)
 app.include_router(metadata_router)
+app.include_router(operational_memory_router)
 app.include_router(semantic_router)
 app.include_router(external_router)
 app.include_router(support_router)

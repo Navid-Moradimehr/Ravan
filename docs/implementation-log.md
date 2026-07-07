@@ -24,7 +24,34 @@ summaries behind one read-only inspection surface.
 - `ObsidianVault/20_Architecture/Platform Core and Semantic Plane.md`
 
 ### Validation
-- Focused pytest run passed: 16 passed.
+- Focused pytest run passed: 18 passed.
+
+## 2026-07-07 - Operational Memory Boundary
+
+Added a read-only operational memory snapshot on top of existing alert,
+annotation, OEE, report, and backup surfaces. This keeps operational context
+visible without promoting maintenance/work-order workflows into the platform
+core yet.
+
+### Added
+1. **Operational memory snapshot** (`services/common/operational_memory.py`) —
+   aggregates alerts, annotations, shift windows, report inventory, and backup
+   readiness into one operator-state view.
+2. **Operational memory API** (`services/api_service/routers/operational_memory.py`)
+   — `/api/v1/metadata/operational` exposes the snapshot.
+3. **Operational memory tests** (`tests/test_operational_memory.py`) — verifies
+   the snapshot and route remain read-only and contract-stable.
+
+### Updated
+- `docs/metadata-plane.md`
+- `docs/operational-memory.md`
+- `docs/platform-semantic-core.md`
+- `docs/production-readiness-checklist.md`
+- `ObsidianVault/20_Architecture/Platform Core and Semantic Plane.md`
+- `ObsidianVault/20_Architecture/System Architecture.md`
+
+### Validation
+- Focused pytest run passed: 18 passed.
 
 ## 2026-07-06 - Data Pipeline Integrity Hardening (Audit Findings 1-5)
 

@@ -14,6 +14,7 @@ The metadata plane is the single inspection surface for platform knowledge:
 - semantic core
 - semantic store summaries
 - lineage previews
+- operational memory snapshot
 
 It is intentionally read-only for now.
 
@@ -50,10 +51,15 @@ Users own:
 
 Operational Memory is documented now so future features can fit the same boundary, but it is still largely user-owned in the current release.
 
+Operational memory now has a read-only snapshot surface over alerts, annotations, shifts, reports, and backups, but it does not yet own work orders or maintenance workflows.
+
 ## Current Implementation
 
 - `services/common/metadata_plane.py`
 - `services/api_service/routers/metadata.py`
+- `services/common/operational_memory.py`
+- `services/api_service/routers/operational_memory.py`
 - `/api/v1/metadata`
+- `/api/v1/metadata/operational`
 
 The implementation aggregates existing registries and catalogs. It does not introduce a second persistence system.
