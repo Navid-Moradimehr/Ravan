@@ -206,6 +206,7 @@ After comparing the platform against a similar managed streaming product (`compa
 - [x] **Inspiration 1e** — Operational-memory durability: optional file-backed state via `COLLABORATION_STORE_PATH`, `ALERT_MANAGER_PATH`, and `REPORT_TEMPLATE_STORE_PATH` keeps annotations, alert lifecycle state, and report templates across restarts. New tests in `tests/test_operational_memory_persistence.py`.
 - [x] **Inspiration 1f** — Report schedule rehydration: persisted report templates now store recurring schedules and restore them when the schedule library is available, so recurring exports survive restarts without adding a workflow engine.
 - [x] **Report** — The postponed-features matrix is documented in `docs/postponed-features.md` and mirrored in Obsidian vault at `ObsidianVault/20_Architecture/Postponed Features Matrix.md`.
+- [x] **Report** — Agent integration guidance is documented in `docs/agent-integration-guidance.md` and mirrored in Obsidian vault at `ObsidianVault/20_Architecture/Agent Integration Guidance.md`.
 - [x] **Inspiration 2** — MQTT QoS, retained availability, and Last-Will support in the edge-ingest connector. Configurable via `MQTT_QOS`, `MQTT_RETAINED`, and `MQTT_WILL_*` env vars. 5 tests in `tests/test_mqtt_qos_will.py`.
 - [x] **Inspiration 3** — Delivery chaos / replay dedup coverage: tests that simulate a mid-batch consumer crash + Kafka redelivery and assert the at-least-once fan-out plus `ON CONFLICT (event_id) DO NOTHING` dedup produces no duplicate historian rows. 3 tests in `tests/test_delivery_chaos.py`.
 

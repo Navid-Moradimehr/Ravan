@@ -217,6 +217,26 @@ def test_diagnostic_runtime_records_read_only_tool_calls(monkeypatch):
     assert captured[0]["details"]["approved"] is True
 
 
+def test_diagnostic_runtime_audits_approval_gated_tool_calls(monkeypatch):
+    import services.common.agent_runtime as agent_runtime
+
+    captured = []
+    monkeypatch.setattr(agent_runtime, "insert_audit_log", lambda event: captured.append(event) or event)
+
+    runtime = agent_runtime.DiagnosticAgentRuntime(actor_id="agent-2", site_id="demo-site", approval_required=True)
+    call = runtime.record_tool_call(
+        call_id="call-2",
+        tool_name="historian.recent_events",
+        arguments={"limit": 1},
+        result_summary="pending approval",
+        metadata={"source": "test"},
+    )
+
+    assert call.approved is False
+    assert captured and captured[0]["details"]["approved"] is False
+    assert captured[0]["action"] == "agent_tool_call"
+
+
 def test_diagnostic_runtime_rejects_non_read_only_tools():
     runtime = DiagnosticAgentRuntime(actor_id="agent-1")
     try:
@@ -224,3 +244,23 @@ def test_diagnostic_runtime_rejects_non_read_only_tools():
         assert False, "expected ValueError"
     except ValueError:
         pass
+
+
+def test_supervised_action_runtime_audits_action_requests(monkeypatch):
+    import services.common.agent_runtime as agent_runtime
+
+    captured = []
+    monkeypatch.setattr(agent_runtime, "insert_audit_log", lambda event: captured.append(event) or event)
+
+    runtime = agent_runtime.SupervisedActionRuntime(actor_id="agent-3", site_id="demo-site")
+    payload = runtime.request_action(
+        action_id="action-1",
+        action_name="restart-pump",
+        target_resource="asset/pump-1",
+        requested_by="operator1",
+        details={"reason": "maintenance"},
+    )
+
+    assert payload["status"] == "pending_approval"
+    assert captured and captured[0]["action"] == "agent_action_requested"
+    assert captured[0]["details"]["status"] == "pending_approval"

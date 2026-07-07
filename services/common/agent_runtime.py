@@ -185,26 +185,25 @@ class DiagnosticAgentRuntime:
             occurred_at=_utc_now(),
             metadata=metadata or {},
         )
-        if record.approved:
-            try:
-                insert_audit_log(
-                    {
-                        "time": record.occurred_at,
-                        "user_id": record.actor_id,
-                        "action": "agent_tool_call",
-                        "resource": record.tool_name,
-                        "details": {
-                            "call_id": record.call_id,
-                            "site_id": record.site_id,
-                            "approved": record.approved,
-                            "arguments": record.arguments,
-                            "result_summary": record.result_summary,
-                            "metadata": record.metadata,
-                        },
-                    }
-                )
-            except Exception:
-                pass
+        try:
+            insert_audit_log(
+                {
+                    "time": record.occurred_at,
+                    "user_id": record.actor_id,
+                    "action": "agent_tool_call",
+                    "resource": record.tool_name,
+                    "details": {
+                        "call_id": record.call_id,
+                        "site_id": record.site_id,
+                        "approved": record.approved,
+                        "arguments": record.arguments,
+                        "result_summary": record.result_summary,
+                        "metadata": record.metadata,
+                    },
+                }
+            )
+        except Exception:
+            pass
         return record
 
 

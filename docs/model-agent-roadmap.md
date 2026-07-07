@@ -17,6 +17,8 @@ into a production-grade model platform that also supports:
 
 The diagnostic agent and supervised action agent are **not** release features for the open-source platform. The platform should only ship the infrastructure that makes those integrations straightforward for users to add themselves.
 
+The platform should also avoid becoming a general skills or MCP ecosystem. Users should bring their own agents, skills, and MCP servers; the platform should provide stable read-only tool schemas, prompt scaffolds, audit logging, and governance contracts.
+
 ## Design Rules
 
 1. The industrial data plane must stay deterministic and usable without any LLM.

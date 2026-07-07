@@ -21,6 +21,7 @@
 - SWaT first-class simulator case
 - local Kubernetes rehearsal command for generated site bundles
 - diagnostic runtime scaffold command for read-only probes and supervised action requests
+- agent governance snapshot contract that exposes read-only diagnostic policy and approval-gated supervised-action policy
 - production-pipeline repeatability reporting with optional baseline comparison
 
 ## Still Missing
@@ -31,6 +32,7 @@
 - real PLC/sensor vendor compatibility validation
 - model evaluation/promotion lifecycle
 - diagnostic and supervised action productization beyond the scaffold
+- a general skills/MCP ecosystem in the platform core
 - one more SWaT verification pass against the exact upstream workbook source used in public distribution
 - repeated benchmark sessions on the target host or real deployment topology
 

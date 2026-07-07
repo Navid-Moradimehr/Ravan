@@ -545,6 +545,32 @@ Made the governance snapshot expose the agent runtime contract so diagnostic and
 
 This does not ship autonomous agents. It just makes the governance boundary explicit and auditable so users can plug in their own agent systems safely later.
 
+## 2026-07-07 - Agent Integration Guidance
+
+Documented the boundary between platform-owned agent contracts and user-owned agent ecosystems.
+
+### What changed
+
+1. **Docs**
+   - Added `docs/agent-integration-guidance.md` and mirrored it in Obsidian vault.
+   - Updated the model-agent roadmap to state that skills, MCP servers, and agent orchestration stay user-owned.
+
+2. **Code**
+   - `DiagnosticAgentRuntime` now audits approval-gated tool calls as well as approved ones.
+   - `SupervisedActionRuntime.request_action()` continues to audit action requests without executing them.
+
+3. **Tests**
+   - Extended `tests/test_modeling_contracts.py` to verify audit logging for approval-gated diagnostic calls and supervised action requests.
+
+### Verification
+
+- `uv run pytest tests/test_modeling_contracts.py tests/test_governance_plane.py` -> 15 passed
+- `python -m compileall services tests` -> clean
+
+### Why this belongs here
+
+The platform should give users stable contracts, read-only scaffolding, and auditability. Users should own their agents, skills, and MCP servers so the core does not become a general agent framework.
+
 ## 2026-07-06 - API System Fix 5 (Real Health Probes)
 
 ### Added
