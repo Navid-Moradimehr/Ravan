@@ -138,8 +138,8 @@ def test_at_least_once_redelivery_with_event_id_dedup_no_duplicates(monkeypatch)
     This is the end-to-end delivery-semantics guarantee: the fan-out commits
     offsets only after a sink success, so a crash before commit causes Kafka to
     rebalance and redeliver. The historian sink's batch insert uses
-    ``ON CONFLICT (event_id) DO NOTHING``, so a redelivered event_id is a no-op
-    rather than a duplicate insert.
+    ``ON CONFLICT (time, event_id) DO NOTHING``, so a redelivered event at the
+    same source timestamp is a no-op rather than a duplicate insert.
     """
     from services.historian import client as historian_client
     from services.sinks.historian_sink import TimescaleHistorianSink
@@ -218,10 +218,10 @@ def test_at_least_once_redelivery_with_event_id_dedup_no_duplicates(monkeypatch)
     assert ids_attempt1 == {"evt-1", "evt-2"}
     assert ids_attempt2 == {"evt-1", "evt-2"}
 
-    # Both batch inserts must carry ON CONFLICT (event_id) DO NOTHING, which is
+    # Both batch inserts must carry ON CONFLICT (time, event_id) DO NOTHING, which is
     # the dedup that turns redelivery into a no-op rather than a duplicate row.
     for query, _rows in batches_received:
-        assert "ON CONFLICT (event_id) DO NOTHING" in query
+        assert "ON CONFLICT (time, event_id) DO NOTHING" in query
 
     # The offset was committed only on the successful second attempt.
     assert consumer.committed_offsets == [("industrial.normalized", 0, 2)]
@@ -297,13 +297,13 @@ def test_crash_before_commit_redelivers_uncommitted_message(monkeypatch):
         asynchronous=False,
     )
 
-    # The same event_id was written twice (at-least-once redelivery).
+    # The same event_id and timestamp was written twice (at-least-once redelivery).
     assert len(batches_received) == 2
     assert batches_received[0][1][0][1] == "evt-1"
     assert batches_received[1][1][0][1] == "evt-1"
     # Both writes carry the dedup clause.
     for query, _rows in batches_received:
-        assert "ON CONFLICT (event_id) DO NOTHING" in query
+        assert "ON CONFLICT (time, event_id) DO NOTHING" in query
     # The offset was committed only after the second (successful) attempt.
     assert consumer.committed_offsets == [("industrial.normalized", 0, 1)]
 
@@ -313,7 +313,7 @@ def test_duplicate_event_ids_in_one_batch_are_deduped_by_sql(monkeypatch):
 
     This models a producer that emitted a duplicate event_id within one batch
     (e.g. a retry that landed before the original timed out). The batch insert
-    must still use ON CONFLICT (event_id) DO NOTHING so the DB rejects the dup.
+    must still use ON CONFLICT (time, event_id) DO NOTHING so the DB rejects the dup.
     """
     from services.historian import client as historian_client
     from services.sinks.historian_sink import TimescaleHistorianSink
@@ -366,7 +366,7 @@ def test_duplicate_event_ids_in_one_batch_are_deduped_by_sql(monkeypatch):
     sink = TimescaleHistorianSink()
     sink.write_batch(dup_events)
 
-    assert "ON CONFLICT (event_id) DO NOTHING" in captured["query"]
+    assert "ON CONFLICT (time, event_id) DO NOTHING" in captured["query"]
     assert len(captured["rows"]) == 2
     # Both rows carry the same event_id; the DB constraint resolves the dup.
     assert captured["rows"][0][1] == "evt-dup"

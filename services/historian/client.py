@@ -183,10 +183,10 @@ def insert_industrial_event(event: dict[str, Any]) -> None:
                         value, quality, unit, site, line, schema_version,
                         fault_type, scenario_id, ground_truth_severity, step
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (event_id) DO NOTHING
+                    ON CONFLICT (time, event_id) DO NOTHING
                     """,
                     (
-                        _coalesce_timestamp(event.get("ts_ingest")),
+                        _coalesce_timestamp(event.get("ts_source") or event.get("ts_ingest")),
                         event.get("event_id"),
                         event.get("source_protocol"),
                         event.get("source_id"),
@@ -242,7 +242,7 @@ def insert_industrial_events(events: list[dict[str, Any]]) -> None:
             value, quality, unit, site, line, schema_version,
             fault_type, scenario_id, ground_truth_severity, step
         ) VALUES %s
-        ON CONFLICT (event_id) DO NOTHING
+        ON CONFLICT (time, event_id) DO NOTHING
         """,
         rows,
     )
@@ -261,7 +261,7 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                         processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
                         anomaly_score, severity, triggered_rules, baseline, evaluation
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (event_id) DO NOTHING
+                    ON CONFLICT (time, event_id) DO NOTHING
                     """,
                     (
                         _coalesce_timestamp(event.get("timestamp")),
@@ -336,7 +336,7 @@ def insert_processed_events(events: list[dict[str, Any]]) -> None:
             processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
             anomaly_score, severity, triggered_rules, baseline, evaluation
         ) VALUES %s
-        ON CONFLICT (event_id) DO NOTHING
+        ON CONFLICT (time, event_id) DO NOTHING
         """,
         rows,
     )
@@ -379,6 +379,7 @@ def insert_dead_letter(event: dict[str, Any]) -> None:
                         time, event_id, source_protocol, source_id,
                         error, payload, schema_version, origin
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (time, event_id) DO NOTHING
                     """,
                     (
                         _coalesce_timestamp(event.get("ts_ingest")),
@@ -955,9 +956,10 @@ def setup_unique_indexes() -> None:
 
     The edge publisher now writes only to Kafka; the normalized fan-out consumer
     persists to the historian. With at-least-once delivery, replayed batches can
-    re-insert the same ``event_id``. A unique index plus ``ON CONFLICT DO
-    NOTHING`` turns those replays into no-ops instead of duplicate rows. This is
-    idempotent (``IF NOT EXISTS``) and safe to call on startup.
+    re-insert the same ``event_id`` at the same source timestamp. A unique index
+    plus ``ON CONFLICT DO NOTHING`` turns those replays into no-ops instead of
+    duplicate rows. This is idempotent (``IF NOT EXISTS``) and safe to call on
+    startup.
     """
     unique_indexes = {
         "industrial_events": "industrial_events_event_id_uniq",
@@ -970,7 +972,7 @@ def setup_unique_indexes() -> None:
                 try:
                     cur.execute(
                         f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} "
-                        f"ON {table} (event_id);"
+                        f"ON {table} (time, event_id);"
                     )
                     logger.info("unique index ensured for %s", table)
                 except psycopg2.Error as exc:

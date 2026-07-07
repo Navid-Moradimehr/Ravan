@@ -260,5 +260,5 @@ def test_insert_processed_events_uses_on_conflict(monkeypatch) -> None:
         ]
     )
 
-    assert "ON CONFLICT (event_id) DO NOTHING" in captured["query"]
+    assert "ON CONFLICT (time, event_id) DO NOTHING" in captured["query"]
     assert captured["committed"] is True

@@ -63,3 +63,30 @@ def test_kafka_init_is_one_shot():
     init = _compose()["services"]["kafka-init"]
     assert init.get("restart") == "no"
     assert init.get("image") == "apache/kafka:4.1.2"
+
+
+def test_timescaledb_migrate_service_exists_and_is_one_shot():
+    services = _compose()["services"]
+    assert "timescaledb-migrate" in services
+    migrate = services["timescaledb-migrate"]
+    assert migrate.get("restart") == "no"
+    assert migrate.get("depends_on", {}).get("timescaledb") == {"condition": "service_healthy"}
+
+
+def test_timescaledb_migrate_repairs_historian_uniqueness():
+    migrate = _compose()["services"]["timescaledb-migrate"]
+    command_blob = " ".join(migrate.get("command", [])) if isinstance(migrate.get("command"), list) else str(migrate.get("command"))
+    assert "timescaledb.max_tuples_decompressed_per_dml_transaction = 0" in command_blob
+    assert "DELETE FROM industrial_events" in command_blob
+    assert "DELETE FROM processed_events" in command_blob
+    assert "DELETE FROM dead_letter_events" in command_blob
+    assert "industrial_events_event_id_uniq" in command_blob
+    assert "processed_events_event_id_uniq" in command_blob
+    assert "dead_letter_events_event_id_uniq" in command_blob
+
+
+def test_fanout_and_ai_services_wait_for_timescale_migration():
+    services = _compose()["services"]
+    for name in ("ai-gateway", "fanout", "ai-fanout"):
+        depends = services[name].get("depends_on", {})
+        assert depends.get("timescaledb-migrate") == {"condition": "service_completed_successfully"}

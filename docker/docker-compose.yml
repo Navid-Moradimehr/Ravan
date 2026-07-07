@@ -99,6 +99,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      timescaledb-migrate:
+        condition: service_completed_successfully
     environment:
       TIMESCALE_HOST: timescaledb
       TIMESCALE_PORT: 5432
@@ -140,6 +142,8 @@ services:
         condition: service_healthy
       timescaledb:
         condition: service_healthy
+      timescaledb-migrate:
+        condition: service_completed_successfully
     environment:
       TIMESCALE_HOST: timescaledb
       TIMESCALE_PORT: 5432
@@ -158,6 +162,8 @@ services:
         condition: service_healthy
       timescaledb:
         condition: service_healthy
+      timescaledb-migrate:
+        condition: service_completed_successfully
     environment:
       TIMESCALE_HOST: timescaledb
       TIMESCALE_PORT: 5432
@@ -362,6 +368,32 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  timescaledb-migrate:
+    image: timescale/timescaledb:latest-pg15
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      PGPASSWORD: stream
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - >-
+        set -e; export PGPASSWORD=stream;
+        until psql -h timescaledb -U stream -d stream_engine -c "SELECT 1" >/dev/null 2>&1;
+        do sleep 1; done;
+        psql -h timescaledb -U stream -d stream_engine -v ON_ERROR_STOP=1
+        -c "SET timescaledb.max_tuples_decompressed_per_dml_transaction = 0;"
+        -c "DELETE FROM industrial_events a USING industrial_events b WHERE a.ctid < b.ctid AND a.event_id = b.event_id;"
+        -c "DELETE FROM processed_events a USING processed_events b WHERE a.ctid < b.ctid AND a.event_id = b.event_id;"
+        -c "DELETE FROM dead_letter_events a USING dead_letter_events b WHERE a.ctid < b.ctid AND a.event_id = b.event_id;" ;
+        psql -h timescaledb -U stream -d stream_engine -v ON_ERROR_STOP=1
+        -c "CREATE UNIQUE INDEX IF NOT EXISTS industrial_events_event_id_uniq ON industrial_events (time, event_id);"
+        -c "CREATE UNIQUE INDEX IF NOT EXISTS processed_events_event_id_uniq ON processed_events (time, event_id);"
+        -c "CREATE UNIQUE INDEX IF NOT EXISTS dead_letter_events_event_id_uniq ON dead_letter_events (time, event_id);"
 
 
   redis:
