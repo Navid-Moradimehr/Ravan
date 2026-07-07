@@ -225,6 +225,7 @@ from services.api_service.routers.retrieval import router as retrieval_router
 from services.api_service.routers.metadata import router as metadata_router
 from services.api_service.routers.asset_registry import router as asset_registry_router
 from services.api_service.routers.event_catalog import router as event_catalog_router
+from services.api_service.routers.governance import router as governance_router
 from services.api_service.routers.operational_memory import router as operational_memory_router
 from services.api_service.routers.observability import router as observability_router
 from services.api_service.routers.lineage import router as lineage_router
@@ -243,6 +244,7 @@ app.include_router(retrieval_router)
 app.include_router(metadata_router)
 app.include_router(asset_registry_router)
 app.include_router(event_catalog_router)
+app.include_router(governance_router)
 app.include_router(operational_memory_router)
 app.include_router(observability_router)
 app.include_router(lineage_router)

@@ -16,6 +16,7 @@ The metadata plane is the single inspection surface for platform knowledge:
 - lineage previews
 - asset registry snapshot
 - event catalog
+- governance snapshot
 - operational memory snapshot
 
 It is intentionally read-only for now.
@@ -65,6 +66,11 @@ Asset metadata is exposed twice as well:
 - the metadata plane keeps the current asset hierarchy as platform knowledge
 - the dedicated `/api/v1/metadata/assets` snapshot gives operators a flattened registry view for validation and rollout checks
 
+Governance is also exposed as a lightweight lifecycle snapshot:
+
+- the metadata plane keeps schema, model, prompt, and dataset registries together
+- the dedicated `/api/v1/metadata/governance` snapshot summarizes readiness and validation issues without turning the platform into a workflow engine
+
 ## Current Implementation
 
 - `services/common/metadata_plane.py`
@@ -77,10 +83,13 @@ Asset metadata is exposed twice as well:
 - `services/api_service/routers/asset_registry.py`
 - `services/common/event_catalog.py`
 - `services/api_service/routers/event_catalog.py`
+- `services/common/governance_plane.py`
+- `services/api_service/routers/governance.py`
 - `/api/v1/metadata`
 - `/api/v1/metadata/operational`
 - `/api/v1/metadata/assets`
 - `/api/v1/metadata/events`
+- `/api/v1/metadata/governance`
 - `/api/v1/lineage`
 
 The implementation aggregates existing registries and catalogs. It does not introduce a second persistence system.

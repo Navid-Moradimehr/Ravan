@@ -30,6 +30,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Read-only agent infrastructure exists as a foundation.
 - Logical metadata plane snapshot exists and unifies schema, model, prompt, dataset, retrieval, semantic, and lineage metadata without adding a new runtime service.
 - Asset registry snapshot and canonical event catalog snapshots exist for rollout validation without adding another service boundary.
+- Governance snapshot exists for schema/model/prompt lifecycle without introducing a workflow engine.
 - Logical operational-memory snapshot exists and aggregates alerts, annotations, shifts, reports, and backup readiness without adding a MES-like workflow engine.
 - Logical site-observability snapshot exists and reports broker, historian, AI, backup, and API health with SLO targets for each deployment mode.
 - Dedicated lineage snapshot route exists and emits an OpenLineage-style read-only view over semantic lineage.

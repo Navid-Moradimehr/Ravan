@@ -19,6 +19,7 @@ The platform now exposes a universal semantic substrate alongside the existing i
 - Logical metadata plane: schema registry, model registry, prompt registry, dataset catalog, retrieval catalog, and semantic-store summaries are exposed through one inspection surface without adding a new microservice.
 - The metadata plane now includes lineage previews, while the dedicated lineage endpoint provides a normalized snapshot for operators and downstream tooling.
 - The metadata plane also now includes the asset registry snapshot and canonical event catalog so rollout validation can inspect both configured assets and Kafka contracts from one place.
+- The metadata plane now exposes a lightweight governance snapshot for schema/model/prompt lifecycle without introducing a workflow engine.
 - Operational memory snapshot: alerts, annotations, OEE shifts, reports, and backup readiness are exposed as a logical operator-state surface without turning the platform into a MES.
 
 ## Design Rule

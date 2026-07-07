@@ -33,6 +33,9 @@ Keep the current industrial app intact, but project it onto a universal semantic
 - Asset registry and event catalog:
   - the asset hierarchy now has a flattened registry snapshot for rollout validation
   - the canonical Kafka topic contract is exposed as a read-only event catalog for operators and tooling
+- Governance snapshot:
+  - schema, model, prompt, and dataset registries are summarized in a lifecycle view
+  - promotion workflow remains out of scope until the platform has a real governance engine
 - Operational memory:
   - alerts, annotations, OEE shifts, report inventory, and backup readiness are exposed through one read-only operator-state surface
   - work orders, approvals, and maintenance plans remain user-owned until a later phase
@@ -58,3 +61,4 @@ The manufacturing model stays as a domain pack. The platform core should remain 
 - The dedicated lineage snapshot is an operator-facing projection, not a second lineage store.
 - The asset registry snapshot is a projection of the existing hierarchy, not a second source of truth for plant topology.
 - The event catalog is a contract view, not a substitute for the project manifest.
+- The governance snapshot is a lifecycle summary, not a new workflow system.

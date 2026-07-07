@@ -18,6 +18,7 @@ Postgres --> Debezium --> CDC topics   keyed state + rules            LLM summar
 - The logical metadata plane is read-only and aggregates platform registries and catalogs without creating a new service boundary.
 - The dedicated lineage snapshot is a read-only projection over semantic lineage, kept separate from the semantic write path.
 - Asset registry and event catalog snapshots are also read-only projections, not separate databases or services.
+- The governance snapshot stays read-only and summarizes lifecycle readiness without creating a workflow engine.
 - Operational memory is read-only for now and exposes alerts, annotations, shifts, reports, and backup readiness without turning the platform into a MES.
 - Site observability is a separate rollout-facing snapshot that reports broker,
   historian, AI gateway, backup readiness, and API health with SLO targets.

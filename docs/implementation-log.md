@@ -110,6 +110,25 @@ Extended the logical metadata plane with a flattened asset registry snapshot and
 ### Validation
 - Focused pytest run passed: 10 passed.
 
+## 2026-07-07 - Governance Snapshot
+
+Added a lightweight read-only governance snapshot for schema, model, prompt, and dataset lifecycle readiness without introducing a workflow engine.
+
+### Added
+1. **Governance snapshot** (`services/common/governance_plane.py`) â€” summarizes registry readiness, compatibility, enabled model roles, prompt versions, and dataset catalog coverage.
+2. **Governance API** (`services/api_service/routers/governance.py`) â€” `/api/v1/metadata/governance` exposes the snapshot through the existing API service.
+3. **Governance tests** (`tests/test_governance_plane.py`) â€” verifies the lifecycle summary and route exposure.
+
+### Updated
+- `docs/metadata-plane.md`
+- `docs/platform-semantic-core.md`
+- `docs/production-readiness-checklist.md`
+- `ObsidianVault/20_Architecture/Platform Core and Semantic Plane.md`
+- `ObsidianVault/20_Architecture/System Architecture.md`
+
+### Validation
+- Focused pytest run passed: 12 passed.
+
 ## 2026-07-07 - Operational Memory Boundary
 
 Added a read-only operational memory snapshot on top of existing alert,
