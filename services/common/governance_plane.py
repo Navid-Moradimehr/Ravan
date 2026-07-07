@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from services.common.agent_runtime import build_agent_runtime_contract
 from services.common.modeling import ModelRegistry
 from services.common.prompt_registry import prompt_registry
 from services.common.schema_registry import schema_registry
@@ -25,6 +26,7 @@ def build_governance_snapshot() -> dict[str, Any]:
     models = ModelRegistry.from_env().export()
     prompts = prompt_registry.list_templates()
     datasets = [dataset.__dict__ for dataset in list_dataset_sources()]
+    agent_contract = build_agent_runtime_contract()
 
     issues: list[GovernanceIssue] = []
     if models["validation_errors"]:
@@ -36,6 +38,11 @@ def build_governance_snapshot() -> dict[str, Any]:
 
     if not datasets:
         issues.append(GovernanceIssue(area="dataset-registry", severity="warning", message="no datasets cataloged"))
+
+    if not agent_contract["diagnostic_policy"]["read_only"]:
+        issues.append(GovernanceIssue(area="agent-governance", severity="warning", message="diagnostic policy is not read-only"))
+    if not agent_contract["action_policy"]["approval_required"]:
+        issues.append(GovernanceIssue(area="agent-governance", severity="warning", message="supervised action policy is not approval-gated"))
 
     schema_compatibility = sorted({schema["compatibility"] for schema in schemas})
     prompt_versions = sorted({prompt["version"] for prompt in prompts})
@@ -51,16 +58,20 @@ def build_governance_snapshot() -> dict[str, Any]:
         "prompt_versions": prompt_versions,
         "prompt_count": len(prompts),
         "dataset_count": len(datasets),
+        "agent_governance": agent_contract,
         "issues": [issue.to_dict() for issue in issues],
         "contracts": {
             "schema_governance": True,
             "model_governance": True,
             "prompt_governance": True,
+            "agent_governance": True,
             "promotion_workflow": False,
         },
         "notes": [
             "This is a lifecycle snapshot, not a workflow engine.",
             "Schema compatibility is enforced in application code.",
             "Model and prompt registries stay infrastructure-only until promotion workflows are needed.",
+            "Diagnostic agents stay read-only.",
+            "Supervised action agents stay approval-gated and are not shipped as autonomous executors.",
         ],
     }

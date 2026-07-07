@@ -494,7 +494,7 @@ Extended the operational-memory sources so annotations, alert lifecycle state, a
 
 ### Verification
 
-- `uv run pytest tests/test_operational_memory_persistence.py tests/test_operational_memory.py` -> 6 passed
+- `uv run pytest tests/test_operational_memory_persistence.py tests/test_operational_memory.py` -> 7 passed
 - `python -m compileall services tests` -> clean
 
 ### Why this belongs here
@@ -508,7 +508,7 @@ Made persisted report templates restore their recurring schedules on startup whe
 ### What changed
 
 1. **`services/analytics/reporting.py`**
-   - Added schedule rehydration after loading persisted templates.
+   - Added schedule persistence on `schedule_report()` and rehydration after loading persisted templates.
    - Replayed daily/hourly/weekly schedules into the existing scheduler when available.
 
 2. **Tests**
@@ -516,12 +516,34 @@ Made persisted report templates restore their recurring schedules on startup whe
 
 ### Verification
 
-- `uv run pytest tests/test_operational_memory_persistence.py tests/test_operational_memory.py` -> 7 passed
+- `uv run pytest tests/test_operational_memory_persistence.py tests/test_governance_plane.py` -> 8 passed
 - `python -m compileall services tests` -> clean
 
 ### Why this belongs here
 
-Scheduled exports are part of the report subsystem, not a separate workflow engine. Rehydrating persisted schedules keeps the recurring export behavior restart-safe while staying inside the current architecture.
+Scheduled exports are part of the report subsystem, not a separate workflow engine. Persisting the cadence with the template and rehydrating it on startup keeps recurring exports restart-safe while staying inside the current architecture.
+
+## 2026-07-07 - AI Governance Snapshot Expansion
+
+Made the governance snapshot expose the agent runtime contract so diagnostic and supervised-action policies are visible alongside schema, model, prompt, and dataset governance.
+
+### What changed
+
+1. **`services/common/governance_plane.py`**
+   - Added `agent_governance` data from `build_agent_runtime_contract()`.
+   - The snapshot now warns if diagnostic tools are not read-only or if supervised action is not approval-gated.
+
+2. **Tests**
+   - Extended `tests/test_governance_plane.py` to assert the agent-governance contract and route output.
+
+### Verification
+
+- `uv run pytest tests/test_operational_memory_persistence.py tests/test_governance_plane.py` -> 8 passed
+- `python -m compileall services tests` -> clean
+
+### Why this belongs here
+
+This does not ship autonomous agents. It just makes the governance boundary explicit and auditable so users can plug in their own agent systems safely later.
 
 ## 2026-07-06 - API System Fix 5 (Real Health Probes)
 

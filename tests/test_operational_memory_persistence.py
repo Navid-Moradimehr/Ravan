@@ -153,3 +153,54 @@ def test_report_templates_rehydrate_schedules_on_startup(tmp_path, monkeypatch):
     restarted = ReportEngine(output_dir=str(tmp_path / "reports"), template_store_path=str(template_store))
     assert "scheduled-report" in restarted._scheduled_jobs
     assert calls
+
+
+def test_schedule_report_persists_requested_schedule(tmp_path, monkeypatch):
+    from services.analytics.reporting import ReportEngine, ReportTemplate
+
+    class DummyJob:
+        def __init__(self, kind: str):
+            self.kind = kind
+
+        def at(self, value: str):
+            return self
+
+        def do(self, func, *args, **kwargs):
+            return self
+
+    class DummyEvery:
+        @property
+        def day(self):
+            return DummyJob("day")
+
+        @property
+        def hour(self):
+            return DummyJob("hour")
+
+        @property
+        def monday(self):
+            return DummyJob("monday")
+
+    dummy_schedule = ModuleType("schedule")
+    dummy_schedule.every = lambda: DummyEvery()
+    monkeypatch.setitem(sys.modules, "schedule", dummy_schedule)
+    monkeypatch.setattr("services.analytics.reporting.SCHEDULE_AVAILABLE", True)
+
+    template_store = tmp_path / "report-templates-schedule-api.json"
+    engine = ReportEngine(output_dir=str(tmp_path / "reports"), template_store_path=str(template_store))
+    engine.register_template(
+        ReportTemplate(
+            template_id="api-report",
+            name="API Report",
+            description="API schedule test",
+            query="SELECT 1",
+            format="json",
+        )
+    )
+
+    result = engine.schedule_report("api-report", "daily")
+    assert result["status"] == "scheduled"
+
+    restarted = ReportEngine(output_dir=str(tmp_path / "reports"), template_store_path=str(template_store))
+    template = restarted._templates["api-report"]
+    assert template.schedule == "daily"

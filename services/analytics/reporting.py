@@ -195,6 +195,9 @@ class ReportEngine:
 
         job.do(self.generate_report, template_id)
         self._scheduled_jobs[template_id] = job
+        template.schedule = cron_expression
+        template.enabled = True
+        self._persist_templates()
 
         return {
             "status": "scheduled",
@@ -294,7 +297,7 @@ class ReportEngine:
         if not SCHEDULE_AVAILABLE:
             return
         for template in self._templates.values():
-            if template.enabled and template.schedule:
+            if template.enabled and template.schedule and template.template_id not in self._scheduled_jobs:
                 self.schedule_report(template.template_id, template.schedule)
 
 

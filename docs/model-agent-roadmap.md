@@ -192,6 +192,7 @@ Already present:
 - read-only context package assembly endpoint
 - model role registry
 - prompt registry for future diagnostic agent prompts
+- governance snapshot exposing diagnostic read-only and supervised-action agent contracts
 - deterministic retrieval search boundary that future agents can call
 
 ### Layer 6: Supervised Action Agents
@@ -226,6 +227,7 @@ These are the model-related features that are meaningfully present now:
 - structured output validation
 - read-only tool schemas for future agents
 - read-only context assembly endpoint
+- governance snapshot includes the agent runtime contract and approval-gated action policy
 - site-profile-aware runtime rollout
 - backup/restore and release-gate harness
 - deterministic analytics and streaming core

@@ -14,6 +14,9 @@ def test_governance_snapshot_reports_registry_lifecycle() -> None:
     assert snapshot["prompt_count"] >= 1
     assert snapshot["dataset_count"] >= 1
     assert snapshot["contracts"]["schema_governance"] is True
+    assert snapshot["contracts"]["agent_governance"] is True
+    assert snapshot["agent_governance"]["diagnostic_policy"]["read_only"] is True
+    assert snapshot["agent_governance"]["action_policy"]["approval_required"] is True
 
 
 def test_governance_route_returns_snapshot() -> None:
@@ -26,3 +29,4 @@ def test_governance_route_returns_snapshot() -> None:
     body = response.json()
     assert body["read_only"] is True
     assert body["contracts"]["model_governance"] is True
+    assert body["contracts"]["agent_governance"] is True
