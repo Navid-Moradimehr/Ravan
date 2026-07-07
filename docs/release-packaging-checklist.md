@@ -72,6 +72,12 @@ Do not require:
 - Docker Desktop
 - cloud credentials
 
+Error handling note:
+
+- keep errors surfaced inside the app shell with inline banners, route error pages, and dismissible toasts
+- avoid relying on Windows-only, Linux-only, or macOS-only notification APIs in the first installer release
+- if native desktop notifications are added later, keep them behind an optional adapter so the web UI remains identical across OSes
+
 The repo now includes a Windows staging path through `scripts/package-release.py` and `scripts/package-release.ps1`.
 
 ## 5. Linux package contents

@@ -38,6 +38,8 @@ the remaining application surface without changing the public API.
 
 The recommended production install is native on Windows Server / industrial PCs or Linux servers. WSL2 is useful for local development and demos, but it should not be a required production dependency or bundled as part of the installer unless the deployment target is explicitly a developer workstation.
 
+Error handling is intentionally platform-neutral: the UI uses in-app banners, inline validation, route error boundaries, and dismissible toasts that work the same on Windows, Linux, and macOS packaged builds. No OS-specific notification API is required for the first release; native notifications can be added later behind an optional adapter if an installer shell needs them.
+
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and adjust ports/model settings.
