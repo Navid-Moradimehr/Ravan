@@ -19,6 +19,7 @@ def test_metadata_plane_snapshot_aggregates_existing_registries(tmp_path) -> Non
     assert {"Historical Memory", "Semantic Memory", "Operational Memory"} <= memory_layer_names
 
     registries = snapshot["registries"]
+    assert registries["asset_registry"]["entry_count"] > 0
     assert registries["schemas"]
     assert any(binding["role"] == "summarization" for binding in registries["models"]["roles"])
     assert registries["prompts"]
@@ -26,6 +27,7 @@ def test_metadata_plane_snapshot_aggregates_existing_registries(tmp_path) -> Non
 
     assert snapshot["catalogs"]["semantic_core"]["platform_primitives"]
     assert snapshot["catalogs"]["retrieval"]["sources"]
+    assert snapshot["catalogs"]["event_catalog"]["canonical_topics"]
     assert snapshot["semantic_store"]["ontology_pack_count"] >= 1
     assert snapshot["operational_memory"]["alerts"]["statistics"]["total_alerts"] >= 0
     assert snapshot["contracts"]["metadata_is_read_only"] is True

@@ -30,6 +30,9 @@ Keep the current industrial app intact, but project it onto a universal semantic
   - metadata is treated as platform memory, separate from historian telemetry and separate from the semantic graph
 - Lineage:
   - a dedicated read-only `/api/v1/lineage` snapshot exposes an OpenLineage-style view over semantic lineage without moving ownership out of the semantic plane
+- Asset registry and event catalog:
+  - the asset hierarchy now has a flattened registry snapshot for rollout validation
+  - the canonical Kafka topic contract is exposed as a read-only event catalog for operators and tooling
 - Operational memory:
   - alerts, annotations, OEE shifts, report inventory, and backup readiness are exposed through one read-only operator-state surface
   - work orders, approvals, and maintenance plans remain user-owned until a later phase
@@ -53,3 +56,5 @@ The manufacturing model stays as a domain pack. The platform core should remain 
 - Benchmark tests should validate the real industrial-shaped flows the platform is expected to handle, even when those flows are still simulated locally.
 - Multi-site correlation should be benchmarked as its own workload shape because it stresses both isolation and cross-site reasoning.
 - The dedicated lineage snapshot is an operator-facing projection, not a second lineage store.
+- The asset registry snapshot is a projection of the existing hierarchy, not a second source of truth for plant topology.
+- The event catalog is a contract view, not a substitute for the project manifest.

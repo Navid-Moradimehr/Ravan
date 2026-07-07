@@ -14,6 +14,8 @@ The metadata plane is the single inspection surface for platform knowledge:
 - semantic core
 - semantic store summaries
 - lineage previews
+- asset registry snapshot
+- event catalog
 - operational memory snapshot
 
 It is intentionally read-only for now.
@@ -58,6 +60,11 @@ Lineage is exposed twice on purpose:
 - the metadata plane keeps lineage previews and counts as part of platform memory
 - the dedicated `/api/v1/lineage` snapshot gives operators and integrations a normalized read-only lineage view without forcing them through the semantic write API
 
+Asset metadata is exposed twice as well:
+
+- the metadata plane keeps the current asset hierarchy as platform knowledge
+- the dedicated `/api/v1/metadata/assets` snapshot gives operators a flattened registry view for validation and rollout checks
+
 ## Current Implementation
 
 - `services/common/metadata_plane.py`
@@ -66,8 +73,14 @@ Lineage is exposed twice on purpose:
 - `services/api_service/routers/operational_memory.py`
 - `services/common/lineage_contract.py`
 - `services/api_service/routers/lineage.py`
+- `services/common/asset_registry.py`
+- `services/api_service/routers/asset_registry.py`
+- `services/common/event_catalog.py`
+- `services/api_service/routers/event_catalog.py`
 - `/api/v1/metadata`
 - `/api/v1/metadata/operational`
+- `/api/v1/metadata/assets`
+- `/api/v1/metadata/events`
 - `/api/v1/lineage`
 
 The implementation aggregates existing registries and catalogs. It does not introduce a second persistence system.

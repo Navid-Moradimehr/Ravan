@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from services.common.modeling import ModelRegistry
+from services.common.asset_registry import build_asset_registry_snapshot
+from services.common.event_catalog import build_event_catalog_snapshot
 from services.common.operational_memory import build_operational_memory_snapshot
 from services.common.prompt_registry import prompt_registry
 from services.common.retrieval import build_retrieval_catalog
@@ -96,6 +98,8 @@ def build_metadata_plane_snapshot(
     model_registry = _model_registry_for(site_profile_path)
     schema_summaries = schema_registry.list_schemas()
     operational_snapshot = build_operational_memory_snapshot()
+    asset_registry = build_asset_registry_snapshot(asset_config=asset_config)
+    event_catalog = build_event_catalog_snapshot()
 
     sections = (
         MetadataPlaneSection(**HISTORICAL_MEMORY),
@@ -112,6 +116,7 @@ def build_metadata_plane_snapshot(
         },
         "memory_layers": [section.to_dict() for section in sections],
         "registries": {
+            "asset_registry": asset_registry,
             "schemas": schema_summaries,
             "models": model_registry.export(),
             "prompts": prompt_registry.list_templates(),
@@ -120,6 +125,7 @@ def build_metadata_plane_snapshot(
         "catalogs": {
             "semantic_core": build_semantic_core_catalog(),
             "retrieval": build_retrieval_catalog(asset_config=asset_config),
+            "event_catalog": event_catalog,
         },
         "semantic_store": {
             "backend": semantic_snapshot.get("path", ""),
@@ -142,6 +148,8 @@ def build_metadata_plane_snapshot(
             "metadata_is_read_only": True,
             "metadata_is_logical": True,
             "semantic_store_backend": semantic_snapshot.get("path", ""),
+            "asset_registry_entries": asset_registry["entry_count"],
+            "event_catalog_topics": event_catalog["counts"]["canonical_topics"],
         },
         "notes": [
             "Historian answers what happened.",

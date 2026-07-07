@@ -89,6 +89,27 @@ Added a dedicated read-only lineage snapshot over the existing semantic lineage 
 ### Validation
 - Focused pytest run passed: 7 passed.
 
+## 2026-07-07 - Asset Registry and Event Catalog Snapshots
+
+Extended the logical metadata plane with a flattened asset registry snapshot and a canonical event catalog snapshot, both exposed as read-only API routes without adding a new service boundary.
+
+### Added
+1. **Asset registry snapshot** (`services/common/asset_registry.py`) â€” flattens the existing asset hierarchy into a rollout-friendly registry view with site, area, line, cell, asset, and tag entries.
+2. **Event catalog snapshot** (`services/common/event_catalog.py`) â€” exposes the canonical Kafka contract plus project-manifest topic mappings as a read-only catalog.
+3. **Metadata API routes** (`services/api_service/routers/asset_registry.py`, `services/api_service/routers/event_catalog.py`) â€” `/api/v1/metadata/assets` and `/api/v1/metadata/events`.
+4. **Metadata catalog tests** (`tests/test_metadata_catalogs.py`) â€” verifies the snapshots and route exposure.
+
+### Updated
+- `services/common/metadata_plane.py`
+- `docs/metadata-plane.md`
+- `docs/platform-semantic-core.md`
+- `docs/production-readiness-checklist.md`
+- `ObsidianVault/20_Architecture/Platform Core and Semantic Plane.md`
+- `ObsidianVault/20_Architecture/System Architecture.md`
+
+### Validation
+- Focused pytest run passed: 10 passed.
+
 ## 2026-07-07 - Operational Memory Boundary
 
 Added a read-only operational memory snapshot on top of existing alert,
