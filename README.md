@@ -127,6 +127,7 @@ against realistic industrial batches without depending on a live model server.
 
 - `Guide.md` contains the original product brief.
 - `docs/app-functionality.md` explains the platform in plain language: what each part does, its inputs and outputs, and how users interact with it.
+- `docs/first-time-plc-ingest-guide.md` explains how a new user connects PLCs and sensors, how protocol differences are handled, and how multiple sources stay separate while still being correlatable.
 - `docs/feature-audit.md` lists the implemented feature set and current completion status.
 - `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
 - `docs/self-host-install-guide.md` gives the operator-facing local install and upgrade flow.
