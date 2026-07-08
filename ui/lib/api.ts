@@ -109,7 +109,7 @@ export type ReplayStatus = {
 };
 
 export async function getHistorianEvents(table: string, limit: number = 100): Promise<HistorianEvent[]> {
-  return requestJson(`/api/historian/events?table=${encodeURIComponent(table)}&limit=${limit}`);
+  return requestJson(`/api/historian?action=events&table=${encodeURIComponent(table)}&limit=${limit}`);
 }
 
 export async function getHistorianTrend(
@@ -118,28 +118,28 @@ export async function getHistorianTrend(
   hours: number = 1,
 ): Promise<HistorianTrendPoint[]> {
   return requestJson(
-    `/api/historian/trend?asset_id=${encodeURIComponent(assetId)}&tag=${encodeURIComponent(tag)}&hours=${hours}`,
+    `/api/historian?action=trend&asset_id=${encodeURIComponent(assetId)}&tag=${encodeURIComponent(tag)}&hours=${hours}`,
   );
 }
 
 export async function getAssetHierarchy(): Promise<AssetHierarchyNode[]> {
-  return requestJson("/api/historian/assets");
+  return requestJson("/api/historian?action=assets");
 }
 
 export async function getScenarios(): Promise<ScenarioInfo[]> {
-  return requestJson("/api/historian/scenarios");
+  return requestJson("/api/historian?action=scenarios");
 }
 
 export async function getAlarms(limit: number = 50): Promise<AlarmEvent[]> {
-  return requestJson(`/api/historian/alarms?limit=${limit}`);
+  return requestJson(`/api/historian?action=alarms&limit=${limit}`);
 }
 
 export async function getReplayStatus(): Promise<ReplayStatus> {
-  return requestJson("/api/historian/replay");
+  return requestJson("/api/historian?action=replay");
 }
 
 export async function startReplay(dataset: string, scenario: string): Promise<{ ok: boolean }> {
-  return requestJson("/api/historian/replay", {
+  return requestJson("/api/historian?action=replay", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dataset, scenario }),
@@ -147,7 +147,7 @@ export async function startReplay(dataset: string, scenario: string): Promise<{ 
 }
 
 export async function stopReplay(): Promise<{ ok: boolean }> {
-  return requestJson("/api/historian/replay", { method: "DELETE" });
+  return requestJson("/api/historian?action=replay", { method: "DELETE" });
 }
 
 export type HistorianStreamPayload = {
@@ -175,7 +175,7 @@ export function subscribeHistorianStream(
   const connect = () => {
     if (closed) return;
     try {
-      ws = new WebSocket(`${baseUrl}/ws/historian`);
+      ws = new WebSocket(`${baseUrl}/ws/alarms`);
       ws.onopen = () => {
         handlers.onConnect?.();
       };
