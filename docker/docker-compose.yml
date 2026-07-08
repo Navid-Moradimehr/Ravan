@@ -258,7 +258,7 @@ services:
     depends_on:
       - ai-gateway
     environment:
-      API_SERVICE_BASE: http://host.docker.internal:8020
+      API_SERVICE_BASE: http://api-service:8020
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
       PROMETHEUS_BASE_URL: http://prometheus:9090
       GRAFANA_BASE_URL: http://grafana:3000

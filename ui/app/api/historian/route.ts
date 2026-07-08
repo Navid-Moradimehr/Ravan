@@ -3,7 +3,7 @@ import { HttpError, readResponseError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
-const API_SERVICE_BASE = process.env.API_SERVICE_BASE ?? "http://localhost:8020";
+const API_SERVICE_BASE = process.env.API_SERVICE_BASE ?? "http://api-service:8020";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init });
