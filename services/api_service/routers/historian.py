@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from services.api_service.runtime import _do_ingest_event, build_asset_hierarchy, list_scenarios
+from services.api_service.replay_state import get_replay_status, start_replay, stop_replay
 from services.historian.client import (
     get_storage_stats,
     insert_dead_letter,
@@ -77,6 +78,27 @@ async def get_assets() -> list[dict[str, Any]]:
 @router.get("/api/v1/scenarios")
 async def get_scenarios() -> list[dict[str, Any]]:
     return list_scenarios()
+
+
+@router.get("/api/v1/historian/replay")
+async def get_replay_state() -> dict[str, Any]:
+    return get_replay_status()
+
+
+@router.post("/api/v1/historian/replay")
+async def start_replay_job(req: dict[str, Any]) -> dict[str, Any]:
+    dataset = str(req.get("dataset", "mock"))
+    scenario = str(req.get("scenario", "normal"))
+    try:
+        state = start_replay(dataset, scenario)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"ok": True, "replay": state}
+
+
+@router.delete("/api/v1/historian/replay")
+async def stop_replay_job() -> dict[str, Any]:
+    return {"ok": True, "replay": stop_replay()}
 
 
 @router.post("/api/v1/events/ingest")

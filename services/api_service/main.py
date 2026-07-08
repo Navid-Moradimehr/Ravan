@@ -273,7 +273,11 @@ app.add_middleware(
 async def _security_middleware(request: Request, call_next):
     path = request.url.path
     method = request.method.upper()
-    if method in {"POST", "PUT", "PATCH", "DELETE"} and path not in {"/api/v1/auth/login"} and not path.startswith(("/docs", "/redoc", "/openapi.json", "/health", "/metrics", "/.well-known")):
+    exempt_mutations = {
+        "/api/v1/auth/login",
+        "/api/v1/historian/replay",
+    }
+    if method in {"POST", "PUT", "PATCH", "DELETE"} and path not in exempt_mutations and not path.startswith(("/docs", "/redoc", "/openapi.json", "/health", "/metrics", "/.well-known")):
         auth_header = request.headers.get("authorization", "")
         if not auth_header.lower().startswith("bearer "):
             return JSONResponse(status_code=401, content={"detail": "Missing bearer token"})

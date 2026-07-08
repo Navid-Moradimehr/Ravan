@@ -60,6 +60,7 @@ def test_split_domain_routes_registered():
         "/api/v1/historian/restore",
         "/api/v1/historian/backups",
         "/api/v1/historian/backup/status",
+        "/api/v1/historian/replay",
         "/api/v1/reports/templates",
         "/api/v1/reports/generate/{template_id}",
         "/api/v1/reports",
