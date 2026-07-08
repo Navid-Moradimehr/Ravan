@@ -94,7 +94,7 @@ groups:
 
       # Slow historian queries degrade dashboards and the AI gateway reads.
       - alert: HistorianQuerySlow
-        expr: histogram_fraction(0.95, sum by (table, operation) (rate(datastream_historian_query_latency_seconds_bucket[5m]))) > 1
+        expr: histogram_quantile(0.95, sum by (le, table, operation) (rate(datastream_historian_query_latency_seconds_bucket[5m]))) > 1
         for: 5m
         labels:
           severity: warning
@@ -107,7 +107,7 @@ groups:
     rules:
       # WebSocket delivery lag degrades the live dashboard experience.
       - alert: WebSocketDeliveryLagHigh
-        expr: histogram_fraction(0.95, sum by (channel) (rate(datastream_websocket_delivery_lag_seconds_bucket[5m]))) > 5
+        expr: histogram_quantile(0.95, sum by (le, channel) (rate(datastream_websocket_delivery_lag_seconds_bucket[5m]))) > 5
         for: 5m
         labels:
           severity: warning
