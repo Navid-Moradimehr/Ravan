@@ -43,11 +43,21 @@ export default function HistorianPage() {
           description="Query, trend, replay, and manage the historian lifecycle."
           icon={DatabaseZap}
         />
-        <HistorianDashboard />
-        <SqlQueryPanel />
-        <WebhookPanel />
-        <NotificationPanel />
-        <DashboardBuilder />
+        <section className="scroll-mt-24">
+          <HistorianDashboard />
+        </section>
+        <section id="sql-query" className="scroll-mt-24">
+          <SqlQueryPanel />
+        </section>
+        <section id="webhooks" className="scroll-mt-24">
+          <WebhookPanel />
+        </section>
+        <section id="notifications" className="scroll-mt-24">
+          <NotificationPanel />
+        </section>
+        <section id="dashboard-builder" className="scroll-mt-24">
+          <DashboardBuilder />
+        </section>
       </div>
     </DashboardFrame>
   );
