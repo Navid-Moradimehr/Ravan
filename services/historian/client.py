@@ -4,8 +4,11 @@ import functools
 import os
 import time
 import logging
+import uuid
+from dataclasses import dataclass
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from threading import Lock
 from typing import Any, Callable
 
 import psycopg2
@@ -62,6 +65,7 @@ WRITE_MAX_RETRIES = int(os.getenv("HISTORIAN_WRITE_MAX_RETRIES", "3"))
 WRITE_BACKOFF_SECONDS = tuple(
     float(x) for x in os.getenv("HISTORIAN_WRITE_BACKOFF_SECONDS", "0.2,0.6,1.8").split(",")
 )
+DEFAULT_QUERY_TIMEOUT_MS = int(os.getenv("HISTORIAN_QUERY_TIMEOUT_MS", "15000"))
 ALLOWED_QUERY_TABLES = {"industrial_events", "processed_events", "ai_enriched", "dead_letter_events"}
 SEMANTIC_TABLES = {
     "semantic_ontology_packs",
@@ -77,6 +81,20 @@ SEMANTIC_TABLES = {
     "semantic_events",
     "semantic_lineage",
 }
+
+
+@dataclass(slots=True)
+class HistorianQueryHandle:
+    query_id: str
+    connection: Any
+    started_at: float
+    timeout_ms: int
+    operation: str
+    sql: str
+
+
+_QUERY_LOCK = Lock()
+_ACTIVE_QUERIES: dict[str, HistorianQueryHandle] = {}
 
 
 def _connection_string() -> str:
@@ -127,11 +145,86 @@ def _execute_values_write(table: str, statement: str, rows: list[tuple[Any, ...]
 
 
 def _fetch_rows(table: str, operation: str, query: str, params: tuple[Any, ...]) -> list[dict[str, Any]]:
+    return _fetch_rows_with_timeout(table, operation, query, params, query_id=None, timeout_ms=None)
+
+
+def _register_query_handle(handle: HistorianQueryHandle) -> None:
+    with _QUERY_LOCK:
+        _ACTIVE_QUERIES[handle.query_id] = handle
+
+
+def _release_query_handle(query_id: str) -> None:
+    with _QUERY_LOCK:
+        _ACTIVE_QUERIES.pop(query_id, None)
+
+
+def cancel_historian_query(query_id: str) -> dict[str, Any]:
+    with _QUERY_LOCK:
+        handle = _ACTIVE_QUERIES.get(query_id)
+    if handle is None:
+        return {"query_id": query_id, "status": "not_found"}
+
+    try:
+        handle.connection.cancel()
+    except Exception as exc:
+        logger.warning("historian query cancel failed for %s: %s", query_id, exc)
+        return {"query_id": query_id, "status": "cancel_failed", "error": str(exc)}
+
+    logger.info(
+        "historian query cancel requested query_id=%s operation=%s timeout_ms=%s",
+        query_id,
+        handle.operation,
+        handle.timeout_ms,
+    )
+    return {"query_id": query_id, "status": "cancel_requested"}
+
+
+class HistorianQueryTimeoutError(TimeoutError):
+    pass
+
+
+class HistorianQueryCancelledError(RuntimeError):
+    pass
+
+
+def _fetch_rows_with_timeout(
+    table: str,
+    operation: str,
+    query: str,
+    params: tuple[Any, ...],
+    *,
+    query_id: str | None,
+    timeout_ms: int | None,
+) -> list[dict[str, Any]]:
     start = time.monotonic()
+    query_id = query_id or uuid.uuid4().hex
+    timeout_ms = DEFAULT_QUERY_TIMEOUT_MS if timeout_ms is None else max(1, int(timeout_ms))
+
     with get_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(query, params)
-            rows = [dict(row) for row in cur.fetchall()]
+        handle = HistorianQueryHandle(
+            query_id=query_id,
+            connection=conn,
+            started_at=start,
+            timeout_ms=timeout_ms,
+            operation=operation,
+            sql=query,
+        )
+        _register_query_handle(handle)
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT set_config('statement_timeout', %s, true)", (f"{timeout_ms}ms",))
+                cur.execute(query, params)
+                rows = [dict(row) for row in cur.fetchall()]
+        except psycopg2.errors.QueryCanceled as exc:
+            message = str(exc).lower()
+            if "timeout" in message or "statement timeout" in message:
+                raise HistorianQueryTimeoutError(
+                    f"Historian query timed out after {timeout_ms} ms"
+                ) from exc
+            raise HistorianQueryCancelledError(f"Historian query {query_id} was cancelled") from exc
+        finally:
+            _release_query_handle(query_id)
+
     observe_historian_query(table, operation, time.monotonic() - start, len(rows))
     return rows
 
@@ -405,15 +498,21 @@ def query_recent_events(table: str, limit: int = 100) -> list[dict[str, Any]]:
 
 
 
-def query_sql(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
-    return _fetch_rows("sql", "readwrite", sql, params)
+def query_sql(sql: str, params: tuple = (), *, query_id: str | None = None, timeout_ms: int | None = None) -> list[dict[str, Any]]:
+    return _fetch_rows_with_timeout("sql", "readwrite", sql, params, query_id=query_id, timeout_ms=timeout_ms)
 
 
-def query_sql_readonly(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
+def query_sql_readonly(
+    sql: str,
+    params: tuple = (),
+    *,
+    query_id: str | None = None,
+    timeout_ms: int | None = None,
+) -> list[dict[str, Any]]:
     safety = validate_readonly_sql(sql)
     if not safety.allowed:
         raise ValueError(safety.reason or "readonly sql rejected")
-    return _fetch_rows("sql", "readonly", sql, params)
+    return _fetch_rows_with_timeout("sql", "readonly", sql, params, query_id=query_id, timeout_ms=timeout_ms)
 
 
 

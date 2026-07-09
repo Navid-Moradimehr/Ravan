@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { formatErrorMessage, requestJson } from "@/lib/http";
 import { showToast } from "@/components/toaster";
+import { HelpTip } from "@/components/help-tip";
 
 async function getWebhooks(): Promise<{ webhooks?: Record<string, any> }> {
   return requestJson<{ webhooks?: Record<string, any> }>("/api/webhooks");
@@ -75,6 +76,10 @@ export function WebhookPanel() {
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
           <Webhook className="size-4 text-accent" />
           Webhooks
+          <HelpTip
+            label="Webhooks help"
+            content="Add outbound HTTP endpoints here for alarms and anomaly events. The destination belongs to the deployment operator, not to the platform core."
+          />
         </CardTitle>
         <CardDescription className="text-text-secondary">Outbound notifications for alarms and anomalies</CardDescription>
       </CardHeader>

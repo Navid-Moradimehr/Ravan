@@ -26,3 +26,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 502 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const queryId = searchParams.get("query_id");
+    if (!queryId) {
+      return NextResponse.json({ error: "query_id is required" }, { status: 400 });
+    }
+
+    const response = await fetch(`${API_SERVICE_BASE}/api/v1/historian/query/${encodeURIComponent(queryId)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      const error = await readResponseError(response);
+      return NextResponse.json({ error: error.message, details: error.details }, { status: error.status });
+    }
+    return NextResponse.json(await response.json());
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message, details: error.details }, { status: error.status });
+    }
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 502 });
+  }
+}

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatErrorMessage, requestJson } from "@/lib/http";
 import { showToast } from "@/components/toaster";
+import { HelpTip } from "@/components/help-tip";
 
 async function getNotifications(): Promise<{ notifications?: Record<string, any> }> {
   return requestJson<{ notifications?: Record<string, any> }>("/api/notifications");
@@ -59,6 +60,10 @@ export function NotificationPanel() {
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
           <Bell className="size-4 text-accent" />
           Notifications
+          <HelpTip
+            label="Notifications help"
+            content="Configure alert delivery destinations here. Email, webhook, and Slack entries are operator-owned channels that receive alarm and anomaly notifications."
+          />
         </CardTitle>
         <CardDescription className="text-text-secondary">Alert destinations for alarms and anomalies</CardDescription>
       </CardHeader>

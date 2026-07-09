@@ -261,6 +261,42 @@ This is the memory of the platform.
 - analysts run SQL queries and export CSV
 - engineers replay past data windows for testing
 
+### Historian SQL workflow
+
+The SQL panel is the read-only historian analysis surface.
+
+**What it does**
+
+- lets operators and analysts run ad-hoc SQL against the historian tables
+- validates the query before it reaches the database
+- enforces a server-side timeout so large scans do not hang the browser indefinitely
+- lets the user cancel an active statement from the UI
+
+**Main inputs**
+
+- a read-only SQL statement
+- optional query parameters
+- historian connection settings from the deployment environment
+
+**Main outputs**
+
+- tabular query results rendered in the UI
+- CSV export for local analysis
+- a query status message if the statement is canceled, fails, or times out
+
+**How it performs**
+
+- the query is executed on the historian service, not in the browser
+- cancellation sends a stop request to the active PostgreSQL statement
+- the timeout keeps accidental full-table scans bounded on the server
+
+**How users interact with it**
+
+- users type a historian-safe SQL statement into the editor
+- a Cancel button appears while the query is running
+- the result table shows rows and columns directly below the editor
+- contextual `?` help tips explain where the data comes from and what the panel can and cannot do
+
 ### 7) UI and Operator Experience
 
 This is the working surface for users.
@@ -299,6 +335,22 @@ This is the working surface for users.
 - analysts use SQL and KPI tools
 - testers use replay and scenario controls
 - admins use service links and configuration screens
+
+### Contextual help tips
+
+The UI now uses small `?` help tips on the most ambiguous surfaces.
+
+**What it does**
+
+- gives inline explanations without forcing the user to leave the page
+- clarifies which panels are editable in the app and which are deployment-configured
+- reduces confusion around SQL, replay, webhooks, notifications, and integration catalogs
+
+**How users interact with it**
+
+- hover or focus the `?` icon to read the explanation
+- use the guidance to find the real owner screen or deployment file
+- use the tip text to understand whether a panel is read-only, catalog-only, or editable
 
 ### 8) Notifications and Integrations
 

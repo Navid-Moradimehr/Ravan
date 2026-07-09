@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeHistorianStream, subscribeEventsWebSocket, type HistorianStreamPayload } from "@/lib/api";
 import { formatErrorMessage } from "@/lib/http";
 import { showToast } from "@/components/toaster";
+import { HelpTip } from "@/components/help-tip";
 
 function TrendChart({ data }: { data: { time: string; value: number }[] }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
@@ -205,9 +206,16 @@ export function HistorianDashboard() {
         </Card>
       ) : null}
 
-      <Card className="app-card overflow-hidden">
-        <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold"><Play className="size-4 text-accent" />Scenario & Replay</CardTitle>
+        <Card className="app-card overflow-hidden">
+          <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Play className="size-4 text-accent" />
+            Scenario & Replay
+            <HelpTip
+              label="Scenario and replay help"
+              content="Choose a dataset and scenario to replay representative industrial data through the historian. The controls here are for test and validation workflows, not for live plant writes."
+            />
+          </CardTitle>
           <CardDescription className="text-text-secondary">Select dataset and scenario for ground-truth testing</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4">
@@ -263,7 +271,14 @@ export function HistorianDashboard() {
       <div className="grid gap-5 lg:grid-cols-2">
         <Card className="app-card overflow-hidden">
           <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold"><FolderTree className="size-4 text-accent" />Asset Hierarchy</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <FolderTree className="size-4 text-accent" />
+              Asset Hierarchy
+              <HelpTip
+                label="Asset hierarchy help"
+                content="This tree mirrors the configured asset model and is used to pick tags for trends. If a site has its own topology, it should come from the asset registry or manifest."
+              />
+            </CardTitle>
             <CardDescription className="text-text-secondary">Click a tag to view its trend</CardDescription>
           </CardHeader>
           <CardContent className="max-h-96 overflow-y-auto p-4">
@@ -277,7 +292,14 @@ export function HistorianDashboard() {
 
         <Card className="app-card overflow-hidden">
           <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold"><TrendingUp className="size-4 text-accent" />Historical Trend</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <TrendingUp className="size-4 text-accent" />
+              Historical Trend
+              <HelpTip
+                label="Historical trend help"
+                content="Trend charts show historian readings for a single selected tag. Use this view to inspect time windows, detect drift, and compare against replay data."
+              />
+            </CardTitle>
             <CardDescription className="text-text-secondary">{selectedAsset ? `${selectedAsset.assetId}.${selectedAsset.tag}` : "Select an asset tag"}</CardDescription>
           </CardHeader>
           <CardContent className="p-4">
@@ -290,7 +312,14 @@ export function HistorianDashboard() {
 
       <Card className="app-card overflow-hidden">
         <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold"><AlertTriangle className="size-4 text-accent" />Alarms & Events</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <AlertTriangle className="size-4 text-accent" />
+            Alarms & Events
+            <HelpTip
+              label="Alarms and events help"
+              content="This table shows processed events that crossed warning or critical thresholds. It is the operational alert surface for historians and dashboards."
+            />
+          </CardTitle>
           <CardDescription className="text-text-secondary">Recent warning and critical events from processed stream</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -329,7 +358,14 @@ export function HistorianDashboard() {
 
     <Card className="app-card overflow-hidden">
         <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold"><Database className="size-4 text-accent" />Raw Events</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Database className="size-4 text-accent" />
+            Raw Events
+            <HelpTip
+              label="Raw events help"
+              content="Use this view to inspect historian tables after ingestion. The dropdown switches between raw industrial events, processed events, and AI-enriched summaries."
+            />
+          </CardTitle>
           <CardDescription className="text-text-secondary">Recent events from the historian</CardDescription>
         </CardHeader>
         <CardContent className="p-0">

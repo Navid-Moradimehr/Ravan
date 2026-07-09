@@ -7,6 +7,7 @@ import { NotificationPanel } from "@/components/notification-panel";
 import { DashboardBuilder } from "@/components/dashboard-builder";
 import { WebhookPanel } from "@/components/webhook-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpTip } from "@/components/help-tip";
 
 export default function HistorianPage() {
   return (
@@ -17,6 +18,10 @@ export default function HistorianPage() {
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <DatabaseZap aria-hidden="true" className="size-4 text-accent" />
               Historian notes
+              <HelpTip
+                label="Historian notes help"
+                content="The historian is the storage and query layer. This panel explains how to use trends, replay, SQL, and recovery tools without mixing them into the ingest path."
+              />
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 p-4 text-sm leading-6 text-text-secondary">

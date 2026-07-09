@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import psycopg2
+import pytest
+
 from services.historian.client import _connection_string
 
 
@@ -262,3 +265,118 @@ def test_insert_processed_events_uses_on_conflict(monkeypatch) -> None:
 
     assert "ON CONFLICT (time, event_id) DO NOTHING" in captured["query"]
     assert captured["committed"] is True
+
+
+def test_query_sql_readonly_applies_timeout_and_tracks_handle(monkeypatch) -> None:
+    from services.historian import client
+
+    client._ACTIVE_QUERIES.clear()
+    captured: dict[str, object] = {}
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def execute(self, query, params=None):
+            captured.setdefault("queries", []).append((query, params))
+
+        def fetchall(self):
+            return [{"event_id": "evt-1", "value": 42}]
+
+    class FakeConn:
+        def cursor(self, *args, **kwargs):
+            captured["cursor_kwargs"] = kwargs
+            return FakeCursor()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    observed: list[tuple[object, ...]] = []
+    monkeypatch.setattr(client, "get_connection", lambda: FakeConn())
+    monkeypatch.setattr(client, "observe_historian_query", lambda *args: observed.append(args))
+
+    rows = client.query_sql_readonly(
+        "SELECT * FROM industrial_events LIMIT 1",
+        query_id="query-1",
+        timeout_ms=1234,
+    )
+
+    assert rows == [{"event_id": "evt-1", "value": 42}]
+    assert observed and observed[0][0] == "sql"
+    assert observed[0][1] == "readonly"
+    assert client._ACTIVE_QUERIES == {}
+    assert any("set_config('statement_timeout'" in query for query, _ in captured["queries"])  # type: ignore[index]
+
+
+def test_cancel_historian_query_calls_connection_cancel() -> None:
+    from services.historian import client
+
+    client._ACTIVE_QUERIES.clear()
+
+    class FakeConn:
+        def __init__(self):
+            self.cancel_called = False
+
+        def cancel(self):
+            self.cancel_called = True
+
+    conn = FakeConn()
+    client._ACTIVE_QUERIES["query-2"] = client.HistorianQueryHandle(
+        query_id="query-2",
+        connection=conn,
+        started_at=0.0,
+        timeout_ms=1500,
+        operation="readonly",
+        sql="SELECT 1",
+    )
+
+    result = client.cancel_historian_query("query-2")
+
+    assert result["status"] == "cancel_requested"
+    assert conn.cancel_called is True
+    client._ACTIVE_QUERIES.clear()
+
+
+def test_query_sql_readonly_raises_timeout_when_statement_cancels(monkeypatch) -> None:
+    from services.historian import client
+
+    client._ACTIVE_QUERIES.clear()
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def execute(self, query, params=None):
+            if "industrial_events" in query:
+                raise psycopg2.errors.QueryCanceled("canceling statement due to statement timeout")
+
+        def fetchall(self):
+            return []
+
+    class FakeConn:
+        def cursor(self, *args, **kwargs):
+            return FakeCursor()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(client, "get_connection", lambda: FakeConn())
+
+    with pytest.raises(client.HistorianQueryTimeoutError):
+        client.query_sql_readonly(
+            "SELECT * FROM industrial_events LIMIT 1",
+            query_id="query-3",
+            timeout_ms=1,
+        )

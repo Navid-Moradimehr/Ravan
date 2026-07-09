@@ -4,6 +4,7 @@ import { DashboardFrame } from "@/components/dashboard-frame";
 import { SectionHeader } from "@/components/section-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { HelpTip } from "@/components/help-tip";
 
 type SurfaceAction = {
   label: string;
@@ -217,6 +218,10 @@ export default function IntegrationsPage() {
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Webhook aria-hidden="true" className="size-4 text-accent" />
               Integration boundary
+              <HelpTip
+                label="Integration boundary help"
+                content="This page is a catalog of integration surfaces. If a control is editable in the app, the button takes you to the owner screen. If not, the card explains the deployment-side location."
+              />
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 p-4 text-sm leading-6 text-text-secondary">
@@ -243,6 +248,7 @@ export default function IntegrationsPage() {
           eyebrow="In app"
           description="These integrations have direct edit screens inside the platform."
           icon={BarChart3}
+          actions={<HelpTip label="Editable surfaces help" content="Open the owner screen from each card. These surfaces are editable inside the platform UI." />}
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {editableSurfaces.map((item) => (
@@ -255,6 +261,7 @@ export default function IntegrationsPage() {
           eyebrow="Operator setup"
           description="These surfaces are cataloged here, but the actual configuration lives in deployment files or APIs."
           icon={Cable}
+          actions={<HelpTip label="Deployment-configured surfaces help" content="These integrations are managed through compose files, environment variables, manifests, or APIs rather than an in-app editor." />}
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {catalogSurfaces.map((item) => (
@@ -267,6 +274,7 @@ export default function IntegrationsPage() {
           eyebrow="Where to configure"
           description="Use these pointers when a surface is not editable in the UI yet."
           icon={DatabaseZap}
+          actions={<HelpTip label="Setup guide help" content="Use these steps for deployment-owned integrations. The UI points you to the config file or API where the setting actually lives." />}
         />
         <div className="space-y-3">
           {catalogSurfaces.map((item) => (

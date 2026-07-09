@@ -13,6 +13,9 @@ from services.historian.client import (
     insert_ai_enriched,
     insert_industrial_event,
     insert_processed_event,
+    cancel_historian_query,
+    HistorianQueryCancelledError,
+    HistorianQueryTimeoutError,
     query_alarms,
     query_tables,
     query_recent_events,
@@ -28,6 +31,8 @@ router = APIRouter(tags=["historian"])
 class SqlQueryRequest(BaseModel):
     sql: str = Field(..., min_length=1, max_length=2000)
     params: list[Any] = Field(default_factory=list)
+    query_id: str | None = Field(default=None, min_length=6, max_length=128)
+    timeout_ms: int | None = Field(default=None, ge=1, le=600000)
 
 
 @router.get("/api/v1/historian/tables")
@@ -39,11 +44,23 @@ async def get_tables() -> list[str]:
 
 
 @router.post("/api/v1/historian/query")
-async def post_query(req: SqlQueryRequest) -> list[dict[str, Any]]:
+def post_query(req: SqlQueryRequest) -> list[dict[str, Any]]:
     try:
-        return query_sql_readonly(req.sql, tuple(req.params))
+        return query_sql_readonly(req.sql, tuple(req.params), query_id=req.query_id, timeout_ms=req.timeout_ms)
+    except HistorianQueryTimeoutError as exc:
+        raise HTTPException(status_code=408, detail=str(exc))
+    except HistorianQueryCancelledError as exc:
+        raise HTTPException(status_code=499, detail=str(exc))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/api/v1/historian/query/{query_id}")
+def delete_query(query_id: str) -> dict[str, Any]:
+    try:
+        return cancel_historian_query(query_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/v1/historian/alarms")

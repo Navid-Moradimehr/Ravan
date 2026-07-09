@@ -2305,3 +2305,51 @@ locations. One fix also resolved a real silent-state-clearing bug.
 - The `uv.lock` and `ui/next-env.d.ts` working-tree changes were spurious
   (CRLF line-ending reformat and a Next.js dev path tweak) and discarded
   rather than committed.
+
+---
+
+## SQL query control and contextual help hardening (2026-07-09)
+
+Implemented the SQL workflow guardrails requested for the historian UI and
+started standardizing inline explanations across the dashboard/catalog pages.
+
+### What changed
+
+1. **Historian SQL timeout and cancel contract**
+   - Added a tracked query handle in `services/historian/client.py` so active
+     read-only statements can be canceled by query ID.
+   - `statement_timeout` is now set per historian SQL call from the backend
+     default (`HISTORIAN_QUERY_TIMEOUT_MS`) before the query executes.
+   - Added `DELETE /api/v1/historian/query/{query_id}` so the UI can stop an
+     active query instead of only waiting for the server to finish.
+
+2. **SQL panel usability**
+   - Added a `?` help tip to the SQL Query card.
+   - Added visible run/cancel controls, a read-only badge, and clearer helper
+     text describing the historian-only workflow.
+   - The panel now generates a query ID per run so cancellation can target the
+     correct statement.
+
+3. **Contextual help tips**
+   - Added reusable help tips to historian replay, asset hierarchy, trends,
+     alarms/events, webhooks, notifications, and the integrations catalog.
+   - The integration page now separates editable surfaces from deployment-
+     configured surfaces with inline guidance.
+
+### Docs and vault
+
+- `docs/app-functionality.md` now includes the historian SQL workflow and the
+  new contextual help-tip pattern.
+- `ObsidianVault/30_UI_UX/` will receive the matching UI note for the same
+  change set.
+
+### Verification
+
+- `py -3.13 -m pytest tests/test_historian.py tests/test_api_route_splits.py -q`:
+  9 passed.
+- `py -3.13 -m pytest tests/test_historian_query_guardrails.py -q`:
+  3 passed.
+- `py -3.13 -m compileall services tests`: clean.
+- `npm run build` in `ui/`: successful production build with route manifest
+  confirming `/api/historian`, `/api/query`, `/api/webhooks`,
+  `/api/notifications`, and the historian pages all compile together.
