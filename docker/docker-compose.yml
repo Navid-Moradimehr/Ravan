@@ -50,7 +50,7 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_READONLY: "false"
+      KAFKA_CLUSTERS_0_READONLY: "true"
     ports:
       - "18080:8080"
 
@@ -96,6 +96,7 @@ services:
     build:
       context: ..
       dockerfile: services/ai_gateway/Dockerfile
+    init: true
     depends_on:
       kafka:
         condition: service_healthy
@@ -255,6 +256,7 @@ services:
     build:
       context: ..
       dockerfile: ui/Dockerfile
+    init: true
     depends_on:
       - ai-gateway
     environment:

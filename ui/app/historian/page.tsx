@@ -8,6 +8,7 @@ import { DashboardBuilder } from "@/components/dashboard-builder";
 import { WebhookPanel } from "@/components/webhook-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HelpTip } from "@/components/help-tip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function HistorianPage() {
   return (
@@ -24,9 +25,32 @@ export default function HistorianPage() {
               />
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 p-4 text-sm leading-6 text-text-secondary">
-            <p>Queries, retention, backups, replay, and dashboards live here.</p>
-            <p>The page is intentionally after storage, not part of the raw ingest path.</p>
+          <CardContent className="p-4">
+            <Tabs defaultValue="about" className="gap-3">
+              <TabsList variant="line" className="w-full justify-start border-b border-border-subtle pb-1">
+                <TabsTrigger value="about">About</TabsTrigger>
+                <TabsTrigger value="use">How to use</TabsTrigger>
+              </TabsList>
+              <TabsContent value="about" className="space-y-2 pt-3 text-sm leading-6 text-text-secondary">
+                <p>
+                  The historian is the platform&apos;s memory. It stores the events that have already been normalized and processed so
+                  operators and analysts can query history instead of only watching live traffic.
+                </p>
+                <p>
+                  This page is where you read back what happened, not where you configure the ingest path itself.
+                </p>
+              </TabsContent>
+              <TabsContent value="use" className="space-y-2 pt-3 text-sm leading-6 text-text-secondary">
+                <p>
+                  Start with the dashboard, then open SQL if you need a custom question, use replay if you need to re-run a scenario,
+                  and use webhooks or notifications if you want to connect the historian to external systems.
+                </p>
+                <p>
+                  If you are new to the platform, think of the historian as the place where you ask, “What happened?”, while Kafka UI is
+                  the place where you ask, “Did the event move through the broker?”
+                </p>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       }
