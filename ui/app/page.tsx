@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, ArrowRight, BarChart3, Cable, DatabaseZap, Gauge, HardDrive, RadioTower, Workflow } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Cable, DatabaseZap, Gauge, HardDrive, Workflow } from "lucide-react";
 import { DashboardFrame } from "@/components/dashboard-frame";
 import { SectionHeader } from "@/components/section-header";
 import { StatCard } from "@/components/stat-card";
@@ -135,19 +135,39 @@ export default function Home() {
       }
     >
       <div className="space-y-6">
-        <section className="space-y-4">
-          <SectionHeader
-            title="Platform indicators"
-            eyebrow="Overview"
-            description="Current targets and active lanes for the local validation stack."
-          />
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Normalized stream" value="industrial.normalized" icon={RadioTower} tone="info" />
-            <StatCard label="Throughput target" value="1k" unit="msg/s" icon={Activity} tone="default" />
-            <StatCard label="Latency budget" value="p95 <500" unit="ms" icon={Gauge} tone="warning" />
-            <StatCard label="Exception lane" value="industrial.dlq" icon={Workflow} tone="error" />
+        <header className="app-card overflow-hidden">
+          <div className="border-b border-border-subtle px-6 py-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="border-accent/40 bg-accent-subtle text-accent">
+                Kafka control plane
+              </Badge>
+              <Badge variant="outline" className={statusTone(aiStatus)}>
+                {aiStatus === "online" ? "Telemetry online" : aiStatus === "degraded" ? "Telemetry degraded" : "Telemetry offline"}
+              </Badge>
+            </div>
+            <h1 className="mt-4 max-w-2xl text-balance font-heading text-3xl font-semibold leading-tight tracking-tight text-text-primary md:text-4xl">
+              Industrial streaming command center
+            </h1>
+            <p className="mt-3 max-w-2xl text-pretty text-sm leading-6 text-text-secondary md:text-base">
+              The landing page keeps a concise operational overview while detailed pipeline, historian, and integration views live on
+              their own routes.
+            </p>
           </div>
-        </section>
+          <div className="flex flex-wrap items-center gap-2 bg-surface-0/40 px-6 py-3">
+            <Link
+              href="/pipeline"
+              className="action-primary inline-flex h-9 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors"
+            >
+              Open pipeline view
+            </Link>
+            <Link
+              href="/historian"
+              className="action-secondary inline-flex h-9 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors"
+            >
+              Open historian tools
+            </Link>
+          </div>
+        </header>
 
         <section className="space-y-4">
           <SectionHeader
