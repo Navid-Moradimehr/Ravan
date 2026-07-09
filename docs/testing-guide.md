@@ -9,7 +9,7 @@
 - Click `Light mode` and confirm the theme flips to a pale surface palette.
 - Refresh the page and confirm the selected theme persists.
 - Confirm the observability route shows throughput, AI latency, protocol mix, severity mix, and service health cards.
-- Confirm the Grafana operator link goes to `http://localhost:13000/login` rather than a public signup page.
+- Confirm the Grafana operator link goes to `http://localhost:13000` and opens Grafana through the local proxy without a second login screen.
 
 ### Industrial Edge Ingestion
 
@@ -60,6 +60,7 @@
 - Confirm metrics are visible for broker, edge ingest, AI gateway, and service health.
 - Check the AI gateway exposes `ai_gateway_batch_size`, `ai_gateway_llm_request_seconds`, and `ai_gateway_batch_severity_total`.
 - Confirm the dashboard still renders when Grafana or Prometheus is stopped; it should fall back to the built-in snapshot and show Grafana as offline.
+  When Grafana is up, it is fronted by the local proxy on port `13000`, so the app should not introduce a second login layer.
 
 ## Performance Tests
 

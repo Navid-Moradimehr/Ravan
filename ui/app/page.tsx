@@ -114,9 +114,9 @@ export default function Home() {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-1.5 p-3">
-              {[
+              {[ 
                 ["Kafka UI", "http://localhost:18080"],
-                ["Grafana", "http://localhost:13000/login"],
+                ["Grafana", "http://localhost:13000"],
                 ["Prometheus", "http://localhost:19090"],
                 ["Edge Metrics", "http://localhost:8090"],
                 ["AI Health", "http://localhost:8080/health"],

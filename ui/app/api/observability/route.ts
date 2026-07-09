@@ -167,7 +167,7 @@ async function fetchPrometheusSnapshot(baseUrl: string): Promise<ObservabilitySn
     grafana: {
       online: true,
       status: "online",
-      login_url: `${baseUrl.replace(/\/$/, "")}/login`,
+      login_url: baseUrl.replace(/\/$/, ""),
     },
     prometheus: {
       online: true,
@@ -187,7 +187,7 @@ async function fetchGrafanaStatus(baseUrl: string) {
     return {
       online: true,
       status: health.database === "ok" ? "online" : "degraded",
-      login_url: `${baseUrl.replace(/\/$/, "")}/login`,
+      login_url: baseUrl.replace(/\/$/, ""),
     };
   } catch {
     return createObservabilityFallback().grafana;

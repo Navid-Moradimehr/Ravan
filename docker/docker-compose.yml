@@ -328,8 +328,12 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_DEFAULT_THEME: dark
+      GF_SERVER_DOMAIN: localhost
+      GF_SERVER_ROOT_URL: http://localhost:13000/
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_BASIC_ENABLED: "true"
     ports:
-      - "13000:3000"
+      - "3001:3000"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health"]
       interval: 15s
@@ -339,6 +343,15 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+  grafana-proxy:
+    image: nginx:1.27-alpine
+    depends_on:
+      - grafana
+    ports:
+      - "13000:80"
+    volumes:
+      - ./grafana/nginx.conf:/etc/nginx/nginx.conf:ro
 
   minio:
     image: minio/minio:RELEASE.2025-01-20T14-49-07Z

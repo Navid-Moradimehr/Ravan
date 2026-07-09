@@ -332,7 +332,7 @@ export function createObservabilityFallback(): ObservabilitySnapshot {
     grafana: {
       online: false,
       status: "offline",
-      login_url: "http://localhost:13000/login",
+      login_url: "http://localhost:13000",
     },
     prometheus: {
       online: false,
