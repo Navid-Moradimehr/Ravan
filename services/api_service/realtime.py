@@ -5,6 +5,7 @@ import json
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
 
 from services.common.runtime_metrics import observe_websocket_batch_delivery
 from services.common.service_health import ServiceHealthState
@@ -33,9 +34,10 @@ class ConnectionManager:
         dead: list[WebSocket] = []
         async with self._lock:
             connections = list(self.active_connections)
+        encoded_message = jsonable_encoder(message)
         for conn in connections:
             try:
-                await conn.send_json(message)
+                await conn.send_json(encoded_message)
             except Exception:
                 dead.append(conn)
         if dead:
@@ -46,7 +48,7 @@ class ConnectionManager:
 
     async def send_personal(self, websocket: WebSocket, message: dict[str, Any]) -> None:
         try:
-            await websocket.send_json(message)
+            await websocket.send_json(jsonable_encoder(message))
         except Exception:
             await self.disconnect(websocket)
 
@@ -130,7 +132,7 @@ async def websocket_alarms(websocket: WebSocket) -> None:
 
         data = query_alarms(50)
         observe_websocket_batch_delivery("alarms", data)
-        await websocket.send_json({"type": "init", "alarms": data})
+        await websocket.send_json(jsonable_encoder({"type": "init", "alarms": data}))
         while True:
             msg = await websocket.receive_text()
             try:
@@ -139,7 +141,7 @@ async def websocket_alarms(websocket: WebSocket) -> None:
                     await websocket.send_json({"type": "pong"})
                 elif parsed.get("action") == "subscribe":
                     data = query_alarms(50)
-                    await websocket.send_json({"type": "init", "alarms": data})
+                    await websocket.send_json(jsonable_encoder({"type": "init", "alarms": data}))
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
@@ -155,7 +157,7 @@ async def websocket_events(websocket: WebSocket) -> None:
         for table in ["industrial_events", "processed_events", "ai_enriched"]:
             data = query_historian_events(table, 100)
             observe_websocket_batch_delivery(f"historian:{table}", data)
-            await websocket.send_json({"type": "init", "table": table, "events": data})
+            await websocket.send_json(jsonable_encoder({"type": "init", "table": table, "events": data}))
         while True:
             msg = await websocket.receive_text()
             try:
@@ -165,7 +167,7 @@ async def websocket_events(websocket: WebSocket) -> None:
                 elif parsed.get("action") == "subscribe":
                     table = parsed.get("table", "industrial_events")
                     data = query_historian_events(table, 100)
-                    await websocket.send_json({"type": "init", "table": table, "events": data})
+                    await websocket.send_json(jsonable_encoder({"type": "init", "table": table, "events": data}))
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
@@ -179,7 +181,7 @@ async def websocket_telemetry(websocket: WebSocket) -> None:
         from services.ai_gateway.main import _build_telemetry
 
         payload = await _build_telemetry()
-        await websocket.send_json({"type": "init", "telemetry": payload})
+        await websocket.send_json(jsonable_encoder({"type": "init", "telemetry": payload}))
         while True:
             msg = await websocket.receive_text()
             try:

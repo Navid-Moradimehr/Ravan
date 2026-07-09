@@ -8,4 +8,6 @@ The main topics to check are `industrial.raw`, `industrial.normalized`, `industr
 
 Kafka UI is most useful when you want to troubleshoot the stream without reading service logs. You can open a topic to see messages, inspect the offset progression, and check consumer groups to see whether the processor is lagging. That tells you where the pipeline is healthy and where it is not.
 
+The `Create new topic` page is for provisioning a new Kafka topic when the stream contract does not already exist. Use it when you are adding a new data domain, creating a replay or benchmark topic, or standing up a temporary test stream in a development deployment. In the open-source local stack this is not the normal day-to-day operator path because topic provisioning is usually deployment-owned infrastructure.
+
 The topic statistics page may show browser-console warnings in this local setup. Those warnings usually come from Kafka UI trying to call ACL or analysis endpoints that are not fully available in a simple standalone broker environment. For this project that means the console is probing features that belong to a more permissioned Kafka installation. The platform itself is still fine if the core topics and consumer groups are working.
