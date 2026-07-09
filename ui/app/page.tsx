@@ -52,6 +52,16 @@ export default function Home() {
     refetchInterval: 60000,
   });
 
+  const telemetrySourceLabel = telemetryEvents.data
+    ? "Live telemetry stream"
+    : telemetryEvents.isConnected
+      ? "Telemetry connected, awaiting payload"
+      : "Demo fallback telemetry";
+  const observabilitySourceLabel =
+    observability.data && (observability.data.prometheus.online || observability.data.grafana.online)
+      ? "Live observability snapshot"
+      : "Demo fallback snapshot";
+
   const pipeline = telemetryEvents.data?.pipeline ?? [
     { name: "edge", status: "starting" as const },
     { name: "normalize", status: "starting" as const },
@@ -125,40 +135,6 @@ export default function Home() {
       }
     >
       <div className="space-y-6">
-        <header className="app-card overflow-hidden">
-          <div className="border-b border-border-subtle px-6 py-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="border-accent/40 bg-accent-subtle text-accent">
-                Kafka control plane
-              </Badge>
-              <Badge variant="outline" className={statusTone(aiStatus)}>
-                {aiStatus === "online" ? "Telemetry online" : aiStatus === "degraded" ? "Telemetry degraded" : "Telemetry offline"}
-              </Badge>
-            </div>
-            <h1 className="mt-4 max-w-2xl text-balance font-heading text-3xl font-semibold leading-tight tracking-tight text-text-primary md:text-4xl">
-              Industrial streaming command center
-            </h1>
-            <p className="mt-3 max-w-2xl text-pretty text-sm leading-6 text-text-secondary md:text-base">
-              The landing page now stays focused on operational health. Pipeline details, processing internals, historian tools,
-              and integrations live on their own routes.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 bg-surface-0/40 px-6 py-3">
-            <Link
-              href="/pipeline"
-              className="action-primary inline-flex h-9 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors"
-            >
-              Open pipeline view
-            </Link>
-            <Link
-              href="/historian"
-              className="action-secondary inline-flex h-9 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-colors"
-            >
-              Open historian tools
-            </Link>
-          </div>
-        </header>
-
         <section className="space-y-4">
           <SectionHeader
             title="Platform indicators"
@@ -213,6 +189,14 @@ export default function Home() {
             eyebrow="Telemetry"
             description="The home page keeps a concise readout of the active pipeline without absorbing the detailed screens."
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="border-accent/40 bg-accent-subtle text-accent">
+              {telemetrySourceLabel}
+            </Badge>
+            <Badge variant="outline" className={statusTone(aiStatus)}>
+              {aiStatus === "online" ? "Telemetry online" : aiStatus === "degraded" ? "Telemetry degraded" : "Telemetry offline"}
+            </Badge>
+          </div>
           <div className="grid gap-3 md:grid-cols-4">
             {pipeline.map((node, index) => (
               <Card key={node.name} className="border-border bg-surface-2">
@@ -236,6 +220,11 @@ export default function Home() {
             eyebrow="Observability"
             description="This mirrors the active service state without turning the home page into a metrics wall."
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="border-accent/40 bg-accent-subtle text-accent">
+              {observabilitySourceLabel}
+            </Badge>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Grafana" value={String(observabilitySnapshot.grafana?.status ?? "unknown")} icon={BarChart3} tone="default" />
             <StatCard label="Prometheus" value={String(observabilitySnapshot.prometheus?.status ?? "unknown")} icon={Gauge} tone="default" />
