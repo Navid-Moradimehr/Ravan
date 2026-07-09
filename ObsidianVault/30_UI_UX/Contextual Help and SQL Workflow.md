@@ -39,3 +39,11 @@ where a control belongs without leaving the current page.
 - Keep the help-tip copy short and aligned with the existing app typography.
 - Reuse the same pattern for other dense cards only when the explanation is
   genuinely useful.
+
+## Integrations layout cleanup
+
+- Desktop now stays closer to the mobile rhythm by using fewer columns and
+  more vertical spacing.
+- Repeated status badges were removed because the section labels already carry
+  the meaning.
+- Card text now wraps more safely in wider layouts.

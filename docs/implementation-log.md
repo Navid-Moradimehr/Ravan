@@ -2353,3 +2353,24 @@ started standardizing inline explanations across the dashboard/catalog pages.
 - `npm run build` in `ui/`: successful production build with route manifest
   confirming `/api/historian`, `/api/query`, `/api/webhooks`,
   `/api/notifications`, and the historian pages all compile together.
+
+---
+
+## Integrations page readability cleanup (2026-07-09)
+
+The desktop layout on `/integrations` was denser than the mobile layout and
+repeated a status badge that was already obvious from the section grouping.
+
+### What changed
+
+- Reduced the card grids from 3-4 columns to a roomier 2-column desktop layout
+  so the page reads more like the stacked mobile view.
+- Removed the redundant `Editable in app` / `Deployment-configured` tags from
+  each card.
+- Increased wrapping room in card titles, descriptions, location rows, and
+  guide steps so longer integration names do not collide with card edges.
+
+### Verification
+
+- `npm run build` in `ui/`: successful.
+- `py -3.13 -m pytest tests/test_api_route_splits.py -q`: 1 passed.

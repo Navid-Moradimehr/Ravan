@@ -3,7 +3,6 @@ import { ArrowRight, BarChart3, Cable, DatabaseZap, Plug, Webhook } from "lucide
 import { DashboardFrame } from "@/components/dashboard-frame";
 import { SectionHeader } from "@/components/section-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { HelpTip } from "@/components/help-tip";
 
 type SurfaceAction = {
@@ -16,7 +15,6 @@ type SurfaceCard = {
   title: string;
   description: string;
   note: string;
-  status: "Editable in app" | "Deployment-configured";
   icon: typeof Plug;
   action: SurfaceAction;
   guide?: {
@@ -31,7 +29,6 @@ const editableSurfaces: SurfaceCard[] = [
     title: "Webhooks",
     description: "Outbound HTTP notifications for alarms and anomaly events.",
     note: "Managed from the historian workspace.",
-    status: "Editable in app",
     icon: Webhook,
     action: { label: "Open editor", href: "/historian#webhooks", tone: "primary" },
   },
@@ -39,7 +36,6 @@ const editableSurfaces: SurfaceCard[] = [
     title: "Notifications",
     description: "Email, Slack, and webhook destinations for alert delivery.",
     note: "Managed from the historian workspace.",
-    status: "Editable in app",
     icon: BarChart3,
     action: { label: "Open editor", href: "/historian#notifications", tone: "primary" },
   },
@@ -47,7 +43,6 @@ const editableSurfaces: SurfaceCard[] = [
     title: "SQL Query",
     description: "Ad-hoc historian SQL for ops, audit, and validation work.",
     note: "Managed from the historian workspace.",
-    status: "Editable in app",
     icon: DatabaseZap,
     action: { label: "Open editor", href: "/historian#sql-query", tone: "primary" },
   },
@@ -55,7 +50,6 @@ const editableSurfaces: SurfaceCard[] = [
     title: "Dashboard builder",
     description: "Saved local dashboard layouts for monitoring and troubleshooting.",
     note: "Managed from the historian workspace.",
-    status: "Editable in app",
     icon: BarChart3,
     action: { label: "Open builder", href: "/historian#dashboard-builder", tone: "primary" },
   },
@@ -66,7 +60,6 @@ const catalogSurfaces: SurfaceCard[] = [
     title: "Debezium CDC",
     description: "PostgreSQL change capture into Kafka topics.",
     note: "Configured in the deployment stack, not in the UI.",
-    status: "Deployment-configured",
     icon: Cable,
     action: { label: "Setup guide", href: "#debezium-cdc", tone: "secondary" },
     guide: {
@@ -86,7 +79,6 @@ const catalogSurfaces: SurfaceCard[] = [
     title: "Kafka sinks",
     description: "Outbound bridge to MQTT, AMQP, and external listeners.",
     note: "Configured from runtime and fan-out settings.",
-    status: "Deployment-configured",
     icon: Cable,
     action: { label: "Setup guide", href: "#kafka-sinks", tone: "secondary" },
     guide: {
@@ -107,7 +99,6 @@ const catalogSurfaces: SurfaceCard[] = [
     title: "AI providers",
     description: "OpenAI-compatible, LM Studio, vLLM, Ollama, and local models.",
     note: "Configured through environment variables and provider routing.",
-    status: "Deployment-configured",
     icon: DatabaseZap,
     action: { label: "Setup guide", href: "#ai-providers", tone: "secondary" },
     guide: {
@@ -127,7 +118,6 @@ const catalogSurfaces: SurfaceCard[] = [
     title: "Connector catalog",
     description: "MQTT, OPC UA, Modbus, SQL, REST, and file adapters.",
     note: "Cataloged in code and mapped through manifests/runtime config.",
-    status: "Deployment-configured",
     icon: Plug,
     action: { label: "Setup guide", href: "#connector-catalog", tone: "secondary" },
     guide: {
@@ -148,7 +138,6 @@ const catalogSurfaces: SurfaceCard[] = [
     title: "Reports",
     description: "Operational and compliance reporting after storage.",
     note: "Configured through the reports API rather than a dedicated UI today.",
-    status: "Deployment-configured",
     icon: BarChart3,
     action: { label: "Setup guide", href: "#reports", tone: "secondary" },
     guide: {
@@ -173,22 +162,14 @@ function SurfaceCardView({ item }: { item: SurfaceCard }) {
   return (
     <Card className="flex h-full flex-col border-border bg-surface-2">
       <CardHeader className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <span className="flex size-8 items-center justify-center rounded-lg border border-border-subtle bg-surface-0 text-accent">
-                <Icon aria-hidden="true" className="size-4" />
-              </span>
-              {item.title}
-            </CardTitle>
-            <CardDescription>{item.description}</CardDescription>
-          </div>
-          <Badge
-            variant="outline"
-            className={item.status === "Editable in app" ? "border-success/30 bg-success/10 text-success" : "border-warning/30 bg-warning/10 text-warning"}
-          >
-            {item.status}
-          </Badge>
+        <div className="space-y-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span className="flex size-8 items-center justify-center rounded-lg border border-border-subtle bg-surface-0 text-accent">
+              <Icon aria-hidden="true" className="size-4" />
+            </span>
+            <span className="min-w-0 break-words">{item.title}</span>
+          </CardTitle>
+          <CardDescription className="max-w-none break-words text-sm leading-6 text-text-secondary">{item.description}</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
@@ -250,7 +231,7 @@ export default function IntegrationsPage() {
           icon={BarChart3}
           actions={<HelpTip label="Editable surfaces help" content="Open the owner screen from each card. These surfaces are editable inside the platform UI." />}
         />
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 xl:grid-cols-2">
           {editableSurfaces.map((item) => (
             <SurfaceCardView key={item.title} item={item} />
           ))}
@@ -263,7 +244,7 @@ export default function IntegrationsPage() {
           icon={Cable}
           actions={<HelpTip label="Deployment-configured surfaces help" content="These integrations are managed through compose files, environment variables, manifests, or APIs rather than an in-app editor." />}
         />
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-2">
           {catalogSurfaces.map((item) => (
             <SurfaceCardView key={item.title} item={item} />
           ))}
@@ -276,26 +257,21 @@ export default function IntegrationsPage() {
           icon={DatabaseZap}
           actions={<HelpTip label="Setup guide help" content="Use these steps for deployment-owned integrations. The UI points you to the config file or API where the setting actually lives." />}
         />
-        <div className="space-y-3">
+        <div className="space-y-4">
           {catalogSurfaces.map((item) => (
             <Card key={item.title} id={item.action.href.replace("#", "")} className="scroll-mt-24 border-border bg-surface-2">
               <CardHeader className="space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-base">{item.guide?.heading ?? item.title}</CardTitle>
-                    <CardDescription>{item.description}</CardDescription>
-                  </div>
-                  <Badge variant="outline" className="border-border-subtle bg-surface-0 text-text-secondary">
-                    {item.status}
-                  </Badge>
+                <div className="space-y-1">
+                  <CardTitle className="text-base">{item.guide?.heading ?? item.title}</CardTitle>
+                  <CardDescription className="max-w-none break-words">{item.description}</CardDescription>
                 </div>
               </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-[1fr_1.2fr]">
+              <CardContent className="grid gap-5 xl:grid-cols-[1fr_1.15fr]">
                 <div className="space-y-2 text-sm leading-6 text-text-secondary">
                   <p className="font-medium text-text-primary">Where it lives</p>
                   <ul className="space-y-1">
                     {item.guide?.location.map((line) => (
-                      <li key={line} className="rounded-lg border border-border-subtle bg-surface-0 px-3 py-2 font-mono text-xs">
+                      <li key={line} className="rounded-lg border border-border-subtle bg-surface-0 px-3 py-2 font-mono text-xs leading-5 break-words">
                         {line}
                       </li>
                     ))}
@@ -307,7 +283,7 @@ export default function IntegrationsPage() {
                     {item.guide?.steps.map((step, index) => (
                       <li key={step} className="flex gap-2 rounded-lg border border-border-subtle bg-surface-0 px-3 py-2">
                         <span className="font-mono text-xs text-accent">{index + 1}.</span>
-                        <span>{step}</span>
+                        <span className="min-w-0 flex-1 break-words">{step}</span>
                       </li>
                     ))}
                   </ol>
