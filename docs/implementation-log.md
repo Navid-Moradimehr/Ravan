@@ -1,5 +1,17 @@
 # Implementation Log
 
+## 2026-07-10 - Processing Walkthrough Doc
+
+Added a standalone walkthrough for the Processing page and clarified the
+distinction between runtime processing and observability.
+
+### Added
+- `docs/processing-walkthrough.md`
+- `ObsidianVault/30_UI_UX/Processing Walkthrough.md`
+
+### Validation
+- Documentation-only change.
+
 ## 2026-07-10 - Pipeline Panel Help Tips
 
 Added inline `?` help tips to the four main Pipeline page panels and clarified
