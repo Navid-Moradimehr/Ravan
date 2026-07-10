@@ -4,6 +4,7 @@ import { DashboardFrame } from "@/components/dashboard-frame";
 import { SectionHeader } from "@/components/section-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HelpTip } from "@/components/help-tip";
+import { SourceConnectionPanel } from "@/components/source-connection-panel";
 
 type SurfaceAction = {
   label: string;
@@ -223,6 +224,8 @@ export default function IntegrationsPage() {
             </p>
           </div>
         </header>
+
+        <SourceConnectionPanel />
 
         <SectionHeader
           title="Editable surfaces"

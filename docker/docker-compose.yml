@@ -249,6 +249,8 @@ services:
       IOT_TOPIC: iot.raw
     ports:
       - "8090:8090"
+    volumes:
+      - api-data:/data:ro
     profiles:
       - edge
 

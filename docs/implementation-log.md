@@ -2542,3 +2542,10 @@ repeated a status badge that was already obvious from the section grouping.
 
 - `npm run build` in `ui/`: successful.
 - `py -3.13 -m pytest tests/test_api_route_splits.py -q`: 1 passed.
+## 2026-07-10 - Source Connection Registry And Multi-Source Runtime
+
+1. Added a lightweight, versioned source connection contract and file-backed registry. It stores endpoint metadata, site/source identity, mappings, configuration versions, lifecycle state, and credential references without accepting plaintext secret fields.
+2. Added `/api/v1/connections` lifecycle routes plus bounded `/test` diagnostics. Tests validate configuration and TCP reachability without publishing data.
+3. Added Docker `api-data` persistence and registry-backed source descriptors in edge-ingest. Existing environment-variable deployments remain the fallback when no enabled registry sources exist.
+4. Added the Integrations source-connection panel and deployment ownership guidance. The UI explains that saving metadata does not connect or publish, and that mutation routes remain behind the operator's configured auth boundary.
+5. Tests: connection registry persistence/security, diagnostics, source-instance fallback, route registration, metadata snapshot, and UI production build.

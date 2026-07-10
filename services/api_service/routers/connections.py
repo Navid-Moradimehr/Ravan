@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from services.common.connection_registry import ConnectionValidationError, SourceConnection, SourceMapping, connection_registry
+from services.common.connection_diagnostics import run_connection_test
 
 router = APIRouter(tags=["connections"])
 
@@ -118,3 +119,11 @@ async def validate_connection(connection_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Connection not found")
     errors = connection.validate()
     return {"connection_id": connection_id, "valid": not errors, "errors": errors, "network_test": "not_run"}
+
+
+@router.post("/api/v1/connections/{connection_id}/test")
+async def test_connection_endpoint(connection_id: str) -> dict[str, Any]:
+    connection = connection_registry.get(connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    return run_connection_test(connection)
