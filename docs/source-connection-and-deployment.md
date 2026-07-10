@@ -21,6 +21,12 @@ The platform does not own plant credentials, certificates, firewall rules, PLC p
 
 The current UI provides the connection definition and test surface. Full protocol-specific browse and register-map editing are the next extension points; existing environment variables remain supported.
 
+The source-connection panel is intentionally metadata-only. It records where a source lives, which protocol it uses, what site it belongs to, and which deployment-managed credential reference it should use. It does not browse the operator's filesystem, it does not import a whole `.env` file, and it does not store passwords or certificates in the app database.
+
+If an operator keeps credentials in a secret manager, each connection should point at a separate named secret reference such as `secret://site-a/opcua/pump-01` or `secret://site-a/mqtt/broker-02`. If multiple credentials happen to live in the same file, the file is still the operator's secret store boundary; the platform should reference the specific entry name or key, not the file contents. That keeps the registry portable and avoids ambiguity when two sources share one file.
+
+This is standard industrial practice for self-hosted tools: the platform owns connection metadata and runtime state, while the deployment environment owns secret material and file access.
+
 ## Configuration compatibility
 
 The persisted registry is stored at `DATASTREAM_CONNECTION_REGISTRY_PATH`. Docker Compose mounts this state at `/data/connection-registry.json` through the `api-data` volume.
@@ -78,7 +84,7 @@ persist route metadata through `/api/v1/sinks`; the API stores it at
 `DATASTREAM_SINK_ROUTING_PATH`, and fan-out loads enabled route types when
 `SINKS` is not explicitly set. Route changes are detected between fan-out
 batches and reload without container recreation. Route metadata contains no secrets;
-`credential_ref` is only a reference to deployment-managed credentials.
+`credential_ref` is only a reference to deployment-managed credentials. It is not a path to be scanned by the app and not a request for the UI to open arbitrary secret files.
 
 ## Current status
 

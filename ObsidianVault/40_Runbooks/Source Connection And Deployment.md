@@ -43,6 +43,10 @@ User-owned device/network
 
 The Integrations page can create source metadata and run a non-ingesting connection test. The edge runtime loads enabled registry records when present and otherwise preserves the legacy environment-variable deployment.
 
+The source-connection panel is metadata-only by design. It stores the connection contract, not the secret contents. The app should not browse arbitrary secret files or import a whole `.env` file. Operators should provide named credential references from their own secret store, and each source should point at a specific named entry even if several credentials live in one file.
+
+This keeps the open-source deployment model portable and matches common industrial practice: the platform owns connection metadata and validation, while the deployment environment owns secret material and filesystem access.
+
 Enabled mappings are applied to the emitted canonical event before validation. Raw source payloads remain available on the raw topic for replay and troubleshooting.
 
 The connection API now offers a bounded read-only OPC UA preview and accepts declarative Modbus register entries. Full Sparkplug B binary activation, richer register-map editing, durable health history, and end-to-end connector task orchestration remain future work.
@@ -55,7 +59,8 @@ or `lakehouse` implementations without adding a service. `FANOUT_SINKS`
 continues to work and takes precedence when set. When `SINKS` is unset,
 fan-out detects route-file changes between batches and reloads the existing
 sink implementations without container recreation. `credential_ref` values
-are references only and no secret material is accepted.
+are references only and no secret material is accepted. They are not file
+paths for the app to browse.
 
 Sparkplug B uses TahUtils/Eclipse Tahu protobuf parsing in explicit Sparkplug mode. JSON MQTT remains a separate source mode.
 

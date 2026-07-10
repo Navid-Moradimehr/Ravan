@@ -58,6 +58,43 @@ This is the front door of the platform.
 - engineers configure assets, tags, limits, and connector settings
 - external systems can push events through the API
 
+### 1a) Source Connections And Credential References
+
+This is the operator-facing catalog for source setup.
+
+**What it does**
+
+- stores connection metadata for OPC UA, MQTT, Modbus, REST, and other supported sources
+- tracks site ownership, protocol type, endpoint, configuration version, and lifecycle state
+- stores a credential reference instead of the secret itself
+- lets the user test and enable a connection without turning the platform into a secret browser
+
+**Main inputs**
+
+- connection name
+- protocol choice
+- site ID
+- endpoint or broker address
+- a deployment-managed credential reference such as `secret://plant-a/opcua/pump`
+
+**Main outputs**
+
+- saved connection records
+- validation and reachability results
+- enabled/disabled runtime state
+
+**How it performs**
+
+- keeps secret handling outside the core app
+- avoids loading huge `.env` files or arbitrary filesystem paths into the UI
+- supports multiple connections that happen to use credentials from the same external file by keeping the references separate
+
+**How users interact with it**
+
+- operators fill in a connection form or import a deployment manifest
+- they point each source at a named secret reference managed by their own deployment tools
+- they test the connection, map assets and tags, and then enable it
+
 ### 2) Canonical Event Model
 
 This is the common language used by the platform.

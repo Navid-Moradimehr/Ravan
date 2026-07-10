@@ -11,6 +11,8 @@ It covers:
 - what the dashboard shows
 - what Apache Flink does in the platform
 
+For the operator-facing source registry and deployment boundary, see `docs/source-connection-and-deployment.md`. That document is the canonical explanation of how source metadata, credential references, and deployment-owned secrets fit together.
+
 ## 1. What The Platform Does Automatically
 
 The platform already knows how to:
@@ -43,6 +45,8 @@ Before connecting any device, prepare these items:
 - TLS certificates if the device requires them
 - username/password or token if the gateway or broker requires it
 
+The platform should not be handed a raw secret file to browse. Instead, the user should create a named secret in the deployment's secret store or environment and reference that name from the source definition. If two devices use different credentials from the same `.env` file, each source still gets its own `credential_ref` that points at a distinct key or named entry.
+
 In this repo, the edge connector settings come from environment variables such as:
 
 - `OPCUA_ENDPOINT`
@@ -67,7 +71,7 @@ For real sites, these values usually come from:
 - the gateway admin
 - the local site profile or installer configuration
 
-Do not hardcode them into the app. Keep them in the site config or local secret store.
+Do not hardcode them into the app. Keep them in the site config or local secret store. The app should carry the reference, not the secret material.
 
 ## 3. How The Data Flows
 
