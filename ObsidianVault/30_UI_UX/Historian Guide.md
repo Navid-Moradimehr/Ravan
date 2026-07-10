@@ -4,7 +4,7 @@ The historian is the storage and readback surface of the platform. It stores nor
 
 The historian page is where you inspect trends, run SQL, replay a stored dataset, and connect the stored events to external systems through webhooks or notifications.
 
-The `Alarms & Events` and `Raw Events` panels stay compact by default so the page does not become unreadable as data grows. Each panel shows the latest five rows first, then expands to the full list on demand. Both panels also expose a refresh selector so operators can slow down or pause the browser redraw cadence when they are reviewing a busy stream.
+The `Alarms & Events` and `Raw Events` panels stay compact by default so the page does not become unreadable as data grows. Each panel shows the latest five rows first, then expands to the full list on demand. Both panels also expose a refresh selector so operators can slow down, pause, or speed up the backend polling cadence when they are reviewing a busy stream.
 
 How to use it:
 
@@ -18,6 +18,6 @@ Important:
 - the historian is not the ingest front door
 - it answers "what happened?"
 - Kafka UI answers "did the event move through the broker?"
-- the live historian panels are fed by the API service websocket layer
-- alarms only change when the historian has new warning or critical rows
-- raw events redraw whenever the selected historian table snapshot changes
+- the live historian panels are fed by the API service through HTTP polling from the browser
+- the alarms panel asks the backend for alarm history at the chosen interval
+- the raw events panel asks for the selected historian table at the chosen interval

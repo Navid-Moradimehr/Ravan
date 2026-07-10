@@ -1,5 +1,18 @@
 # Implementation Log
 
+## 2026-07-10 - Historian Refresh Selector Drives Backend Polling
+
+Moved the historian live panels from websocket snapshot redraws to interval-based HTTP polling so the refresh selector now controls the actual backend fetch cadence for `Alarms & Events` and `Raw Events`.
+
+### Changed
+- `ui/components/historian-views.tsx`
+- `docs/historian-guide.md`
+- `docs/app-functionality.md`
+- `ObsidianVault/30_UI_UX/Historian Guide.md`
+
+### Validation
+- UI build and browser verification to be rerun after the code change.
+
 ## 2026-07-10 - Historian Live Panel Compacting And Refresh Controls
 
 Changed the historian page so `Alarms & Events` and `Raw Events` only show the latest five rows by default, added expand toggles for the full list, and added per-panel refresh controls so users can slow down or pause browser redraws while reviewing a busy stream.

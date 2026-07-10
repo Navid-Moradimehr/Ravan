@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Activity, AlertTriangle, ChevronDown, ChevronUp, Clock3, Database, FolderTree, Play, RefreshCcw, Square, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, startReplay, stopReplay, subscribeHistorianStream, subscribeEventsWebSocket, type HistorianStreamPayload } from "@/lib/api";
+import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, getHistorianEvents, getAlarms, startReplay, stopReplay } from "@/lib/api";
 import { formatErrorMessage } from "@/lib/http";
 import { showToast } from "@/components/toaster";
 import { HelpTip } from "@/components/help-tip";
@@ -20,7 +20,7 @@ type RefreshOption = {
 };
 
 const HISTORIAN_REFRESH_OPTIONS: RefreshOption[] = [
-  { label: "Live (2s)", value: 2000, description: "Matches the current websocket sync cadence." },
+  { label: "Live (2s)", value: 2000, description: "Matches the current backend polling cadence." },
   { label: "5s", value: 5000, description: "Reduce redraws while keeping near-real-time updates." },
   { label: "15s", value: 15000, description: "Best for slower review sessions." },
   { label: "Paused", value: null, description: "Freeze the table until you resume live sync." },
@@ -139,111 +139,22 @@ export function HistorianDashboard() {
   const [eventsExpanded, setEventsExpanded] = useState(false);
   const queryClient = useQueryClient();
 
-  // WebSocket-driven state for alarms and events
-  const [streamAlarms, setStreamAlarms] = useState<any[]>([]);
-  const [streamEvents, setStreamEvents] = useState<any[]>([]);
-  const latestAlarmsRef = useRef<any[]>([]);
-  const latestEventsRef = useRef<any[]>([]);
-  const alarmRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const eventRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [isStreamConnected, setIsStreamConnected] = useState(false);
-  const prevAlarmsRef = useRef<string>("");
-  const prevEventsRef = useRef<string>("");
-
-  const handleAlarmPayload = useCallback((payload: HistorianStreamPayload) => {
-    if (payload.type === "init" || payload.type === "update") {
-      if (payload.alarms) {
-        const serialized = JSON.stringify(payload.alarms);
-        if (serialized !== prevAlarmsRef.current) {
-          prevAlarmsRef.current = serialized;
-          latestAlarmsRef.current = payload.alarms;
-          if (payload.type === "init") {
-            setStreamAlarms(payload.alarms);
-          }
-        }
-      }
-    }
-  }, []);
-
-  const handleEventPayload = useCallback((payload: HistorianStreamPayload) => {
-    if (payload.type === "init" || payload.type === "update") {
-      if (payload.events) {
-        const serialized = JSON.stringify(payload.events);
-        if (serialized !== prevEventsRef.current) {
-          prevEventsRef.current = serialized;
-          latestEventsRef.current = payload.events;
-          if (payload.type === "init") {
-            setStreamEvents(payload.events);
-          }
-        }
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const wsBase = process.env.NEXT_PUBLIC_WS_BASE_URL ?? "ws://localhost:8020";
-    const cleanupAlarms = subscribeHistorianStream({
-      onPayload: handleAlarmPayload,
-      onConnect: () => setIsStreamConnected(true),
-      onDisconnect: () => setIsStreamConnected(false),
-      onError: () => setIsStreamConnected(false),
-    }, wsBase);
-    const cleanupEvents = subscribeEventsWebSocket({
-      onPayload: handleEventPayload,
-      onConnect: () => setIsStreamConnected(true),
-      onDisconnect: () => setIsStreamConnected(false),
-      onError: () => setIsStreamConnected(false),
-    }, wsBase);
-    return () => {
-      cleanupAlarms();
-      cleanupEvents();
-    };
-  }, [handleAlarmPayload, handleEventPayload]);
-
-  useEffect(() => {
-    if (alarmRefreshTimerRef.current) {
-      clearInterval(alarmRefreshTimerRef.current);
-      alarmRefreshTimerRef.current = null;
-    }
-    if (alarmsRefreshMs === null) return;
-    if (alarmsRefreshMs <= 0) return;
-    alarmRefreshTimerRef.current = setInterval(() => {
-      if (latestAlarmsRef.current.length) {
-        setStreamAlarms([...latestAlarmsRef.current]);
-      }
-    }, alarmsRefreshMs);
-    return () => {
-      if (alarmRefreshTimerRef.current) {
-        clearInterval(alarmRefreshTimerRef.current);
-        alarmRefreshTimerRef.current = null;
-      }
-    };
-  }, [alarmsRefreshMs]);
-
-  useEffect(() => {
-    if (eventRefreshTimerRef.current) {
-      clearInterval(eventRefreshTimerRef.current);
-      eventRefreshTimerRef.current = null;
-    }
-    if (eventsRefreshMs === null) return;
-    if (eventsRefreshMs <= 0) return;
-    eventRefreshTimerRef.current = setInterval(() => {
-      if (latestEventsRef.current.length) {
-        setStreamEvents([...latestEventsRef.current]);
-      }
-    }, eventsRefreshMs);
-    return () => {
-      if (eventRefreshTimerRef.current) {
-        clearInterval(eventRefreshTimerRef.current);
-        eventRefreshTimerRef.current = null;
-      }
-    };
-  }, [eventsRefreshMs]);
-
   const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, 1) : Promise.resolve([]), enabled: !!selectedAsset });
   const assetsQuery = useQuery({ queryKey: ["historian", "assets"], queryFn: getAssetHierarchy });
   const scenariosQuery = useQuery({ queryKey: ["historian", "scenarios"], queryFn: getScenarios });
   const replayQuery = useQuery({ queryKey: ["historian", "replay"], queryFn: getReplayStatus, refetchInterval: 10000 });
+  const alarmsQuery = useQuery({
+    queryKey: ["historian", "alarms"],
+    queryFn: () => getAlarms(50),
+    refetchInterval: alarmsRefreshMs ?? false,
+    refetchIntervalInBackground: true,
+  });
+  const eventsQuery = useQuery({
+    queryKey: ["historian", "events", selectedTable],
+    queryFn: () => getHistorianEvents(selectedTable, 100),
+    refetchInterval: eventsRefreshMs ?? false,
+    refetchIntervalInBackground: true,
+  });
 
   const startReplayMutation = useMutation({
     mutationFn: () => startReplay(selectedDataset, selectedScenario),
@@ -287,14 +198,16 @@ export function HistorianDashboard() {
     assetsQuery.isError ? `Assets: ${formatErrorMessage(assetsQuery.error, "Unable to load the asset hierarchy.")}` : null,
     scenariosQuery.isError ? `Scenarios: ${formatErrorMessage(scenariosQuery.error, "Unable to load scenarios.")}` : null,
     replayQuery.isError ? `Replay: ${formatErrorMessage(replayQuery.error, "Unable to load replay status.")}` : null,
+    alarmsQuery.isError ? `Alarms: ${formatErrorMessage(alarmsQuery.error, "Unable to load alarm history.")}` : null,
+    eventsQuery.isError ? `Events: ${formatErrorMessage(eventsQuery.error, "Unable to load historian events.")}` : null,
   ].filter((item): item is string => Boolean(item));
 
-  const alarmsData = streamAlarms;
-  const eventsData = streamEvents;
+  const alarmsData = alarmsQuery.data ?? [];
+  const eventsData = eventsQuery.data ?? [];
   const visibleAlarms = alarmsExpanded ? alarmsData : alarmsData.slice(0, 5);
   const visibleEvents = eventsExpanded ? eventsData : eventsData.slice(0, 5);
-  const isAlarmsLoading = !isStreamConnected && alarmsData.length === 0 && latestAlarmsRef.current.length === 0;
-  const isEventsLoading = !isStreamConnected && eventsData.length === 0 && latestEventsRef.current.length === 0;
+  const isAlarmsLoading = alarmsQuery.isLoading;
+  const isEventsLoading = eventsQuery.isLoading;
 
   return (
       <div className="space-y-5">
