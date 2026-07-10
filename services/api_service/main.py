@@ -66,6 +66,7 @@ def _prune_legacy_routes() -> None:
         "/api/v1/connections/{connection_id}/validate",
         "/api/v1/connections/{connection_id}/test",
         "/api/v1/connections/{connection_id}/preview",
+        "/api/v1/observability/source-health",
         "/api/v1/sinks",
         "/api/v1/sinks/{route_id}",
         "/api/v1/digital-twin/scenes/{scene_id}",

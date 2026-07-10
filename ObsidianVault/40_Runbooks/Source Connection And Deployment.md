@@ -47,14 +47,15 @@ Enabled mappings are applied to the emitted canonical event before validation. R
 
 The connection API now offers a bounded read-only OPC UA preview and accepts declarative Modbus register entries. Full Sparkplug B binary activation, richer register-map editing, durable health history, and end-to-end connector task orchestration remain future work.
 
-The edge runtime exposes `edge_source_state` and `edge_source_last_success_epoch` Prometheus metrics labeled by connection ID, protocol, and site. The current state is live; long-term history remains the responsibility of Prometheus retention or a future operational store.
+The edge runtime exposes `edge_source_state` and `edge_source_last_success_epoch` Prometheus metrics labeled by connection ID, protocol, and site. With `EDGE_SOURCE_HEALTH_HISTORY_PATH`, state transitions are retained in a bounded local file and exposed through `/api/v1/observability/source-health`; repeated successful reads are not recorded individually.
 
 Sink routing metadata is available through `/api/v1/sinks` and is stored at
 `DATASTREAM_SINK_ROUTING_PATH`. It selects the existing `historian`, `kafka`,
 or `lakehouse` implementations without adding a service. `FANOUT_SINKS`
-continues to work and takes precedence when set. Route changes require a
-fan-out restart; `credential_ref` values are references only and no secret
-material is accepted.
+continues to work and takes precedence when set. When `SINKS` is unset,
+fan-out detects route-file changes between batches and reloads the existing
+sink implementations without container recreation. `credential_ref` values
+are references only and no secret material is accepted.
 
 Sparkplug B uses TahUtils/Eclipse Tahu protobuf parsing in explicit Sparkplug mode. JSON MQTT remains a separate source mode.
 

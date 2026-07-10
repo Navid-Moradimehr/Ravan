@@ -1,5 +1,16 @@
 # Implementation Log
 
+## 2026-07-10 - Durable Source Health And Sink Route Refresh
+
+Persisted source-health state transitions in a bounded local file when
+configured, exposed them through `/api/v1/observability/source-health`, and
+mounted the edge state read-only into the API container in Compose. The edge
+does not write a record for every successful telemetry event.
+
+Added controlled fan-out route-file refresh between batches. Explicit `SINKS`
+environment configuration remains authoritative; file-backed routes reload
+only when that override is absent. No new service was introduced.
+
 ## 2026-07-10 - Verification And Benchmark Pass
 
 Full verification after the deployment-hardening phases: `503 passed, 4

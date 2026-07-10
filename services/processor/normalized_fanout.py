@@ -40,7 +40,9 @@ def main() -> None:
     auto_offset_reset = os.getenv("FANOUT_AUTO_OFFSET_RESET", "latest")
     running = True
 
+    sink_route_path = os.getenv("DATASTREAM_SINK_ROUTING_PATH", "")
     sink = SinkRegistry.from_env()
+    sink_route_mtime = os.path.getmtime(sink_route_path) if sink_route_path and os.path.exists(sink_route_path) else None
     if not sink.sinks:
         logger.warning(
             "normalized fan-out started with no sinks (SINKS unset); "
@@ -88,6 +90,20 @@ def main() -> None:
         nonlocal running
         running = False
 
+    def reload_sink_routes() -> None:
+        """Reload file-backed routes between batches without changing env semantics."""
+        nonlocal sink, sink_route_mtime
+        if not sink_route_path or os.getenv("SINKS", "").strip() or not os.path.exists(sink_route_path):
+            return
+        current_mtime = os.path.getmtime(sink_route_path)
+        if current_mtime == sink_route_mtime:
+            return
+        flush(force=True)
+        sink.close()
+        sink = SinkRegistry.from_env()
+        sink_route_mtime = current_mtime
+        logger.info("reloaded sink routes from %s", sink_route_path)
+
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
 
@@ -104,6 +120,7 @@ def main() -> None:
 
     try:
         while running:
+            reload_sink_routes()
             message = consumer.poll(1)
             if message is None:
                 flush()

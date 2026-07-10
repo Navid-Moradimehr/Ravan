@@ -17,3 +17,9 @@ async def site_observability(site_profile: str | None = None) -> dict[str, Any]:
         site_profile_path=Path(site_profile) if site_profile else None,
     )
 
+
+@router.get("/api/v1/observability/source-health")
+async def source_health(limit: int = 100) -> dict[str, Any]:
+    from services.edge_ingest.source_health import history, snapshot
+
+    return {"current": snapshot(), "history": history(limit)}

@@ -72,8 +72,8 @@ and `lakehouse` sink implementations. `FANOUT_SINKS` remains the
 backward-compatible environment configuration. Alternatively, operators can
 persist route metadata through `/api/v1/sinks`; the API stores it at
 `DATASTREAM_SINK_ROUTING_PATH`, and fan-out loads enabled route types when
-`SINKS` is not explicitly set. Route changes return `restart_required` and
-take effect on the next fan-out restart. Route metadata contains no secrets;
+`SINKS` is not explicitly set. Route changes are detected between fan-out
+batches and reload without container recreation. Route metadata contains no secrets;
 `credential_ref` is only a reference to deployment-managed credentials.
 
 ## Current status
@@ -82,4 +82,7 @@ take effect on the next fan-out restart. Route metadata contains no secrets;
 - Implemented: per-source Prometheus health metrics labeled by connection, protocol, and site.
 - Partially implemented: MQTT Sparkplug B activation, richer Modbus register maps, durable health history, and source-to-asset mapping UI.
 - User-owned: credentials, certificates, network access, firewall rules, asset topology, register-map correctness, external storage, external brokers, SMTP, and authentication/authorization.
-- Future: durable connector task orchestration, richer protocol diagnostics, and long-term source-health history. Sink routing metadata is implemented; hot reload and per-route delivery history remain future work.
+- Future: durable connector task orchestration, richer protocol diagnostics,
+  and per-route delivery history. Source-health transition history and sink
+  route refresh are implemented; a durable asynchronous notification queue
+  remains intentionally deployment-owned.

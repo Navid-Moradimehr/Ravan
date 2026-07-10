@@ -17,6 +17,7 @@ def test_fanout_main_uses_strict_sink_writes_before_commit():
     assert "write_batch_strict" in source
     assert "flush_strict" in source
     assert 'FANOUT_AUTO_OFFSET_RESET", "latest"' in source
+    assert "reload_sink_routes" in source
     assert source.index("write_batch_strict") < source.index("consumer.commit")
     assert source.index("flush_strict") < source.index("consumer.commit")
 
