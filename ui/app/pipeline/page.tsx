@@ -1,5 +1,6 @@
 import { Activity, AlertTriangle, Cable, RadioTower } from "lucide-react";
 import { DashboardFrame } from "@/components/dashboard-frame";
+import { HelpTip } from "@/components/help-tip";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +46,13 @@ export default function PipelinePage() {
             eyebrow="Edge ingest"
             description="Protocol adapters and their current simulated endpoints."
             icon={Cable}
+            actions={
+              <HelpTip
+                label="Ingress lanes help"
+                side="left"
+                content="This panel shows the protocol adapters at the edge. Use it to understand which industrial source types the platform can ingest, how they are mapped, and whether a protocol lane is active or degraded."
+              />
+            }
           />
           <div className="grid gap-4 md:grid-cols-3">
             {sourceHealth.map((source) => (
@@ -82,6 +90,13 @@ export default function PipelinePage() {
             eyebrow="Flow"
             description="The path from extraction to normalized Kafka topics."
             icon={Activity}
+            actions={
+              <HelpTip
+                label="Pipeline stages help"
+                side="left"
+                content="This panel explains the transformation path after data arrives from the edge. Use it to see where the record is extracted, validated, normalized, and routed to either the canonical stream or the DLQ."
+              />
+            }
           />
           <div className="grid gap-3 md:grid-cols-4">
             {[
@@ -107,6 +122,13 @@ export default function PipelinePage() {
             eyebrow="Preview"
             description="Representative records after extraction and normalization."
             icon={RadioTower}
+            actions={
+              <HelpTip
+                label="Event preview help"
+                side="left"
+                content="This panel shows example records in the shape the platform expects after normalization. Use it to understand the asset, tag, value, protocol, and quality fields before data is written to durable storage."
+              />
+            }
           />
           <Card className="border-border bg-surface-2">
             <Table>
@@ -146,10 +168,17 @@ function PipelineRail() {
   return (
     <Card className="app-card overflow-hidden">
       <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          <AlertTriangle aria-hidden="true" className="size-4 text-accent" />
-          Boundary notes
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <AlertTriangle aria-hidden="true" className="size-4 text-accent" />
+            Boundary notes
+          </CardTitle>
+          <HelpTip
+            label="Boundary notes help"
+            side="left"
+            content="This panel is a static guidance card. It is not a live data feed. Use it to understand that the Pipeline page is only about pre-storage flow, source isolation, normalization, and DLQ behavior."
+          />
+        </div>
       </CardHeader>
       <CardContent className="space-y-3 p-4 text-sm leading-6 text-text-secondary">
         <p>Everything here happens before durable storage or analytics views.</p>

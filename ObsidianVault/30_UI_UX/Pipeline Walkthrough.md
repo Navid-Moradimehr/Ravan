@@ -13,6 +13,8 @@ The page has four parts:
 
 The page is mostly a simulated or contract-oriented view today. The endpoints and labels are real platform concepts, but the visible source endpoints on the page are illustrative so users can understand the shape of the pipeline without needing live hardware attached.
 
+Each of the four main panels now has a small `?` help tip so a first-time user can understand what the panel is for without leaving the page.
+
 ## 1) Ingress lanes
 
 This section describes the protocol adapters.
@@ -124,6 +126,8 @@ Why that matters:
 - it keeps the pipeline page from becoming a general dashboard
 - it makes the page useful as a troubleshooting surface
 
+This panel is static guidance rather than a live feed. It is there to remind the user where the page boundaries are.
+
 ## How the page fits the overall platform
 
 The Pipeline page sits before the historian and before the main analytics surfaces. It answers questions like “did the data get in?”, “did it pass validation?”, and “what did the normalized record look like?” It does not answer long-term storage questions or deep BI questions. Those belong to the historian and observability surfaces.
@@ -135,4 +139,3 @@ The Pipeline page sits before the historian and before the main analytics surfac
 3. Read the stage cards to understand where the record is in the flow.
 4. Inspect the event preview to confirm the shape of the data.
 5. Use the boundary notes to understand what this page is responsible for and what happens elsewhere.
-

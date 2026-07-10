@@ -1,5 +1,18 @@
 # Implementation Log
 
+## 2026-07-10 - Pipeline Panel Help Tips
+
+Added inline `?` help tips to the four main Pipeline page panels and clarified
+that the Boundary Notes rail is static guidance rather than a live data feed.
+
+### Updated
+- `ui/app/pipeline/page.tsx`
+- `docs/pipeline-walkthrough.md`
+- `ObsidianVault/30_UI_UX/Pipeline Walkthrough.md`
+
+### Validation
+- UI build to be rerun after the change.
+
 ## 2026-07-10 - Prometheus and Pipeline Walkthrough Docs
 
 Added standalone walkthrough docs for Prometheus and the Pipeline route so
