@@ -24,6 +24,10 @@ async function addNotification(config: any) {
   });
 }
 
+async function deleteNotification(notificationId: string) {
+  return requestJson(`/api/notifications/${notificationId}`, { method: "DELETE" });
+}
+
 export function NotificationPanel() {
   const [email, setEmail] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
@@ -50,6 +54,11 @@ export function NotificationPanel() {
         variant: "error",
       });
     },
+  });
+  const remove = useMutation({
+    mutationFn: deleteNotification,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["notifications"] }); showToast({ title: "Notification removed", description: "The destination was removed from the registry and delivery runtime.", variant: "success" }); },
+    onError: (error) => showToast({ title: "Notification removal failed", description: formatErrorMessage(error, "The notification could not be removed."), variant: "error" }),
   });
 
   const notifs = notifications.data?.notifications ?? {};
@@ -132,7 +141,7 @@ export function NotificationPanel() {
                   ))}
                 </div>
               </div>
-              <Button variant="ghost" size="sm" className="text-error">
+              <Button variant="ghost" size="sm" className="text-error" onClick={() => remove.mutate(id)} disabled={remove.isPending}>
                 <Trash2 className="size-4" />
               </Button>
             </div>

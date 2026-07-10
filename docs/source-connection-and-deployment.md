@@ -47,6 +47,12 @@ For air-gapped sites, keep Kafka and historian local and export approved batches
 
 The API's mutation routes remain protected by the existing bearer-token middleware. This project does not prescribe an identity provider, SSO system, RBAC model, gateway, or reverse proxy. Operators may place Traefik, NGINX, Kong, an auth proxy, SSO, or an enterprise IAM integration in front of the API and dashboard according to site policy.
 
+## Webhooks and notifications
+
+Webhooks created through the historian UI are persisted in the API data volume, can be tested and deleted, and are attached to the same outbound webhook runtime used by alarm delivery. Generic notification webhook destinations are attached to that runtime as well.
+
+An email address alone is not an SMTP configuration. To deliver email, the operator must configure an Apprise URL or SMTP-capable provider through the operator-owned deployment environment. The notification registry records this distinction instead of pretending that an address is automatically deliverable.
+
 ## Current status
 
 - Implemented: versioned connection contract, persisted registry, secret-reference validation, list/create/update/delete/enable/disable APIs, bounded TCP diagnostics, Docker persistence, multiple registry-backed edge source descriptors, and legacy environment fallback.

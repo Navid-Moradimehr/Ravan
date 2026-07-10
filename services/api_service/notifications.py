@@ -98,12 +98,24 @@ class AppriseNotifier:
         if not APPRISE_AVAILABLE:
             return False
         try:
+            if self._apprise is None:
+                self._apprise = apprise.Apprise()
             self._apprise.add(url)
             self._config_urls.append(url)
             return True
         except Exception as e:
             logger.error(f"Failed to add channel {url}: {e}")
             return False
+
+    def remove_channel(self, url: str) -> bool:
+        if url not in self._config_urls:
+            return False
+        self._config_urls.remove(url)
+        if self._apprise is not None:
+            self._apprise = apprise.Apprise()
+            for channel in self._config_urls:
+                self._apprise.add(channel)
+        return True
 
 class WebhookOutbound:
     """Generic HTTP webhook outbound for alarms/events."""

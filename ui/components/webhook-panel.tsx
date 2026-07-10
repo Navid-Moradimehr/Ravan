@@ -27,6 +27,10 @@ async function testWebhook(hookId: string) {
   return requestJson(`/api/webhooks/test/${hookId}`, { method: "POST" });
 }
 
+async function deleteWebhook(hookId: string) {
+  return requestJson(`/api/webhooks/${hookId}`, { method: "DELETE" });
+}
+
 export function WebhookPanel() {
   const [url, setUrl] = useState("");
   const queryClient = useQueryClient();
@@ -66,6 +70,11 @@ export function WebhookPanel() {
         variant: "error",
       });
     },
+  });
+  const remove = useMutation({
+    mutationFn: deleteWebhook,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["webhooks"] }); showToast({ title: "Webhook removed", description: "The destination is no longer used by the alert delivery runtime.", variant: "success" }); },
+    onError: (error) => showToast({ title: "Webhook removal failed", description: formatErrorMessage(error, "The webhook could not be removed."), variant: "error" }),
   });
 
   const hooks = webhooks.data?.webhooks ?? {};
@@ -118,7 +127,7 @@ export function WebhookPanel() {
                 <Button variant="ghost" size="sm" onClick={() => test.mutate(id)} disabled={test.isPending}>
                   <TestTube className="size-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="text-error">
+                <Button variant="ghost" size="sm" className="text-error" onClick={() => remove.mutate(id)} disabled={remove.isPending}>
                   <Trash2 className="size-4" />
                 </Button>
               </div>

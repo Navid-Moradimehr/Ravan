@@ -85,6 +85,7 @@ def _prune_legacy_routes() -> None:
         "/api/v1/webhooks/{hook_id}",
         "/api/v1/webhooks/test/{hook_id}",
         "/api/v1/notifications",
+        "/api/v1/notifications/{notification_id}",
         "/api/v1/annotations",
         "/api/v1/annotations/{annotation_id}",
         "/api/v1/users",

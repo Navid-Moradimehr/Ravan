@@ -48,3 +48,7 @@ Protocol browsing, full Sparkplug B activation, configurable Modbus register map
 ## Security boundary
 
 The registry never accepts raw password, token, secret, private-key, or API-key fields. Use Docker secrets, Kubernetes Secrets, Vault, environment variables, or another operator-controlled mechanism and store only a reference in the platform.
+
+## Outbound delivery boundary
+
+UI-created webhooks are persisted and attached to the alert webhook runtime. A generic notification webhook follows the same path. Email metadata is not an SMTP account; the operator must provide an Apprise or SMTP-capable deployment configuration before it can deliver.
