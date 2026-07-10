@@ -1,5 +1,25 @@
 # Implementation Log
 
+## 2026-07-10 - Processing / Observability Separation
+
+Removed the duplicated observability panels from the Processing page and
+introduced a dedicated Observability walkthrough so the two routes have
+separate responsibilities.
+
+### Changed
+- `ui/app/processing/page.tsx`
+
+### Added
+- `docs/observability-walkthrough.md`
+- `ObsidianVault/60_Observability/Observability Walkthrough.md`
+
+### Updated
+- `docs/processing-walkthrough.md`
+- `ObsidianVault/30_UI_UX/Processing Walkthrough.md`
+
+### Validation
+- UI build to be rerun after the code change.
+
 ## 2026-07-10 - Processing Walkthrough Doc
 
 Added a standalone walkthrough for the Processing page and clarified the

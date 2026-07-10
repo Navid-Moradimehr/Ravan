@@ -1,24 +1,14 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { BrainCircuit, Gauge, Workflow } from "lucide-react";
 import { DashboardFrame } from "@/components/dashboard-frame";
 import { SectionHeader } from "@/components/section-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { createObservabilityFallback, getObservability } from "@/lib/api";
 import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
-import { ObservabilityPanels } from "@/components/observability-panels";
 
 export default function ProcessingPage() {
   const telemetry = useTelemetryEvents();
-  const observability = useQuery({
-    queryKey: ["observability"],
-    queryFn: getObservability,
-    refetchInterval: 60000,
-  });
-
-  const snapshot = observability.data ?? createObservabilityFallback();
   const runtimeMode = telemetry.data?.pipeline?.[2]?.status ?? "starting";
 
   return (
@@ -68,7 +58,29 @@ export default function ProcessingPage() {
           </div>
         </section>
 
-        <ObservabilityPanels snapshot={snapshot} />
+        <section className="space-y-4">
+          <SectionHeader
+            title="Processing outputs"
+            eyebrow="Downstream"
+            description="What this runtime hands off to the rest of the platform."
+            icon={BrainCircuit}
+          />
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              ["Processed events", "iot.processed", "Events that passed runtime scoring and are ready for historian and AI consumers."],
+              ["AI enrichment", "iot.ai_enriched", "Versioned summaries and explanations that downstream consumers can replay."],
+              ["Alerts", "Rule and anomaly outputs", "Severity signals that can be turned into alarms or operational notifications."],
+            ].map(([title, value, desc]) => (
+              <Card key={title} className="border-border bg-surface-2">
+                <CardHeader>
+                  <CardTitle className="text-base">{title}</CardTitle>
+                  <CardDescription>{value}</CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm text-text-secondary">{desc}</CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
       </div>
     </DashboardFrame>
   );

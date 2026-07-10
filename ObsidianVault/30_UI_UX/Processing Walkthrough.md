@@ -10,7 +10,7 @@ The page has four parts:
 
 1. Runtime summary cards
 2. Processing runtime section
-3. Shared observability panels
+3. Processing outputs
 4. Runtime notes in the right rail
 
 ## 1) Runtime summary cards
@@ -70,36 +70,20 @@ How users use it:
 - a site operator uses Flink local when validating production-style behavior on one server or one site
 - a larger deployment uses Flink production when it needs checkpointed streaming state and better scaling
 
-## 3) Shared observability panels
+## 3) Processing outputs
 
-This section is where Processing and Observability overlap on purpose.
+This section shows what the runtime hands off to the rest of the platform.
 
 What it does:
 
-- shows throughput, latency, protocol mix, severity mix, and service health
-- gives the processing page a small amount of live telemetry context
-- reuses the same observability component used on the dedicated Observability page
+- shows the processed Kafka topic
+- shows the AI-enriched topic
+- shows the alert and severity outputs that downstream tools consume
 
 Why it is here:
 
-- processing needs to show whether runtime changes are affecting throughput or latency
-- the shared component prevents duplication of chart code
-- the page still stays centered on runtime behavior instead of becoming a full monitoring dashboard
-
-Inputs:
-
-- observability snapshot from Prometheus-backed data
-- fallback snapshot when metrics are unavailable
-
-Outputs:
-
-- compact health and runtime telemetry panels
-
-How users use it:
-
-- check whether processing changes are increasing latency
-- compare runtime mode with throughput and AI handoff behavior
-- confirm that the processing layer still matches the expected runtime contract
+- the Processing page should tell users where the runtime sends data after scoring
+- this keeps the page focused on transformation and output, not broad monitoring
 
 ## 4) Runtime notes
 
@@ -134,5 +118,4 @@ These pages are related, but not the same.
 - Processing is about the runtime path and how events are transformed.
 - Observability is about the metrics that tell you whether the whole stack is healthy.
 
-Processing includes a small observability slice because runtime changes should be visible immediately. Observability is still the authoritative place to inspect metrics, latency, DLQ totals, and service health.
-
+Processing no longer embeds the observability charts. Observability is the authoritative place to inspect metrics, latency, DLQ totals, and service health.
