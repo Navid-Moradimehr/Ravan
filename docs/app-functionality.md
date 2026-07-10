@@ -262,6 +262,39 @@ This turns machine events into human-readable operational context.
 - developers can point it to LM Studio, Ollama, vLLM, TGI, llama.cpp, Triton, or cloud APIs
 - future prediction and recommendation outputs can follow the same event contract
 
+### 5a) Flink Runtime
+
+This is the distributed stream-processing path for larger deployments.
+
+**What it does**
+
+- runs the keyed, stateful hot path when the platform is deployed in Flink mode
+- keeps rolling windows, scores, and enrichment logic aligned with the Python fallback
+- preserves the same canonical event contract so downstream services do not need to care which runtime produced the result
+
+**Main inputs**
+
+- normalized industrial events from Kafka
+- keyed state and checkpoint configuration
+- processing rules and window settings
+
+**Main outputs**
+
+- processed industrial events
+- scored or enriched records
+- historian writes when the Flink persistence sink is enabled
+
+**How it performs**
+
+- preferred for horizontal scaling, checkpointing, and restart-safe state
+- keeps the same business meaning as the Python path but is the better fit for larger multi-node deployments
+
+**How users interact with it**
+
+- local users can stay on the Python fallback
+- site operators can switch to Flink local to validate distributed behavior
+- larger deployments can use Flink production for checkpointed stateful processing
+
 ### 6) Historian
 
 This is the memory of the platform.
@@ -299,6 +332,40 @@ This is the memory of the platform.
 - engineers replay past data windows for testing
 - live alarm and raw-event panels show the latest five rows by default and expand on demand
 - the panel refresh selector lets users slow down, pause, or speed up backend polling without changing the historian data itself, and the browser remembers the choice after reload
+
+### 6a) Sink routing
+
+This is how data leaves the main processing path.
+
+**What it does**
+
+- fans the normalized stream out to the configured endpoints
+- keeps the historian as the operational default
+- optionally writes to downstream Kafka and lakehouse sinks
+
+**Main inputs**
+
+- normalized event batches
+- sink route metadata or `SINKS`
+- sink-specific deployment settings
+
+**Main outputs**
+
+- historian writes
+- downstream Kafka messages
+- Iceberg/MinIO lakehouse files or tables
+
+**How it performs**
+
+- historian remains the system of record
+- Kafka and lakehouse are optional deployment targets
+- the route metadata can be changed without rewriting the core pipeline
+
+**How users interact with it**
+
+- operators keep historian enabled for operational reads
+- they enable Kafka when they want another stream or downstream pipeline
+- they enable lakehouse when they want long-term analytical storage or AI training data
 
 ### Historian SQL workflow
 

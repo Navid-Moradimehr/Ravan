@@ -86,6 +86,18 @@ persist route metadata through `/api/v1/sinks`; the API stores it at
 batches and reload without container recreation. Route metadata contains no secrets;
 `credential_ref` is only a reference to deployment-managed credentials. It is not a path to be scanned by the app and not a request for the UI to open arbitrary secret files.
 
+The default sink is still the historian because that is the operational
+system of record. Kafka and lakehouse sinks are already integrated, but they
+are optional fan-out targets rather than the default path:
+
+- historian sink = built-in operational storage
+- Kafka sink = downstream stream/export target
+- lakehouse sink = Iceberg/MinIO analytical archive for AI and batch use
+
+The platform owns the sink contract and route metadata; the deployment owns
+whether a given sink is enabled and how its credentials or endpoints are
+supplied.
+
 ## Current status
 
 - Implemented: versioned connection contract, persisted registry, secret-reference validation, list/create/update/delete/enable/disable APIs, bounded TCP diagnostics, Docker persistence, multiple registry-backed edge source descriptors, and legacy environment fallback.

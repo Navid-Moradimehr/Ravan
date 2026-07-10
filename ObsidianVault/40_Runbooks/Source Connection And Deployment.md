@@ -78,3 +78,22 @@ Notification status includes a bounded, redacted delivery ledger for webhook
 and Apprise attempts. It is intended for diagnostics and does not provide
 durable asynchronous retry after process failure. A site that needs that
 guarantee can supply its own queue or notification gateway.
+
+## Flink and sink ownership
+
+The distributed Flink path is the larger-deployment stream processor. It
+handles keyed, stateful processing with checkpoints, while the Python path is
+the local fallback and development path. Both keep the same canonical event
+contract so downstream services do not have to care which runtime produced a
+record.
+
+Sink ownership is split the same way:
+
+- historian sink = operational system of record
+- Kafka sink = downstream stream/export target
+- lakehouse sink = optional Iceberg/MinIO archive for AI and batch analysis
+
+The historian sink is the default. Kafka and lakehouse are already integrated
+in the codebase, but they are optional fan-out targets enabled by route
+metadata or `SINKS`, not hard requirements. Operators still own the endpoint
+credentials and deployment-time settings for those sinks.
