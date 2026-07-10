@@ -152,6 +152,9 @@ services:
       INDUSTRIAL_NORMALIZED_TOPIC: industrial.normalized
       FANOUT_GROUP_ID: normalized-fanout
       SINKS: ${FANOUT_SINKS:-historian}
+      DATASTREAM_SINK_ROUTING_PATH: /data/sink-routes.json
+    volumes:
+      - api-data:/data:ro
 
   ai-fanout:
     build:
@@ -171,6 +174,9 @@ services:
       KAFKA_BROKERS: kafka:9092
       AI_ENRICHED_TOPIC: iot.ai_enriched
       AI_ENRICHED_FANOUT_GROUP_ID: ai-enriched-fanout
+      DATASTREAM_SINK_ROUTING_PATH: /data/sink-routes.json
+    volumes:
+      - api-data:/data:ro
 
   mqtt-broker:
     image: eclipse-mosquitto:2.0

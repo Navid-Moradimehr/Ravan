@@ -140,6 +140,14 @@ class SinkRegistry:
     def from_env(env: dict[str, str] | None = None) -> CompositeSink:
         env = env or {k: v for k, v in os.environ.items()}
         names = [n.strip().lower() for n in env.get("SINKS", "").split(",") if n.strip()]
+        routing_path = env.get("DATASTREAM_SINK_ROUTING_PATH", "")
+        if routing_path and not names:
+            try:
+                from services.common.sink_routing import SinkRouteRegistry
+
+                names = SinkRouteRegistry(routing_path).enabled_sink_types()
+            except Exception as exc:
+                logger.warning("sink routing registry could not be loaded: %s", exc)
         composite = CompositeSink()
         for name in names:
             sink = SinkRegistry._build(name, env)

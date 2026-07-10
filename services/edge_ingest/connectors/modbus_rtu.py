@@ -11,7 +11,7 @@ from services.edge_ingest.source_health import mark_source, mark_source_success
 
 
 async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
-    if "modbus_rtu" not in settings.enabled_protocols:
+    if source is None and "modbus_rtu" not in settings.enabled_protocols:
         return
     source = source or settings.source_connections()[0]
     options = source.options

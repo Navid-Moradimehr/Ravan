@@ -12,7 +12,7 @@ from services.edge_ingest.source_health import mark_source, mark_source_success
 
 
 async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
-    if "opcua_discovery" not in settings.enabled_protocols:
+    if source is None and "opcua_discovery" not in settings.enabled_protocols:
         return
     source = source or settings.source_connections()[0]
     endpoint = source.endpoint or os.getenv("OPCUA_DISCOVERY_ENDPOINT", "opc.tcp://localhost:4840")

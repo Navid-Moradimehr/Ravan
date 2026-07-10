@@ -57,10 +57,21 @@ Webhooks created through the historian UI are persisted in the API data volume, 
 
 An email address alone is not an SMTP configuration. To deliver email, the operator must configure an Apprise URL or SMTP-capable provider through the operator-owned deployment environment. The notification registry records this distinction instead of pretending that an address is automatically deliverable.
 
+## Sink routing
+
+The normalized fan-out consumer supports the existing `historian`, `kafka`,
+and `lakehouse` sink implementations. `FANOUT_SINKS` remains the
+backward-compatible environment configuration. Alternatively, operators can
+persist route metadata through `/api/v1/sinks`; the API stores it at
+`DATASTREAM_SINK_ROUTING_PATH`, and fan-out loads enabled route types when
+`SINKS` is not explicitly set. Route changes return `restart_required` and
+take effect on the next fan-out restart. Route metadata contains no secrets;
+`credential_ref` is only a reference to deployment-managed credentials.
+
 ## Current status
 
 - Implemented: versioned connection contract, persisted registry, secret-reference validation, list/create/update/delete/enable/disable APIs, bounded TCP diagnostics, Docker persistence, multiple registry-backed edge source descriptors, and legacy environment fallback.
 - Implemented: per-source Prometheus health metrics labeled by connection, protocol, and site.
 - Partially implemented: MQTT Sparkplug B activation, richer Modbus register maps, durable health history, and source-to-asset mapping UI.
 - User-owned: credentials, certificates, network access, firewall rules, asset topology, register-map correctness, external storage, external brokers, SMTP, and authentication/authorization.
-- Future: durable connector task orchestration, richer protocol diagnostics, long-term source-health history, and configurable sink routing.
+- Future: durable connector task orchestration, richer protocol diagnostics, and long-term source-health history. Sink routing metadata is implemented; hot reload and per-route delivery history remain future work.

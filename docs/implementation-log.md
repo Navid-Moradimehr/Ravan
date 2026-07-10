@@ -1,5 +1,18 @@
 # Implementation Log
 
+## 2026-07-10 - Persisted Sink Routing And Registry-Managed Connector Guards
+
+Added a lightweight file-backed sink-routing contract. The API can persist
+enabled `historian`, `kafka`, and `lakehouse` route metadata while the fan-out
+runtime continues to support the existing `SINKS` environment variable. The
+shared Compose data volume exposes route metadata read-only to fan-out
+processes, and route changes explicitly require restart.
+
+Also corrected the Modbus RTU and OPC UA discovery connector guards so a
+registry-managed source is not blocked by legacy `EDGE_PROTOCOLS` flags.
+
+Validation: focused sink, route, connection, and API split tests passed.
+
 # 2026-07-10 - Historian SQL Preference Persistence And Timeout Control
 
 Persisted the historian SQL editor contents, saved query snippets, and timeout input in browser storage so repeat analysis opens with the last working state. The SQL panel now sends the selected timeout to the historian backend while keeping cancel transient for the active query only.

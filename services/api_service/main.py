@@ -66,6 +66,8 @@ def _prune_legacy_routes() -> None:
         "/api/v1/connections/{connection_id}/validate",
         "/api/v1/connections/{connection_id}/test",
         "/api/v1/connections/{connection_id}/preview",
+        "/api/v1/sinks",
+        "/api/v1/sinks/{route_id}",
         "/api/v1/digital-twin/scenes/{scene_id}",
         "/api/v1/digital-twin/scenes/{scene_id}/entities/{entity_id}/values",
         "/api/v1/oee/shifts",
@@ -228,6 +230,7 @@ from services.api_service.routers.historian import router as historian_router
 from services.api_service.routers.operations import router as operations_router
 from services.api_service.routers.design import router as design_router
 from services.api_service.routers.connections import router as connections_router
+from services.api_service.routers.sinks import router as sinks_router
 from services.api_service.routers.modeling import router as modeling_router
 from services.api_service.routers.search import router as search_router
 from services.api_service.routers.retrieval import router as retrieval_router
@@ -248,6 +251,7 @@ app.include_router(historian_router)
 app.include_router(operations_router)
 app.include_router(design_router)
 app.include_router(connections_router)
+app.include_router(sinks_router)
 app.include_router(modeling_router)
 app.include_router(search_router)
 app.include_router(retrieval_router)
