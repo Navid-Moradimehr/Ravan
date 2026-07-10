@@ -15,7 +15,7 @@ from services.edge_ingest.publisher import (
     dlq_total,
     overflow_total,
 )
-from services.edge_ingest.settings import Settings
+from services.edge_ingest.settings import Settings, SourceRuntime
 
 
 def enqueue_mqtt_message(
@@ -50,7 +50,7 @@ def enqueue_mqtt_message(
         )
 
 
-async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:
+async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
     """MQTT adapter with a bounded asyncio decoupling queue.
 
     paho's network thread calls ``on_message`` on its own loop, so producing to
@@ -65,6 +65,11 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
     last known good value per topic.
     """
 
+    source = source or settings.source_connections()[0]
+    options = source.options
+    topic_filter = str(options.get("topic") or settings.mqtt_topic)
+    host = str(options.get("host") or source.endpoint.removeprefix("mqtt://").split(":", 1)[0] or settings.mqtt_host)
+    port = int(options.get("port") or (source.endpoint.rsplit(":", 1)[-1] if ":" in source.endpoint else settings.mqtt_port))
     queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue(maxsize=settings.mqtt_queue_size)
 
     async def _drain_queue() -> None:
@@ -94,7 +99,7 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
 
     def on_connect(client: mqtt.Client, _userdata: object, _flags: dict[str, Any], reason_code: int, _properties: object = None) -> None:
         if reason_code == 0:
-            client.subscribe(settings.mqtt_topic, qos=settings.mqtt_qos)
+            client.subscribe(topic_filter, qos=int(options.get("qos", settings.mqtt_qos)))
         else:
             adapter_errors.labels(protocol="mqtt").inc()
 
@@ -119,7 +124,7 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
         source_id = payload.get("source_id", message.topic) if isinstance(payload, dict) else message.topic
         enqueue_mqtt_message(queue, payload, publisher, source_id)
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="edge-ingest-mqtt")
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"edge-ingest-{source.connection_id}")
     client.on_connect = on_connect
     client.on_message = on_message
 
@@ -146,7 +151,7 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
     try:
         while not stop_event.is_set():
             try:
-                client.connect(settings.mqtt_host, settings.mqtt_port, keepalive=30)
+                client.connect(host, port, keepalive=30)
                 client.loop_start()
                 await stop_event.wait()
                 break

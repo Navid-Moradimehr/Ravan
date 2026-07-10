@@ -6,15 +6,18 @@ import os
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.opcua_discovery import OPCUADiscoveryClient
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors
-from services.edge_ingest.settings import Settings
+from services.edge_ingest.settings import Settings, SourceRuntime
 from services.common.device_compat import unit_for_tag
 
 
-async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:
+async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
     if "opcua_discovery" not in settings.enabled_protocols:
         return
-    endpoint = os.getenv("OPCUA_DISCOVERY_ENDPOINT", "opc.tcp://localhost:4840")
-    nodes = [n.strip() for n in os.getenv("OPCUA_DISCOVERY_NODES", "").split(",") if n.strip()]
+    source = source or settings.source_connections()[0]
+    endpoint = source.endpoint or os.getenv("OPCUA_DISCOVERY_ENDPOINT", "opc.tcp://localhost:4840")
+    nodes = [n.strip() for n in source.options.get("nodes", []) if n.strip()]
+    if not nodes:
+        nodes = [n.strip() for n in os.getenv("OPCUA_DISCOVERY_NODES", "").split(",") if n.strip()]
     client = OPCUADiscoveryClient(endpoint)
     while not stop_event.is_set():
         try:
@@ -28,12 +31,13 @@ async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop
                     publisher.publish_event(
                         {
                             "source_protocol": "opcua",
-                            "source_id": node_id,
+                            "source_id": source.source_id or node_id,
                             "asset_id": node_id.split(".")[0] if "." in node_id else "unknown",
                             "tag": node_id.split(".")[-1] if "." in node_id else node_id,
                             "value": float(value),
                             "quality": "good",
                             "unit": unit_for_tag(node_id),
+                            "site": source.site_id,
                             "ts_source": utc_now(),
                         }
                     )

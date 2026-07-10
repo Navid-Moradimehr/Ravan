@@ -8,6 +8,7 @@ from typing import Any
 from services.common.modeling import ModelRegistry
 from services.common.dataset_builder import build_dataset_builder_snapshot
 from services.common.asset_registry import build_asset_registry_snapshot
+from services.common.connection_registry import connection_registry
 from services.common.event_catalog import build_event_catalog_snapshot
 from services.common.operational_memory import build_operational_memory_snapshot
 from services.common.prompt_registry import prompt_registry
@@ -148,6 +149,7 @@ def build_metadata_plane_snapshot(
         "memory_layers": [section.to_dict() for section in sections],
         "registries": {
             "asset_registry": asset_registry,
+            "connections": connection_registry.export(),
             "schemas": schema_summaries,
             "models": model_registry.export(),
             "prompts": prompt_registry.list_templates(),

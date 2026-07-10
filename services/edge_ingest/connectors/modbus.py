@@ -8,10 +8,15 @@ from pymodbus.client import ModbusTcpClient
 
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors, adapter_reconnects
-from services.edge_ingest.settings import Settings
+from services.edge_ingest.settings import Settings, SourceRuntime
 
 
-async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:
+async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
+    source = source or settings.source_connections()[0]
+    endpoint = source.endpoint.removeprefix("modbus://") if source.endpoint else ""
+    endpoint_host, _, endpoint_port = endpoint.partition(":")
+    host = endpoint_host or settings.modbus_host
+    port = int(endpoint_port or settings.modbus_port)
     register_map = [(0, "Temperature", "c"), (1, "Vibration", "mm/s"), (2, "Pressure", "bar")]
     while not stop_event.is_set():
         modbus_tls = os.getenv("MODBUS_TLS", "false").lower() == "true"
@@ -20,8 +25,8 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
         if modbus_tls and modbus_ca:
             sslctx = ssl.create_default_context(cafile=modbus_ca)
         client = ModbusTcpClient(
-            settings.modbus_host,
-            port=settings.modbus_port,
+            host,
+            port=port,
             sslctx=sslctx,
         )
         try:
@@ -36,12 +41,13 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
                     publisher.publish_event(
                         {
                             "source_protocol": "modbus",
-                            "source_id": f"{settings.modbus_host}:{settings.modbus_port}/hr/{address}",
-                            "asset_id": "Pump-03",
+                            "source_id": source.source_id or f"{host}:{port}/hr/{address}",
+                            "asset_id": str(source.options.get("asset_id", "Pump-03")),
                             "tag": tag,
                             "value": result.registers[address] / scale,
                             "quality": "good",
                             "unit": unit,
+                            "site": source.site_id,
                             "ts_source": utc_now(),
                         }
                     )

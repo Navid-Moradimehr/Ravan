@@ -9,10 +9,13 @@ from asyncua import Client
 from services.common.device_compat import unit_for_tag
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors, adapter_reconnects
-from services.edge_ingest.settings import Settings
+from services.edge_ingest.settings import Settings, SourceRuntime
 
 
-async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> None:
+async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
+    source = source or settings.source_connections()[0]
+    endpoint = source.endpoint or settings.opcua_endpoint
+    nodes = tuple(source.options.get("nodes") or settings.opcua_nodes)
     while not stop_event.is_set():
         try:
             opcua_cert = os.getenv("OPCUA_CERTIFICATE", "")
@@ -21,20 +24,21 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
             if opcua_cert and opcua_key:
                 client_kwargs["certificate"] = opcua_cert
                 client_kwargs["private_key"] = opcua_key
-            async with Client(settings.opcua_endpoint, **client_kwargs) as client:
+            async with Client(endpoint, **client_kwargs) as client:
                 while not stop_event.is_set():
-                    for node_id in settings.opcua_nodes:
+                    for node_id in nodes:
                         value = await client.get_node(node_id).read_value()
                         asset_id, tag = node_id.split(";s=", 1)[1].split(".", 1)
                         publisher.publish_event(
                             {
                                 "source_protocol": "opcua",
-                                "source_id": node_id,
+                                "source_id": source.source_id or node_id,
                                 "asset_id": asset_id,
                                 "tag": tag,
                                 "value": value,
                                 "quality": "good",
                                 "unit": unit_for_tag(tag),
+                                "site": source.site_id,
                                 "ts_source": utc_now(),
                             }
                         )

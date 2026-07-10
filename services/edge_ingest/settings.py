@@ -2,8 +2,24 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Any
 
 from services.common.brokers import resolve_kafka_brokers
+from services.common.connection_registry import ConnectionRegistry
+
+
+@dataclass(frozen=True)
+class SourceRuntime:
+    connection_id: str
+    source_protocol: str
+    site_id: str
+    endpoint: str = ""
+    source_id: str = ""
+    config: dict[str, Any] | None = None
+
+    @property
+    def options(self) -> dict[str, Any]:
+        return self.config or {}
 
 
 @dataclass(frozen=True)
@@ -43,3 +59,39 @@ class Settings:
     historian_batch_size: int = int(os.getenv("EDGE_HISTORIAN_BATCH_SIZE", "1024"))
     mqtt_queue_size: int = int(os.getenv("EDGE_MQTT_QUEUE_SIZE", "10000"))
     max_message_bytes: int = int(os.getenv("EDGE_MAX_MESSAGE_BYTES", "1048576"))
+
+    def source_connections(self) -> tuple[SourceRuntime, ...]:
+        """Return enabled registry sources, or one legacy source per protocol.
+
+        The fallback is intentional: existing Compose and CLI deployments do
+        not need a registry file to keep working.
+        """
+        registry = ConnectionRegistry()
+        configured = registry.list(enabled=True)
+        if configured:
+            return tuple(
+                SourceRuntime(
+                    connection_id=item.connection_id,
+                    source_protocol=item.source_protocol,
+                    site_id=item.site_id,
+                    endpoint=item.endpoint,
+                    source_id=item.source_id,
+                    config=item.config,
+                )
+                for item in configured
+            )
+        return self._legacy_sources()
+
+    def _legacy_sources(self) -> tuple[SourceRuntime, ...]:
+        sources: list[SourceRuntime] = []
+        if "mqtt" in self.enabled_protocols:
+            sources.append(SourceRuntime("legacy-mqtt", "mqtt", os.getenv("SITE_ID", "demo-site"), f"mqtt://{self.mqtt_host}:{self.mqtt_port}", "legacy-mqtt", {"topic": self.mqtt_topic}))
+        if "opcua" in self.enabled_protocols:
+            sources.append(SourceRuntime("legacy-opcua", "opcua", os.getenv("SITE_ID", "demo-site"), self.opcua_endpoint, "legacy-opcua", {"nodes": list(self.opcua_nodes)}))
+        if "modbus" in self.enabled_protocols:
+            sources.append(SourceRuntime("legacy-modbus", "modbus", os.getenv("SITE_ID", "demo-site"), f"modbus://{self.modbus_host}:{self.modbus_port}", "legacy-modbus", {}))
+        if "modbus_rtu" in self.enabled_protocols:
+            sources.append(SourceRuntime("legacy-modbus-rtu", "modbus_rtu", os.getenv("SITE_ID", "demo-site"), "", "legacy-modbus-rtu", {}))
+        if "opcua_discovery" in self.enabled_protocols:
+            sources.append(SourceRuntime("legacy-opcua-discovery", "opcua_discovery", os.getenv("SITE_ID", "demo-site"), "", "legacy-opcua-discovery", {}))
+        return tuple(sources)
