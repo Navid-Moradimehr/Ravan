@@ -1,5 +1,18 @@
 # Implementation Log
 
+## 2026-07-10 - Verification And Benchmark Pass
+
+Full verification after the deployment-hardening phases: `503 passed, 4
+warnings`; Next.js production build passed; Compose configuration passed;
+Docker API health, sink routes, integrations UI, and edge metrics returned
+HTTP 200.
+
+The local industrial simulator averaged 63,849 events/s with zero invalid
+events. The mixed end-to-end benchmark measured 27,498 events/s with JSON and
+34,955 events/s with MessagePack. MessagePack was 27.1% faster and reduced
+p99 latency by 62.0% in the same local in-process test. These are not
+PLC/Kafka/TimescaleDB production capacity claims.
+
 ## 2026-07-10 - Durable Notification Delivery Status
 
 Added a bounded file-backed delivery ledger for webhook and Apprise attempts.
