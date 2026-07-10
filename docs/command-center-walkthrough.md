@@ -159,9 +159,13 @@ Links:
 
 Kafka UI note:
 
-- the Kafka UI explanation is attached to the Kafka UI link itself as a small `?` help tip
-- it is not rendered as a separate help card in the Command Center anymore
-- the help tip explains that Kafka UI is the broker console and that it is a third-party web app, not a page built inside this React app
+- each operator link now has its own `?` help tip
+- the help tips explain what the tool is for and how to use it in the running stack
+- Kafka UI explains topics, partitions, offsets, consumer groups, and message flow
+- Grafana explains dashboards and service health views
+- Prometheus explains direct metric and target inspection
+- Edge Metrics explains protocol-ingest health
+- AI Health explains AI gateway state and fallback behavior
 
 ## Typical user flow
 
@@ -171,7 +175,7 @@ Kafka UI note:
 4. Check the live pipeline summary for stream health.
 5. Check the health snapshot for observability state.
 6. Use the operator links if you need the broker, metrics, or AI service directly.
-7. Hover the Kafka UI help tip if you want the broker-console explanation without leaving the page.
+7. Hover any operator-link help tip if you want the short usage explanation without leaving the page.
 
 ## What is live and what is fallback
 

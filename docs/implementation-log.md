@@ -1,5 +1,20 @@
 # Implementation Log
 
+## 2026-07-10 - Prometheus and Pipeline Walkthrough Docs
+
+Added standalone walkthrough docs for Prometheus and the Pipeline route so
+new users can understand the monitoring backend and the pre-storage flow
+without reading the source code first.
+
+### Added
+- `docs/prometheus-guide.md`
+- `docs/pipeline-walkthrough.md`
+- `ObsidianVault/60_Observability/Prometheus Guide.md`
+- `ObsidianVault/30_UI_UX/Pipeline Walkthrough.md`
+
+### Validation
+- Documentation-only change.
+
 ## 2026-07-10 - Kafka UI Help Placement and External Surface Clarification
 
 Adjusted the Command Center so the Kafka UI explanation lives where operators

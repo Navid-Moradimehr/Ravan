@@ -96,11 +96,15 @@ Operator Links:
 - Edge Metrics
 - AI Health
 
-Kafka UI note:
+Each operator link has a small `?` help tip.
 
-- the broker-console explanation is attached to the Kafka UI link itself as a small `?` help tip
-- it is not a separate panel on the page anymore
-- the help tip explains that Kafka UI is a third-party web app, not a React page built inside this repository
+The help tips explain:
+
+- Kafka UI: topics, partitions, offsets, consumer groups, and message flow
+- Grafana: dashboards and service health views
+- Prometheus: direct metric and target inspection
+- Edge Metrics: protocol-ingest health
+- AI Health: AI gateway state and fallback behavior
 
 ## User flow
 
@@ -109,7 +113,7 @@ Kafka UI note:
 3. Check the live pipeline summary.
 4. Check the health snapshot.
 5. Use the right-rail links for the broker or monitoring tools.
-6. Hover the Kafka UI `?` help tip if you want the short broker-console explanation.
+6. Hover any operator-link `?` help tip if you want the short usage explanation.
 
 ## Editable vs external pages
 

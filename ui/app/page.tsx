@@ -114,34 +114,43 @@ export default function Home() {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-1.5 p-3">
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-2 px-3 py-2">
-                <Link
-                  href="http://localhost:18080"
-                  className="action-secondary inline-flex h-9 min-w-0 flex-1 items-center rounded-lg px-3 text-sm font-medium transition-colors"
-                >
-                  <ArrowRight aria-hidden="true" className="mr-2 size-4 text-text-secondary" />
-                  Kafka UI
-                </Link>
-                <HelpTip
-                  label="Kafka UI help"
-                  side="left"
-                  content="Kafka UI is the broker console. Use it to inspect topics, consumer groups, partitions, and message flow. It is a third-party web app, not a page built inside this React app."
-                />
-              </div>
               {[
-                ["Grafana", "http://localhost:13000"],
-                ["Prometheus", "http://localhost:19090"],
-                ["Edge Metrics", "http://localhost:8090"],
-                ["AI Health", "http://localhost:8080/health"],
-              ].map(([label, href]) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="action-secondary inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium transition-colors"
-                >
-                  <ArrowRight aria-hidden="true" className="mr-2 size-4 text-text-secondary" />
-                  {label}
-                </Link>
+                {
+                  label: "Kafka UI",
+                  href: "http://localhost:18080",
+                  help: "Open Kafka UI to inspect topics, partitions, offsets, consumer groups, and message payloads. Use it when you want to confirm that events are flowing through the broker and whether a topic is filling, lagging, or stuck.",
+                },
+                {
+                  label: "Grafana",
+                  href: "http://localhost:13000",
+                  help: "Open Grafana to read dashboards, inspect chart panels, and compare live health signals such as throughput, latency, and service state. Use it when you want a visual summary of the running stack rather than raw broker details.",
+                },
+                {
+                  label: "Prometheus",
+                  href: "http://localhost:19090",
+                  help: "Open Prometheus to query metrics directly, check targets, and inspect alerting inputs. Use it when you need the underlying scrape data that Grafana and the platform observability views are built from.",
+                },
+                {
+                  label: "Edge Metrics",
+                  href: "http://localhost:8090",
+                  help: "Open Edge Metrics to verify protocol ingestion health at the edge layer. Use it when you need to see whether OPC UA, MQTT, or Modbus traffic is entering the platform before processing or historian writes.",
+                },
+                {
+                  label: "AI Health",
+                  href: "http://localhost:8080/health",
+                  help: "Open AI Health to check whether the AI gateway is connected to the configured model endpoint, whether it is degraded, and whether it is using fallback behavior. Use it when you want to confirm enrichment is healthy before trusting AI outputs.",
+                },
+              ].map(({ label, href, help }) => (
+                <div key={href} className="flex items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-2 px-3 py-2">
+                  <Link
+                    href={href}
+                    className="action-secondary inline-flex h-9 min-w-0 flex-1 items-center rounded-lg px-3 text-sm font-medium transition-colors"
+                  >
+                    <ArrowRight aria-hidden="true" className="mr-2 size-4 text-text-secondary" />
+                    {label}
+                  </Link>
+                  <HelpTip label={`${label} help`} side="left" content={help} />
+                </div>
               ))}
             </CardContent>
           </Card>
