@@ -45,6 +45,8 @@ For a plant-local deployment, run the edge service near the PLCs and write to a 
 
 For air-gapped sites, keep Kafka and historian local and export approved batches or replicated topics through the company-controlled transfer mechanism. The platform does not decide the company network boundary.
 
+The edge runtime supports an opt-in local spool through `EDGE_STORE_FORWARD_DIR`. When Kafka publication fails synchronously, events are written as crash-tolerant JSONL records and retried on later flushes. Mount this directory on durable local storage. This does not replace Kafka replication or site backups.
+
 ## Authentication and authorization boundary
 
 The API's mutation routes remain protected by the existing bearer-token middleware. This project does not prescribe an identity provider, SSO system, RBAC model, gateway, or reverse proxy. Operators may place Traefik, NGINX, Kong, an auth proxy, SSO, or an enterprise IAM integration in front of the API and dashboard according to site policy.
@@ -61,4 +63,4 @@ An email address alone is not an SMTP configuration. To deliver email, the opera
 - Implemented: per-source Prometheus health metrics labeled by connection, protocol, and site.
 - Partially implemented: MQTT Sparkplug B activation, richer Modbus register maps, durable health history, and source-to-asset mapping UI.
 - User-owned: credentials, certificates, network access, firewall rules, asset topology, register-map correctness, external storage, external brokers, SMTP, and authentication/authorization.
-- Future: durable connector task orchestration, richer protocol diagnostics, store-and-forward across Kafka outages, and configurable sink routing.
+- Future: durable connector task orchestration, richer protocol diagnostics, long-term source-health history, and configurable sink routing.

@@ -51,6 +51,8 @@ The edge runtime exposes `edge_source_state` and `edge_source_last_success_epoch
 
 Sparkplug B uses TahUtils/Eclipse Tahu protobuf parsing in explicit Sparkplug mode. JSON MQTT remains a separate source mode.
 
+Set `EDGE_STORE_FORWARD_DIR` to enable the optional durable local edge spool. Mount it on persistent storage. The spool covers synchronous Kafka publication failures and replays pending records on later flushes; it does not replace broker replication or backups.
+
 ## Security boundary
 
 The registry never accepts raw password, token, secret, private-key, or API-key fields. Use Docker secrets, Kubernetes Secrets, Vault, environment variables, or another operator-controlled mechanism and store only a reference in the platform.

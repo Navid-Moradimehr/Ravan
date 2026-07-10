@@ -12,6 +12,7 @@ from services.common.normalize import to_legacy_iot_event
 from services.common.stream_scope import stream_partition_key
 from services.edge_ingest.model import IndustrialEvent, to_json_bytes, validate_event
 from services.edge_ingest.settings import Settings
+from services.edge_ingest.disk_spool import DiskEventSpool
 
 
 events_total = Counter("edge_ingest_events_total", "Validated industrial events", ["protocol"])
@@ -26,6 +27,9 @@ delivery_failures = Counter(
 overflow_total = Counter(
     "edge_ingest_overflow_total", "Records routed to DLQ by producer backpressure/oversize", ["reason"]
 )
+store_forward_spooled = Counter("edge_store_forward_spooled_total", "Events written to the local edge spool", ["topic"])
+store_forward_replayed = Counter("edge_store_forward_replayed_total", "Events replayed from the local edge spool", ["topic"])
+store_forward_pending = Gauge("edge_store_forward_pending", "Events currently pending in the local edge spool")
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +55,8 @@ class EdgePublisher:
         self._flush_interval_ms = flush_interval_ms
         self._buffer: list[tuple[str, bytes, bytes]] = []
         self._last_flush = time.time()
+        spool_dir = __import__("os").getenv("EDGE_STORE_FORWARD_DIR", "")
+        self._spool = DiskEventSpool(spool_dir) if spool_dir else None
 
     @staticmethod
     def _delivery_report(err: Any, msg: Any) -> None:
@@ -71,8 +77,29 @@ class EdgePublisher:
                 # caller experiences natural backpressure instead of crashing.
                 self.producer.poll(0.5)
             except Exception as exc:
-                self._route_oversize(topic, key, value, origin, error=type(exc).__name__)
+                if self._spool is not None:
+                    self._spool.append(topic, key, value)
+                    store_forward_spooled.labels(topic=topic).inc()
+                    store_forward_pending.set(len(self._spool.read_all()))
+                else:
+                    self._route_oversize(topic, key, value, origin, error=type(exc).__name__)
                 return
+
+    def _replay_spool(self) -> None:
+        if self._spool is None:
+            return
+        records = self._spool.read_all()
+        remaining = list(records)
+        for index, record in enumerate(records):
+            topic, key, value = self._spool.decode(record)
+            try:
+                self.producer.produce(topic, key=key, value=value, on_delivery=self._delivery_report)
+                remaining = remaining[index + 1 :]
+                store_forward_replayed.labels(topic=topic).inc()
+            except Exception:
+                break
+        self._spool.replace(remaining)
+        store_forward_pending.set(len(remaining))
 
     def _route_oversize(
         self, topic: str, key: bytes, value: bytes, origin: str, error: str = "message_too_large"
@@ -138,6 +165,7 @@ class EdgePublisher:
             self._flush_buffer()
 
     def _flush_buffer(self) -> None:
+        self._replay_spool()
         for topic, key, value in self._buffer:
             self._produce_safe(topic, key, value, origin="batch")
         self._buffer.clear()

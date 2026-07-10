@@ -2553,3 +2553,4 @@ repeated a status badge that was already obvious from the section grouping.
 7. Added bounded source preview: OPC UA browse/read preview and protocol configuration previews for MQTT and Modbus. Added declarative Modbus address/tag/unit/scale/offset/unit-ID handling while retaining the legacy fallback map.
 8. Added per-source edge health metrics (`edge_source_state` and `edge_source_last_success_epoch`) labeled by connection ID, protocol, and site.
 9. Added explicit Sparkplug B protobuf decoding through pinned TahUtils/Eclipse Tahu support. JSON MQTT remains unchanged; Sparkplug decode failures route to the DLQ path.
+10. Added optional disk-backed edge store-and-forward through `EDGE_STORE_FORWARD_DIR`, with Docker persistent storage and Prometheus spool counters.
