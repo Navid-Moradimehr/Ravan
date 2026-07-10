@@ -442,8 +442,11 @@ services:
       TIMESCALE_USER: stream
       TIMESCALE_PASSWORD: stream
       API_SERVICE_PORT: 8020
+      DATASTREAM_CONNECTION_REGISTRY_PATH: /data/connection-registry.json
     ports:
       - "8020:8020"
+    volumes:
+      - api-data:/data
     profiles:
       - api
 
@@ -455,3 +458,4 @@ volumes:
   minio-data:
   timescale-data:
   redis-data:
+  api-data:

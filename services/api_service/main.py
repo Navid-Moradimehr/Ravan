@@ -59,6 +59,11 @@ def _prune_legacy_routes() -> None:
         "/api/v1/preview/topics/{topic}/peek",
         "/api/v1/connectors",
         "/api/v1/connectors/{connector_id}",
+        "/api/v1/connections",
+        "/api/v1/connections/{connection_id}",
+        "/api/v1/connections/{connection_id}/enable",
+        "/api/v1/connections/{connection_id}/disable",
+        "/api/v1/connections/{connection_id}/validate",
         "/api/v1/digital-twin/scenes/{scene_id}",
         "/api/v1/digital-twin/scenes/{scene_id}/entities/{entity_id}/values",
         "/api/v1/oee/shifts",
@@ -219,6 +224,7 @@ app = FastAPI(title="Local Stream Engine API", version="0.2.0", lifespan=lifespa
 from services.api_service.routers.historian import router as historian_router
 from services.api_service.routers.operations import router as operations_router
 from services.api_service.routers.design import router as design_router
+from services.api_service.routers.connections import router as connections_router
 from services.api_service.routers.modeling import router as modeling_router
 from services.api_service.routers.search import router as search_router
 from services.api_service.routers.retrieval import router as retrieval_router
@@ -238,6 +244,7 @@ from services.api_service.routers.historian import ingest_batch, ingest_event
 app.include_router(historian_router)
 app.include_router(operations_router)
 app.include_router(design_router)
+app.include_router(connections_router)
 app.include_router(modeling_router)
 app.include_router(search_router)
 app.include_router(retrieval_router)
