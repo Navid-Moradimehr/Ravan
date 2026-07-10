@@ -35,7 +35,7 @@ When an enabled source has mappings, the edge runtime applies the first matching
 
 OPC UA sources use the configured endpoint and node list. The connection workflow now provides a bounded read-only preview endpoint that browses tags or reads a selected node without enabling ingestion. Subscription management, certificate trust configuration, and persistent browse selection remain future work.
 
-MQTT sources subscribe to configured topic filters with the existing QoS, TLS, reconnect, bounded queue, and dead-letter behavior. Sparkplug B requires an explicit Sparkplug mode; ordinary JSON MQTT is not automatically equivalent to binary Sparkplug B.
+MQTT sources subscribe to configured topic filters with the existing QoS, TLS, reconnect, bounded queue, and dead-letter behavior. Sparkplug B sources use the optional pinned TahUtils/Eclipse Tahu protobuf decoder when `source_protocol` is `sparkplug_b` or `config.payload_mode` is `sparkplug_b`. Ordinary JSON MQTT is not automatically equivalent to binary Sparkplug B.
 
 Modbus sources accept declarative register entries with address, tag, unit, scale, offset, and unit ID. Datatype, byte order, word order, input/holding register selection, and richer register-map editing remain user-owned configuration or future UI work. The platform cannot safely infer those from a TCP endpoint.
 

@@ -49,6 +49,8 @@ The connection API now offers a bounded read-only OPC UA preview and accepts dec
 
 The edge runtime exposes `edge_source_state` and `edge_source_last_success_epoch` Prometheus metrics labeled by connection ID, protocol, and site. The current state is live; long-term history remains the responsibility of Prometheus retention or a future operational store.
 
+Sparkplug B uses TahUtils/Eclipse Tahu protobuf parsing in explicit Sparkplug mode. JSON MQTT remains a separate source mode.
+
 ## Security boundary
 
 The registry never accepts raw password, token, secret, private-key, or API-key fields. Use Docker secrets, Kubernetes Secrets, Vault, environment variables, or another operator-controlled mechanism and store only a reference in the platform.

@@ -68,6 +68,7 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
 
     source = source or settings.source_connections()[0]
     options = source.options
+    sparkplug_mode = source.source_protocol == "sparkplug_b" or str(options.get("payload_mode", "")).lower() == "sparkplug_b"
     topic_filter = str(options.get("topic") or settings.mqtt_topic)
     host = str(options.get("host") or source.endpoint.removeprefix("mqtt://").split(":", 1)[0] or settings.mqtt_host)
     port = int(options.get("port") or (source.endpoint.rsplit(":", 1)[-1] if ":" in source.endpoint else settings.mqtt_port))
@@ -107,6 +108,18 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
             adapter_errors.labels(protocol="mqtt").inc()
 
     def on_message(_client: mqtt.Client, _userdata: object, message: mqtt.MQTTMessage) -> None:
+        if sparkplug_mode:
+            try:
+                from services.edge_ingest.mqtt_sparkplug_b import decode_binary_payload
+
+                events = decode_binary_payload(message.payload, message.topic, source.site_id, source.source_id or message.topic)
+                for event in events:
+                    enqueue_mqtt_message(queue, source.map_event(event), publisher, event["source_id"])
+                mark_source_success(source.connection_id, source.source_protocol, source.site_id)
+            except Exception as exc:
+                dlq_total.labels(protocol="sparkplug_b").inc()
+                publisher.publish_event({"source_protocol": "sparkplug_b", "source_id": source.source_id or message.topic, "asset_id": "", "tag": "", "value": message.payload.hex()[:4096], "quality": "bad", "ts_source": utc_now(), "error": str(exc), "site": source.site_id})
+            return
         try:
             payload = json.loads(message.payload.decode("utf-8"))
         except Exception as exc:

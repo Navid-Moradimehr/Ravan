@@ -16,3 +16,4 @@ orjson>=3.10.0,<4
 msgpack>=1.1.0,<2
 pyiceberg[s3fs]>=0.7.0,<1
 pyarrow>=17.0.0,<19
+tahutils==0.1.11

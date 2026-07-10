@@ -24,6 +24,37 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def decode_binary_payload(payload: bytes, topic: str, site: str, source_id: str) -> list[dict[str, Any]]:
+    """Decode a real Sparkplug B protobuf payload through TahUtils/Eclipse Tahu."""
+    try:
+        from tahutils.parse import parse_payload_to_metric_list, payload_from_string
+    except ImportError as exc:
+        raise RuntimeError("Sparkplug B requires the optional tahutils dependency") from exc
+    parsed_payload = payload_from_string(payload)
+    metrics = parse_payload_to_metric_list(parsed_payload)
+    topic_parts = topic.split("/")
+    asset_id = topic_parts[-1] if topic_parts and topic_parts[-1] else source_id
+    timestamp = parsed_payload.timestamp or int(time.time() * 1000)
+    ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(timestamp / 1000))
+    return [
+        {
+            "source_protocol": "sparkplug_b",
+            "source_id": f"{source_id}:{metric.name}",
+            "asset_id": asset_id,
+            "tag": metric.name,
+            "value": metric.value,
+            "quality": "good",
+            "site": site,
+            "ts_source": ts,
+            "sparkplug_topic": topic,
+            "sparkplug_datatype": metric.datatype,
+            "sparkplug_timestamp": metric.timestamp,
+        }
+        for metric in metrics
+        if not metric.is_null and metric.value is not None
+    ]
+
+
 # Sparkplug B metric types (simplified)
 SPARKPLUG_METRIC_TYPES = {
     "Int8": 1,
