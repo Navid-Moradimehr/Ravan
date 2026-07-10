@@ -273,6 +273,8 @@ The SQL panel is the read-only historian analysis surface.
 - validates the query before it reaches the database
 - enforces a server-side timeout so large scans do not hang the browser indefinitely
 - lets the user cancel an active statement from the UI
+- remembers the last query text, saved query snippets, and timeout value in the browser so the workflow is faster after reload
+- restores the SQL editor and timeout input from local browser storage so repeat analysis starts from the previous state
 
 **Main inputs**
 
@@ -298,6 +300,7 @@ The SQL panel is the read-only historian analysis surface.
 - a Cancel button appears while the query is running
 - the result table shows rows and columns directly below the editor
 - contextual `?` help tips explain where the data comes from and what the panel can and cannot do
+- the editor and timeout field reopen with the last values the user used on this browser
 - the SQL result is rendered from the historian service response, not from a separate browser-side dataset
 
 ### 7) UI and Operator Experience

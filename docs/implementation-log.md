@@ -1,5 +1,20 @@
 # Implementation Log
 
+# 2026-07-10 - Historian SQL Preference Persistence And Timeout Control
+
+Persisted the historian SQL editor contents, saved query snippets, and timeout input in browser storage so repeat analysis opens with the last working state. The SQL panel now sends the selected timeout to the historian backend while keeping cancel transient for the active query only.
+
+### Changed
+- `ui/components/sql-query-panel.tsx`
+
+### Updated
+- `docs/app-functionality.md`
+- `docs/historian-guide.md`
+- `ObsidianVault/30_UI_UX/Historian Guide.md`
+
+### Validation
+- UI build and browser verification to be rerun after the code change.
+
 ## 2026-07-10 - Historian Refresh Preference Persistence
 
 Persisted the historian panel refresh selectors in browser storage so the operator's chosen polling cadence survives reloads for both `Alarms & Events` and `Raw Events`.

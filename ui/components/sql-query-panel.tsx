@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Database, Play, Square, Table } from "lucide-react";
+import { Database, Play, Square, Table, TimerReset } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatErrorMessage, requestJson } from "@/lib/http";
@@ -16,7 +17,57 @@ type QueryPayload = {
   sql: string;
   params?: any[];
   query_id: string;
+  timeout_ms?: number;
 };
+
+const SQL_QUERY_STORAGE_KEY = "lse.historian.sql";
+const SQL_TIMEOUT_STORAGE_KEY = "lse.historian.sql-timeout";
+const SQL_SAVED_QUERIES_STORAGE_KEY = "lse.historian.sql-saved";
+
+function readStoredString(key: string): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    return window.localStorage.getItem(key) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readStoredNumber(key: string): number | undefined {
+  const raw = readStoredString(key);
+  if (raw === undefined) return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function readStoredStringArray(key: string): string[] | undefined {
+  const raw = readStoredString(key);
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStoredValue(key: string, value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage failures and keep the panel functional.
+  }
+}
+
+function writeStoredArray(key: string, value: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage failures and keep the panel functional.
+  }
+}
 
 async function runQuery(payload: QueryPayload) {
   return requestJson<any[]>("/api/query", {
@@ -57,12 +108,40 @@ function downloadCsv(rows: any[], filename: string) {
 export function SqlQueryPanel() {
   const [sql, setSql] = useState("SELECT * FROM industrial_events ORDER BY time DESC LIMIT 10");
   const [savedQueries, setSavedQueries] = useState<string[]>(["SELECT * FROM industrial_events ORDER BY time DESC LIMIT 10"]);
+  const [timeoutMs, setTimeoutMs] = useState<number>(60000);
+  const [preferencesReady, setPreferencesReady] = useState(false);
   const [activeQueryId, setActiveQueryId] = useState<string | null>(null);
   const query = useMutation({ mutationFn: (payload: QueryPayload) => runQuery(payload) });
   const cancel = useMutation({ mutationFn: cancelQuery });
 
   const data = query.data ?? [];
   const columns = data.length ? Object.keys(data[0]) : [];
+
+  useEffect(() => {
+    const storedSql = readStoredString(SQL_QUERY_STORAGE_KEY);
+    const storedTimeout = readStoredNumber(SQL_TIMEOUT_STORAGE_KEY);
+    const storedSavedQueries = readStoredStringArray(SQL_SAVED_QUERIES_STORAGE_KEY);
+    if (storedSql) setSql(storedSql);
+    if (storedTimeout !== undefined) setTimeoutMs(storedTimeout);
+    if (storedSavedQueries?.length) setSavedQueries(storedSavedQueries);
+    setPreferencesReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!preferencesReady) return;
+    writeStoredValue(SQL_QUERY_STORAGE_KEY, sql);
+  }, [preferencesReady, sql]);
+
+  useEffect(() => {
+    if (!preferencesReady) return;
+    writeStoredValue(SQL_TIMEOUT_STORAGE_KEY, String(timeoutMs));
+  }, [preferencesReady, timeoutMs]);
+
+  useEffect(() => {
+    if (!preferencesReady) return;
+    writeStoredArray(SQL_SAVED_QUERIES_STORAGE_KEY, savedQueries);
+  }, [preferencesReady, savedQueries]);
+
   const handleRunQuery = useCallback(async () => {
     if (!savedQueries.includes(sql)) {
       setSavedQueries((current) => [...current, sql]);
@@ -74,7 +153,7 @@ export function SqlQueryPanel() {
     setActiveQueryId(queryId);
 
     try {
-      const rows = await query.mutateAsync({ sql, params: [], query_id: queryId });
+      const rows = await query.mutateAsync({ sql, params: [], query_id: queryId, timeout_ms: timeoutMs });
       showToast({
         title: "Query completed",
         description: `${rows.length} rows returned from the historian.`,
@@ -90,7 +169,7 @@ export function SqlQueryPanel() {
     } finally {
       setActiveQueryId(null);
     }
-  }, [query, savedQueries, sql]);
+  }, [query, savedQueries, sql, timeoutMs]);
 
   const handleCancelQuery = useCallback(async () => {
     if (!activeQueryId) return;
@@ -139,19 +218,47 @@ export function SqlQueryPanel() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {savedQueries.map((q, i) => (
-              <button key={i} onClick={() => setSql(q)} className="text-xs rounded-md border border-border-subtle bg-surface-2 px-2 py-1 hover:bg-accent-subtle">
-                {q.length > 40 ? q.slice(0, 40) + "..." : q}
-              </button>
-            ))}
-          </div>
-          <textarea
-            value={sql}
-            onChange={(e) => setSql(e.target.value)}
-            className="w-full rounded-lg border border-border-subtle bg-surface-2 p-3 font-mono text-sm text-text-primary min-h-[80px]"
-            placeholder="SELECT * FROM industrial_events LIMIT 10"
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              {savedQueries.map((q, i) => (
+                <button key={i} onClick={() => setSql(q)} className="text-xs rounded-md border border-border-subtle bg-surface-2 px-2 py-1 hover:bg-accent-subtle">
+                  {q.length > 40 ? q.slice(0, 40) + "..." : q}
+                </button>
+              ))}
+            </div>
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem]">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-text-secondary">SQL timeout</label>
+                <Input
+                  type="number"
+                  min={1000}
+                  max={600000}
+                  step={1000}
+                  value={timeoutMs}
+                  onChange={(event) => {
+                    const next = Number(event.target.value);
+                    if (Number.isFinite(next)) {
+                      setTimeoutMs(Math.max(1000, Math.min(600000, Math.round(next))));
+                    }
+                  }}
+                  className="bg-surface-2 font-mono"
+                />
+              </div>
+              <div className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-2 text-xs leading-5 text-text-secondary">
+                <div className="flex items-center gap-2 font-medium text-text-primary">
+                  <TimerReset className="size-3.5 text-accent" />
+                  Timeout and cancel
+                </div>
+                <p className="mt-1">
+                  Timeout is sent to the historian backend. Cancel remains a live action and only applies to the current running query.
+                </p>
+              </div>
+            </div>
+            <textarea
+              value={sql}
+              onChange={(e) => setSql(e.target.value)}
+              className="w-full rounded-lg border border-border-subtle bg-surface-2 p-3 font-mono text-sm text-text-primary min-h-[80px]"
+              placeholder="SELECT * FROM industrial_events LIMIT 10"
           />
           <p className="text-xs leading-5 text-text-secondary">
             This panel queries historian tables only. Use a time filter and LIMIT for broader scans. The server enforces a timeout

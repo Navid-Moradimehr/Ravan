@@ -6,6 +6,8 @@ The historian page is where you inspect trends, run SQL, replay a stored dataset
 
 The `Alarms & Events` and `Raw Events` panels stay compact by default so the page does not become unreadable as data grows. Each panel shows the latest five rows first, then expands to the full list on demand. Both panels also expose a refresh selector so operators can slow down, pause, or speed up the backend polling cadence when they are reviewing a busy stream, and the selected cadence is remembered in the browser after reload.
 
+The SQL panel also remembers the last query text, saved query snippets, and timeout value in the browser. The cancel button stays transient because it only applies to the currently running statement.
+
 How to use it:
 
 1. Open the historian dashboard first.
