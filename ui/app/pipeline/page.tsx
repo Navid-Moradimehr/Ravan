@@ -183,10 +183,10 @@ export default function PipelinePage() {
             }
           />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Runtime mode" value={runtimeMode} icon={Workflow} tone="info" />
-            <StatCard label="Batch path" value="iot.raw -> iot.processed" icon={Gauge} tone="default" />
-            <StatCard label="AI handoff" value="iot.processed -> ai" icon={BrainCircuit} tone="warning" />
-            <StatCard label="State model" value="keyed windows" icon={Workflow} tone="default" />
+            <StatCard label="Runtime mode" value={runtimeMode} icon={Workflow} tone="info" compact />
+            <StatCard label="Batch path" value="iot.raw -> iot.processed" icon={Gauge} tone="default" compact />
+            <StatCard label="AI handoff" value="iot.processed -> ai" icon={BrainCircuit} tone="warning" compact />
+            <StatCard label="State model" value="keyed windows" icon={Workflow} tone="default" compact />
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             {[

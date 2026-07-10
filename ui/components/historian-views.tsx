@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Activity, AlertTriangle, Database, FolderTree, Play, Square, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, ChevronDown, ChevronUp, Clock3, Database, FolderTree, Play, RefreshCcw, Square, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,63 @@ import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, st
 import { formatErrorMessage } from "@/lib/http";
 import { showToast } from "@/components/toaster";
 import { HelpTip } from "@/components/help-tip";
+
+type RefreshOption = {
+  label: string;
+  value: number | null;
+  description: string;
+};
+
+const HISTORIAN_REFRESH_OPTIONS: RefreshOption[] = [
+  { label: "Live (2s)", value: 2000, description: "Matches the current websocket sync cadence." },
+  { label: "5s", value: 5000, description: "Reduce redraws while keeping near-real-time updates." },
+  { label: "15s", value: 15000, description: "Best for slower review sessions." },
+  { label: "Paused", value: null, description: "Freeze the table until you resume live sync." },
+];
+
+function formatRefreshLabel(value: number | null): string {
+  if (value === null) return "Paused";
+  if (value === 2000) return "Live (2s)";
+  if (value % 1000 === 0) return `${value / 1000}s`;
+  return `${value}ms`;
+}
+
+function RefreshMenu({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (next: number | null) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-8 items-center gap-2 rounded-full border border-border-subtle bg-surface-2 px-3 text-xs font-medium text-text-secondary transition-colors hover:bg-accent-subtle hover:text-accent"
+        >
+          <Clock3 className="size-3.5" />
+          {label}: {formatRefreshLabel(value)}
+          <RefreshCcw className="size-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-48">
+        {HISTORIAN_REFRESH_OPTIONS.map((option) => (
+          <DropdownMenuItem
+            key={option.label}
+            onClick={() => onChange(option.value)}
+            className="flex flex-col items-start gap-0.5"
+          >
+            <span className="font-medium text-text-primary">{option.label}</span>
+            <span className="block text-xs text-text-secondary">{option.description}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 function TrendChart({ data }: { data: { time: string; value: number }[] }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
@@ -76,11 +133,19 @@ export function HistorianDashboard() {
   const [selectedAsset, setSelectedAsset] = useState<{ assetId: string; tag: string } | null>(null);
   const [selectedScenario, setSelectedScenario] = useState("normal");
   const [selectedDataset, setSelectedDataset] = useState("ai4i");
+  const [alarmsRefreshMs, setAlarmsRefreshMs] = useState<number | null>(2000);
+  const [eventsRefreshMs, setEventsRefreshMs] = useState<number | null>(2000);
+  const [alarmsExpanded, setAlarmsExpanded] = useState(false);
+  const [eventsExpanded, setEventsExpanded] = useState(false);
   const queryClient = useQueryClient();
 
   // WebSocket-driven state for alarms and events
   const [streamAlarms, setStreamAlarms] = useState<any[]>([]);
   const [streamEvents, setStreamEvents] = useState<any[]>([]);
+  const latestAlarmsRef = useRef<any[]>([]);
+  const latestEventsRef = useRef<any[]>([]);
+  const alarmRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const eventRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isStreamConnected, setIsStreamConnected] = useState(false);
   const prevAlarmsRef = useRef<string>("");
   const prevEventsRef = useRef<string>("");
@@ -91,7 +156,10 @@ export function HistorianDashboard() {
         const serialized = JSON.stringify(payload.alarms);
         if (serialized !== prevAlarmsRef.current) {
           prevAlarmsRef.current = serialized;
-          setStreamAlarms(payload.alarms);
+          latestAlarmsRef.current = payload.alarms;
+          if (payload.type === "init") {
+            setStreamAlarms(payload.alarms);
+          }
         }
       }
     }
@@ -103,7 +171,10 @@ export function HistorianDashboard() {
         const serialized = JSON.stringify(payload.events);
         if (serialized !== prevEventsRef.current) {
           prevEventsRef.current = serialized;
-          setStreamEvents(payload.events);
+          latestEventsRef.current = payload.events;
+          if (payload.type === "init") {
+            setStreamEvents(payload.events);
+          }
         }
       }
     }
@@ -128,6 +199,46 @@ export function HistorianDashboard() {
       cleanupEvents();
     };
   }, [handleAlarmPayload, handleEventPayload]);
+
+  useEffect(() => {
+    if (alarmRefreshTimerRef.current) {
+      clearInterval(alarmRefreshTimerRef.current);
+      alarmRefreshTimerRef.current = null;
+    }
+    if (alarmsRefreshMs === null) return;
+    if (alarmsRefreshMs <= 0) return;
+    alarmRefreshTimerRef.current = setInterval(() => {
+      if (latestAlarmsRef.current.length) {
+        setStreamAlarms([...latestAlarmsRef.current]);
+      }
+    }, alarmsRefreshMs);
+    return () => {
+      if (alarmRefreshTimerRef.current) {
+        clearInterval(alarmRefreshTimerRef.current);
+        alarmRefreshTimerRef.current = null;
+      }
+    };
+  }, [alarmsRefreshMs]);
+
+  useEffect(() => {
+    if (eventRefreshTimerRef.current) {
+      clearInterval(eventRefreshTimerRef.current);
+      eventRefreshTimerRef.current = null;
+    }
+    if (eventsRefreshMs === null) return;
+    if (eventsRefreshMs <= 0) return;
+    eventRefreshTimerRef.current = setInterval(() => {
+      if (latestEventsRef.current.length) {
+        setStreamEvents([...latestEventsRef.current]);
+      }
+    }, eventsRefreshMs);
+    return () => {
+      if (eventRefreshTimerRef.current) {
+        clearInterval(eventRefreshTimerRef.current);
+        eventRefreshTimerRef.current = null;
+      }
+    };
+  }, [eventsRefreshMs]);
 
   const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, 1) : Promise.resolve([]), enabled: !!selectedAsset });
   const assetsQuery = useQuery({ queryKey: ["historian", "assets"], queryFn: getAssetHierarchy });
@@ -180,8 +291,10 @@ export function HistorianDashboard() {
 
   const alarmsData = streamAlarms;
   const eventsData = streamEvents;
-  const isAlarmsLoading = !isStreamConnected && streamAlarms.length === 0;
-  const isEventsLoading = !isStreamConnected && streamEvents.length === 0;
+  const visibleAlarms = alarmsExpanded ? alarmsData : alarmsData.slice(0, 5);
+  const visibleEvents = eventsExpanded ? eventsData : eventsData.slice(0, 5);
+  const isAlarmsLoading = !isStreamConnected && alarmsData.length === 0 && latestAlarmsRef.current.length === 0;
+  const isEventsLoading = !isStreamConnected && eventsData.length === 0 && latestEventsRef.current.length === 0;
 
   return (
       <div className="space-y-5">
@@ -312,15 +425,30 @@ export function HistorianDashboard() {
 
       <Card className="app-card overflow-hidden">
         <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <AlertTriangle className="size-4 text-accent" />
-            Alarms & Events
-            <HelpTip
-              label="Alarms and events help"
-              content="This table shows processed events that crossed warning or critical thresholds. It is the operational alert surface for historians and dashboards."
-            />
-          </CardTitle>
-          <CardDescription className="text-text-secondary">Recent warning and critical events from processed stream</CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <AlertTriangle className="size-4 text-accent" />
+                Alarms & Events
+                <HelpTip
+                  label="Alarms and events help"
+                  content="This table shows processed events that crossed warning or critical thresholds. It is the operational alert surface for historians and dashboards. The refresh control changes how often the panel redraws from the live historian stream."
+                />
+              </CardTitle>
+              <CardDescription className="text-text-secondary">Recent warning and critical events from processed stream</CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <RefreshMenu label="Refresh" value={alarmsRefreshMs} onChange={setAlarmsRefreshMs} />
+              <button
+                type="button"
+                onClick={() => setAlarmsExpanded((value) => !value)}
+                className="inline-flex h-8 items-center gap-2 rounded-full border border-border-subtle bg-surface-2 px-3 text-xs font-medium text-text-secondary transition-colors hover:bg-accent-subtle hover:text-accent"
+              >
+                {alarmsExpanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                {alarmsExpanded ? "Show latest 5" : `Show all (${alarmsData.length})`}
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -336,37 +464,84 @@ export function HistorianDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-              {isAlarmsLoading ? (Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-5 w-full bg-surface-2" /></TableCell></TableRow>
-              ))) : alarmsData?.length ? (alarmsData.map((alarm: any, i: number) => (
-                <TableRow key={i} className="border-border-subtle hover:bg-surface-2">
-                  <TableCell className="font-mono text-xs">{new Date(alarm.time).toLocaleTimeString()}</TableCell>
-                  <TableCell className="text-sm font-medium">{alarm.asset_id}</TableCell>
-                  <TableCell className="text-sm">{alarm.tag}</TableCell>
-                  <TableCell><Badge variant="outline" className={alarm.severity === "critical" ? "border-error/30 bg-error/10 text-error" : "border-warning/30 bg-warning/10 text-warning"}>{alarm.severity}</Badge></TableCell>
-                  <TableCell className="text-sm text-text-secondary">{alarm.message}</TableCell>
-                  <TableCell><div className="flex flex-wrap gap-1">{alarm.triggered_rules?.map((rule: string, j: number) => (<Badge key={j} variant="secondary" className="text-[10px]">{rule}</Badge>))}</div></TableCell>
-                </TableRow>
-              ))) : (
-              <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-text-secondary">No alarms in the selected window</TableCell></TableRow>
-            )}
+                {isAlarmsLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell colSpan={6}>
+                        <Skeleton className="h-5 w-full bg-surface-2" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : visibleAlarms?.length ? (
+                  visibleAlarms.map((alarm: any, i: number) => (
+                    <TableRow key={i} className="border-border-subtle hover:bg-surface-2">
+                      <TableCell className="font-mono text-xs">{new Date(alarm.time).toLocaleTimeString()}</TableCell>
+                      <TableCell className="text-sm font-medium">{alarm.asset_id}</TableCell>
+                      <TableCell className="text-sm">{alarm.tag}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={alarm.severity === "critical" ? "border-error/30 bg-error/10 text-error" : "border-warning/30 bg-warning/10 text-warning"}
+                        >
+                          {alarm.severity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-text-secondary">{alarm.message}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {alarm.triggered_rules?.map((rule: string, j: number) => (
+                            <Badge key={j} variant="secondary" className="text-[10px]">
+                              {rule}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-text-secondary">
+                      No alarms in the selected window
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
+            {!alarmsExpanded && alarmsData.length > 5 ? (
+              <div className="border-t border-border-subtle px-4 py-3 text-xs text-text-secondary">
+                Showing the latest 5 entries. Expand the panel to inspect the full alarm history.
+              </div>
+            ) : null}
           </div>
         </CardContent>
       </Card>
 
     <Card className="app-card overflow-hidden">
         <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Database className="size-4 text-accent" />
-            Raw Events
-            <HelpTip
-              label="Raw events help"
-              content="Use this view to inspect historian tables after ingestion. The dropdown switches between raw industrial events, processed events, and AI-enriched summaries."
-            />
-          </CardTitle>
-          <CardDescription className="text-text-secondary">Recent events from the historian</CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Database className="size-4 text-accent" />
+                Raw Events
+                <HelpTip
+                  label="Raw events help"
+                  content="Use this view to inspect historian tables after ingestion. The dropdown switches between raw industrial events, processed events, and AI-enriched summaries. The refresh control only changes how often the live table redraws in the browser."
+                />
+              </CardTitle>
+              <CardDescription className="text-text-secondary">Recent events from the historian</CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <RefreshMenu label="Refresh" value={eventsRefreshMs} onChange={setEventsRefreshMs} />
+              <button
+                type="button"
+                onClick={() => setEventsExpanded((value) => !value)}
+                className="inline-flex h-8 items-center gap-2 rounded-full border border-border-subtle bg-surface-2 px-3 text-xs font-medium text-text-secondary transition-colors hover:bg-accent-subtle hover:text-accent"
+              >
+                {eventsExpanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                {eventsExpanded ? "Show latest 5" : `Show all (${eventsData.length})`}
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2">
@@ -396,7 +571,7 @@ export function HistorianDashboard() {
             <TableBody>
               {isEventsLoading ? (Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-5 w-full bg-surface-2" /></TableCell></TableRow>
-              ))) : eventsData?.length ? (eventsData.map((event: any, i: number) => (
+              ))) : visibleEvents?.length ? (visibleEvents.map((event: any, i: number) => (
                 <TableRow key={i} className="border-border-subtle hover:bg-surface-2">
                   <TableCell className="font-mono text-xs">{new Date(event.time).toLocaleTimeString()}</TableCell>
                   <TableCell className="text-sm font-medium">{event.asset_id}</TableCell>
@@ -411,6 +586,11 @@ export function HistorianDashboard() {
               )}
             </TableBody>
           </Table>
+          {!eventsExpanded && eventsData.length > 5 ? (
+            <div className="border-t border-border-subtle px-4 py-3 text-xs text-text-secondary">
+              Showing the latest 5 entries. Expand the panel to inspect the full event list.
+            </div>
+          ) : null}
       </CardContent>
 </Card>
     </div>

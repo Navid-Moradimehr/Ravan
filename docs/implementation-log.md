@@ -1,5 +1,22 @@
 # Implementation Log
 
+## 2026-07-10 - Historian Live Panel Compacting And Refresh Controls
+
+Changed the historian page so `Alarms & Events` and `Raw Events` only show the latest five rows by default, added expand toggles for the full list, and added per-panel refresh controls so users can slow down or pause browser redraws while reviewing a busy stream.
+
+### Changed
+- `ui/components/historian-views.tsx`
+- `ui/components/stat-card.tsx`
+- `ui/app/pipeline/page.tsx`
+
+### Updated
+- `docs/historian-guide.md`
+- `docs/app-functionality.md`
+- `ObsidianVault/30_UI_UX/Historian Guide.md`
+
+### Validation
+- UI build and browser verification to be rerun after the code change.
+
 ## 2026-07-10 - Merge Processing Into Pipeline
 
 Folded the standalone Processing page into the Pipeline page, moved the old

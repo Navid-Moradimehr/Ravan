@@ -260,6 +260,8 @@ This is the memory of the platform.
 - operators browse trends and alarms
 - analysts run SQL queries and export CSV
 - engineers replay past data windows for testing
+- live alarm and raw-event panels show the latest five rows by default and expand on demand
+- the panel refresh selector lets users slow down or pause browser redraws without changing the historian data itself
 
 ### Historian SQL workflow
 
@@ -296,6 +298,7 @@ The SQL panel is the read-only historian analysis surface.
 - a Cancel button appears while the query is running
 - the result table shows rows and columns directly below the editor
 - contextual `?` help tips explain where the data comes from and what the panel can and cannot do
+- the SQL result is rendered from the historian service response, not from a separate browser-side dataset
 
 ### 7) UI and Operator Experience
 
@@ -335,6 +338,7 @@ This is the working surface for users.
 - analysts use SQL and KPI tools
 - testers use replay and scenario controls
 - admins use service links and configuration screens
+- live historian tables are backed by websocket updates from the API service, which reads the current historian snapshot and broadcasts changes
 
 ### Contextual help tips
 
