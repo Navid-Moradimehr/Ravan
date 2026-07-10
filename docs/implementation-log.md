@@ -1,5 +1,15 @@
 # Implementation Log
 
+## 2026-07-10 - Final Deployment-Hardening Report
+
+Completed the software-verifiable portion of source commissioning, health
+history, store-and-forward, sink routing, notification status, and Compose
+service wiring. Full suite: `504 passed, 4 warnings`. A five-run local mixed
+pipeline benchmark averaged 34,272 events/s for JSON and 28,227 events/s for
+MessagePack; the variance means no stable throughput improvement is claimed.
+The full effect and ownership report is in
+`docs/implementation-report-2026-07-10.md`.
+
 ## 2026-07-10 - Correct Docker AI Health Probe Address
 
 The API health probe previously defaulted to `localhost:8080` inside the API
