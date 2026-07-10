@@ -16,6 +16,7 @@ from services.edge_ingest.publisher import (
     overflow_total,
 )
 from services.edge_ingest.settings import Settings, SourceRuntime
+from services.edge_ingest.source_health import mark_source, mark_source_success
 
 
 def enqueue_mqtt_message(
@@ -99,8 +100,10 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
 
     def on_connect(client: mqtt.Client, _userdata: object, _flags: dict[str, Any], reason_code: int, _properties: object = None) -> None:
         if reason_code == 0:
+            mark_source(source.connection_id, source.source_protocol, source.site_id, "connected")
             client.subscribe(topic_filter, qos=int(options.get("qos", settings.mqtt_qos)))
         else:
+            mark_source(source.connection_id, source.source_protocol, source.site_id, "error", str(reason_code))
             adapter_errors.labels(protocol="mqtt").inc()
 
     def on_message(_client: mqtt.Client, _userdata: object, message: mqtt.MQTTMessage) -> None:
@@ -123,6 +126,7 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
             return
         source_id = payload.get("source_id", message.topic) if isinstance(payload, dict) else message.topic
         enqueue_mqtt_message(queue, source.map_event(payload), publisher, source_id)
+        mark_source_success(source.connection_id, source.source_protocol, source.site_id)
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"edge-ingest-{source.connection_id}")
     client.on_connect = on_connect
@@ -156,6 +160,7 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
                 await stop_event.wait()
                 break
             except Exception:
+                mark_source(source.connection_id, source.source_protocol, source.site_id, "reconnecting")
                 adapter_errors.labels(protocol="mqtt").inc()
                 adapter_reconnects.labels(protocol="mqtt").inc()
                 await asyncio.sleep(3)

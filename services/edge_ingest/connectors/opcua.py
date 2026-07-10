@@ -9,6 +9,7 @@ from asyncua import Client
 from services.common.device_compat import unit_for_tag
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors, adapter_reconnects
+from services.edge_ingest.source_health import mark_source, mark_source_success
 from services.edge_ingest.settings import Settings, SourceRuntime
 
 
@@ -25,6 +26,7 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
                 client_kwargs["certificate"] = opcua_cert
                 client_kwargs["private_key"] = opcua_key
             async with Client(endpoint, **client_kwargs) as client:
+                mark_source(source.connection_id, source.source_protocol, source.site_id, "connected")
                 while not stop_event.is_set():
                     for node_id in nodes:
                         value = await client.get_node(node_id).read_value()
@@ -42,8 +44,10 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
                                 "ts_source": utc_now(),
                             }
                         ))
+                        mark_source_success(source.connection_id, source.source_protocol, source.site_id)
                     await asyncio.sleep(settings.poll_seconds)
         except Exception:
+            mark_source(source.connection_id, source.source_protocol, source.site_id, "error", "OPC UA connection or read failed")
             adapter_errors.labels(protocol="opcua").inc()
             adapter_reconnects.labels(protocol="opcua").inc()
             await asyncio.sleep(3)

@@ -45,7 +45,9 @@ The Integrations page can create source metadata and run a non-ingesting connect
 
 Enabled mappings are applied to the emitted canonical event before validation. Raw source payloads remain available on the raw topic for replay and troubleshooting.
 
-The connection API now offers a bounded read-only OPC UA preview and accepts declarative Modbus register entries. Full Sparkplug B binary activation, richer register-map editing, durable per-source health, and end-to-end connector task orchestration remain future work.
+The connection API now offers a bounded read-only OPC UA preview and accepts declarative Modbus register entries. Full Sparkplug B binary activation, richer register-map editing, durable health history, and end-to-end connector task orchestration remain future work.
+
+The edge runtime exposes `edge_source_state` and `edge_source_last_success_epoch` Prometheus metrics labeled by connection ID, protocol, and site. The current state is live; long-term history remains the responsibility of Prometheus retention or a future operational store.
 
 ## Security boundary
 

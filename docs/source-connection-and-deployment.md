@@ -58,6 +58,7 @@ An email address alone is not an SMTP configuration. To deliver email, the opera
 ## Current status
 
 - Implemented: versioned connection contract, persisted registry, secret-reference validation, list/create/update/delete/enable/disable APIs, bounded TCP diagnostics, Docker persistence, multiple registry-backed edge source descriptors, and legacy environment fallback.
-- Partially implemented: OPC UA browse/preview, MQTT Sparkplug B activation, richer Modbus register maps, per-source live health, and source-to-asset mapping UI.
+- Implemented: per-source Prometheus health metrics labeled by connection, protocol, and site.
+- Partially implemented: MQTT Sparkplug B activation, richer Modbus register maps, durable health history, and source-to-asset mapping UI.
 - User-owned: credentials, certificates, network access, firewall rules, asset topology, register-map correctness, external storage, external brokers, SMTP, and authentication/authorization.
 - Future: durable connector task orchestration, richer protocol diagnostics, store-and-forward across Kafka outages, and configurable sink routing.

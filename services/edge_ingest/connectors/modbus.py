@@ -9,6 +9,7 @@ from pymodbus.client import ModbusTcpClient
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors, adapter_reconnects
 from services.edge_ingest.settings import Settings, SourceRuntime
+from services.edge_ingest.source_health import mark_source, mark_source_success
 
 
 async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
@@ -39,6 +40,7 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
         try:
             if not client.connect():
                 raise ConnectionError("modbus connect failed")
+            mark_source(source.connection_id, source.source_protocol, source.site_id, "connected")
             while not stop_event.is_set():
                 for address, tag, unit, scale, offset, slave_id in register_map:
                     result = client.read_holding_registers(address=address, count=1, slave=slave_id)
@@ -57,8 +59,10 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
                             "ts_source": utc_now(),
                         }
                     ))
+                    mark_source_success(source.connection_id, source.source_protocol, source.site_id)
                 await asyncio.sleep(settings.poll_seconds)
         except Exception:
+            mark_source(source.connection_id, source.source_protocol, source.site_id, "error", "Modbus connection or read failed")
             adapter_errors.labels(protocol="modbus").inc()
             adapter_reconnects.labels(protocol="modbus").inc()
             await asyncio.sleep(3)

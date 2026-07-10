@@ -7,6 +7,7 @@ from services.edge_ingest.modbus_rtu_client import ModbusRTUClient
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors
 from services.edge_ingest.settings import Settings, SourceRuntime
+from services.edge_ingest.source_health import mark_source, mark_source_success
 
 
 async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
@@ -24,6 +25,7 @@ async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_even
         try:
             if not client._client or not client._client.connected:
                 client.connect()
+            mark_source(source.connection_id, source.source_protocol, source.site_id, "connected")
             for addr, count in registers:
                 values = client.read_holding_registers(addr, count)
                 if values:
@@ -41,8 +43,10 @@ async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_even
                                 "ts_source": utc_now(),
                             }
                         ))
+                        mark_source_success(source.connection_id, source.source_protocol, source.site_id)
             await asyncio.sleep(settings.poll_seconds)
         except Exception:
+            mark_source(source.connection_id, source.source_protocol, source.site_id, "error", "Modbus RTU connection or read failed")
             adapter_errors.labels(protocol="modbus_rtu").inc()
             client.disconnect()
             await asyncio.sleep(5)

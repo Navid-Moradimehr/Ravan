@@ -8,6 +8,7 @@ from services.edge_ingest.opcua_discovery import OPCUADiscoveryClient
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors
 from services.edge_ingest.settings import Settings, SourceRuntime
 from services.common.device_compat import unit_for_tag
+from services.edge_ingest.source_health import mark_source, mark_source_success
 
 
 async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
@@ -23,6 +24,7 @@ async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop
         try:
             connected = await client.connect()
             if not connected:
+                mark_source(source.connection_id, source.source_protocol, source.site_id, "error", "OPC UA discovery connection failed")
                 await asyncio.sleep(5)
                 continue
             for node_id in nodes:
@@ -41,7 +43,9 @@ async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop
                             "ts_source": utc_now(),
                         }
                     ))
+                    mark_source_success(source.connection_id, source.source_protocol, source.site_id)
             await asyncio.sleep(settings.poll_seconds)
         except Exception:
+            mark_source(source.connection_id, source.source_protocol, source.site_id, "error", "OPC UA discovery failed")
             adapter_errors.labels(protocol="opcua_discovery").inc()
             await asyncio.sleep(5)
