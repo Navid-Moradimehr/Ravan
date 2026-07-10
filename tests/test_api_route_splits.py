@@ -22,6 +22,7 @@ def test_split_domain_routes_registered():
         "/api/v1/connections/{connection_id}/disable",
         "/api/v1/connections/{connection_id}/validate",
         "/api/v1/connections/{connection_id}/test",
+        "/api/v1/connections/{connection_id}/preview",
         "/api/v1/notifications/{notification_id}",
         "/api/v1/modeling/models",
         "/api/v1/modeling/tools",

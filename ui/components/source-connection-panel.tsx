@@ -55,6 +55,11 @@ export function SourceConnectionPanel() {
     onSuccess: (result: any) => showToast({ title: `Connection test: ${result.network_test}`, description: result.network_error || "No data was published by the test.", variant: result.network_test === "reachable" || result.network_test === "not_required" ? "success" : "error" }),
     onError: (error) => showToast({ title: "Connection test failed", description: formatErrorMessage(error, "The connection test could not run."), variant: "error" }),
   });
+  const preview = useMutation({
+    mutationFn: (id: string) => requestJson(`/api/connections/${encodeURIComponent(id)}/preview`, { method: "POST" }),
+    onSuccess: (result: any) => showToast({ title: "Source preview ready", description: result.tags ? `${result.tags.length} OPC UA tags discovered.` : `Preview mode: ${result.preview}.`, variant: "success" }),
+    onError: (error) => showToast({ title: "Source preview failed", description: formatErrorMessage(error, "The source preview could not run."), variant: "error" }),
+  });
 
   return (
     <Card className="app-card">
@@ -83,7 +88,7 @@ export function SourceConnectionPanel() {
             const Icon = iconFor(connection.source_protocol);
             return <div key={connection.connection_id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-0 p-3">
               <div className="flex min-w-0 items-center gap-3"><Icon className="size-4 shrink-0 text-accent" /><div className="min-w-0"><p className="truncate text-sm font-medium">{connection.name}</p><p className="truncate font-mono text-xs text-text-secondary">{connection.endpoint}</p></div></div>
-              <div className="flex items-center gap-2"><Badge variant="outline">{connection.source_protocol}</Badge><Badge variant="outline">v{connection.config_version}</Badge><Badge variant="outline">{connection.state}</Badge><Button variant="ghost" size="sm" onClick={() => test.mutate(connection.connection_id)} disabled={test.isPending}><TestTube className="size-4" /> Test</Button>{connection.state === "enabled" ? <CircleCheck className="size-4 text-success" /> : <CircleX className="size-4 text-text-muted" />}</div>
+              <div className="flex items-center gap-2"><Badge variant="outline">{connection.source_protocol}</Badge><Badge variant="outline">v{connection.config_version}</Badge><Badge variant="outline">{connection.state}</Badge><Button variant="ghost" size="sm" onClick={() => test.mutate(connection.connection_id)} disabled={test.isPending}><TestTube className="size-4" /> Test</Button><Button variant="ghost" size="sm" onClick={() => preview.mutate(connection.connection_id)} disabled={preview.isPending}>Preview</Button>{connection.state === "enabled" ? <CircleCheck className="size-4 text-success" /> : <CircleX className="size-4 text-text-muted" />}</div>
             </div>;
           })}
           {!connections.isLoading && (connections.data?.connections ?? []).length === 0 ? <p className="text-sm text-text-secondary">No registry connections yet. Existing environment-variable sources remain available to the edge runtime.</p> : null}

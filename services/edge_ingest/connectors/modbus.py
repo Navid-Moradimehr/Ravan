@@ -17,7 +17,14 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
     endpoint_host, _, endpoint_port = endpoint.partition(":")
     host = endpoint_host or settings.modbus_host
     port = int(endpoint_port or settings.modbus_port)
-    register_map = [(0, "Temperature", "c"), (1, "Vibration", "mm/s"), (2, "Pressure", "bar")]
+    configured_registers = source.options.get("registers") or []
+    if configured_registers:
+        register_map = [
+            (int(item["address"]), str(item.get("tag", f"register_{item['address']}")), str(item.get("unit", "")), float(item.get("scale", 1.0)), float(item.get("offset", 0.0)), int(item.get("unit_id", item.get("slave_id", 1))))
+            for item in configured_registers
+        ]
+    else:
+        register_map = [(0, "Temperature", "c", 0.1, 0.0, 1), (1, "Vibration", "mm/s", 0.01, 0.0, 1), (2, "Pressure", "bar", 0.1, 0.0, 1)]
     while not stop_event.is_set():
         modbus_tls = os.getenv("MODBUS_TLS", "false").lower() == "true"
         modbus_ca = os.getenv("MODBUS_CA_CERT", "")
@@ -33,18 +40,17 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
             if not client.connect():
                 raise ConnectionError("modbus connect failed")
             while not stop_event.is_set():
-                result = client.read_holding_registers(address=0, count=3, slave=1)
-                if result.isError():
-                    raise RuntimeError(str(result))
-                for address, tag, unit in register_map:
-                    scale = 10 if tag != "Vibration" else 100
+                for address, tag, unit, scale, offset, slave_id in register_map:
+                    result = client.read_holding_registers(address=address, count=1, slave=slave_id)
+                    if result.isError():
+                        raise RuntimeError(str(result))
                     publisher.publish_event(source.map_event(
                         {
                             "source_protocol": "modbus",
                             "source_id": source.source_id or f"{host}:{port}/hr/{address}",
                             "asset_id": str(source.options.get("asset_id", "Pump-03")),
                             "tag": tag,
-                            "value": result.registers[address] / scale,
+                            "value": result.registers[0] * scale + offset,
                             "quality": "good",
                             "unit": unit,
                             "site": source.site_id,

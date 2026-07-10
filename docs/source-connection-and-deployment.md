@@ -33,11 +33,11 @@ When an enabled source has mappings, the edge runtime applies the first matching
 
 ## Protocol notes
 
-OPC UA sources currently use the configured endpoint and node list. The discovery client can browse and subscribe, but production connection onboarding should add those capabilities to the source workflow before claiming no-code OPC UA commissioning.
+OPC UA sources use the configured endpoint and node list. The connection workflow now provides a bounded read-only preview endpoint that browses tags or reads a selected node without enabling ingestion. Subscription management, certificate trust configuration, and persistent browse selection remain future work.
 
 MQTT sources subscribe to configured topic filters with the existing QoS, TLS, reconnect, bounded queue, and dead-letter behavior. Sparkplug B requires an explicit Sparkplug mode; ordinary JSON MQTT is not automatically equivalent to binary Sparkplug B.
 
-Modbus sources require user-owned register maps, unit IDs, datatype, byte order, scaling, and polling choices. The platform cannot safely infer those from a TCP endpoint.
+Modbus sources accept declarative register entries with address, tag, unit, scale, offset, and unit ID. Datatype, byte order, word order, input/holding register selection, and richer register-map editing remain user-owned configuration or future UI work. The platform cannot safely infer those from a TCP endpoint.
 
 ## Multi-site deployment options
 
@@ -58,6 +58,6 @@ An email address alone is not an SMTP configuration. To deliver email, the opera
 ## Current status
 
 - Implemented: versioned connection contract, persisted registry, secret-reference validation, list/create/update/delete/enable/disable APIs, bounded TCP diagnostics, Docker persistence, multiple registry-backed edge source descriptors, and legacy environment fallback.
-- Partially implemented: protocol-specific browse, MQTT Sparkplug B activation, declarative Modbus register maps, per-source live health, and source-to-asset mapping UI.
+- Partially implemented: OPC UA browse/preview, MQTT Sparkplug B activation, richer Modbus register maps, per-source live health, and source-to-asset mapping UI.
 - User-owned: credentials, certificates, network access, firewall rules, asset topology, register-map correctness, external storage, external brokers, SMTP, and authentication/authorization.
 - Future: durable connector task orchestration, richer protocol diagnostics, store-and-forward across Kafka outages, and configurable sink routing.

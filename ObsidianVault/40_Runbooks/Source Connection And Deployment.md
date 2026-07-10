@@ -45,7 +45,7 @@ The Integrations page can create source metadata and run a non-ingesting connect
 
 Enabled mappings are applied to the emitted canonical event before validation. Raw source payloads remain available on the raw topic for replay and troubleshooting.
 
-Protocol browsing, full Sparkplug B activation, configurable Modbus register maps, durable per-source health, and end-to-end connector task orchestration remain future work.
+The connection API now offers a bounded read-only OPC UA preview and accepts declarative Modbus register entries. Full Sparkplug B binary activation, richer register-map editing, durable per-source health, and end-to-end connector task orchestration remain future work.
 
 ## Security boundary
 

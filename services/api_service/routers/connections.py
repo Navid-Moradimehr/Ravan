@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -127,3 +128,31 @@ async def test_connection_endpoint(connection_id: str) -> dict[str, Any]:
     if connection is None:
         raise HTTPException(status_code=404, detail="Connection not found")
     return run_connection_test(connection)
+
+
+@router.post("/api/v1/connections/{connection_id}/preview")
+async def preview_connection(connection_id: str, node_id: str | None = None, max_tags: int = 100) -> dict[str, Any]:
+    """Preview source metadata without enabling ingestion or publishing events."""
+    connection = connection_registry.get(connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    if connection.source_protocol == "opcua":
+        from services.edge_ingest.opcua_discovery import OPCUADiscoveryClient
+
+        client = OPCUADiscoveryClient(connection.endpoint)
+        connected = await asyncio.wait_for(client.connect(), timeout=5.0)
+        if not connected:
+            return {"connection_id": connection_id, "preview": "unavailable", "error": "OPC UA connection failed"}
+        try:
+            if node_id:
+                tags = [await asyncio.wait_for(client.read_tag(node_id), timeout=5.0)]
+            else:
+                tags = (await asyncio.wait_for(client.browse_tags(), timeout=10.0))[:max(1, min(max_tags, 1000))]
+            return {"connection_id": connection_id, "preview": "opcua", "endpoint": connection.endpoint, "tags": tags}
+        finally:
+            await client.disconnect()
+    if connection.source_protocol in {"modbus", "modbus_rtu"}:
+        return {"connection_id": connection_id, "preview": "modbus", "registers": connection.config.get("registers", []), "config": connection.config}
+    if connection.source_protocol in {"mqtt", "sparkplug_b"}:
+        return {"connection_id": connection_id, "preview": "mqtt", "topic": connection.config.get("topic", ""), "payload_mode": connection.config.get("payload_mode", "json")}
+    return {"connection_id": connection_id, "preview": "configuration", "config": connection.config}
