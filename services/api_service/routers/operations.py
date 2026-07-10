@@ -197,10 +197,12 @@ async def send_notification(req: NotifyRequest) -> dict[str, Any]:
 
 @router.get("/api/v1/notifications/status")
 async def notification_status() -> dict[str, Any]:
+    from services.api_service.delivery_ledger import recent_deliveries
     return {
         "apprise_available": APPRISE_AVAILABLE,
         "channels_configured": len(notifier._config_urls),
         "channels": notifier._config_urls,
+        "recent_deliveries": recent_deliveries(),
     }
 
 

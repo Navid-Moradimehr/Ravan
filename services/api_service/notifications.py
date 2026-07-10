@@ -60,10 +60,14 @@ class AppriseNotifier:
             logger.info(f"[NOTIFICATION] {payload.severity.upper()}: {payload.title} - {payload.body}")
             result["sent"] = True
             result["mode"] = "logged"
+            from services.api_service.delivery_ledger import record_delivery
+            record_delivery(channel="local://log", kind="apprise", ok=True)
             return result
 
         if not self._apprise:
             result["error"] = "No notification channels configured"
+            from services.api_service.delivery_ledger import record_delivery
+            record_delivery(channel="configured://none", kind="apprise", ok=False, error=result["error"])
             return result
 
         try:
@@ -87,9 +91,15 @@ class AppriseNotifier:
             self._apprise.notify(title=title, body=body)
             result["sent"] = True
             result["mode"] = "apprise"
+            from services.api_service.delivery_ledger import record_delivery
+            for channel in self._config_urls:
+                record_delivery(channel=channel, kind="apprise", ok=True)
         except Exception as e:
             logger.error(f"Failed to send notification: {e}")
             result["error"] = str(e)
+            from services.api_service.delivery_ledger import record_delivery
+            for channel in self._config_urls:
+                record_delivery(channel=channel, kind="apprise", ok=False, error=result["error"])
 
         return result
 
@@ -159,12 +169,16 @@ class WebhookOutbound:
                     retryable = status == 429 or status >= 500
                     if ok or not retryable or attempt >= self._max_retries:
                         results.append({"url": url, "status": status, "ok": ok, "attempts": attempt + 1})
+                        from services.api_service.delivery_ledger import record_delivery
+                        record_delivery(channel=url, kind="webhook", ok=ok, attempts=attempt + 1, status=status)
                         break
                     last_error = f"http_{status}"
                 except Exception as e:
                     last_error = str(e)
                     if attempt >= self._max_retries:
                         results.append({"url": url, "status": status, "ok": False, "attempts": attempt + 1, "error": last_error})
+                        from services.api_service.delivery_ledger import record_delivery
+                        record_delivery(channel=url, kind="webhook", ok=False, attempts=attempt + 1, status=status, error=last_error)
                         break
                 attempt += 1
                 backoff = self._backoff_seconds[min(attempt - 1, len(self._backoff_seconds) - 1)]

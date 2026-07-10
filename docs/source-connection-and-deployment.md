@@ -57,6 +57,14 @@ Webhooks created through the historian UI are persisted in the API data volume, 
 
 An email address alone is not an SMTP configuration. To deliver email, the operator must configure an Apprise URL or SMTP-capable provider through the operator-owned deployment environment. The notification registry records this distinction instead of pretending that an address is automatically deliverable.
 
+The API notification status endpoint also exposes a bounded recent delivery
+ledger. It records whether webhook or Apprise delivery was attempted,
+delivered, or failed, including retry count and HTTP status where applicable.
+Destination labels are redacted and provider credentials are never written to
+the ledger. This is operational visibility, not a durable asynchronous queue;
+operators requiring guaranteed delayed delivery should place a user-managed
+queue or notification service behind the configured provider.
+
 ## Sink routing
 
 The normalized fan-out consumer supports the existing `historian`, `kafka`,

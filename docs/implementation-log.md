@@ -1,5 +1,17 @@
 # Implementation Log
 
+## 2026-07-10 - Durable Notification Delivery Status
+
+Added a bounded file-backed delivery ledger for webhook and Apprise attempts.
+The notification status API now reports recent delivered/failed attempts,
+retry count, and HTTP status without persisting full destination URLs or
+provider credentials. This improves operations without introducing a queue or
+new service; guaranteed asynchronous delivery remains a deployment-owned
+integration.
+
+Validation: focused delivery, admin integration, optional dependency, and
+notification regression tests passed.
+
 ## 2026-07-10 - Persisted Sink Routing And Registry-Managed Connector Guards
 
 Added a lightweight file-backed sink-routing contract. The API can persist

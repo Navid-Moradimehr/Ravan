@@ -455,6 +455,7 @@ services:
       DATASTREAM_CONNECTION_REGISTRY_PATH: /data/connection-registry.json
       DATASTREAM_WEBHOOK_REGISTRY_PATH: /data/webhooks.json
       DATASTREAM_NOTIFICATION_REGISTRY_PATH: /data/notifications.json
+      DATASTREAM_DELIVERY_LEDGER_PATH: /data/delivery-ledger.json
     ports:
       - "8020:8020"
     volumes:

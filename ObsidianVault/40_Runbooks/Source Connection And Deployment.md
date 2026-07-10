@@ -67,3 +67,8 @@ The registry never accepts raw password, token, secret, private-key, or API-key 
 ## Outbound delivery boundary
 
 UI-created webhooks are persisted and attached to the alert webhook runtime. A generic notification webhook follows the same path. Email metadata is not an SMTP account; the operator must provide an Apprise or SMTP-capable deployment configuration before it can deliver.
+
+Notification status includes a bounded, redacted delivery ledger for webhook
+and Apprise attempts. It is intended for diagnostics and does not provide
+durable asynchronous retry after process failure. A site that needs that
+guarantee can supply its own queue or notification gateway.
