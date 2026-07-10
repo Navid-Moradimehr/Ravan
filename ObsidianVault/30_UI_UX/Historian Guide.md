@@ -4,7 +4,7 @@ The historian is the storage and readback surface of the platform. It stores nor
 
 The historian page is where you inspect trends, run SQL, replay a stored dataset, and connect the stored events to external systems through webhooks or notifications.
 
-The `Alarms & Events` and `Raw Events` panels stay compact by default so the page does not become unreadable as data grows. Each panel shows the latest five rows first, then expands to the full list on demand. Both panels also expose a refresh selector so operators can slow down, pause, or speed up the backend polling cadence when they are reviewing a busy stream.
+The `Alarms & Events` and `Raw Events` panels stay compact by default so the page does not become unreadable as data grows. Each panel shows the latest five rows first, then expands to the full list on demand. Both panels also expose a refresh selector so operators can slow down, pause, or speed up the backend polling cadence when they are reviewing a busy stream, and the selected cadence is remembered in the browser after reload.
 
 How to use it:
 

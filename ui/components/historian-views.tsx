@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Activity, AlertTriangle, ChevronDown, ChevronUp, Clock3, Database, FolderTree, Play, RefreshCcw, Square, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,31 @@ const HISTORIAN_REFRESH_OPTIONS: RefreshOption[] = [
   { label: "15s", value: 15000, description: "Best for slower review sessions." },
   { label: "Paused", value: null, description: "Freeze the table until you resume live sync." },
 ];
+
+const HISTORIAN_REFRESH_STORAGE_KEY = "lse.historian.refresh";
+const HISTORIAN_EVENTS_REFRESH_STORAGE_KEY = "lse.historian.events-refresh";
+
+function readStoredRefresh(key: string): number | null | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return undefined;
+    if (raw === "null") return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStoredRefresh(key: string, value: number | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value === null ? "null" : String(value));
+  } catch {
+    // Ignore storage failures and fall back to in-memory state.
+  }
+}
 
 function formatRefreshLabel(value: number | null): string {
   if (value === null) return "Paused";
@@ -137,6 +162,7 @@ export function HistorianDashboard() {
   const [eventsRefreshMs, setEventsRefreshMs] = useState<number | null>(2000);
   const [alarmsExpanded, setAlarmsExpanded] = useState(false);
   const [eventsExpanded, setEventsExpanded] = useState(false);
+  const [refreshPreferencesReady, setRefreshPreferencesReady] = useState(false);
   const queryClient = useQueryClient();
 
   const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, 1) : Promise.resolve([]), enabled: !!selectedAsset });
@@ -155,6 +181,28 @@ export function HistorianDashboard() {
     refetchInterval: eventsRefreshMs ?? false,
     refetchIntervalInBackground: true,
   });
+
+  useEffect(() => {
+    const storedAlarms = readStoredRefresh(HISTORIAN_REFRESH_STORAGE_KEY);
+    const storedEvents = readStoredRefresh(HISTORIAN_EVENTS_REFRESH_STORAGE_KEY);
+    if (storedAlarms !== undefined) {
+      setAlarmsRefreshMs(storedAlarms);
+    }
+    if (storedEvents !== undefined) {
+      setEventsRefreshMs(storedEvents);
+    }
+    setRefreshPreferencesReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!refreshPreferencesReady) return;
+    writeStoredRefresh(HISTORIAN_REFRESH_STORAGE_KEY, alarmsRefreshMs);
+  }, [alarmsRefreshMs, refreshPreferencesReady]);
+
+  useEffect(() => {
+    if (!refreshPreferencesReady) return;
+    writeStoredRefresh(HISTORIAN_EVENTS_REFRESH_STORAGE_KEY, eventsRefreshMs);
+  }, [eventsRefreshMs, refreshPreferencesReady]);
 
   const startReplayMutation = useMutation({
     mutationFn: () => startReplay(selectedDataset, selectedScenario),

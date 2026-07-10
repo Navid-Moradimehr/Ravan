@@ -261,7 +261,7 @@ This is the memory of the platform.
 - analysts run SQL queries and export CSV
 - engineers replay past data windows for testing
 - live alarm and raw-event panels show the latest five rows by default and expand on demand
-- the panel refresh selector lets users slow down, pause, or speed up backend polling without changing the historian data itself
+- the panel refresh selector lets users slow down, pause, or speed up backend polling without changing the historian data itself, and the browser remembers the choice after reload
 
 ### Historian SQL workflow
 

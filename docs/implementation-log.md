@@ -1,5 +1,20 @@
 # Implementation Log
 
+## 2026-07-10 - Historian Refresh Preference Persistence
+
+Persisted the historian panel refresh selectors in browser storage so the operator's chosen polling cadence survives reloads for both `Alarms & Events` and `Raw Events`.
+
+### Changed
+- `ui/components/historian-views.tsx`
+
+### Updated
+- `docs/historian-guide.md`
+- `docs/app-functionality.md`
+- `ObsidianVault/30_UI_UX/Historian Guide.md`
+
+### Validation
+- UI build and browser verification to be rerun after the code change.
+
 ## 2026-07-10 - Historian Refresh Selector Drives Backend Polling
 
 Moved the historian live panels from websocket snapshot redraws to interval-based HTTP polling so the refresh selector now controls the actual backend fetch cadence for `Alarms & Events` and `Raw Events`.
