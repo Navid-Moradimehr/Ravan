@@ -79,7 +79,7 @@ function RefreshMenu({
           <RefreshCcw className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-48">
+      <DropdownMenuContent align="end" className="min-w-[12rem] max-w-[calc(100vw-2rem)]">
         {HISTORIAN_REFRESH_OPTIONS.map((option) => (
           <DropdownMenuItem
             key={option.label}
