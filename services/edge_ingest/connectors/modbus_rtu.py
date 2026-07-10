@@ -28,7 +28,7 @@ async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_even
                 values = client.read_holding_registers(addr, count)
                 if values:
                     for i, val in enumerate(values):
-                        publisher.publish_event(
+                        publisher.publish_event(source.map_event(
                             {
                                 "source_protocol": "modbus_rtu",
                                 "source_id": source.source_id or f"{port}:{slave_id}:hr/{addr+i}",
@@ -40,7 +40,7 @@ async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_even
                                 "site": source.site_id,
                                 "ts_source": utc_now(),
                             }
-                        )
+                        ))
             await asyncio.sleep(settings.poll_seconds)
         except Exception:
             adapter_errors.labels(protocol="modbus_rtu").inc()

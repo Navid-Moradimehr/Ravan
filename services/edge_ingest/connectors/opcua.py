@@ -29,7 +29,7 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
                     for node_id in nodes:
                         value = await client.get_node(node_id).read_value()
                         asset_id, tag = node_id.split(";s=", 1)[1].split(".", 1)
-                        publisher.publish_event(
+                        publisher.publish_event(source.map_event(
                             {
                                 "source_protocol": "opcua",
                                 "source_id": source.source_id or node_id,
@@ -41,7 +41,7 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
                                 "site": source.site_id,
                                 "ts_source": utc_now(),
                             }
-                        )
+                        ))
                     await asyncio.sleep(settings.poll_seconds)
         except Exception:
             adapter_errors.labels(protocol="opcua").inc()

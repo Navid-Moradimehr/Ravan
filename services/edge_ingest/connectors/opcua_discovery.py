@@ -28,7 +28,7 @@ async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop
             for node_id in nodes:
                 value = await client.read_node_value(node_id)
                 if value is not None:
-                    publisher.publish_event(
+                    publisher.publish_event(source.map_event(
                         {
                             "source_protocol": "opcua",
                             "source_id": source.source_id or node_id,
@@ -40,7 +40,7 @@ async def run_opcua_discovery(settings: Settings, publisher: EdgePublisher, stop
                             "site": source.site_id,
                             "ts_source": utc_now(),
                         }
-                    )
+                    ))
             await asyncio.sleep(settings.poll_seconds)
         except Exception:
             adapter_errors.labels(protocol="opcua_discovery").inc()

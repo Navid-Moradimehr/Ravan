@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from services.common.connection_registry import ConnectionRegistry, SourceConnection
+from services.common.connection_registry import ConnectionRegistry, SourceConnection, SourceMapping
 from services.edge_ingest.settings import Settings
 
 
@@ -17,6 +17,19 @@ def test_settings_loads_multiple_enabled_sources_from_registry(tmp_path, monkeyp
 
     assert [source.connection_id for source in sources] == ["conn-mqtt", "conn-opcua"]
     assert sources[0].options["topic"] == "plant/a/#"
+
+
+def test_registry_mapping_is_applied_before_validation(tmp_path, monkeypatch):
+    path = tmp_path / "connections.json"
+    registry = ConnectionRegistry(path)
+    registry.put(SourceConnection("conn-mqtt", "Sensor MQTT", "mqtt", "plant-a", "mqtt://broker-a:1883", source_id="gateway-a", mappings=[SourceMapping(source_field="temperature", asset_id="Pump-01", tag="Temperature", unit="c", scale=2.0)], enabled=True, state="enabled"))
+    monkeypatch.setenv("DATASTREAM_CONNECTION_REGISTRY_PATH", str(path))
+
+    source = Settings().source_connections()[0]
+    mapped = source.map_event({"tag": "temperature", "value": 20})
+    assert mapped["asset_id"] == "Pump-01"
+    assert mapped["tag"] == "Temperature"
+    assert mapped["value"] == 40.0
 
 
 def test_settings_keeps_legacy_environment_fallback(monkeypatch):

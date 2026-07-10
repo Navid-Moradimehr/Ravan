@@ -29,6 +29,8 @@ If no enabled registry connections exist, the edge runtime creates the legacy so
 
 Each registry source has a stable `connection_id`, site boundary, source protocol, endpoint, configuration version, mappings, and runtime state. Secrets are represented only by references. The registry rejects password, token, secret, private-key, and API-key fields.
 
+When an enabled source has mappings, the edge runtime applies the first matching mapping to the emitted event before canonical validation. Mapping can set asset, tag, site, line, unit, scale, and offset. The raw topic still receives the source payload, so mapping changes do not erase the original source record.
+
 ## Protocol notes
 
 OPC UA sources currently use the configured endpoint and node list. The discovery client can browse and subscribe, but production connection onboarding should add those capabilities to the source workflow before claiming no-code OPC UA commissioning.

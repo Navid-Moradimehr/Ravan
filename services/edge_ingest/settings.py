@@ -16,10 +16,36 @@ class SourceRuntime:
     endpoint: str = ""
     source_id: str = ""
     config: dict[str, Any] | None = None
+    mappings: tuple[dict[str, Any], ...] = ()
 
     @property
     def options(self) -> dict[str, Any]:
         return self.config or {}
+
+    def map_event(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Apply the first matching source mapping without changing raw data."""
+        candidate_fields = {
+            str(payload.get("source_id", "")),
+            str(payload.get("tag", "")),
+            str(payload.get("topic", "")),
+        }
+        for mapping in self.mappings:
+            if str(mapping.get("source_field", "")) not in candidate_fields:
+                continue
+            mapped = dict(payload)
+            mapped["asset_id"] = mapping.get("asset_id", mapped.get("asset_id", ""))
+            mapped["tag"] = mapping.get("tag", mapped.get("tag", ""))
+            mapped["site"] = mapping.get("site_id", mapped.get("site", self.site_id)) or self.site_id
+            if mapping.get("line"):
+                mapped["line"] = mapping["line"]
+            if mapping.get("unit"):
+                mapped["unit"] = mapping["unit"]
+            try:
+                mapped["value"] = float(mapped["value"]) * float(mapping.get("scale", 1.0)) + float(mapping.get("offset", 0.0))
+            except (TypeError, ValueError):
+                pass
+            return mapped
+        return payload
 
 
 @dataclass(frozen=True)
@@ -77,6 +103,7 @@ class Settings:
                     endpoint=item.endpoint,
                     source_id=item.source_id,
                     config=item.config,
+                    mappings=tuple(mapping.to_dict() for mapping in item.mappings),
                 )
                 for item in configured
             )

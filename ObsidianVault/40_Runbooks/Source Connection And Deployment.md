@@ -43,6 +43,8 @@ User-owned device/network
 
 The Integrations page can create source metadata and run a non-ingesting connection test. The edge runtime loads enabled registry records when present and otherwise preserves the legacy environment-variable deployment.
 
+Enabled mappings are applied to the emitted canonical event before validation. Raw source payloads remain available on the raw topic for replay and troubleshooting.
+
 Protocol browsing, full Sparkplug B activation, configurable Modbus register maps, durable per-source health, and end-to-end connector task orchestration remain future work.
 
 ## Security boundary

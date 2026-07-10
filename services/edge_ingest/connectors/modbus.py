@@ -38,7 +38,7 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
                     raise RuntimeError(str(result))
                 for address, tag, unit in register_map:
                     scale = 10 if tag != "Vibration" else 100
-                    publisher.publish_event(
+                    publisher.publish_event(source.map_event(
                         {
                             "source_protocol": "modbus",
                             "source_id": source.source_id or f"{host}:{port}/hr/{address}",
@@ -50,7 +50,7 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
                             "site": source.site_id,
                             "ts_source": utc_now(),
                         }
-                    )
+                    ))
                 await asyncio.sleep(settings.poll_seconds)
         except Exception:
             adapter_errors.labels(protocol="modbus").inc()

@@ -122,7 +122,7 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
             )
             return
         source_id = payload.get("source_id", message.topic) if isinstance(payload, dict) else message.topic
-        enqueue_mqtt_message(queue, payload, publisher, source_id)
+        enqueue_mqtt_message(queue, source.map_event(payload), publisher, source_id)
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"edge-ingest-{source.connection_id}")
     client.on_connect = on_connect

@@ -2549,3 +2549,4 @@ repeated a status badge that was already obvious from the section grouping.
 3. Added Docker `api-data` persistence and registry-backed source descriptors in edge-ingest. Existing environment-variable deployments remain the fallback when no enabled registry sources exist.
 4. Added the Integrations source-connection panel and deployment ownership guidance. The UI explains that saving metadata does not connect or publish, and that mutation routes remain behind the operator's configured auth boundary.
 5. Tests: connection registry persistence/security, diagnostics, source-instance fallback, route registration, metadata snapshot, and UI production build.
+6. Registry mappings now apply asset/tag/site/line/unit/scale/offset to emitted events before canonical validation while preserving the raw source payload.
