@@ -51,6 +51,10 @@ The edge runtime supports an opt-in local spool through `EDGE_STORE_FORWARD_DIR`
 
 The API's mutation routes remain protected by the existing bearer-token middleware. This project does not prescribe an identity provider, SSO system, RBAC model, gateway, or reverse proxy. Operators may place Traefik, NGINX, Kong, an auth proxy, SSO, or an enterprise IAM integration in front of the API and dashboard according to site policy.
 
+In Docker Compose, internal API-to-AI health checks use the service DNS name
+`ai-gateway:8080`; host/browser access remains through the published host
+ports.
+
 ## Webhooks and notifications
 
 Webhooks created through the historian UI are persisted in the API data volume, can be tested and deleted, and are attached to the same outbound webhook runtime used by alarm delivery. Generic notification webhook destinations are attached to that runtime as well.

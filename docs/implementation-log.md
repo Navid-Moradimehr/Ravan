@@ -1,5 +1,12 @@
 # Implementation Log
 
+## 2026-07-10 - Correct Docker AI Health Probe Address
+
+The API health probe previously defaulted to `localhost:8080` inside the API
+container, which cannot reach the separate AI gateway container. Compose now
+sets `DATASTREAM_AI_BASE=http://ai-gateway:8080`, making the health result
+reflect the actual service-to-service path.
+
 ## 2026-07-10 - Durable Source Health And Sink Route Refresh
 
 Persisted source-health state transitions in a bounded local file when
