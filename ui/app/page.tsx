@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, ArrowRight, BarChart3, Cable, DatabaseZap, Gauge, HardDrive, HelpCircle, Workflow } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Cable, DatabaseZap, Gauge, HardDrive, Workflow } from "lucide-react";
 import { DashboardFrame } from "@/components/dashboard-frame";
 import { SectionHeader } from "@/components/section-header";
 import { StatCard } from "@/components/stat-card";
+import { HelpTip } from "@/components/help-tip";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createObservabilityFallback, getObservability } from "@/lib/api";
 import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
 
@@ -114,8 +114,21 @@ export default function Home() {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-1.5 p-3">
-              {[ 
-                ["Kafka UI", "http://localhost:18080"],
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-2 px-3 py-2">
+                <Link
+                  href="http://localhost:18080"
+                  className="action-secondary inline-flex h-9 min-w-0 flex-1 items-center rounded-lg px-3 text-sm font-medium transition-colors"
+                >
+                  <ArrowRight aria-hidden="true" className="mr-2 size-4 text-text-secondary" />
+                  Kafka UI
+                </Link>
+                <HelpTip
+                  label="Kafka UI help"
+                  side="left"
+                  content="Kafka UI is the broker console. Use it to inspect topics, consumer groups, partitions, and message flow. It is a third-party web app, not a page built inside this React app."
+                />
+              </div>
+              {[
                 ["Grafana", "http://localhost:13000"],
                 ["Prometheus", "http://localhost:19090"],
                 ["Edge Metrics", "http://localhost:8090"],
@@ -130,46 +143,6 @@ export default function Home() {
                   {label}
                 </Link>
               ))}
-            </CardContent>
-          </Card>
-
-          <Card className="app-card overflow-hidden">
-            <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <HelpCircle aria-hidden="true" className="size-4 text-accent" />
-                Kafka UI
-              </CardTitle>
-              <CardDescription className="text-text-secondary">What the broker console is for and how to read it.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4">
-              <Tabs defaultValue="about" className="gap-3">
-                <TabsList variant="line" className="w-full justify-start border-b border-border-subtle pb-1">
-                  <TabsTrigger value="about">About</TabsTrigger>
-                  <TabsTrigger value="use">How to use</TabsTrigger>
-                </TabsList>
-                <TabsContent value="about" className="space-y-2 pt-3 text-sm leading-6 text-text-secondary">
-                  <p>
-                    Kafka UI is the broker inspection console. It shows the topics, messages, partitions, and consumer groups that sit
-                    behind the platform's event stream.
-                  </p>
-                  <p>
-                    In this stack it is not a design surface and not a data-entry form. It is the place where operators verify that
-                    events are moving through Kafka correctly.
-                  </p>
-                </TabsContent>
-                <TabsContent value="use" className="space-y-2 pt-3 text-sm leading-6 text-text-secondary">
-                  <p>
-                    Open a topic to inspect the messages it contains, check whether the topic is filling up, and confirm that the
-                    processor or historian consumers are keeping up.
-                  </p>
-                  <p>
-                    Start with the canonical streams: <span className="font-mono text-text-primary">industrial.raw</span>,
-                    <span className="font-mono text-text-primary"> industrial.normalized</span>, and{" "}
-                    <span className="font-mono text-text-primary">iot.processed</span>. If a topic stays empty, the ingestion path or
-                    simulator is not producing data yet.
-                  </p>
-                </TabsContent>
-              </Tabs>
             </CardContent>
           </Card>
         </>

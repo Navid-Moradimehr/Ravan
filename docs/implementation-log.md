@@ -1,5 +1,29 @@
 # Implementation Log
 
+## 2026-07-10 - Kafka UI Help Placement and External Surface Clarification
+
+Adjusted the Command Center so the Kafka UI explanation lives where operators
+actually look for it: as a small help tip attached to the Kafka UI operator
+link. The separate Kafka UI help card was removed from the landing page to keep
+the right rail compact.
+
+### Updated
+- `ui/app/page.tsx`
+- `docs/command-center-walkthrough.md`
+- `docs/kafka-ui-guide.md`
+
+### Notes
+- The Kafka UI page at `http://localhost:18080/` is an upstream app served by
+  the `ghcr.io/kafbat/kafka-ui` container.
+- The Grafana page at `http://localhost:13000/` is an upstream app served by
+  the `grafana/grafana` container and proxied through NGINX.
+- This repository controls links, proxying, provisioning, and explanatory UI,
+  but the broker console and Grafana UI themselves are owned by their upstream
+  projects.
+
+### Validation
+- UI and docs alignment checked by code inspection.
+
 ## 2026-07-07 - Logical Metadata Plane Foundation
 
 Added a lightweight logical metadata plane without introducing a new microservice.

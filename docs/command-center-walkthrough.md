@@ -157,6 +157,12 @@ Links:
 - Edge metrics
 - AI health
 
+Kafka UI note:
+
+- the Kafka UI explanation is attached to the Kafka UI link itself as a small `?` help tip
+- it is not rendered as a separate help card in the Command Center anymore
+- the help tip explains that Kafka UI is the broker console and that it is a third-party web app, not a page built inside this React app
+
 ## Typical user flow
 
 1. Open the Command Center.
@@ -165,6 +171,7 @@ Links:
 4. Check the live pipeline summary for stream health.
 5. Check the health snapshot for observability state.
 6. Use the operator links if you need the broker, metrics, or AI service directly.
+7. Hover the Kafka UI help tip if you want the broker-console explanation without leaving the page.
 
 ## What is live and what is fallback
 
@@ -178,3 +185,13 @@ Fallback:
 - pipeline stage placeholders when telemetry has not arrived yet
 - demo observability snapshot when metrics services are unavailable
 
+## Editable vs external pages
+
+The Command Center itself is part of this repository and is editable here.
+
+The Kafka UI and Grafana pages that it links to are external services running in Docker Compose:
+
+- Kafka UI is served by the `ghcr.io/kafbat/kafka-ui` container on `http://localhost:18080`
+- Grafana is served by the `grafana/grafana` container and proxied on `http://localhost:13000`
+
+That means the links, proxying, provisioning, and surrounding help text are editable in this repo, but the actual third-party UI pages are owned by their upstream projects.

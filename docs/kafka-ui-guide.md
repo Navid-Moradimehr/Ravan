@@ -2,6 +2,8 @@
 
 Kafka UI is the broker console for this platform. It is the place where you inspect Kafka itself: which topics exist, whether messages are arriving, whether consumer groups are keeping up, and whether the stream is healthy. It is not where you configure business logic, historian tables, or dashboards. It sits one layer below those things and lets you verify that the message backbone is doing its job.
 
+The Command Center now exposes a small `?` help tip next to the Kafka UI operator link. That help tip gives the short explanation without adding a separate panel to the landing page.
+
 In this local stack the UI is intentionally read-only. That keeps the broker console aligned with the rest of the open-source release: inspect the broker, do not change the platform from there.
 
 When you open Kafka UI, the first thing to look at is the topic list. In this platform the canonical topics are the main contract surface. `industrial.raw` shows the pre-normalized industrial stream, `industrial.normalized` is the canonical downstream stream, `industrial.dlq` contains rejected records, `iot.raw` feeds the compatibility path, `iot.processed` contains scored events, and `iot.ai_enriched` contains AI output events. If a topic is empty, that usually means the simulator, ingestion path, or processor is not producing data yet.
@@ -15,3 +17,5 @@ The `Create new topic` page is for provisioning a brand-new Kafka topic when you
 The topic statistics page can emit browser-console warnings in a local setup. That is usually Kafka UI trying to query ACL or analysis-related endpoints that are not fully available in a simple standalone broker install. In this repository those logs are not evidence that the platform is broken. They are a sign that Kafka UI is probing features that belong to a more permissioned or enterprise-style broker deployment. The local compose file now runs Kafka UI in read-only mode, so the broker console is intentionally diagnostic only. If you need those pages to be completely quiet, the next step is to tune Kafka UI permissions or run it against a broker that exposes the relevant ACL and analysis features.
 
 For this project, Kafka UI should be treated as a diagnostic viewer. It gives you visibility into the event backbone, but the actual platform behavior still lives in the ingest, processing, historian, and observability services.
+
+Kafka UI itself is an upstream web application running in Docker Compose. This repository controls how it is launched, linked, and documented, but the actual Kafka UI page is owned by the upstream project.
