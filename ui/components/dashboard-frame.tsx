@@ -18,7 +18,6 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/", label: "Command center", icon: LayoutDashboard, description: "Overview and quick actions" },
-  { href: "/processing", label: "Processing", icon: Workflow, description: "Python and Flink runtime" },
   { href: "/historian", label: "Historian", icon: DatabaseZap, description: "Storage, queries, backup" },
   { href: "/observability", label: "Observability", icon: Gauge, description: "Health, metrics, latency" },
   { href: "/integrations", label: "Integrations", icon: BarChart3, description: "CDC, webhooks, models" },

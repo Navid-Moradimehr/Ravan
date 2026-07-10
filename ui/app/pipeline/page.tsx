@@ -1,7 +1,11 @@
-import { Activity, AlertTriangle, Cable, RadioTower } from "lucide-react";
+"use client";
+
+import { Activity, AlertTriangle, BrainCircuit, Cable, Gauge, RadioTower, Workflow } from "lucide-react";
 import { DashboardFrame } from "@/components/dashboard-frame";
 import { HelpTip } from "@/components/help-tip";
 import { SectionHeader } from "@/components/section-header";
+import { StatCard } from "@/components/stat-card";
+import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,22 +24,26 @@ const events = [
 ];
 
 function statusTone(status: string) {
-  if (status === "active") return "border-success/30 bg-success/10 text-success";
+  if (status === "active" || status === "online") return "border-success/30 bg-success/10 text-success";
   if (status === "degraded" || status === "warning") return "border-warning/30 bg-warning/10 text-warning";
   return "border-error/30 bg-error/10 text-error";
 }
 
 export default function PipelinePage() {
+  const telemetry = useTelemetryEvents();
+  const runtimeMode = telemetry.data?.pipeline?.[2]?.status ?? "starting";
+  const systemStatus = telemetry.error ? "degraded" : "online";
+
   return (
-    <DashboardFrame rightRail={<PipelineRail />}>
+    <DashboardFrame systemStatus={systemStatus} rightRail={<PipelineRail runtimeMode={runtimeMode} />}>
       <div className="space-y-6">
         <header className="app-card overflow-hidden">
           <div className="border-b border-border-subtle px-6 py-5">
             <p className="label-overline">Pipeline</p>
-            <h1 className="mt-2 font-heading text-3xl font-semibold tracking-tight">Extraction, normalization, and DLQ boundaries</h1>
+            <h1 className="mt-2 font-heading text-3xl font-semibold tracking-tight">Extraction, normalization, processing, and DLQ boundaries</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-text-secondary">
-              This route isolates the pre-storage flow: PLC and sensor extraction, validation, normalized Kafka topics, and the
-              exception lane for bad records.
+              This route shows the pre-storage flow from PLC and sensor extraction through validation, normalization, runtime
+              processing, and the exception lane for bad records.
             </p>
           </div>
         </header>
@@ -94,7 +102,7 @@ export default function PipelinePage() {
               <HelpTip
                 label="Pipeline stages help"
                 side="left"
-                content="This panel explains the transformation path after data arrives from the edge. Use it to see where the record is extracted, validated, normalized, and routed to either the canonical stream or the DLQ."
+                content="This panel explains the transformation path after source data enters the platform. Use it to see where the record is extracted, validated, normalized, and routed to either the canonical stream or the DLQ."
               />
             }
           />
@@ -159,31 +167,75 @@ export default function PipelinePage() {
             </Table>
           </Card>
         </section>
+
+        <section className="space-y-4">
+          <SectionHeader
+            title="Processing runtime"
+            eyebrow="Runtime"
+            description="The live contract for the scoring and enrichment layer that consumes normalized events."
+            icon={Workflow}
+            actions={
+              <HelpTip
+                label="Processing runtime help"
+                side="left"
+                content="This panel shows how the platform processes normalized records after ingestion. Use it to understand whether the runtime is on Python fallback or a Flink path, and how events are handed off to downstream consumers."
+              />
+            }
+          />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard label="Runtime mode" value={runtimeMode} icon={Workflow} tone="info" />
+            <StatCard label="Batch path" value="iot.raw -> iot.processed" icon={Gauge} tone="default" />
+            <StatCard label="AI handoff" value="iot.processed -> ai" icon={BrainCircuit} tone="warning" />
+            <StatCard label="State model" value="keyed windows" icon={Workflow} tone="default" />
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              ["Python fallback", "Single-node development and benchmark harness"],
+              ["Flink local", "Distributed stateful runtime for plant-local deployments"],
+              ["Flink production", "Multi-site mode with checkpointed keyed processing"],
+            ].map(([title, desc]) => (
+              <Card key={title} className="border-border bg-surface-2">
+                <CardHeader>
+                  <CardTitle className="text-base">{title}</CardTitle>
+                  <CardDescription>{desc}</CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm text-text-secondary">
+                  Same normalization and scoring contract, different runtime envelope.
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
       </div>
     </DashboardFrame>
   );
 }
 
-function PipelineRail() {
+function PipelineRail({ runtimeMode }: { runtimeMode: string }) {
   return (
-    <Card className="app-card overflow-hidden">
-      <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
+    <div className="space-y-4">
+      <Card className="app-card overflow-hidden">
+        <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <AlertTriangle aria-hidden="true" className="size-4 text-accent" />
             Boundary notes
           </CardTitle>
-          <HelpTip
-            label="Boundary notes help"
-            side="left"
-            content="This panel is a static guidance card. It is not a live data feed. Use it to understand that the Pipeline page is only about pre-storage flow, source isolation, normalization, and DLQ behavior."
-          />
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 p-4 text-sm leading-6 text-text-secondary">
-        <p>Everything here happens before durable storage or analytics views.</p>
-        <p>Use this page to test source isolation, normalization, and DLQ behavior.</p>
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="space-y-3 p-4 text-sm leading-6 text-text-secondary">
+          <p>Everything here happens before durable storage or analytics views.</p>
+          <p>Use this page to test source isolation, normalization, DLQ behavior, and processing runtime behavior.</p>
+        </CardContent>
+      </Card>
+
+      <Card className="app-card overflow-hidden">
+        <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
+          <CardTitle className="text-base font-semibold">Runtime notes</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 p-4 text-sm leading-6 text-text-secondary">
+          <p>Use Python fallback to debug logic and Flink to validate distributed behavior.</p>
+          <p className="font-mono text-xs text-text-primary">active: {runtimeMode}</p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

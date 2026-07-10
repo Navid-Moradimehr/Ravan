@@ -39,9 +39,9 @@ Purpose:
 Routes:
 
 - Pipeline
-- Processing
 - Historian
 - Observability
+- Integrations
 
 ## Live pipeline summary
 

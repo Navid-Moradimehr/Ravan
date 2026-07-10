@@ -7,8 +7,7 @@ Use an industrial control-room visual system: graphite surfaces, sharp borders, 
 ## Screens
 
 - Command center
-- Pipeline explorer
-- Processing and Flink view
+- Combined pipeline and processing explorer
 - Historian and CDC view
 - Observability view
 - Integrations and AI view

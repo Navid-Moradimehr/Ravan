@@ -12,8 +12,7 @@ The dashboard is now a routed shadcn-based operations cockpit with a dedicated c
 ## Primary Views
 
 - Command center overview.
-- Pipeline view.
-- Processing view.
+- Combined pipeline and processing view.
 - Historian view.
 - Observability view.
 - Integrations view.

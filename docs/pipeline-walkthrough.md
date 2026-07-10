@@ -9,7 +9,8 @@ The page has four parts:
 1. Ingress lanes
 2. Pipeline stages
 3. Event preview
-4. Boundary notes in the right rail
+4. Processing runtime
+5. Boundary notes in the right rail
 
 The page is mostly a simulated or contract-oriented view today. The endpoints and labels are real platform concepts, but the visible source endpoints on the page are illustrative so users can understand the shape of the pipeline without needing live hardware attached.
 
@@ -111,7 +112,36 @@ How users use it:
 - an integrator can compare their data with the platform’s event contract
 - a developer can quickly confirm that the preview shape matches the intended ingestion model
 
-## 4) Boundary notes
+## 4) Processing runtime
+
+This section is the live middle of the flow.
+
+What it does:
+
+- shows whether the runtime is in Python fallback, Flink local, or Flink production mode
+- shows the current batch path from `iot.raw` to `iot.processed`
+- shows the AI handoff from `iot.processed` to AI enrichment
+- shows the keyed-window state model used by the scoring path
+
+Inputs:
+
+- live telemetry from the runtime stream
+- fallback state if telemetry has not arrived yet
+
+Outputs:
+
+- runtime summary cards
+- runtime envelope cards
+
+How users use it:
+
+- developers use Python fallback to debug logic
+- site operators use Flink local to validate distributed behavior on one site
+- larger deployments use Flink production when they need checkpointed streaming state
+
+This section used to live on the Processing page. It now lives here so the platform has one combined ingestion-and-processing route.
+
+## 5) Boundary notes
 
 The right rail explains the scope of the page.
 
@@ -138,4 +168,9 @@ The Pipeline page sits before the historian and before the main analytics surfac
 2. Check the ingress lanes to see whether the protocol source is active.
 3. Read the stage cards to understand where the record is in the flow.
 4. Inspect the event preview to confirm the shape of the data.
-5. Use the boundary notes to understand what this page is responsible for and what happens elsewhere.
+5. Read the processing runtime section if you want to understand the current execution envelope.
+6. Use the boundary notes to understand what this page is responsible for and what happens elsewhere.
+
+## Route note
+
+The old `/processing` route now redirects here so bookmarks and old links still work.

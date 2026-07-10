@@ -16,14 +16,8 @@ const quickRoutes = [
   {
     href: "/pipeline",
     title: "Pipeline",
-    description: "Ingress, normalization, DLQ, and event preview.",
+    description: "Ingress, normalization, DLQ, processing runtime, and event preview.",
     icon: Cable,
-  },
-  {
-    href: "/processing",
-    title: "Processing",
-    description: "Python fallback, Flink runtime, and benchmark paths.",
-    icon: Workflow,
   },
   {
     href: "/historian",
@@ -36,6 +30,12 @@ const quickRoutes = [
     title: "Observability",
     description: "Throughput, latency, reconnects, and health.",
     icon: Gauge,
+  },
+  {
+    href: "/integrations",
+    title: "Integrations",
+    description: "CDC, external sinks, and operational connectors.",
+    icon: BarChart3,
   },
 ];
 

@@ -45,10 +45,10 @@ These are the route cards under Navigation.
 
 What they do:
 
-- `Pipeline` opens ingress, normalization, DLQ, and event preview
-- `Processing` opens the stream-processing and benchmark area
+- `Pipeline` opens ingress, normalization, DLQ, event preview, and runtime processing
 - `Historian` opens SQL, backup, replay, webhooks, and dashboards
 - `Observability` opens throughput, latency, reconnect, and health views
+- `Integrations` opens CDC, webhooks, and model connectivity
 
 Inputs:
 

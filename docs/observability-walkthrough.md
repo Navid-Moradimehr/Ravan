@@ -97,7 +97,7 @@ How users use it:
 
 ## How it fits the platform
 
-Observability sits beside the historian and processing pages, but it has a different job. Processing is about what the runtime is doing. Observability is about whether the runtime is healthy. Historian is about what happened and how to query it later. Those three areas are related, but they are not the same thing.
+Observability sits beside the historian and pipeline pages, but it has a different job. The Pipeline page now carries the runtime processing summary as part of the combined route. Observability is about whether the runtime is healthy. Historian is about what happened and how to query it later. Those three areas are related, but they are not the same thing.
 
 ## Typical user flow
 
@@ -106,4 +106,3 @@ Observability sits beside the historian and processing pages, but it has a diffe
 3. Look for the fallback warning if live metrics are unavailable.
 4. Read the charts for throughput, latency, protocol mix, and severity mix.
 5. Use the right rail to understand which signal sources feed the page.
-

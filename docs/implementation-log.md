@@ -1,5 +1,29 @@
 # Implementation Log
 
+## 2026-07-10 - Merge Processing Into Pipeline
+
+Folded the standalone Processing page into the Pipeline page, moved the old
+`/processing` route to a redirect, and updated the navigation and docs so the
+platform has one combined ingestion-and-processing view.
+
+### Changed
+- `ui/app/pipeline/page.tsx`
+- `ui/app/processing/page.tsx`
+- `ui/components/dashboard-frame.tsx`
+- `ui/app/page.tsx`
+- `ui/playwright-smoke.cjs`
+
+### Added / Updated
+- `docs/pipeline-walkthrough.md`
+- `docs/processing-walkthrough.md`
+- `docs/command-center-walkthrough.md`
+- `ObsidianVault/30_UI_UX/Pipeline Walkthrough.md`
+- `ObsidianVault/30_UI_UX/Processing Walkthrough.md`
+- `ObsidianVault/30_UI_UX/Command Center Walkthrough.md`
+
+### Validation
+- UI build to be rerun after the code change.
+
 ## 2026-07-10 - Processing / Observability Separation
 
 Removed the duplicated observability panels from the Processing page and

@@ -13,13 +13,14 @@ const { chromium, expect } = require('@playwright/test');
   }
   await expect(page.getByRole('link', { name: 'Open pipeline view' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Kafka UI' })).toBeVisible();
-  for (const text of ['Pipeline', 'Processing', 'Historian', 'Observability']) {
+  for (const text of ['Pipeline', 'Historian', 'Observability', 'Integrations']) {
     await expect(page.getByRole('link', { name: text, exact: true })).toBeVisible();
   }
   await page.getByRole('link', { name: 'Pipeline', exact: true }).first().click();
-  await expect(page.getByRole('heading', { name: 'Extraction, normalization, and DLQ boundaries' })).toBeVisible();
-  await page.getByRole('link', { name: 'Processing', exact: true }).first().click();
-  await expect(page.getByRole('heading', { name: 'Runtime processing and enrichment' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Extraction, normalization, processing, and DLQ boundaries' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Processing runtime' })).toBeVisible();
+  await page.goto('http://localhost:3006/processing', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: 'Extraction, normalization, processing, and DLQ boundaries' })).toBeVisible();
   await page.getByRole('button', { name: 'Switch to light mode' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.getByRole('button', { name: 'Switch to dark mode' })).toBeVisible();
