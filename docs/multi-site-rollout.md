@@ -421,3 +421,8 @@ Prometheus metric when a transport adapter reports lag.
 Dataset compilation also reports duplicate IDs, missing source timestamps, and
 late events. Sites may tighten those checks in their training gates without
 making the operational ingest path reject records by default.
+
+The local `multi-site-failure` benchmark exercises the expected outage
+contract: sites continue writing locally, central delivery catches up, and
+stable event IDs prevent duplicates. It does not replace a real broker/WAN
+rehearsal.

@@ -10,10 +10,14 @@ import json
 import logging
 import os
 import signal
+import json as json_module
+from pathlib import Path
+import time
 
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, TopicPartition
 
 from services.common.brokers import resolve_kafka_brokers
+from services.common.runtime_metrics import set_federation_lag
 from services.federation.policy import allowed_topics, topic_allowed
 from services.sinks.lakehouse import LakehouseSink
 
@@ -65,11 +69,23 @@ def main() -> None:
                 logger.warning("central federation consumer error: %s", message.error())
                 continue
             try:
+                _, high = consumer.get_watermark_offsets(TopicPartition(message.topic(), message.partition()))
+                set_federation_lag(message.topic(), max(high - message.offset() - 1, 0))
+            except Exception:
+                pass
+            try:
                 event = json.loads(message.value().decode("utf-8"))
                 event["federation_source_topic"] = message.topic()
                 batch.append(event)
                 if len(batch) >= batch_size:
                     flush()
+                status_path = os.getenv("FEDERATION_STATUS_PATH", "")
+                if status_path:
+                    Path(status_path).parent.mkdir(parents=True, exist_ok=True)
+                    Path(status_path).write_text(
+                        json_module.dumps({"status": "healthy", "topic": message.topic(), "last_message_at": time.time()}),
+                        encoding="utf-8",
+                    )
             except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
                 logger.warning("central federation skipped invalid event: %s", exc)
     finally:

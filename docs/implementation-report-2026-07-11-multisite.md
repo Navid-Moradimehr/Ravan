@@ -24,7 +24,7 @@ The historian-only fan-out remains the default when `SINKS` is not configured.
 
 ## Verification
 
-- Python tests: `519 passed`, 4 pre-existing warnings.
+- Python tests before this phase: `520 passed`, 4 pre-existing warnings.
 - UI production build: passed, including TypeScript checking and all routes.
 - Default Compose configuration: valid.
 - Federation Compose profile: valid.
@@ -32,6 +32,8 @@ The historian-only fan-out remains the default when `SINKS` is not configured.
 - Real-world simulator suite: average `80,908.50 events/sec`, p99 `0.0207 ms`.
 - Site matrix: `demo-site` median `80,374.01 events/sec`; `plant-a` median
   `84,291.51 events/sec`; both passed the configured threshold.
+- Multi-site outage simulation: 3 sites, 30,000 local events, 6,000 queued
+  during outage, 30,000 centrally recovered, 0 duplicates.
 
 ## Not validated locally
 

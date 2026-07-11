@@ -124,3 +124,12 @@ missing status file is reported as `unknown`; it is not treated as healthy.
 - Identity or topology conflicts are reported during manifest validation.
 - Data-quality warnings appear in dataset reports without rejecting ordinary
   live ingestion by default.
+
+Run the local outage/recovery correctness simulation with:
+
+```powershell
+datastreamctl benchmark multi-site-failure --sites 3 --events-per-site 10000 --outage-events-per-site 2000
+```
+
+This verifies local continuity, central catch-up, and duplicate-free replay in
+memory. Its reported operation rate is not a Kafka or S3 throughput result.

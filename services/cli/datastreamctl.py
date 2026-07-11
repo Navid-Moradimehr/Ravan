@@ -56,6 +56,8 @@ from services.benchmarks.site_profile_calibration import format_result as format
 from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
 from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
 from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
+from services.benchmarks.multi_site_failure import format_result as format_multi_site_failure_result
+from services.benchmarks.multi_site_failure import run_benchmark as run_multi_site_failure_benchmark
 from services.historian.backup import (
     collect_historian_snapshot,
     compare_historian_snapshots,
@@ -1776,6 +1778,26 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                 for path in written_reports:
                     print(f"{'':6}report  {path}")
         return 0 if result.passed else 2
+    if args.action == "multi-site-failure":
+        result = run_multi_site_failure_benchmark(
+            sites=args.sites,
+            events_per_site=args.events_per_site,
+            outage_events_per_site=args.outage_events_per_site,
+        )
+        payload = {
+            "sites": result.sites,
+            "events_per_site": result.events_per_site,
+            "outage_events_per_site": result.outage_events_per_site,
+            "local_events_written": result.local_events_written,
+            "central_events_written": result.central_events_written,
+            "queued_during_outage": result.queued_during_outage,
+            "duplicate_events": result.duplicate_events,
+            "recovery_complete": result.recovery_complete,
+            "elapsed_seconds": result.elapsed_seconds,
+            "local_events_per_second": result.local_events_per_second,
+        }
+        print(json.dumps(payload, indent=2) if args.json else format_multi_site_failure_result(result))
+        return 0 if result.recovery_complete and result.duplicate_events == 0 else 2
     if args.action == "site-profile-calibration":
         site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
         result = run_site_profile_calibration(
@@ -2605,6 +2627,12 @@ def build_parser() -> argparse.ArgumentParser:
     site_profile_matrix.add_argument("--report-dir", default=None, help="Optional directory to write JSON benchmark reports")
     site_profile_matrix.add_argument("--json", action="store_true")
     site_profile_matrix.set_defaults(func=cmd_benchmark)
+    multi_site_failure = benchmark_sub.add_parser("multi-site-failure", help="Simulate site-local operation during central outage and recovery")
+    multi_site_failure.add_argument("--sites", type=int, default=3)
+    multi_site_failure.add_argument("--events-per-site", type=int, default=10_000)
+    multi_site_failure.add_argument("--outage-events-per-site", type=int, default=2_000)
+    multi_site_failure.add_argument("--json", action="store_true")
+    multi_site_failure.set_defaults(func=cmd_benchmark)
     site_profile_calibration = benchmark_sub.add_parser("site-profile-calibration", help="Calibrate per-site benchmark thresholds from the mixed replay pack")
     site_profile_calibration.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
     site_profile_calibration.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
