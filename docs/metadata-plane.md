@@ -112,6 +112,10 @@ The model registry and prompt registry now also support optional file-backed sta
 The dataset catalog now also supports optional file-backed state through `DATASET_CATALOG_PATH`, so benchmark and release-candidate dataset listings can remain stable across restarts without becoming a separate data-service boundary.
 The dataset-builder contract is still logical only; it describes how curated, versioned datasets should be created for AI, benchmarking, and replay without exposing raw historian data directly.
 
+The first implementation is a library/CLI compiler rather than a new service.
+`datastreamctl training-dataset` validates manifests and emits portable
+Parquet bundles with semantic context, lineage, and quality reports.
+
 Canonical events also carry lightweight provenance identities for the source
 connection, configuration version, mapping version, schema version, and event
 lineage ID. These fields travel with normalized and processed records and are

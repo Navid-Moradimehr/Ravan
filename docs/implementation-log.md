@@ -1,5 +1,14 @@
 # Implementation Log
 
+## 2026-07-11 - Versioned Training Dataset Bundles
+
+Added `services.common.training_dataset` and the
+`datastreamctl training-dataset validate|compile` commands. Manifests require
+observation sources and enforce action/outcome/episode declarations for
+Dreamer/MuZero-style datasets. Compilation emits observations, operational
+events, outcomes, manifest, semantic context, lineage, and quality-report
+artifacts. Focused suite: `60 passed`.
+
 ## 2026-07-11 - Event Provenance Identities
 
 Canonical events now carry source connection, source configuration, mapping,

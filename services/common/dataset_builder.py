@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from services.datasets.runtime_catalog import list_dataset_sources
+from services.common.training_dataset import validate_manifest
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,6 @@ def build_dataset_builder_snapshot() -> dict[str, Any]:
             "The builder is a logical contract that sits between lakehouse storage and AI workloads.",
             "Curated datasets should remain versioned and reproducible.",
             "Raw historian access remains a separate concern from dataset curation.",
+            "Versioned training manifests are validated by services.common.training_dataset.",
         ],
     }
-

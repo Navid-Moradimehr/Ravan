@@ -928,6 +928,26 @@ def cmd_datasets(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_training_dataset(args: argparse.Namespace) -> int:
+    from services.common.training_dataset import compile_bundle, load_manifest, validate_manifest
+
+    if args.action == "validate":
+        result = validate_manifest(load_manifest(args.manifest)).to_dict()
+    else:
+        result = compile_bundle(
+            args.manifest,
+            args.output_dir,
+            observations=args.observations,
+            operational_events=args.operational_events,
+            outcomes=args.outcomes,
+        )
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(json.dumps(result, indent=2))
+    return 0 if result.get("valid", True) else 1
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     print("datastream-doctor checks")
     print("=" * 40)
@@ -2353,6 +2373,21 @@ def build_parser() -> argparse.ArgumentParser:
     datasets_cmd = sub.add_parser("datasets", help="List testing datasets")
     datasets_cmd.add_argument("--category", default=None, help="Filter by category (mock, synthetic, industrial, security, multimodal)")
     datasets_cmd.set_defaults(func=cmd_datasets)
+
+    training_dataset = sub.add_parser("training-dataset", help="Validate or compile a versioned training dataset bundle")
+    training_dataset_sub = training_dataset.add_subparsers(dest="action", required=True)
+    training_validate = training_dataset_sub.add_parser("validate", help="Validate a training dataset manifest")
+    training_validate.add_argument("manifest")
+    training_validate.add_argument("--json", action="store_true")
+    training_validate.set_defaults(func=cmd_training_dataset)
+    training_compile = training_dataset_sub.add_parser("compile", help="Compile local exports into a portable dataset bundle")
+    training_compile.add_argument("manifest")
+    training_compile.add_argument("output_dir")
+    training_compile.add_argument("--observations", default=None)
+    training_compile.add_argument("--operational-events", default=None)
+    training_compile.add_argument("--outcomes", default=None)
+    training_compile.add_argument("--json", action="store_true")
+    training_compile.set_defaults(func=cmd_training_dataset)
 
     sub.add_parser("doctor", help="Run health/diagnostic checks").set_defaults(func=cmd_doctor)
     sub.add_parser("config", help="Show effective control configuration").set_defaults(func=cmd_config)
