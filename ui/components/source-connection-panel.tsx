@@ -99,7 +99,7 @@ export function SourceConnectionPanel() {
           <Button disabled={!name || !endpoint || add.isPending} onClick={() => add.mutate({ name, source_protocol: protocol, site_id: siteId, endpoint, credential_ref: credentialRef })}><Plus className="size-4" /> Save</Button>
         </div>
         <Input value={credentialRef} onChange={(event) => setCredentialRef(event.target.value)} placeholder="Credential reference, e.g. secret://plant-a/opcua/pump" />
-        <p className="text-xs leading-5 text-text-secondary">Save creates metadata only. It does not connect, publish, or store secrets. Network testing and activation require the operator&apos;s configured API security boundary.</p>
+        <p className="text-xs leading-5 text-text-secondary">Save creates metadata only. It does not connect, publish, or store secrets. Test with the button, then activate with <code>POST /api/v1/connections/&lt;id&gt;/enable</code> through the operator&apos;s configured API security boundary.</p>
         {connections.isError ? <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm">{formatErrorMessage(connections.error, "Connections could not be loaded.")}</p> : null}
         {sourceHealth.isError ? <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text-primary">Mapping diagnostics are temporarily unavailable, so live match counts are hidden until the observability endpoint recovers.</p> : null}
         <div className="space-y-2">

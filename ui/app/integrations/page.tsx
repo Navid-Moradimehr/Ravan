@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, Cable, DatabaseZap, Plug, Webhook } from "lucide-react";
+import { ArrowRight, BarChart3, Cable, DatabaseZap, Webhook } from "lucide-react";
 import { DashboardFrame } from "@/components/dashboard-frame";
 import { SectionHeader } from "@/components/section-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ type SurfaceCard = {
   title: string;
   description: string;
   note: string;
-  icon: typeof Plug;
+  icon: typeof Cable;
   action: SurfaceAction;
   guide?: {
     heading: string;
@@ -26,6 +26,13 @@ type SurfaceCard = {
 };
 
 const editableSurfaces: SurfaceCard[] = [
+  {
+    title: "Source connections",
+    description: "Register OPC UA, MQTT, Modbus, Sparkplug B, REST, file, dataset, and mock sources.",
+    note: "Metadata is edited here; testing and activation use the deployment API boundary.",
+    icon: Cable,
+    action: { label: "Open editor", href: "#source-connections", tone: "primary" },
+  },
   {
     title: "Webhooks",
     description: "Outbound HTTP notifications for alarms and anomaly events.",
@@ -118,7 +125,7 @@ const catalogSurfaces: SurfaceCard[] = [
   },
   {
     title: "Kafka sinks",
-    description: "Outbound bridge to MQTT, AMQP, and external listeners.",
+    description: "Fan normalized events to historian, downstream Kafka, or an optional Iceberg lakehouse.",
     note: "Configured from runtime and fan-out settings.",
     icon: Cable,
     action: { label: "Setup guide", href: "#kafka-sinks", tone: "secondary" },
@@ -130,9 +137,9 @@ const catalogSurfaces: SurfaceCard[] = [
         "services/sinks/kafka_sink.py",
       ],
       steps: [
-        "Choose which sink channels should be enabled for the fan-out consumer.",
-        "Set `FANOUT_SINKS` and related broker or destination variables in the deployment file.",
-        "Keep the external broker credentials outside the platform core.",
+        "Choose one or more sink names: `historian`, `kafka`, or `lakehouse`.",
+        "Set `FANOUT_SINKS` (or `SINKS`) and the corresponding broker/catalog variables in the deployment environment.",
+        "Keep external Kafka, object-store, and catalog credentials outside the platform core.",
       ],
     },
   },
@@ -149,29 +156,9 @@ const catalogSurfaces: SurfaceCard[] = [
         "services/ai_gateway/providers.py",
       ],
       steps: [
-        "Set the provider base URL, model name, and API key in the environment.",
+        "Set `LLM_PROVIDER`, `LLM_ENDPOINT_URL`, `LLM_MODEL_ID`, and the provider credential in the deployment environment.",
         "Choose the local or remote provider endpoint per deployment.",
         "Leave provider credentials and GPU sizing to the operator.",
-      ],
-    },
-  },
-  {
-    title: "Connector catalog",
-    description: "MQTT, OPC UA, Modbus, SQL, REST, and file adapters.",
-    note: "Cataloged in code and mapped through manifests/runtime config.",
-    icon: Plug,
-    action: { label: "Setup guide", href: "#connector-catalog", tone: "secondary" },
-    guide: {
-      heading: "How to configure connector sources",
-      location: [
-        "services/datasets/data_sources_catalog.py",
-        "config/project-manifest.yaml",
-        "config/assets.yaml",
-      ],
-      steps: [
-        "Select the connector that matches the source protocol.",
-        "Map the source to a site, asset, and tag model in the project manifest.",
-        "Keep plant-specific credentials and endpoints out of the platform core.",
       ],
     },
   },
@@ -265,7 +252,9 @@ export default function IntegrationsPage() {
           </div>
         </header>
 
-        <SourceConnectionPanel />
+        <div id="source-connections" className="scroll-mt-24">
+          <SourceConnectionPanel />
+        </div>
 
         <SectionHeader
           title="Editable surfaces"

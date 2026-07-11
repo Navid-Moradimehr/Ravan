@@ -25,7 +25,8 @@ The platform stores that as metadata. The actual secret material stays in the op
 7. Save the source definition.
 8. Run the connection test.
 9. Add mappings if the source fields need to become asset or tag names.
-10. Enable the source.
+10. Activate the source through the operator API boundary with
+    `POST /api/v1/connections/<connection_id>/enable`.
 
 ## 3. What happens after save
 
