@@ -95,7 +95,27 @@ export function KPIBuilder() {
   const setTag = useCallback((i: number, val: string) => setForm((f) => { const t = [...f.input_tags]; t[i] = val; return { ...f, input_tags: t }; }), []);
 
   const submit = useCallback(() => {
-    const kpi = { ...form, kpi_id: form.kpi_id || `kpi-${Date.now()}` };
+    const name = form.name.trim();
+    const expression = form.expression.trim();
+    const unit = form.unit.trim();
+    const input_tags = form.input_tags.map((tag) => tag.trim()).filter(Boolean);
+    if (!name || !expression || !input_tags.length || !Number.isFinite(form.window_seconds) || form.window_seconds <= 0) {
+      showToast({
+        title: "KPI definition incomplete",
+        description: "Fill in the KPI name, expression, window, and at least one input tag before saving.",
+        variant: "warning",
+      });
+      return;
+    }
+    const kpi = {
+      ...form,
+      kpi_id: form.kpi_id || `kpi-${Date.now()}`,
+      name,
+      expression,
+      unit,
+      input_tags,
+      window_seconds: Math.max(1, Math.round(form.window_seconds)),
+    };
     create.mutate(kpi);
   }, [form, create]);
 
@@ -131,7 +151,7 @@ export function KPIBuilder() {
             <input type="number" value={form.warning_threshold ?? ""} onChange={(e) => setForm((f) => ({ ...f, warning_threshold: e.target.value ? Number(e.target.value) : null }))} placeholder="Warning Threshold" className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-2 text-sm" />
             <input type="number" value={form.critical_threshold ?? ""} onChange={(e) => setForm((f) => ({ ...f, critical_threshold: e.target.value ? Number(e.target.value) : null }))} placeholder="Critical Threshold" className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-2 text-sm" />
           </div>
-          <Button onClick={submit} disabled={create.isPending} className="inline-flex items-center gap-2">
+          <Button onClick={submit} disabled={create.isPending || !form.name.trim() || !form.expression.trim()} className="inline-flex items-center gap-2">
             <Save className="size-4" />{create.isPending ? "Saving..." : "Save KPI"}
           </Button>
         </div>

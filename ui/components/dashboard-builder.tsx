@@ -61,7 +61,11 @@ export function DashboardBuilder() {
 
   useEffect(() => {
     if (hydrated) {
-      localStorage.setItem("dashboard_panels", JSON.stringify(panels));
+      try {
+        localStorage.setItem("dashboard_panels", JSON.stringify(panels));
+      } catch {
+        setStorageWarning("Dashboard layout changes could not be saved in this browser.");
+      }
     }
   }, [hydrated, panels]);
 
@@ -110,7 +114,7 @@ export function DashboardBuilder() {
             {storageWarning}
           </p>
         ) : null}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {panels.map((panel) => (
             <div key={panel.id} className="relative rounded-lg border border-border-subtle p-4 bg-surface-2">
               <div className="flex items-center justify-between mb-2">
@@ -126,7 +130,7 @@ export function DashboardBuilder() {
                   </Button>
                 </div>
               </div>
-              <div className="h-32 flex items-center justify-center text-text-secondary text-sm">
+              <div className="flex h-32 items-center justify-center text-sm text-text-secondary">
                 {panel.type} panel placeholder
               </div>
             </div>

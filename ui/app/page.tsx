@@ -70,8 +70,8 @@ export default function Home() {
     { name: "ai", status: "starting" as const },
   ];
   const observabilitySnapshot = observability.data ?? createObservabilityFallback();
-  const systemOnline = !telemetryEvents.error;
-  const aiStatus = telemetryEvents.data?.llm?.last_error ? "degraded" : systemOnline ? "online" : "offline";
+  const systemOnline = telemetryEvents.isConnected && !telemetryEvents.error;
+  const aiStatus = telemetryEvents.data?.llm?.last_error ? "degraded" : telemetryEvents.isConnected ? "online" : "offline";
 
   return (
     <DashboardFrame

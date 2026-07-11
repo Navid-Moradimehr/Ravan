@@ -74,6 +74,17 @@ function formatRefreshLabel(value: number | null): string {
   return `${value}ms`;
 }
 
+function formatEventValue(value: unknown): string {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(2) : "n/a";
+}
+
+function formatEventTime(value: unknown): string {
+  if (!value) return "n/a";
+  const time = new Date(String(value));
+  return Number.isNaN(time.getTime()) ? "n/a" : time.toLocaleTimeString();
+}
+
 function RefreshMenu({
   label,
   value,
@@ -578,13 +589,13 @@ export function HistorianDashboard() {
                 <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-5 w-full bg-surface-2" /></TableCell></TableRow>
               ))) : visibleEvents?.length ? (visibleEvents.map((event: any, i: number) => (
                 <TableRow key={i} className="border-border-subtle hover:bg-surface-2">
-                  <TableCell className="font-mono text-xs">{new Date(event.time).toLocaleTimeString()}</TableCell>
-                  <TableCell className="text-sm font-medium">{event.asset_id}</TableCell>
-                  <TableCell className="text-sm">{event.tag}</TableCell>
-                  <TableCell className="font-mono text-sm">{Number(event.value).toFixed(2)}</TableCell>
-                  <TableCell><Badge variant="outline" className={event.quality === "good" ? "border-success/30 bg-success/10 text-success" : "border-error/30 bg-error/10 text-error"}>{event.quality}</Badge></TableCell>
-                  <TableCell className="text-sm text-text-secondary">{event.fault_type}</TableCell>
-                  <TableCell><Badge variant="outline" className={event.ground_truth_severity === "critical" ? "border-error/30 bg-error/10 text-error" : event.ground_truth_severity === "warning" ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}>{event.ground_truth_severity}</Badge></TableCell>
+                  <TableCell className="font-mono text-xs">{formatEventTime(event.time)}</TableCell>
+                  <TableCell className="text-sm font-medium">{event.asset_id || "n/a"}</TableCell>
+                  <TableCell className="text-sm">{event.tag || "n/a"}</TableCell>
+                  <TableCell className="font-mono text-sm">{formatEventValue(event.value)}</TableCell>
+                  <TableCell><Badge variant="outline" className={event.quality === "good" ? "border-success/30 bg-success/10 text-success" : "border-error/30 bg-error/10 text-error"}>{event.quality || "unknown"}</Badge></TableCell>
+                  <TableCell className="text-sm text-text-secondary">{event.fault_type || "n/a"}</TableCell>
+                  <TableCell><Badge variant="outline" className={event.ground_truth_severity === "critical" ? "border-error/30 bg-error/10 text-error" : event.ground_truth_severity === "warning" ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}>{event.ground_truth_severity || "normal"}</Badge></TableCell>
                 </TableRow>
               ))) : (
                 <TableRow><TableCell colSpan={7} className="py-8 text-center text-sm text-text-secondary">No events in the selected table</TableCell></TableRow>

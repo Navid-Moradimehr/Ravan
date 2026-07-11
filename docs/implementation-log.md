@@ -1,5 +1,22 @@
 # Implementation Log
 
+## 2026-07-11 - UI Hardening Verification Note
+
+The UI build passed after the broader error-hardening batch. Browser smoke
+verification was attempted, but Playwright browser download is blocked in the
+current environment, so the remaining check is environmental rather than a
+code regression.
+
+## 2026-07-11 - UI Error-Hardening Batch
+
+Hardened the remaining user-facing error paths beyond SQL: command center
+status now respects connection state, historian tables render safe fallbacks
+for missing values, observability charts show explicit empty states, the
+dashboard builder catches localStorage write failures, the KPI builder blocks
+incomplete submissions, and source-health diagnostics use the same-origin
+UI proxy. Toasts and inline warnings continue to use the platform's existing
+styles.
+
 ## 2026-07-11 - Historian Mapping-Setup Warning
 
 Added a same-origin source-health proxy for the UI, and surfaced a historian

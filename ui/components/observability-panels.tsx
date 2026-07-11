@@ -55,6 +55,11 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
   const grafanaButtonClass = snapshot.grafana.online
     ? "action-primary"
     : "action-secondary pointer-events-none cursor-not-allowed opacity-60";
+  const grafanaHref = snapshot.grafana.login_url || "http://localhost:13000";
+  const hasThroughputData = snapshot.throughput.length > 0;
+  const hasLatencyData = snapshot.latency.length > 0;
+  const hasProtocolMixData = snapshot.protocolMix.length > 0;
+  const hasSeverityData = snapshot.severity.length > 0;
 
   return (
     <section id="observability" className="space-y-5">
@@ -100,19 +105,25 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
             <CardDescription className="text-text-secondary">Live rate by protocol from the edge stream.</CardDescription>
           </CardHeader>
           <CardContent className="p-5">
-            <ChartContainer config={throughputConfig} className="h-[260px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={snapshot.throughput}>
-                  {chartGrid}
-                  <XAxis dataKey="timestamp" {...axisProps} />
-                  <YAxis {...axisProps} width={32} />
-                  <Tooltip content={<ChartTooltipContent indicator="line" />} />
-                  <Line type="monotone" dataKey="mqtt" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="opcua" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="modbus" stroke="var(--chart-3)" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            {hasThroughputData ? (
+              <ChartContainer config={throughputConfig} className="h-[260px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={snapshot.throughput}>
+                    {chartGrid}
+                    <XAxis dataKey="timestamp" {...axisProps} />
+                    <YAxis {...axisProps} width={32} />
+                    <Tooltip content={<ChartTooltipContent indicator="line" />} />
+                    <Line type="monotone" dataKey="mqtt" stroke="var(--chart-2)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="opcua" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="modbus" stroke="var(--chart-3)" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <p className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-10 text-center text-sm text-text-secondary">
+                No throughput data available yet.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -138,7 +149,7 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
               </div>
             </div>
             <a
-              href={snapshot.grafana.login_url}
+              href={grafanaHref}
               target="_blank"
               rel="noreferrer"
               className={cn(
@@ -159,18 +170,24 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
             <CardDescription className="text-text-secondary">Model response time and batch size.</CardDescription>
           </CardHeader>
           <CardContent className="p-5">
-            <ChartContainer config={latencyConfig} className="h-[260px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={snapshot.latency}>
-                  {chartGrid}
-                  <XAxis dataKey="timestamp" {...axisProps} />
-                  <YAxis {...axisProps} width={32} />
-                  <Tooltip content={<ChartTooltipContent indicator="line" />} />
-                  <Area type="monotone" dataKey="p95" stroke="var(--chart-4)" strokeWidth={2} fill="var(--chart-4)" fillOpacity={0.18} />
-                  <Area type="monotone" dataKey="batch_size" stroke="var(--chart-2)" strokeWidth={2} fill="var(--chart-2)" fillOpacity={0.12} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            {hasLatencyData ? (
+              <ChartContainer config={latencyConfig} className="h-[260px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={snapshot.latency}>
+                    {chartGrid}
+                    <XAxis dataKey="timestamp" {...axisProps} />
+                    <YAxis {...axisProps} width={32} />
+                    <Tooltip content={<ChartTooltipContent indicator="line" />} />
+                    <Area type="monotone" dataKey="p95" stroke="var(--chart-4)" strokeWidth={2} fill="var(--chart-4)" fillOpacity={0.18} />
+                    <Area type="monotone" dataKey="batch_size" stroke="var(--chart-2)" strokeWidth={2} fill="var(--chart-2)" fillOpacity={0.12} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <p className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-10 text-center text-sm text-text-secondary">
+                No latency samples available yet.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -180,17 +197,23 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
             <CardDescription className="text-text-secondary">Current totals by source type.</CardDescription>
           </CardHeader>
           <CardContent className="p-5">
-            <ChartContainer config={throughputConfig} className="h-[260px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={snapshot.protocolMix}>
-                  {chartGrid}
-                  <XAxis dataKey="protocol" {...axisProps} />
-                  <YAxis {...axisProps} width={32} />
-                  <Tooltip content={<ChartTooltipContent indicator="dot" />} />
-                  <Bar dataKey="total" radius={[4, 4, 0, 0]} fill="var(--chart-1)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            {hasProtocolMixData ? (
+              <ChartContainer config={throughputConfig} className="h-[260px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={snapshot.protocolMix}>
+                    {chartGrid}
+                    <XAxis dataKey="protocol" {...axisProps} />
+                    <YAxis {...axisProps} width={32} />
+                    <Tooltip content={<ChartTooltipContent indicator="dot" />} />
+                    <Bar dataKey="total" radius={[4, 4, 0, 0]} fill="var(--chart-1)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <p className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-10 text-center text-sm text-text-secondary">
+                No protocol mix samples available yet.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -200,17 +223,23 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
             <CardDescription className="text-text-secondary">Live processor output grouped by severity.</CardDescription>
           </CardHeader>
           <CardContent className="p-5">
-            <ChartContainer config={severityConfig} className="h-[240px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={snapshot.severity}>
-                  {chartGrid}
-                  <XAxis dataKey="label" {...axisProps} />
-                  <YAxis {...axisProps} width={32} />
-                  <Tooltip content={<ChartTooltipContent indicator="dot" />} />
-                  <Bar dataKey="total" radius={[4, 4, 0, 0]} fill="var(--chart-3)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            {hasSeverityData ? (
+              <ChartContainer config={severityConfig} className="h-[240px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={snapshot.severity}>
+                    {chartGrid}
+                    <XAxis dataKey="label" {...axisProps} />
+                    <YAxis {...axisProps} width={32} />
+                    <Tooltip content={<ChartTooltipContent indicator="dot" />} />
+                    <Bar dataKey="total" radius={[4, 4, 0, 0]} fill="var(--chart-3)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <p className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-10 text-center text-sm text-text-secondary">
+                No severity samples available yet.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
