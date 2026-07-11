@@ -17,7 +17,8 @@ docker compose -f docker/docker-compose.yml --profile extended up -d
 
 The profile starts MinIO, creates the `lakehouse` bucket, uses the existing
 Timescale/Postgres service as the PyIceberg SQL catalog, and writes table data
-to MinIO. The platform does not require a cloud account for this path.
+to MinIO. The SQL catalog dependency is included in the platform image. The
+platform does not require a cloud account for this path.
 
 The SQL catalog stores Iceberg table metadata; MinIO stores Parquet data and
 Iceberg metadata files. They are different responsibilities and both must be

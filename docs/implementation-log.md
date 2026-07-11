@@ -1,5 +1,12 @@
 # Implementation Log
 
+## 2026-07-11 - Lakehouse SQL Catalog Runtime Dependency
+
+The first live Docker append exposed that the processor image had PyIceberg
+but not its SQLAlchemy/Postgres catalog extra. Added
+`pyiceberg[sql-postgres]` to the runtime requirements; the live lakehouse
+append must be rerun after the image rebuild.
+
 ## 2026-07-11 - Training Bundle Benchmark
 
 Added a repeatable local dataset-bundle compilation benchmark and documented
