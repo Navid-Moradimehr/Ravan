@@ -159,3 +159,17 @@ against realistic industrial batches without depending on a live model server.
 - Grafana: `http://localhost:13000`
 - Grafana login: `http://localhost:13000/login`
 - Prometheus: `http://localhost:19090`
+## Industrial AI Data Foundation
+
+The platform collects replayable industrial telemetry, semantic context, and
+optional operational events. It can archive normalized events to TimescaleDB
+and, when enabled, Apache Iceberg over MinIO or external S3-compatible storage.
+
+For world-model data preparation, see:
+
+- `docs/lakehouse-and-s3-guide.md`
+- `docs/operational-event-guide.md`
+- `docs/training-dataset-guide.md`
+- `docs/jepa-training-guide.md`
+- `docs/dreamer-training-guide.md`
+- `docs/muzero-training-guide.md`

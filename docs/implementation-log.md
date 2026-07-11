@@ -1,5 +1,12 @@
 # Implementation Log
 
+## 2026-07-11 - Training Bundle Benchmark
+
+Added a repeatable local dataset-bundle compilation benchmark and documented
+the world-model preparation guides in the README. The benchmark measures
+bundle materialization throughput without claiming model-training or object
+storage performance.
+
 ## 2026-07-11 - Versioned Training Dataset Bundles
 
 Added `services.common.training_dataset` and the
