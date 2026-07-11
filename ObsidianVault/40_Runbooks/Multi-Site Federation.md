@@ -32,3 +32,8 @@ datastreamctl project-manifest validate config/project-manifest.yaml
 
 Inspect the non-secret API view at `/api/v1/metadata/federation`. Use the
 federation Compose profile only for a deliberate central transport deployment.
+
+The central lakehouse writer is available as
+`python -m services.federation.kafka_lakehouse_bridge`. It is not started by a
+site-local deployment. Its topic allow-list defaults to normalized and
+operational events and rejects raw events unless explicitly approved.

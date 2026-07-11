@@ -23,3 +23,10 @@ async def source_health(limit: int = 100) -> dict[str, Any]:
     from services.edge_ingest.source_health import history, snapshot
 
     return {"current": snapshot(), "history": history(limit)}
+
+
+@router.get("/api/v1/observability/federation")
+async def federation_observability() -> dict[str, Any]:
+    from services.federation.health import federation_health
+
+    return federation_health()

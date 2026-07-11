@@ -36,6 +36,7 @@ def test_split_domain_routes_registered():
         "/api/v1/metadata/governance",
         "/api/v1/metadata/operational",
         "/api/v1/observability/site",
+        "/api/v1/observability/federation",
         "/api/v1/lineage",
         "/api/v1/operational/events",
         "/api/v1/search/catalog",

@@ -47,11 +47,17 @@ if Gauge is not None and Histogram is not None:
         "Delay between event timestamp and WebSocket delivery",
         ["channel"],
     )
+    federation_lag = Gauge(
+        "datastream_federation_lag_messages",
+        "Federation transport lag in messages",
+        ["topic"],
+    )
 else:  # pragma: no cover - fallback path
     historian_query_latency = _noop_metric()
     historian_result_size = _noop_metric()
     broker_consumer_lag = _noop_metric()
     websocket_delivery_lag = _noop_metric()
+    federation_lag = _noop_metric()
 
 
 def observe_historian_query(table: str, operation: str, duration_seconds: float, result_count: int) -> None:
@@ -81,3 +87,7 @@ def observe_websocket_batch_delivery(channel: str, events: list[dict[str, Any]])
     if not events:
         return
     observe_websocket_delivery(channel, events[0])
+
+
+def set_federation_lag(topic: str, lag_messages: int) -> None:
+    federation_lag.labels(topic=topic).set(max(int(lag_messages), 0))

@@ -102,6 +102,15 @@ Review `quality-report.json` and `lineage.json` before training. Do not treat a
 successful compile as proof that the data is physically or causally sufficient
 for a world model.
 
+For a central writer, run `python -m services.federation.kafka_lakehouse_bridge`
+in the central environment with `CENTRAL_KAFKA_BROKERS`,
+`FEDERATION_INPUT_TOPIC`, and the lakehouse variables configured. The bridge
+rejects topics that are not in `FEDERATION_ALLOWED_TOPICS` when policy
+enforcement is enabled.
+
+Inspect `/api/v1/observability/federation` for the latest adapter status. A
+missing status file is reported as `unknown`; it is not treated as healthy.
+
 ## Failure behavior
 
 - Site-local ingestion does not depend on the central broker.

@@ -412,6 +412,12 @@ The read-only API endpoint `/api/v1/metadata/federation` reports the declared
 organization, sites, allowed topics, lakehouse layout, and validation errors;
 it deliberately does not return credentials.
 
+The central writer reference is `services.federation.kafka_lakehouse_bridge`.
+It consumes a replicated topic, enforces the approved topic list, and writes
+to the configured lakehouse sink. Federation health is exposed through
+`/api/v1/observability/federation` and the `datastream_federation_lag_messages`
+Prometheus metric when a transport adapter reports lag.
+
 Dataset compilation also reports duplicate IDs, missing source timestamps, and
 late events. Sites may tighten those checks in their training gates without
 making the operational ingest path reject records by default.
