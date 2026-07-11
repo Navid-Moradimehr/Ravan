@@ -940,6 +940,7 @@ def cmd_training_dataset(args: argparse.Namespace) -> int:
             observations=args.observations,
             operational_events=args.operational_events,
             outcomes=args.outcomes,
+            iceberg_sources=args.iceberg_sources,
         )
     if args.json:
         print(json.dumps(result, indent=2))
@@ -2386,6 +2387,11 @@ def build_parser() -> argparse.ArgumentParser:
     training_compile.add_argument("--observations", default=None)
     training_compile.add_argument("--operational-events", default=None)
     training_compile.add_argument("--outcomes", default=None)
+    training_compile.add_argument(
+        "--iceberg-sources",
+        default=None,
+        help="Optional JSON config selecting Iceberg tables for observations, operational_events, and outcomes",
+    )
     training_compile.add_argument("--json", action="store_true")
     training_compile.set_defaults(func=cmd_training_dataset)
 

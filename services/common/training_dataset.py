@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -76,6 +77,32 @@ def _read_records(path: Path) -> list[dict[str, Any]]:
         return [dict(row) for row in csv.DictReader(handle)]
 
 
+def _read_iceberg_sources(path: str | Path) -> dict[str, list[dict[str, Any]]]:
+    """Read explicitly selected Iceberg tables into bundle records.
+
+    The config contains catalog/table locations only. Credentials are resolved
+    from environment variables by the configured catalog client.
+    """
+    import pyiceberg.catalog
+
+    config = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise ValueError("iceberg source config must be a JSON object")
+    catalog_config = {
+        str(key): os.path.expandvars(str(value))
+        for key, value in (config.get("catalog") or {}).items()
+    }
+    catalog_name = str(catalog_config.pop("name", "sql"))
+    catalog = pyiceberg.catalog.load_catalog(catalog_name, **catalog_config)
+    records: dict[str, list[dict[str, Any]]] = {}
+    for logical_name, table_ref in (config.get("sources") or {}).items():
+        namespace = str(table_ref.get("namespace", "industrial"))
+        table_name = str(table_ref.get("table", logical_name))
+        table = catalog.load_table((namespace, table_name))
+        records[str(logical_name)] = table.scan().to_arrow().to_pylist()
+    return records
+
+
 def _write_parquet(path: Path, records: list[dict[str, Any]]) -> None:
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -91,6 +118,7 @@ def compile_bundle(
     observations: str | Path | None = None,
     operational_events: str | Path | None = None,
     outcomes: str | Path | None = None,
+    iceberg_sources: str | Path | None = None,
     semantic_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = load_manifest(manifest_path)
@@ -100,12 +128,15 @@ def compile_bundle(
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     records_by_name: dict[str, list[dict[str, Any]]] = {}
+    iceberg_records = _read_iceberg_sources(iceberg_sources) if iceberg_sources else {}
     for name, source in (
         ("observations", observations),
         ("operational_events", operational_events),
         ("outcomes", outcomes),
     ):
-        records = _read_records(Path(source)) if source else []
+        records = iceberg_records.get(name)
+        if records is None:
+            records = _read_records(Path(source)) if source else []
         records_by_name[name] = records
         _write_parquet(destination / f"{name}.parquet", records)
     (destination / "manifest.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")

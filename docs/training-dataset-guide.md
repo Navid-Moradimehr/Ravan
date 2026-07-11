@@ -61,3 +61,37 @@ tables are still emitted so downstream code has a predictable bundle shape.
 
 The compiler does not silently interpolate, invent rewards, or merge sites.
 Users must define their alignment and reward logic in the training code.
+
+## Compile directly from Iceberg
+
+Users with a MinIO or S3-backed Iceberg catalog can provide an explicit JSON
+source configuration instead of exporting files first. Credentials remain in
+the environment or catalog's secret configuration.
+
+```json
+{
+  "catalog": {
+    "name": "sql",
+    "type": "sql",
+    "uri": "${LAKEHOUSE_CATALOG_URI}",
+    "warehouse": "${LAKEHOUSE_WAREHOUSE}"
+  },
+  "sources": {
+    "observations": {"namespace": "industrial_plant-a", "table": "events"},
+    "operational_events": {"namespace": "industrial_plant-a", "table": "operational_events"}
+  }
+}
+```
+
+Then run:
+
+```powershell
+datastreamctl training-dataset compile `
+  config/training/plant-a-jepa.yaml `
+  data/training/plant-a-jepa-v1 `
+  --iceberg-sources config/training/iceberg-sources.json
+```
+
+This is an explicit batch read, not a background lakehouse service. Users
+should bound the selected tables and time ranges, and should use the dataset
+manifest for site, topology, provenance, and quality restrictions.

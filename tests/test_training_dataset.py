@@ -39,3 +39,14 @@ def test_compile_bundle_writes_portable_artifacts(tmp_path: Path) -> None:
     assert result["quality"]["records"]["observations"] == 1
     assert (tmp_path / "bundle" / "observations.parquet").exists()
     assert (tmp_path / "bundle" / "lineage.json").exists()
+
+
+def test_iceberg_reader_is_optional_and_does_not_change_file_path(tmp_path: Path) -> None:
+    # The source config is only consumed when explicitly passed; ordinary
+    # file-backed compilation remains the default path.
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(_manifest()), encoding="utf-8")
+    observations = tmp_path / "observations.jsonl"
+    observations.write_text(json.dumps({"event_id": "e1", "site_id": "plant-a"}) + "\n", encoding="utf-8")
+    result = compile_bundle(manifest_path, tmp_path / "bundle", observations=observations)
+    assert result["quality"]["records"]["observations"] == 1
