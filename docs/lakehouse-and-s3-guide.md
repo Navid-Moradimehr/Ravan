@@ -84,3 +84,18 @@ This sink archives observations. A JEPA dataset can begin from these records,
 but Dreamer/MuZero datasets also need user-supplied actions, outcomes, episode
 boundaries, and reward semantics. Those are covered by the operational-event
 and training-dataset contracts, not inferred from sensor values.
+
+## Site-aware routing
+
+The default remains `LAKEHOUSE_LAYOUT=single-table`, preserving the existing
+deployment. A central multi-site deployment may opt into
+`LAKEHOUSE_LAYOUT=per-site`; events are then routed to a namespace per site,
+such as `industrial_plant-a.events`. Set
+`LAKEHOUSE_NAMESPACE_TEMPLATE` and `LAKEHOUSE_TABLE_TEMPLATE` when a different
+naming convention is required. Site routing is based on the event's `site`
+field and does not merge local asset identities.
+
+The platform does not enable concurrent direct writes from every plant by
+itself. Operators should prefer a central controlled writer or a catalog with
+documented multi-writer commit guarantees. Partitioning, compaction, catalog
+availability, and S3 lifecycle policy remain deployment responsibilities.

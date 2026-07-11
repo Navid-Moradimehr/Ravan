@@ -33,6 +33,29 @@ def test_from_env_uses_defaults():
     assert sink._batch_size == 1024
 
 
+def test_per_site_layout_routes_events_to_site_namespaces():
+    sink = LakehouseSink.from_env(
+        {
+            "LAKEHOUSE_LAYOUT": "per-site",
+            "LAKEHOUSE_NAMESPACE": "company",
+            "LAKEHOUSE_TABLE": "events",
+        }
+    )
+    assert sink._table_target("plant-a") == ("company_plant-a", "events")
+    assert sink._table_target("plant-b") == ("company_plant-b", "events")
+
+
+def test_per_site_layout_supports_templates():
+    sink = LakehouseSink.from_env(
+        {
+            "LAKEHOUSE_LAYOUT": "per-site",
+            "LAKEHOUSE_NAMESPACE_TEMPLATE": "company_{site}",
+            "LAKEHOUSE_TABLE_TEMPLATE": "telemetry_{site}",
+        }
+    )
+    assert sink._table_target("plant-a") == ("company_plant-a", "telemetry_plant-a")
+
+
 def test_write_batch_buffers_until_threshold():
     sink = LakehouseSink(
         catalog_name="rest",

@@ -38,6 +38,9 @@ class LakehouseSink:
         catalog_uri: str = "",
         s3_region: str = "us-east-1",
         batch_size: int = 1024,
+        layout: str = "single-table",
+        namespace_template: str = "industrial",
+        table_template: str = "events",
     ) -> None:
         self._catalog_name = catalog_name
         self._catalog_uri = catalog_uri or "postgresql+psycopg2://stream:stream@timescaledb:5432/stream_engine"
@@ -49,8 +52,12 @@ class LakehouseSink:
         self._s3_secret_key = s3_secret_key
         self._s3_region = s3_region
         self._batch_size = batch_size
+        self._layout = layout
+        self._namespace_template = namespace_template
+        self._table_template = table_template
         self._buffer: list[dict[str, Any]] = []
         self._table = None
+        self._tables: dict[tuple[str, str], Any] = {}
         self._catalog = None
 
     @classmethod
@@ -69,12 +76,28 @@ class LakehouseSink:
             s3_secret_key=env.get("LAKEHOUSE_S3_SECRET_KEY", "minio12345"),
             s3_region=env.get("LAKEHOUSE_S3_REGION", "us-east-1"),
             batch_size=int(env.get("LAKEHOUSE_BATCH_SIZE", "1024")),
+            layout=env.get("LAKEHOUSE_LAYOUT", "single-table"),
+            namespace_template=env.get("LAKEHOUSE_NAMESPACE_TEMPLATE", env.get("LAKEHOUSE_NAMESPACE", "industrial")),
+            table_template=env.get("LAKEHOUSE_TABLE_TEMPLATE", env.get("LAKEHOUSE_TABLE", "events")),
         )
 
-    def _ensure_table(self) -> None:
+    def _table_target(self, site: str) -> tuple[str, str]:
+        if self._layout == "per-site" and site:
+            namespace = self._namespace_template.replace("{site}", site).rstrip("/")
+            table = self._table_template.replace("{site}", site)
+            if "{site}" not in self._namespace_template:
+                namespace = f"{namespace}_{site}"
+            if "{site}" not in self._table_template and self._table_template == "events":
+                table = "events"
+            return namespace, table
+        return self._namespace_template, self._table_template
+
+    def _ensure_table(self, site: str = "") -> Any:
         """Lazily load the catalog and create/load the Iceberg table."""
-        if self._table is not None:
-            return
+        namespace, table_name = self._table_target(site)
+        cache_key = (namespace, table_name)
+        if cache_key in self._tables:
+            return self._tables[cache_key]
 
         import pyarrow as pa
 
@@ -92,16 +115,17 @@ class LakehouseSink:
             catalog_props["s3.access-key-id"] = self._s3_access_key
         if self._s3_secret_key:
             catalog_props["s3.secret-access-key"] = self._s3_secret_key
-        self._catalog = load_catalog(self._catalog_name, **catalog_props)
+        if self._catalog is None:
+            self._catalog = load_catalog(self._catalog_name, **catalog_props)
 
         # Ensure namespace exists (idempotent).
         try:
-            self._catalog.create_namespace(self._namespace)
+            self._catalog.create_namespace(namespace)
         except Exception:
             pass
 
         try:
-            self._table = self._catalog.load_table((self._namespace, self._table_name))
+            table = self._catalog.load_table((namespace, table_name))
         except Exception:
             schema = pa.schema(
                 [
@@ -127,11 +151,15 @@ class LakehouseSink:
                     pa.field("payload_json", pa.string()),
                 ]
             )
-            self._table = self._catalog.create_table(
-                (self._namespace, self._table_name),
+            table = self._catalog.create_table(
+                (namespace, table_name),
                 schema=schema,
             )
-            logger.info("created iceberg table %s.%s", self._namespace, self._table_name)
+            logger.info("created iceberg table %s.%s", namespace, table_name)
+        self._tables[cache_key] = table
+        if self._table is None and self._layout != "per-site":
+            self._table = table
+        return table
 
     def write_batch(self, events: list[dict[str, Any]]) -> int:
         if not events:
@@ -145,11 +173,11 @@ class LakehouseSink:
         if not self._buffer:
             return
         try:
-            self._ensure_table()
             import pyarrow as pa
 
-            arrow_table = self._build_arrow_table(pa)
-            self._table.append(arrow_table)
+            for site, events in self._group_by_site().items():
+                table = self._ensure_table(site)
+                table.append(self._build_arrow_table(pa, table, events))
             self._buffer.clear()
         except Exception as exc:  # pragma: no cover - lakehouse runtime failure
             logger.warning("lakehouse append failed: %s", exc)
@@ -157,16 +185,22 @@ class LakehouseSink:
     def flush_strict(self) -> None:
         if not self._buffer:
             return
-        self._ensure_table()
         import pyarrow as pa
 
-        arrow_table = self._build_arrow_table(pa)
-        self._table.append(arrow_table)
+        for site, events in self._group_by_site().items():
+            table = self._ensure_table(site)
+            table.append(self._build_arrow_table(pa, table, events))
         self._buffer.clear()
 
-    def _build_arrow_table(self, pa: Any) -> Any:
+    def _group_by_site(self) -> dict[str, list[dict[str, Any]]]:
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for event in self._buffer:
+            grouped.setdefault(str(event.get("site", "") or "unknown"), []).append(event)
+        return grouped
+
+    def _build_arrow_table(self, pa: Any, table: Any, events: list[dict[str, Any]]) -> Any:
         """Project rows onto the current Iceberg schema with exact Arrow types."""
-        columns = [field.name for field in self._table.schema().fields]
+        columns = [field.name for field in table.schema().fields]
         rows = []
         for event in self._buffer:
             row = dict(event)
@@ -177,7 +211,7 @@ class LakehouseSink:
             row.setdefault("source_config_version", row.get("source_config_version", 0))
             row.setdefault("payload_json", json.dumps(row, sort_keys=True, default=str))
             rows.append({name: row.get(name) for name in columns})
-        return pa.Table.from_pylist(rows, schema=self._table.schema().as_arrow())
+        return pa.Table.from_pylist(rows, schema=table.schema().as_arrow())
 
     def close(self) -> None:
         self.flush()
