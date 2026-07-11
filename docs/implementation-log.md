@@ -1,5 +1,13 @@
 # Implementation Log
 
+## 2026-07-11 - Semantic Mapping Miss Diagnostics
+
+Added runtime mapping-match and mapping-miss tracking to source health so
+Integrations can show when a source is configured but does not semantically
+match incoming live traffic. The edge runtime now preserves mapping statistics
+across normal connected-state updates, and the Source Connection panel shows a
+summary badge plus a warning when misses occur.
+
 ## 2026-07-10 - Final Deployment-Hardening Report
 
 Completed the software-verifiable portion of source commissioning, health

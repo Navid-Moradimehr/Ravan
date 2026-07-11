@@ -8,6 +8,7 @@ from pymodbus.client import ModbusTcpClient
 
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors, adapter_reconnects
+from services.edge_ingest.source_health import mark_mapping_result
 from services.edge_ingest.settings import Settings, SourceRuntime
 from services.edge_ingest.source_health import mark_source, mark_source_success
 
@@ -46,19 +47,20 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
                     result = client.read_holding_registers(address=address, count=1, slave=slave_id)
                     if result.isError():
                         raise RuntimeError(str(result))
-                    publisher.publish_event(source.map_event(
-                        {
-                            "source_protocol": "modbus",
-                            "source_id": source.source_id or f"{host}:{port}/hr/{address}",
-                            "asset_id": str(source.options.get("asset_id", "Pump-03")),
-                            "tag": tag,
-                            "value": result.registers[0] * scale + offset,
-                            "quality": "good",
-                            "unit": unit,
-                            "site": source.site_id,
-                            "ts_source": utc_now(),
-                        }
-                    ))
+                    payload = {
+                        "source_protocol": "modbus",
+                        "source_id": source.source_id or f"{host}:{port}/hr/{address}",
+                        "asset_id": str(source.options.get("asset_id", "Pump-03")),
+                        "tag": tag,
+                        "value": result.registers[0] * scale + offset,
+                        "quality": "good",
+                        "unit": unit,
+                        "site": source.site_id,
+                        "ts_source": utc_now(),
+                    }
+                    mapped, matched, source_field = source.map_event_with_status(payload)
+                    publisher.publish_event(mapped)
+                    mark_mapping_result(source.connection_id, source.source_protocol, source.site_id, matched=matched, source_field=source_field)
                     mark_source_success(source.connection_id, source.source_protocol, source.site_id)
                 await asyncio.sleep(settings.poll_seconds)
         except Exception:

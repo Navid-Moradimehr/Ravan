@@ -37,6 +37,8 @@ Each registry source has a stable `connection_id`, site boundary, source protoco
 
 When an enabled source has mappings, the edge runtime applies the first matching mapping to the emitted event before canonical validation. Mapping can set asset, tag, site, line, unit, scale, and offset. The raw topic still receives the source payload, so mapping changes do not erase the original source record.
 
+Mapping health is also tracked at runtime. If mappings are configured but do not match live traffic, the source-health snapshot records mapping-match and mapping-miss counts so operators can distinguish a valid connection from a semantically misaligned one.
+
 ## Protocol notes
 
 OPC UA sources use the configured endpoint and node list. The connection workflow now provides a bounded read-only preview endpoint that browses tags or reads a selected node without enabling ingestion. Subscription management, certificate trust configuration, and persistent browse selection remain future work.
@@ -101,8 +103,8 @@ supplied.
 ## Current status
 
 - Implemented: versioned connection contract, persisted registry, secret-reference validation, list/create/update/delete/enable/disable APIs, bounded TCP diagnostics, Docker persistence, multiple registry-backed edge source descriptors, and legacy environment fallback.
-- Implemented: per-source Prometheus health metrics labeled by connection, protocol, and site.
-- Partially implemented: MQTT Sparkplug B activation, richer Modbus register maps, durable health history, and source-to-asset mapping UI.
+- Implemented: per-source Prometheus health metrics labeled by connection, protocol, and site, plus runtime mapping-match and mapping-miss diagnostics.
+- Partially implemented: MQTT Sparkplug B activation, richer Modbus register maps, durable health history, and deeper source-to-asset mapping UI.
 - User-owned: credentials, certificates, network access, firewall rules, asset topology, register-map correctness, external storage, external brokers, SMTP, and authentication/authorization.
 - Future: durable connector task orchestration, richer protocol diagnostics,
   and per-route delivery history. Source-health transition history and sink

@@ -15,6 +15,7 @@ from services.edge_ingest.publisher import (
     dlq_total,
     overflow_total,
 )
+from services.edge_ingest.source_health import mark_mapping_result
 from services.edge_ingest.settings import Settings, SourceRuntime
 from services.edge_ingest.source_health import mark_source, mark_source_success
 
@@ -114,7 +115,9 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
 
                 events = decode_binary_payload(message.payload, message.topic, source.site_id, source.source_id or message.topic)
                 for event in events:
-                    enqueue_mqtt_message(queue, source.map_event(event), publisher, event["source_id"])
+                    mapped, matched, source_field = source.map_event_with_status(event)
+                    enqueue_mqtt_message(queue, mapped, publisher, event["source_id"])
+                    mark_mapping_result(source.connection_id, source.source_protocol, source.site_id, matched=matched, source_field=source_field)
                 mark_source_success(source.connection_id, source.source_protocol, source.site_id)
             except Exception as exc:
                 dlq_total.labels(protocol="sparkplug_b").inc()
@@ -138,7 +141,9 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
             )
             return
         source_id = payload.get("source_id", message.topic) if isinstance(payload, dict) else message.topic
-        enqueue_mqtt_message(queue, source.map_event(payload), publisher, source_id)
+        mapped, matched, source_field = source.map_event_with_status(payload)
+        enqueue_mqtt_message(queue, mapped, publisher, source_id)
+        mark_mapping_result(source.connection_id, source.source_protocol, source.site_id, matched=matched, source_field=source_field)
         mark_source_success(source.connection_id, source.source_protocol, source.site_id)
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"edge-ingest-{source.connection_id}")

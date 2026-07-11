@@ -22,8 +22,25 @@ type Connection = {
   config_version: number;
 };
 
+type SourceHealth = {
+  connection_id: string;
+  protocol: string;
+  site: string;
+  state?: string;
+  error?: string;
+  mapping_seen?: number;
+  mapping_matched?: number;
+  mapping_missed?: number;
+  last_mapping_match?: string;
+  last_mapping_miss?: string;
+};
+
 async function getConnections(): Promise<{ connections: Connection[] }> {
   return requestJson("/api/connections");
+}
+
+async function getSourceHealth(): Promise<{ current: SourceHealth[] }> {
+  return requestJson("/api/v1/observability/source-health");
 }
 
 function iconFor(protocol: string) {
@@ -41,6 +58,7 @@ export function SourceConnectionPanel() {
   const [credentialRef, setCredentialRef] = useState("");
   const queryClient = useQueryClient();
   const connections = useQuery({ queryKey: ["connections"], queryFn: getConnections });
+  const sourceHealth = useQuery({ queryKey: ["source-health"], queryFn: getSourceHealth, refetchInterval: 10000 });
   const add = useMutation({
     mutationFn: (payload: object) => requestJson("/api/connections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
     onSuccess: () => {
@@ -86,9 +104,16 @@ export function SourceConnectionPanel() {
         <div className="space-y-2">
           {(connections.data?.connections ?? []).map((connection) => {
             const Icon = iconFor(connection.source_protocol);
+            const health = sourceHealth.data?.current.find((item) => item.connection_id === connection.connection_id);
+            const mappingSummary = health && typeof health.mapping_seen === "number" ? `${health.mapping_matched ?? 0}/${health.mapping_seen} matched` : "";
+            const mappingWarning = health && typeof health.mapping_missed === "number" && health.mapping_missed > 0;
             return <div key={connection.connection_id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-0 p-3">
               <div className="flex min-w-0 items-center gap-3"><Icon className="size-4 shrink-0 text-accent" /><div className="min-w-0"><p className="truncate text-sm font-medium">{connection.name}</p><p className="truncate font-mono text-xs text-text-secondary">{connection.endpoint}</p></div></div>
-              <div className="flex items-center gap-2"><Badge variant="outline">{connection.source_protocol}</Badge><Badge variant="outline">v{connection.config_version}</Badge><Badge variant="outline">{connection.state}</Badge><Button variant="ghost" size="sm" onClick={() => test.mutate(connection.connection_id)} disabled={test.isPending}><TestTube className="size-4" /> Test</Button><Button variant="ghost" size="sm" onClick={() => preview.mutate(connection.connection_id)} disabled={preview.isPending}>Preview</Button>{connection.state === "enabled" ? <CircleCheck className="size-4 text-success" /> : <CircleX className="size-4 text-text-muted" />}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{connection.source_protocol}</Badge><Badge variant="outline">v{connection.config_version}</Badge><Badge variant="outline">{connection.state}</Badge>
+                {mappingSummary ? <Badge variant={mappingWarning ? "destructive" : "outline"}>{mappingSummary}</Badge> : null}
+                <Button variant="ghost" size="sm" onClick={() => test.mutate(connection.connection_id)} disabled={test.isPending}><TestTube className="size-4" /> Test</Button><Button variant="ghost" size="sm" onClick={() => preview.mutate(connection.connection_id)} disabled={preview.isPending}>Preview</Button>{connection.state === "enabled" ? <CircleCheck className="size-4 text-success" /> : <CircleX className="size-4 text-text-muted" />}</div>
+              {mappingWarning ? <p className="w-full text-xs text-warning">Configured mappings are enabled, but live traffic has produced mapping misses. Check source_field, source_id, and tag alignment.</p> : null}
             </div>;
           })}
           {!connections.isLoading && (connections.data?.connections ?? []).length === 0 ? <p className="text-sm text-text-secondary">No registry connections yet. Existing environment-variable sources remain available to the edge runtime.</p> : null}

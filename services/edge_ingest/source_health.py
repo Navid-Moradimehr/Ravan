@@ -8,10 +8,13 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from prometheus_client import Gauge
+from prometheus_client import Counter, Gauge
 
 source_state = Gauge("edge_source_state", "Current edge source state: 1 connected, 0 disconnected, -1 error", ["connection_id", "protocol", "site"])
 source_last_success = Gauge("edge_source_last_success_epoch", "Last successful event epoch per edge source", ["connection_id", "protocol", "site"])
+source_mapping_seen = Counter("edge_source_mapping_seen_total", "Mapping checks per edge source", ["connection_id", "protocol", "site"])
+source_mapping_match = Counter("edge_source_mapping_match_total", "Mapping matches per edge source", ["connection_id", "protocol", "site"])
+source_mapping_miss = Counter("edge_source_mapping_miss_total", "Mapping misses per edge source", ["connection_id", "protocol", "site"])
 _lock = Lock()
 _states: dict[str, dict[str, Any]] = {}
 _history_path_raw = os.getenv("EDGE_SOURCE_HEALTH_HISTORY_PATH", "")
@@ -44,10 +47,12 @@ def mark_source(connection_id: str, protocol: str, site: str, state: str, error:
     value = {"connection_id": connection_id, "protocol": protocol, "site": site, "state": state, "error": error, "updated_at": datetime.now(timezone.utc).isoformat()}
     with _lock:
         previous = _states.get(connection_id)
-        _states[connection_id] = value
+        current = dict(previous or {})
+        current.update(value)
+        _states[connection_id] = current
         if previous is None or previous.get("state") != state or previous.get("error") != error:
             try:
-                _record_transition(value)
+                _record_transition(current)
             except OSError:
                 pass
 
@@ -55,6 +60,42 @@ def mark_source(connection_id: str, protocol: str, site: str, state: str, error:
 def mark_source_success(connection_id: str, protocol: str, site: str) -> None:
     source_last_success.labels(connection_id=connection_id, protocol=protocol, site=site).set(datetime.now(timezone.utc).timestamp())
     mark_source(connection_id, protocol, site, "connected")
+
+
+def mark_mapping_result(
+    connection_id: str,
+    protocol: str,
+    site: str,
+    *,
+    matched: bool,
+    source_field: str = "",
+) -> None:
+    source_mapping_seen.labels(connection_id=connection_id, protocol=protocol, site=site).inc()
+    if matched:
+        source_mapping_match.labels(connection_id=connection_id, protocol=protocol, site=site).inc()
+    else:
+        source_mapping_miss.labels(connection_id=connection_id, protocol=protocol, site=site).inc()
+    with _lock:
+        state = dict(_states.get(connection_id) or {})
+        state.setdefault("connection_id", connection_id)
+        state.setdefault("protocol", protocol)
+        state.setdefault("site", site)
+        state.setdefault("state", "configured")
+        state.setdefault("error", "")
+        state.setdefault("mapping_seen", 0)
+        state.setdefault("mapping_matched", 0)
+        state.setdefault("mapping_missed", 0)
+        state.setdefault("last_mapping_match", "")
+        state.setdefault("last_mapping_miss", "")
+        state["updated_at"] = datetime.now(timezone.utc).isoformat()
+        state["mapping_seen"] = int(state.get("mapping_seen", 0)) + 1
+        if matched:
+            state["mapping_matched"] = int(state.get("mapping_matched", 0)) + 1
+            state["last_mapping_match"] = source_field
+        else:
+            state["mapping_missed"] = int(state.get("mapping_missed", 0)) + 1
+            state["last_mapping_miss"] = source_field
+        _states[connection_id] = state
 
 
 def snapshot() -> list[dict[str, Any]]:

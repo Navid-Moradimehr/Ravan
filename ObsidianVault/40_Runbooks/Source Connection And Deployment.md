@@ -49,9 +49,11 @@ This keeps the open-source deployment model portable and matches common industri
 
 Enabled mappings are applied to the emitted canonical event before validation. Raw source payloads remain available on the raw topic for replay and troubleshooting.
 
+Mapping health is also tracked at runtime. If mappings are configured but do not match live traffic, the source-health snapshot records mapping-match and mapping-miss counts so operators can distinguish a valid connection from a semantically misaligned one.
+
 The connection API now offers a bounded read-only OPC UA preview and accepts declarative Modbus register entries. Full Sparkplug B binary activation, richer register-map editing, durable health history, and end-to-end connector task orchestration remain future work.
 
-The edge runtime exposes `edge_source_state` and `edge_source_last_success_epoch` Prometheus metrics labeled by connection ID, protocol, and site. With `EDGE_SOURCE_HEALTH_HISTORY_PATH`, state transitions are retained in a bounded local file and exposed through `/api/v1/observability/source-health`; repeated successful reads are not recorded individually.
+The edge runtime exposes `edge_source_state`, `edge_source_last_success_epoch`, and mapping-match/mapping-miss counters labeled by connection ID, protocol, and site. With `EDGE_SOURCE_HEALTH_HISTORY_PATH`, state transitions are retained in a bounded local file and exposed through `/api/v1/observability/source-health`; repeated successful reads are not recorded individually.
 
 Sink routing metadata is available through `/api/v1/sinks` and is stored at
 `DATASTREAM_SINK_ROUTING_PATH`. It selects the existing `historian`, `kafka`,

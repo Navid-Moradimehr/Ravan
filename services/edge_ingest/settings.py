@@ -24,13 +24,23 @@ class SourceRuntime:
 
     def map_event(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Apply the first matching source mapping without changing raw data."""
-        candidate_fields = {
+        return self.map_event_with_status(payload)[0]
+
+    def map_event_with_status(self, payload: dict[str, Any]) -> tuple[dict[str, Any], bool, str]:
+        """Return the mapped payload plus a match flag and matched field.
+
+        The raw event remains intact if no mapping matches. Callers can use the
+        boolean and matched field to record semantic-match diagnostics without
+        changing the payload contract.
+        """
+        candidate_fields = (
             str(payload.get("source_id", "")),
             str(payload.get("tag", "")),
             str(payload.get("topic", "")),
-        }
+        )
         for mapping in self.mappings:
-            if str(mapping.get("source_field", "")) not in candidate_fields:
+            source_field = str(mapping.get("source_field", ""))
+            if source_field not in candidate_fields:
                 continue
             mapped = dict(payload)
             mapped["asset_id"] = mapping.get("asset_id", mapped.get("asset_id", ""))
@@ -44,8 +54,8 @@ class SourceRuntime:
                 mapped["value"] = float(mapped["value"]) * float(mapping.get("scale", 1.0)) + float(mapping.get("offset", 0.0))
             except (TypeError, ValueError):
                 pass
-            return mapped
-        return payload
+            return mapped, True, source_field
+        return payload, False, ""
 
 
 @dataclass(frozen=True)

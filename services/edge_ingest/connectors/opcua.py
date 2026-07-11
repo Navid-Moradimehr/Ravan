@@ -10,6 +10,7 @@ from services.common.device_compat import unit_for_tag
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors, adapter_reconnects
 from services.edge_ingest.source_health import mark_source, mark_source_success
+from services.edge_ingest.source_health import mark_mapping_result
 from services.edge_ingest.settings import Settings, SourceRuntime
 
 
@@ -31,19 +32,20 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
                     for node_id in nodes:
                         value = await client.get_node(node_id).read_value()
                         asset_id, tag = node_id.split(";s=", 1)[1].split(".", 1)
-                        publisher.publish_event(source.map_event(
-                            {
-                                "source_protocol": "opcua",
-                                "source_id": source.source_id or node_id,
-                                "asset_id": asset_id,
-                                "tag": tag,
-                                "value": value,
-                                "quality": "good",
-                                "unit": unit_for_tag(tag),
-                                "site": source.site_id,
-                                "ts_source": utc_now(),
-                            }
-                        ))
+                        payload = {
+                            "source_protocol": "opcua",
+                            "source_id": source.source_id or node_id,
+                            "asset_id": asset_id,
+                            "tag": tag,
+                            "value": value,
+                            "quality": "good",
+                            "unit": unit_for_tag(tag),
+                            "site": source.site_id,
+                            "ts_source": utc_now(),
+                        }
+                        mapped, matched, source_field = source.map_event_with_status(payload)
+                        publisher.publish_event(mapped)
+                        mark_mapping_result(source.connection_id, source.source_protocol, source.site_id, matched=matched, source_field=source_field)
                         mark_source_success(source.connection_id, source.source_protocol, source.site_id)
                     await asyncio.sleep(settings.poll_seconds)
         except Exception:

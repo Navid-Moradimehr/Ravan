@@ -54,7 +54,7 @@ The platform stores that as metadata. The actual secret material stays in the op
 ## 6. Where the source shows up
 
 - `Integrations` as saved source metadata
-- source-health diagnostics and metrics
+- source-health diagnostics and metrics, including mapping-match and mapping-miss counts when mappings are configured
 - historian queries and trends
 - dashboards, if you create a chart for its tag or asset
 - Kafka UI, if you look at the relevant topic
@@ -117,3 +117,5 @@ Some mismatches are intentionally softer:
 
 - a missing `credential_ref` is not always an error because some deployments use legacy environment variables or other operator-owned secret paths
 - a mapping that does not match incoming source fields does not block ingest, it just does not apply
+
+That means the platform catches broken config, and it now exposes mapping misses in source-health state so operators can see when a connection is valid but semantically misaligned.

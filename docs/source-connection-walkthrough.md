@@ -69,7 +69,7 @@ The data path is:
 After enablement and event flow, the source can show up in:
 
 - `Integrations` as saved source metadata
-- source-health diagnostics and metrics
+- source-health diagnostics and metrics, including mapping-match and mapping-miss counts when a source has mappings
 - historian queries and trends
 - dashboards, if you create a chart for its tag or asset
 - Kafka UI, if you look at the relevant topic
@@ -161,4 +161,4 @@ Some mismatches are intentionally softer:
 - a missing `credential_ref` is not always an error because some deployments use legacy environment variables or other operator-owned secret paths
 - a mapping that does not match incoming source fields does not block ingest, it just does not apply
 
-That means the platform is good at catching broken config, but not yet perfect at explaining every runtime mismatch.
+That means the platform is good at catching broken config, and it now surfaces mapping misses in source-health state so operators can see when a connection is valid but semantically misaligned.
