@@ -106,3 +106,14 @@ stall the partition forever.
 - [[20_Architecture/Schema Governance]]
 - [[20_Architecture/Industrial Edge Pipeline]]
 - `comparission.md` pillar 06
+# Lakehouse deployment boundary
+
+The lakehouse sink is optional and does not replace the historian. The local
+reference deployment uses MinIO for S3-compatible object storage and the
+existing Postgres/Timescale service as a PyIceberg SQL catalog. External AWS
+S3 or S3-compatible storage is supported through deployment configuration.
+
+An object bucket is not an Iceberg catalog. The deployment must provide both
+the catalog and the warehouse, and owns IAM, TLS, retention, backups, and
+credential injection. Raw archival is opt-in; normalized events are the
+default analytical archive.

@@ -153,6 +153,16 @@ services:
       FANOUT_GROUP_ID: normalized-fanout
       SINKS: ${FANOUT_SINKS:-historian}
       DATASTREAM_SINK_ROUTING_PATH: /data/sink-routes.json
+      LAKEHOUSE_CATALOG: ${LAKEHOUSE_CATALOG:-sql}
+      LAKEHOUSE_CATALOG_URI: ${LAKEHOUSE_CATALOG_URI:-postgresql+psycopg2://stream:stream@timescaledb:5432/stream_engine}
+      LAKEHOUSE_NAMESPACE: ${LAKEHOUSE_NAMESPACE:-industrial}
+      LAKEHOUSE_TABLE: ${LAKEHOUSE_TABLE:-events}
+      LAKEHOUSE_WAREHOUSE: ${LAKEHOUSE_WAREHOUSE:-s3://lakehouse/}
+      LAKEHOUSE_S3_ENDPOINT: ${LAKEHOUSE_S3_ENDPOINT:-http://minio:9000}
+      LAKEHOUSE_S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:-minio}
+      LAKEHOUSE_S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:-minio12345}
+      LAKEHOUSE_S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
+      LAKEHOUSE_BATCH_SIZE: ${LAKEHOUSE_BATCH_SIZE:-1024}
     volumes:
       - api-data:/data:ro
 
@@ -375,6 +385,24 @@ services:
       - "19001:9001"
     volumes:
       - minio-data:/data
+    profiles:
+      - extended
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do sleep 1; done;
+        mc mb --ignore-existing local/$${LAKEHOUSE_BUCKET};
+        mc anonymous set private local/$${LAKEHOUSE_BUCKET};
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio12345}
+      LAKEHOUSE_BUCKET: ${LAKEHOUSE_BUCKET:-lakehouse}
     profiles:
       - extended
 

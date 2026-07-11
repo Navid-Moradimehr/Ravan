@@ -14,6 +14,7 @@ not installed.
 from __future__ import annotations
 
 import logging
+import json
 import os
 from typing import Any
 
@@ -34,15 +35,19 @@ class LakehouseSink:
         s3_endpoint: str,
         s3_access_key: str,
         s3_secret_key: str,
+        catalog_uri: str = "",
+        s3_region: str = "us-east-1",
         batch_size: int = 1024,
     ) -> None:
         self._catalog_name = catalog_name
+        self._catalog_uri = catalog_uri or "postgresql+psycopg2://stream:stream@timescaledb:5432/stream_engine"
         self._namespace = namespace
         self._table_name = table_name
         self._warehouse = warehouse
         self._s3_endpoint = s3_endpoint
         self._s3_access_key = s3_access_key
         self._s3_secret_key = s3_secret_key
+        self._s3_region = s3_region
         self._batch_size = batch_size
         self._buffer: list[dict[str, Any]] = []
         self._table = None
@@ -51,13 +56,18 @@ class LakehouseSink:
     @classmethod
     def from_env(cls, env: dict[str, str]) -> "LakehouseSink":
         return cls(
-            catalog_name=env.get("LAKEHOUSE_CATALOG", "rest"),
+            catalog_name=env.get("LAKEHOUSE_CATALOG", "sql"),
+            catalog_uri=env.get(
+                "LAKEHOUSE_CATALOG_URI",
+                "postgresql+psycopg2://stream:stream@timescaledb:5432/stream_engine",
+            ),
             namespace=env.get("LAKEHOUSE_NAMESPACE", "industrial"),
             table_name=env.get("LAKEHOUSE_TABLE", "events"),
             warehouse=env.get("LAKEHOUSE_WAREHOUSE", "s3://lakehouse/"),
             s3_endpoint=env.get("LAKEHOUSE_S3_ENDPOINT", "http://localhost:19000"),
             s3_access_key=env.get("LAKEHOUSE_S3_ACCESS_KEY", "minio"),
             s3_secret_key=env.get("LAKEHOUSE_S3_SECRET_KEY", "minio12345"),
+            s3_region=env.get("LAKEHOUSE_S3_REGION", "us-east-1"),
             batch_size=int(env.get("LAKEHOUSE_BATCH_SIZE", "1024")),
         )
 
@@ -73,10 +83,15 @@ class LakehouseSink:
         catalog_props = {
             "type": self._catalog_name,
             "warehouse": self._warehouse,
-            "s3.endpoint": self._s3_endpoint,
-            "s3.access-key-id": self._s3_access_key,
-            "s3.secret-access-key": self._s3_secret_key,
+            "uri": self._catalog_uri,
+            "s3.region": self._s3_region,
         }
+        if self._s3_endpoint:
+            catalog_props["s3.endpoint"] = self._s3_endpoint
+        if self._s3_access_key:
+            catalog_props["s3.access-key-id"] = self._s3_access_key
+        if self._s3_secret_key:
+            catalog_props["s3.secret-access-key"] = self._s3_secret_key
         self._catalog = load_catalog(self._catalog_name, **catalog_props)
 
         # Ensure namespace exists (idempotent).
@@ -102,6 +117,12 @@ class LakehouseSink:
                     pa.field("site", pa.string()),
                     pa.field("line", pa.string()),
                     pa.field("schema_version", pa.int32()),
+                    pa.field("event_stage", pa.string()),
+                    pa.field("ts_ingest", pa.string()),
+                    pa.field("project_id", pa.string()),
+                    pa.field("mapping_version", pa.string()),
+                    pa.field("source_config_version", pa.string()),
+                    pa.field("payload_json", pa.string()),
                 ]
             )
             self._table = self._catalog.create_table(
@@ -125,7 +146,21 @@ class LakehouseSink:
             self._ensure_table()
             import pyarrow as pa
 
-            arrow_table = pa.Table.from_pylist(self._buffer)
+            # Older user-created tables may not have the enriched columns yet.
+            # Project rows onto the existing table schema so upgrades remain
+            # append-compatible; new tables receive the full schema above.
+            columns = [field.name for field in self._table.schema().fields]
+            rows = []
+            for event in self._buffer:
+                row = dict(event)
+                row.setdefault("event_stage", "normalized")
+                row.setdefault("ts_ingest", row.get("ts_source", ""))
+                row.setdefault("project_id", row.get("site", ""))
+                row.setdefault("mapping_version", row.get("mapping_version", ""))
+                row.setdefault("source_config_version", row.get("source_config_version", ""))
+                row.setdefault("payload_json", json.dumps(row, sort_keys=True, default=str))
+                rows.append({name: row.get(name) for name in columns})
+            arrow_table = pa.Table.from_pylist(rows)
             self._table.append(arrow_table)
             self._buffer.clear()
         except Exception as exc:  # pragma: no cover - lakehouse runtime failure

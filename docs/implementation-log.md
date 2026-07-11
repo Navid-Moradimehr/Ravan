@@ -2652,3 +2652,13 @@ repeated a status badge that was already obvious from the section grouping.
 8. Added per-source edge health metrics (`edge_source_state` and `edge_source_last_success_epoch`) labeled by connection ID, protocol, and site.
 9. Added explicit Sparkplug B protobuf decoding through pinned TahUtils/Eclipse Tahu support. JSON MQTT remains unchanged; Sparkplug decode failures route to the DLQ path.
 10. Added optional disk-backed edge store-and-forward through `EDGE_STORE_FORWARD_DIR`, with Docker persistent storage and Prometheus spool counters.
+# 2026-07-11 - Verified Iceberg Lakehouse Profile
+
+The lakehouse sink now defaults to a self-hosted PyIceberg SQL catalog backed
+by the existing Postgres/Timescale deployment, while preserving external REST
+catalog support. The Compose extended profile initializes a MinIO bucket and
+passes explicit lakehouse settings to the fan-out consumer. New tables retain
+source/ingest timing and provenance fields while older tables remain readable
+through schema projection. Added `docs/lakehouse-and-s3-guide.md` and the
+matching Obsidian runbook. Focused verification: `6 passed`; Compose config
+validation passed.
