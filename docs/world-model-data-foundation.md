@@ -8,7 +8,7 @@ meaning and model training outside the core runtime.
 
 - replayable canonical telemetry on Kafka
 - TimescaleDB historian for operational reads
-- optional Iceberg archive over MinIO or external S3-compatible storage
+- optional Iceberg archive of normalized events over MinIO or external S3-compatible storage
 - SQL-catalog local reference deployment and external REST-catalog option
 - semantic entities, relationships, observations, states, actions, documents,
   and lineage primitives

@@ -25,4 +25,5 @@ analytical/training archive and is not required for live monitoring.
 
 User-owned responsibilities include bucket/catalog creation, IAM, TLS,
 retention, encryption, backups, credential injection, and external S3 network
-access. Raw payload archival is opt-in.
+access. The current platform archives normalized events; raw topic archival to
+Iceberg remains a user-managed connector/export decision.

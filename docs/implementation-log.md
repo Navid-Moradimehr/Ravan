@@ -1,5 +1,12 @@
 # Implementation Log
 
+## 2026-07-11 - Documentation Accuracy Correction
+
+Clarified that the current Iceberg path archives normalized events, while
+`industrial.raw` remains the Kafka replay boundary. A separate raw-topic
+archive is intentionally user-managed until its retention and payload-policy
+requirements are defined.
+
 ## 2026-07-11 - World-Model Foundation Verification
 
 Full Python suite: `511 passed` with four existing warnings. Training-bundle

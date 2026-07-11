@@ -62,9 +62,12 @@ available mapping/configuration provenance. Existing older tables remain
 append-compatible; a migration or a new table is required before expecting
 new columns in an already-created table.
 
-Raw payload archival is optional. Enable it only when the company has reviewed
-retention, privacy, and industrial-network data policies. The raw Kafka topic
-remains the replay boundary even when raw lakehouse archival is disabled.
+The current lakehouse consumer archives normalized events and their available
+payload metadata. It does not yet run a separate raw-topic-to-Iceberg archive
+consumer. The raw Kafka topic remains the authoritative replay boundary. A
+company that needs raw files in S3 should export `industrial.raw` with a
+user-managed Kafka/Iceberg connector after reviewing retention, privacy, and
+industrial-network data policies.
 
 ## Operational ownership
 
