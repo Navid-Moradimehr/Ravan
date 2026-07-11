@@ -58,6 +58,46 @@ const editableSurfaces: SurfaceCard[] = [
 
 const catalogSurfaces: SurfaceCard[] = [
   {
+    title: "Kafka federation",
+    description: "Optional site-to-central replication for approved normalized and operational topics.",
+    note: "Configured with the federation Compose profile and operator-owned central broker settings.",
+    icon: Cable,
+    action: { label: "Setup guide", href: "#kafka-federation", tone: "secondary" },
+    guide: {
+      heading: "How to configure Kafka federation",
+      location: [
+        "config/federation/mirrormaker2.properties",
+        "docker/docker-compose.yml: federation profile",
+        "GET /api/v1/metadata/federation: non-secret contract view",
+      ],
+      steps: [
+        "Provision or select the central Kafka cluster and configure its network and TLS/SASL policy.",
+        "Set CENTRAL_KAFKA_BROKERS and review FEDERATION_TOPICS before enabling the profile.",
+        "Keep raw replication disabled unless retention and data-sharing approval are documented.",
+      ],
+    },
+  },
+  {
+    title: "Iceberg dataset reads",
+    description: "Compile selected MinIO/S3 Iceberg tables into portable training or replay bundles.",
+    note: "Configured through an explicit CLI source file; credentials remain deployment-owned.",
+    icon: DatabaseZap,
+    action: { label: "Setup guide", href: "#iceberg-dataset-reads", tone: "secondary" },
+    guide: {
+      heading: "How to compile from Iceberg",
+      location: [
+        "services/common/training_dataset.py",
+        "datastreamctl training-dataset compile",
+        "docs/training-dataset-guide.md",
+      ],
+      steps: [
+        "Create a dataset manifest with the sites, time range, purpose, and quality requirements.",
+        "Create a JSON source file selecting only the approved Iceberg catalog tables.",
+        "Run the compiler to produce Parquet, lineage, semantic context, and quality artifacts.",
+      ],
+    },
+  },
+  {
     title: "Debezium CDC",
     description: "PostgreSQL change capture into Kafka topics.",
     note: "Configured in the deployment stack, not in the UI.",
