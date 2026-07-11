@@ -111,4 +111,10 @@ The schema registry now also has optional file-backed state via `SCHEMA_REGISTRY
 The model registry and prompt registry now also support optional file-backed state through `MODEL_REGISTRY_PATH` and `PROMPT_REGISTRY_PATH`, which keeps AI role bindings and prompt templates durable in single-node and Docker Compose installs.
 The dataset catalog now also supports optional file-backed state through `DATASET_CATALOG_PATH`, so benchmark and release-candidate dataset listings can remain stable across restarts without becoming a separate data-service boundary.
 The dataset-builder contract is still logical only; it describes how curated, versioned datasets should be created for AI, benchmarking, and replay without exposing raw historian data directly.
+
+Canonical events also carry lightweight provenance identities for the source
+connection, configuration version, mapping version, schema version, and event
+lineage ID. These fields travel with normalized and processed records and are
+archived by new lakehouse tables. They complement, rather than replace, the
+metadata-plane lineage snapshot.
 The implementation aggregates existing registries and catalogs. It does not introduce a second persistence system.

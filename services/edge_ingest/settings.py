@@ -15,6 +15,8 @@ class SourceRuntime:
     site_id: str
     endpoint: str = ""
     source_id: str = ""
+    config_version: int = 1
+    mapping_version: str = ""
     config: dict[str, Any] | None = None
     mappings: tuple[dict[str, Any], ...] = ()
 
@@ -33,6 +35,11 @@ class SourceRuntime:
         boolean and matched field to record semantic-match diagnostics without
         changing the payload contract.
         """
+        enriched = dict(payload)
+        enriched.setdefault("source_connection_id", self.connection_id)
+        enriched.setdefault("source_config_version", self.config_version)
+        enriched.setdefault("mapping_version", self.mapping_version or f"{self.connection_id}:v{self.config_version}")
+        enriched.setdefault("lineage_id", str(enriched.get("event_id", "")))
         candidate_fields = (
             str(payload.get("source_id", "")),
             str(payload.get("tag", "")),
@@ -42,7 +49,7 @@ class SourceRuntime:
             source_field = str(mapping.get("source_field", ""))
             if source_field not in candidate_fields:
                 continue
-            mapped = dict(payload)
+            mapped = dict(enriched)
             mapped["asset_id"] = mapping.get("asset_id", mapped.get("asset_id", ""))
             mapped["tag"] = mapping.get("tag", mapped.get("tag", ""))
             mapped["site"] = mapping.get("site_id", mapped.get("site", self.site_id)) or self.site_id
@@ -55,7 +62,7 @@ class SourceRuntime:
             except (TypeError, ValueError):
                 pass
             return mapped, True, source_field
-        return payload, False, ""
+        return enriched, False, ""
 
 
 @dataclass(frozen=True)
@@ -112,6 +119,8 @@ class Settings:
                     site_id=item.site_id,
                     endpoint=item.endpoint,
                     source_id=item.source_id,
+                    config_version=item.config_version,
+                    mapping_version=f"{item.connection_id}:v{item.config_version}",
                     config=item.config,
                     mappings=tuple(mapping.to_dict() for mapping in item.mappings),
                 )
@@ -122,13 +131,13 @@ class Settings:
     def _legacy_sources(self) -> tuple[SourceRuntime, ...]:
         sources: list[SourceRuntime] = []
         if "mqtt" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-mqtt", "mqtt", os.getenv("SITE_ID", "demo-site"), f"mqtt://{self.mqtt_host}:{self.mqtt_port}", "legacy-mqtt", {"topic": self.mqtt_topic}))
+            sources.append(SourceRuntime("legacy-mqtt", "mqtt", os.getenv("SITE_ID", "demo-site"), f"mqtt://{self.mqtt_host}:{self.mqtt_port}", "legacy-mqtt", 1, "legacy-mqtt:v1", {"topic": self.mqtt_topic}))
         if "opcua" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-opcua", "opcua", os.getenv("SITE_ID", "demo-site"), self.opcua_endpoint, "legacy-opcua", {"nodes": list(self.opcua_nodes)}))
+            sources.append(SourceRuntime("legacy-opcua", "opcua", os.getenv("SITE_ID", "demo-site"), self.opcua_endpoint, "legacy-opcua", 1, "legacy-opcua:v1", {"nodes": list(self.opcua_nodes)}))
         if "modbus" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-modbus", "modbus", os.getenv("SITE_ID", "demo-site"), f"modbus://{self.modbus_host}:{self.modbus_port}", "legacy-modbus", {}))
+            sources.append(SourceRuntime("legacy-modbus", "modbus", os.getenv("SITE_ID", "demo-site"), f"modbus://{self.modbus_host}:{self.modbus_port}", "legacy-modbus", 1, "legacy-modbus:v1", {}))
         if "modbus_rtu" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-modbus-rtu", "modbus_rtu", os.getenv("SITE_ID", "demo-site"), "", "legacy-modbus-rtu", {}))
+            sources.append(SourceRuntime("legacy-modbus-rtu", "modbus_rtu", os.getenv("SITE_ID", "demo-site"), "", "legacy-modbus-rtu", 1, "legacy-modbus-rtu:v1", {}))
         if "opcua_discovery" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-opcua-discovery", "opcua_discovery", os.getenv("SITE_ID", "demo-site"), "", "legacy-opcua-discovery", {}))
+            sources.append(SourceRuntime("legacy-opcua-discovery", "opcua_discovery", os.getenv("SITE_ID", "demo-site"), "", "legacy-opcua-discovery", 1, "legacy-opcua-discovery:v1", {}))
         return tuple(sources)

@@ -121,7 +121,9 @@ class LakehouseSink:
                     pa.field("ts_ingest", pa.string()),
                     pa.field("project_id", pa.string()),
                     pa.field("mapping_version", pa.string()),
-                    pa.field("source_config_version", pa.string()),
+                    pa.field("source_config_version", pa.int32()),
+                    pa.field("source_connection_id", pa.string()),
+                    pa.field("lineage_id", pa.string()),
                     pa.field("payload_json", pa.string()),
                 ]
             )

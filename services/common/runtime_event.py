@@ -41,6 +41,10 @@ def _build_record_from_mapping(event: dict[str, Any]) -> "RuntimeEventRecord":
         timestamp=str(get("ts_source") or get("ts_ingest") or ""),
         device_id=str(get("asset_id", get("device_id", "unknown-asset"))),
         project_id=str(get("project_id", get("site", get("site_id", ""))) or ""),
+        source_connection_id=str(get("source_connection_id", "")),
+        source_config_version=_to_int(get("source_config_version", 0), 0),
+        mapping_version=str(get("mapping_version", "")),
+        lineage_id=str(get("lineage_id", get("event_id", ""))),
         fault_type=str(get("fault_type", "normal")),
         scenario_id=str(get("scenario_id", "sc-000")),
         ground_truth_severity=str(get("ground_truth_severity", "normal")),
@@ -71,6 +75,10 @@ class RuntimeEventRecord:
     timestamp: str
     device_id: str
     project_id: str = ""
+    source_connection_id: str = ""
+    source_config_version: int = 0
+    mapping_version: str = ""
+    lineage_id: str = ""
     temperature_c: float = 0.0
     vibration_mm_s: float = 0.0
     pressure_bar: float = 0.0
@@ -160,6 +168,10 @@ class RuntimeEventRecord:
             "timestamp": self.timestamp,
             "device_id": self.device_id,
             "project_id": self.project_id,
+            "source_connection_id": self.source_connection_id,
+            "source_config_version": self.source_config_version,
+            "mapping_version": self.mapping_version,
+            "lineage_id": self.lineage_id,
             "temperature_c": self.temperature_c,
             "vibration_mm_s": self.vibration_mm_s,
             "pressure_bar": self.pressure_bar,

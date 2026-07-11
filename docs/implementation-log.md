@@ -1,5 +1,14 @@
 # Implementation Log
 
+## 2026-07-11 - Event Provenance Identities
+
+Canonical events now carry source connection, source configuration, mapping,
+schema, and lineage identities. Registry-backed sources populate these values
+before validation; legacy sources receive stable version identities. The
+runtime record and new Iceberg schema preserve the fields without introducing
+a per-event lineage service. Focused edge, Flink parity, and lakehouse tests:
+`19 passed`.
+
 ## 2026-07-11 - Operational Event Contract
 
 Added the domain-neutral `OperationalEvent` envelope, `/api/v1/operational/events`,

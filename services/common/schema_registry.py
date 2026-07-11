@@ -84,6 +84,10 @@ class SchemaRegistry:
             {"name": "quality", "type": "string", "required": True},
             {"name": "unit", "type": "string", "required": False},
             {"name": "ts_source", "type": "datetime", "required": True},
+            {"name": "source_connection_id", "type": "string", "required": False},
+            {"name": "source_config_version", "type": "int", "required": False},
+            {"name": "mapping_version", "type": "string", "required": False},
+            {"name": "lineage_id", "type": "string", "required": False},
         ])
         self.register("processed_event", [
             {"name": "event_id", "type": "string", "required": True},

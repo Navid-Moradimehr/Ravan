@@ -38,6 +38,10 @@ class IndustrialEvent(BaseModel):
     ts_source: str
     ts_ingest: str = Field(default_factory=lambda: utc_now())
     schema_version: int = 1
+    source_connection_id: str = ""
+    source_config_version: int = 0
+    mapping_version: str = ""
+    lineage_id: str = ""
 
     @field_validator("tag", "asset_id", "source_id")
     @classmethod
