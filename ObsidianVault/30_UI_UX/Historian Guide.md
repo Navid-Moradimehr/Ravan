@@ -15,6 +15,8 @@ How to use it:
 3. Use replay when you want to re-run a dataset or scenario.
 4. Use webhooks and notifications when you want historian events to leave the platform.
 
+If the platform sees live source traffic but no mapping match yet, the historian page also shows a warning above the raw event table. That is a semantic-setup signal, not a historian failure.
+
 Important:
 
 - the historian is not the ingest front door

@@ -40,7 +40,7 @@ async function getConnections(): Promise<{ connections: Connection[] }> {
 }
 
 async function getSourceHealth(): Promise<{ current: SourceHealth[] }> {
-  return requestJson("/api/v1/observability/source-health");
+  return requestJson("/api/observability/source-health");
 }
 
 function iconFor(protocol: string) {

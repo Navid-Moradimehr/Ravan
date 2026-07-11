@@ -55,6 +55,7 @@ The platform stores that as metadata. The actual secret material stays in the op
 
 - `Integrations` as saved source metadata
 - source-health diagnostics and metrics, including mapping-match and mapping-miss counts when mappings are configured
+- the historian page may also show a warning if live traffic is arriving but no mapping has matched yet
 - historian queries and trends
 - dashboards, if you create a chart for its tag or asset
 - Kafka UI, if you look at the relevant topic

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, getHistorianEvents, getAlarms, startReplay, stopReplay } from "@/lib/api";
+import { requestJson } from "@/lib/http";
 import { formatErrorMessage } from "@/lib/http";
 import { showToast } from "@/components/toaster";
 import { HelpTip } from "@/components/help-tip";
@@ -17,6 +18,17 @@ type RefreshOption = {
   label: string;
   value: number | null;
   description: string;
+};
+
+type SourceHealth = {
+  connection_id: string;
+  protocol: string;
+  site: string;
+  state?: string;
+  error?: string;
+  mapping_seen?: number;
+  mapping_matched?: number;
+  mapping_missed?: number;
 };
 
 const HISTORIAN_REFRESH_OPTIONS: RefreshOption[] = [
@@ -28,6 +40,10 @@ const HISTORIAN_REFRESH_OPTIONS: RefreshOption[] = [
 
 const HISTORIAN_REFRESH_STORAGE_KEY = "lse.historian.refresh";
 const HISTORIAN_EVENTS_REFRESH_STORAGE_KEY = "lse.historian.events-refresh";
+
+async function getSourceHealth(): Promise<{ current: SourceHealth[] }> {
+  return requestJson("/api/observability/source-health");
+}
 
 function readStoredRefresh(key: string): number | null | undefined {
   if (typeof window === "undefined") return undefined;
@@ -169,6 +185,7 @@ export function HistorianDashboard() {
   const assetsQuery = useQuery({ queryKey: ["historian", "assets"], queryFn: getAssetHierarchy });
   const scenariosQuery = useQuery({ queryKey: ["historian", "scenarios"], queryFn: getScenarios });
   const replayQuery = useQuery({ queryKey: ["historian", "replay"], queryFn: getReplayStatus, refetchInterval: 10000 });
+  const sourceHealthQuery = useQuery({ queryKey: ["historian", "source-health"], queryFn: getSourceHealth, refetchInterval: 10000 });
   const alarmsQuery = useQuery({
     queryKey: ["historian", "alarms"],
     queryFn: () => getAlarms(50),
@@ -246,6 +263,7 @@ export function HistorianDashboard() {
     assetsQuery.isError ? `Assets: ${formatErrorMessage(assetsQuery.error, "Unable to load the asset hierarchy.")}` : null,
     scenariosQuery.isError ? `Scenarios: ${formatErrorMessage(scenariosQuery.error, "Unable to load scenarios.")}` : null,
     replayQuery.isError ? `Replay: ${formatErrorMessage(replayQuery.error, "Unable to load replay status.")}` : null,
+    sourceHealthQuery.isError ? `Source health: ${formatErrorMessage(sourceHealthQuery.error, "Unable to load source health.")}` : null,
     alarmsQuery.isError ? `Alarms: ${formatErrorMessage(alarmsQuery.error, "Unable to load alarm history.")}` : null,
     eventsQuery.isError ? `Events: ${formatErrorMessage(eventsQuery.error, "Unable to load historian events.")}` : null,
   ].filter((item): item is string => Boolean(item));
@@ -256,6 +274,8 @@ export function HistorianDashboard() {
   const visibleEvents = eventsExpanded ? eventsData : eventsData.slice(0, 5);
   const isAlarmsLoading = alarmsQuery.isLoading;
   const isEventsLoading = eventsQuery.isLoading;
+  const mappedSources = sourceHealthQuery.data?.current.filter((source) => (source.mapping_seen ?? 0) > 0) ?? [];
+  const unmappedSources = mappedSources.filter((source) => (source.mapping_matched ?? 0) === 0);
 
   return (
       <div className="space-y-5">
@@ -274,6 +294,30 @@ export function HistorianDashboard() {
             {queryErrors.map((message) => (
               <div key={message} className="rounded-lg border border-error/20 bg-background/80 px-3 py-2">
                 {message}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {unmappedSources.length ? (
+        <Card className="app-card overflow-hidden border-warning/30 bg-warning/5">
+          <CardHeader className="app-card-header rounded-none border-b border-warning/20 px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <AlertTriangle className="size-4 text-warning" />
+              No matched mappings yet
+            </CardTitle>
+            <CardDescription className="text-text-secondary">
+              One or more sources have live traffic, but their configured mappings have not matched the incoming fields yet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 p-4 text-sm text-text-primary">
+            {unmappedSources.slice(0, 3).map((source) => (
+              <div key={source.connection_id} className="rounded-lg border border-warning/20 bg-background/80 px-3 py-2">
+                <div className="font-medium">{source.connection_id}</div>
+                <div className="text-xs text-text-secondary">
+                  {source.protocol} · {source.site} · {source.mapping_missed ?? 0} misses · check source_field, source_id, and tag alignment
+                </div>
               </div>
             ))}
           </CardContent>

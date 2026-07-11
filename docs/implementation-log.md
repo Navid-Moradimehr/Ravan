@@ -1,5 +1,12 @@
 # Implementation Log
 
+## 2026-07-11 - Historian Mapping-Setup Warning
+
+Added a same-origin source-health proxy for the UI, and surfaced a historian
+warning when live traffic exists but no source mapping has matched yet. This
+keeps the notification tone consistent with the platform and makes the
+semantic mismatch visible without turning it into a hard ingest failure.
+
 ## 2026-07-11 - Semantic Mapping Miss Diagnostics
 
 Added runtime mapping-match and mapping-miss tracking to source health so
