@@ -18,3 +18,6 @@ partition strategy, central writer topology, and migration/backfill approval.
 Raw archival is a separate opt-in consumer for `industrial.raw`. It writes a
 raw envelope table and is disabled by default. The raw topic remains the
 replay boundary for ordinary installations.
+
+The archive can enforce a maximum payload size, redact configured top-level
+fields, and publish rejected records to a user-selected DLQ topic.

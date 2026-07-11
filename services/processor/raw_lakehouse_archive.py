@@ -13,10 +13,11 @@ import os
 import signal
 import time
 
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, Producer
 
 from services.common.brokers import resolve_kafka_brokers
 from services.sinks.lakehouse import LakehouseSink
+from services.processor.raw_archive_policy import sanitize_raw_event
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,10 @@ def main() -> None:
         "LAKEHOUSE_TABLE_TEMPLATE": os.getenv("LAKEHOUSE_RAW_TABLE_TEMPLATE", "raw_events"),
     }
     sink = LakehouseSink.from_env(env)
+    max_bytes = max(1, int(os.getenv("RAW_ARCHIVE_MAX_BYTES", "1048576")))
+    redact_fields = tuple(item.strip() for item in os.getenv("RAW_ARCHIVE_REDACT_FIELDS", "").split(",") if item.strip())
+    dlq_topic = os.getenv("RAW_ARCHIVE_DLQ_TOPIC", "")
+    dlq_producer = Producer({"bootstrap.servers": resolve_kafka_brokers("localhost:19092")}) if dlq_topic else None
     consumer = Consumer(
         {
             "bootstrap.servers": resolve_kafka_brokers("localhost:19092"),
@@ -73,14 +78,22 @@ def main() -> None:
                 continue
             try:
                 event = json.loads(message.value().decode("utf-8"))
-                event["event_stage"] = "raw"
-                event["payload_json"] = json.dumps(event, sort_keys=True, default=str)
+                event, rejection = sanitize_raw_event(event, max_bytes=max_bytes, redact_fields=redact_fields)
+                if rejection:
+                    logger.warning("raw archive rejected record: %s", rejection)
+                    if dlq_producer and dlq_topic:
+                        dlq_producer.produce(dlq_topic, value=json.dumps({"reason": rejection, "source_topic": message.topic(), "offset": message.offset()}).encode("utf-8"))
+                        dlq_producer.flush(5)
+                    consumer.commit(message=message, asynchronous=False)
+                    continue
+                assert event is not None
                 event.setdefault("site", event.get("site_id", ""))
                 event.setdefault("ts_ingest", event.get("ts_source", ""))
                 buffer.append(event)
                 flush()
             except Exception as exc:
                 logger.warning("raw archive skipped invalid record: %s", exc)
+                consumer.commit(message=message, asynchronous=False)
     finally:
         flush(force=True)
         sink.close()

@@ -75,6 +75,11 @@ that explicitly approve raw archival. It writes raw envelopes to a separate
 disabled by default; users must still define retention, redaction, access
 control, and bucket lifecycle policies.
 
+Raw archival supports `RAW_ARCHIVE_MAX_BYTES`,
+`RAW_ARCHIVE_REDACT_FIELDS`, and `RAW_ARCHIVE_DLQ_TOPIC`. Oversized or invalid
+records are reported and committed past so one poison payload cannot stall the
+archive consumer. The DLQ topic and its retention remain operator-owned.
+
 ## Operational ownership
 
 The platform owns the sink contract, table-writing code, and health failures.
