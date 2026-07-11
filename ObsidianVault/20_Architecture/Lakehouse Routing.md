@@ -14,3 +14,7 @@ append failure behavior.
 
 User-owned: catalog, bucket, credentials, TLS/IAM, retention, compaction,
 partition strategy, central writer topology, and migration/backfill approval.
+
+Raw archival is a separate opt-in consumer for `industrial.raw`. It writes a
+raw envelope table and is disabled by default. The raw topic remains the
+replay boundary for ordinary installations.

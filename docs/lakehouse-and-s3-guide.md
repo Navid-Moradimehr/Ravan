@@ -62,12 +62,18 @@ available mapping/configuration provenance. Existing older tables remain
 append-compatible; a migration or a new table is required before expecting
 new columns in an already-created table.
 
-The current lakehouse consumer archives normalized events and their available
-payload metadata. It does not yet run a separate raw-topic-to-Iceberg archive
-consumer. The raw Kafka topic remains the authoritative replay boundary. A
-company that needs raw files in S3 should export `industrial.raw` with a
-user-managed Kafka/Iceberg connector after reviewing retention, privacy, and
-industrial-network data policies.
+The normalized lakehouse consumer archives normalized events and their
+available payload metadata. The raw Kafka topic remains the authoritative
+replay boundary for ordinary installations. A company that does not use the
+optional archive can export `industrial.raw` with a user-managed
+Kafka/Iceberg connector after reviewing retention, privacy, and industrial
+network data policies.
+
+An optional `raw-archive` Compose profile is now available for deployments
+that explicitly approve raw archival. It writes raw envelopes to a separate
+`raw_events` table and never changes the normalized historian path. It remains
+disabled by default; users must still define retention, redaction, access
+control, and bucket lifecycle policies.
 
 ## Operational ownership
 

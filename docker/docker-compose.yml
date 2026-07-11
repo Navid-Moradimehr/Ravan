@@ -410,6 +410,7 @@ services:
       - minio-data:/data
     profiles:
       - extended
+      - raw-archive
 
   minio-init:
     image: minio/mc:latest
@@ -428,6 +429,7 @@ services:
       LAKEHOUSE_BUCKET: ${LAKEHOUSE_BUCKET:-lakehouse}
     profiles:
       - extended
+      - raw-archive
 
   operational-fanout:
     build:
@@ -459,6 +461,35 @@ services:
       LAKEHOUSE_S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
     profiles:
       - extended
+
+  raw-lakehouse-archive:
+    build:
+      context: ..
+      dockerfile: services/processor/Dockerfile
+    command: ["python", "-m", "services.processor.raw_lakehouse_archive"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      timescaledb:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      INDUSTRIAL_RAW_TOPIC: industrial.raw
+      LAKEHOUSE_CATALOG: ${LAKEHOUSE_CATALOG:-sql}
+      LAKEHOUSE_CATALOG_URI: ${LAKEHOUSE_CATALOG_URI:-postgresql+psycopg2://stream:stream@timescaledb:5432/stream_engine}
+      LAKEHOUSE_NAMESPACE: ${LAKEHOUSE_RAW_NAMESPACE:-industrial_raw}
+      LAKEHOUSE_RAW_TABLE: ${LAKEHOUSE_RAW_TABLE:-raw_events}
+      LAKEHOUSE_RAW_TABLE_TEMPLATE: ${LAKEHOUSE_RAW_TABLE_TEMPLATE:-raw_events}
+      LAKEHOUSE_LAYOUT: ${LAKEHOUSE_LAYOUT:-single-table}
+      LAKEHOUSE_WAREHOUSE: ${LAKEHOUSE_WAREHOUSE:-s3://lakehouse/}
+      LAKEHOUSE_S3_ENDPOINT: ${LAKEHOUSE_S3_ENDPOINT:-http://minio:9000}
+      LAKEHOUSE_S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:-minio}
+      LAKEHOUSE_S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:-minio12345}
+      LAKEHOUSE_S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
+    profiles:
+      - raw-archive
 
 
   timescaledb:
