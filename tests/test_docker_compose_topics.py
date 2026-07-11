@@ -90,3 +90,10 @@ def test_fanout_and_ai_services_wait_for_timescale_migration():
     for name in ("ai-gateway", "fanout", "ai-fanout"):
         depends = services[name].get("depends_on", {})
         assert depends.get("timescaledb-migrate") == {"condition": "service_completed_successfully"}
+
+
+def test_dashboard_profile_starts_api_service_for_same_origin_proxies():
+    services = _compose()["services"]
+    assert "ui" in services["api-service"].get("profiles", [])
+    depends = services["dashboard"].get("depends_on", {})
+    assert depends.get("api-service") == {"condition": "service_started"}

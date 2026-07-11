@@ -27,6 +27,17 @@ Postgres --> Debezium --> CDC topics   keyed state + rules            LLM summar
 - Site observability is a separate rollout-facing snapshot that reports broker,
   historian, AI gateway, backup readiness, and API health with SLO targets.
 
+## HTTP Gateway Boundaries
+
+FastAPI on port 8020 is the application API gateway boundary. The AI gateway on
+port 8080 is separate and owns model telemetry and AI event streaming. The
+Next.js dashboard exposes same-origin `/api/*` proxies for browser operations,
+including historian SQL, KPI definitions, connections, webhooks, notifications,
+and observability. The Compose `ui` profile starts `api-service` so the
+dashboard's internal `api-service:8020` target is reachable. Authorization
+headers are forwarded by mutation proxies; identity-provider and reverse-proxy
+selection remains deployment-owned.
+
 
 ## Normalized Fan-Out Data Flow
 

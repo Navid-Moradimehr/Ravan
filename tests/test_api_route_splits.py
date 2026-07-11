@@ -78,6 +78,12 @@ def test_split_domain_routes_registered():
         "/api/v1/reports/generate/{template_id}",
         "/api/v1/reports",
         "/api/v1/reports/schedule/{template_id}",
+        "/api/v1/kpis",
+        "/api/v1/kpis/{kpi_id}",
+        "/api/v1/connections/{connection_id}/validate",
+        "/api/v1/connections/{connection_id}/test",
+        "/api/v1/connections/{connection_id}/preview",
+        "/api/v1/webhooks/test/{hook_id}",
     }
     missing = expected - routes
     assert not missing, f"missing routes: {sorted(missing)}"

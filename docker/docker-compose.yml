@@ -302,7 +302,10 @@ services:
       dockerfile: ui/Dockerfile
     init: true
     depends_on:
-      - ai-gateway
+      ai-gateway:
+        condition: service_started
+      api-service:
+        condition: service_started
     environment:
       API_SERVICE_BASE: http://api-service:8020
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
@@ -582,6 +585,7 @@ services:
       - edge-data:/var/lib/datastream:ro
     profiles:
       - api
+      - ui
 
 volumes:
   kafka-data:

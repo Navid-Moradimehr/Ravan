@@ -5,12 +5,17 @@ export const dynamic = "force-dynamic";
 
 const API_SERVICE_BASE = process.env.API_SERVICE_BASE ?? "http://localhost:8020";
 
+function forwardedHeaders(request: Request): HeadersInit {
+  const authorization = request.headers.get("authorization");
+  return authorization ? { Authorization: authorization } : {};
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const response = await fetch(`${API_SERVICE_BASE}/api/v1/historian/query`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...forwardedHeaders(request) },
       body: JSON.stringify(body),
     });
     if (!response.ok) {
@@ -37,6 +42,7 @@ export async function DELETE(request: Request) {
 
     const response = await fetch(`${API_SERVICE_BASE}/api/v1/historian/query/${encodeURIComponent(queryId)}`, {
       method: "DELETE",
+      headers: forwardedHeaders(request),
     });
     if (!response.ok) {
       const error = await readResponseError(response);
