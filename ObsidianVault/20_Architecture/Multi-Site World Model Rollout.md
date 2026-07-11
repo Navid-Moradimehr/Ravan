@@ -2,7 +2,9 @@
 
 Recommended topology: independent site-local stacks, optional approved-topic
 Kafka federation, central Iceberg/MinIO or S3 storage, and explicit dataset
-compilation.
+compilation. The lakehouse may use `single-table`, `per-site`, or
+`shared-partitioned` layouts depending on whether the company wants one table,
+one namespace per site, or one centrally managed table with site partitions.
 
 The simple ingestion path remains the default and is not changed by enabling
 the new contracts. Sites continue to operate during central outages.

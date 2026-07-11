@@ -156,6 +156,13 @@ class LakehouseSink:
                 schema=schema,
             )
             logger.info("created iceberg table %s.%s", namespace, table_name)
+        if self._layout == "shared-partitioned" and table.spec().is_unpartitioned():
+            try:
+                table.update_spec().add_identity("site").commit()
+                table = self._catalog.load_table((namespace, table_name))
+                logger.info("enabled site partitioning for iceberg table %s.%s", namespace, table_name)
+            except Exception as exc:
+                logger.warning("failed to enable shared partitioning for %s.%s: %s", namespace, table_name, exc)
         self._tables[cache_key] = table
         if self._table is None and self._layout != "per-site":
             self._table = table
@@ -202,7 +209,7 @@ class LakehouseSink:
         """Project rows onto the current Iceberg schema with exact Arrow types."""
         columns = [field.name for field in table.schema().fields]
         rows = []
-        for event in self._buffer:
+        for event in events:
             row = dict(event)
             row.setdefault("event_stage", "normalized")
             row.setdefault("ts_ingest", row.get("ts_source", ""))

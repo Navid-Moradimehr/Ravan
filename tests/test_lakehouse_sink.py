@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pyarrow as pa
+
 from services.sinks.lakehouse import LakehouseSink
 
 
@@ -56,6 +60,25 @@ def test_per_site_layout_supports_templates():
     assert sink._table_target("plant-a") == ("company_plant-a", "telemetry_plant-a")
 
 
+def test_shared_partitioned_layout_uses_site_partition(monkeypatch):
+    from pyiceberg.catalog import load_in_memory
+
+    catalog = load_in_memory("test", {})
+    sink = LakehouseSink.from_env(
+        {
+            "LAKEHOUSE_LAYOUT": "shared-partitioned",
+            "LAKEHOUSE_NAMESPACE": "company",
+            "LAKEHOUSE_TABLE": "events",
+        }
+    )
+
+    monkeypatch.setattr("pyiceberg.catalog.load_catalog", lambda *args, **kwargs: catalog)
+
+    table = sink._ensure_table("plant-a")
+    assert not table.spec().is_unpartitioned()
+    assert table.spec().fields[0].name == "site"
+
+
 def test_write_batch_buffers_until_threshold():
     sink = LakehouseSink(
         catalog_name="rest",
@@ -95,6 +118,33 @@ def test_flush_without_pyiceberg_does_not_crash():
     # the exception is caught and logged, not raised.
     sink.flush()
     sink.close()
+
+
+def test_build_arrow_table_uses_only_passed_events():
+    sink = LakehouseSink.from_env({})
+
+    class _FakeSchema:
+        fields = [SimpleNamespace(name="event_id"), SimpleNamespace(name="site")]
+
+        @staticmethod
+        def as_arrow():
+            return pa.schema([pa.field("event_id", pa.string()), pa.field("site", pa.string())])
+
+    class _FakeTable:
+        @staticmethod
+        def schema():
+            return _FakeSchema()
+
+    sink._buffer = [{"event_id": "buffer-event", "site": "buffer-site"}]
+    arrow_table = sink._build_arrow_table(
+        pa,
+        _FakeTable(),
+        [{"event_id": "chosen-event", "site": "site-a"}],
+    )
+    rows = arrow_table.to_pylist()
+    assert len(rows) == 1
+    assert rows[0]["event_id"] == "chosen-event"
+    assert rows[0]["site"] == "site-a"
 
 
 def test_registry_builds_lakehouse_sink():

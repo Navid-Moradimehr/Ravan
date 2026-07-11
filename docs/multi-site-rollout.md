@@ -388,6 +388,11 @@ For multi-site users, treat these fields as the beginning of a controlled
 rollout: validate identity and policy in CI first, then enable a federation
 profile only after the central broker and lakehouse ownership are defined.
 
+`shared-partitioned` is the preferred lakehouse shape when one controlled
+writer needs to store multiple sites into one analytical table while keeping
+`site` available as a physical partition key. Use `per-site` when each plant
+needs independent table names or separate object-store layouts.
+
 ### Optional Kafka Federation Profile
 
 The repository includes a disabled-by-default `federation` Compose profile and

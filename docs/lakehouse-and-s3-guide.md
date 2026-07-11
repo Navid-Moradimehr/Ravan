@@ -106,6 +106,13 @@ such as `industrial_plant-a.events`. Set
 naming convention is required. Site routing is based on the event's `site`
 field and does not merge local asset identities.
 
+For deployments that want a single analytical table with site-level pruning,
+`LAKEHOUSE_LAYOUT=shared-partitioned` keeps one Iceberg table and partitions
+it by `site`. This is the right choice for a controlled central writer that
+needs one table namespace without losing site isolation in the storage layout.
+It still does not change the historian path or make raw cross-site writes
+automatic.
+
 The platform does not enable concurrent direct writes from every plant by
 itself. Operators should prefer a central controlled writer or a catalog with
 documented multi-writer commit guarantees. Partitioning, compaction, catalog

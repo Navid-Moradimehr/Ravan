@@ -6,8 +6,11 @@ S3 is optional analytical and training storage.
 Default behavior is unchanged: `single-table` routing and historian-only fanout
 for ordinary installations. The optional `per-site` layout routes normalized
 events to separate site namespaces while preserving the event's site and
-source identity. This is the recommended starting point for central company
-collection because it limits accidental cross-site mixing.
+source identity. The optional `shared-partitioned` layout keeps a single
+Iceberg table but partitions it by `site` for controlled multi-site central
+writes. This is the recommended starting point for central company collection
+when one writer owns the lakehouse because it limits accidental cross-site
+mixing without multiplying table names.
 
 Platform-owned: sink interface, schema projection, site-aware routing, and
 append failure behavior.
