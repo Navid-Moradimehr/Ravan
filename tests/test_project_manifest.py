@@ -187,6 +187,29 @@ def test_manifest_lint_detects_topic_collision():
     assert any("topic collision" in issue for issue in issues)
 
 
+def test_manifest_lint_requires_explicit_identity_correlation():
+    manifest = load_project_manifest(MANIFEST)
+    broken = replace(
+        manifest,
+        sources=manifest.sources
+        + (
+            replace(
+                manifest.sources[0],
+                source_id="uncorrelated-temperature",
+                topic="industrial/demo-site/line-01/uncorrelated-temperature",
+            ),
+        ),
+        correlation_groups=(),
+    )
+    issues = broken.lint()
+    assert any("identity collision" in issue for issue in issues)
+
+
+def test_manifest_lint_accepts_explicit_identity_correlation():
+    manifest = load_project_manifest(MANIFEST)
+    assert not any("identity collision" in issue for issue in manifest.lint())
+
+
 def test_validate_project_manifest_requires_source_site_id():
     manifest = load_project_manifest(MANIFEST)
     broken = replace(

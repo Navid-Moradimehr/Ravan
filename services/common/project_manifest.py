@@ -733,15 +733,33 @@ class ProjectManifest:
         site_ids = {site.site_id for site in self.sites}
         source_site_map = self.source_site_map()
         topic_to_sources: dict[str, list[str]] = {}
+        identity_to_sources: dict[tuple[str, str, str], list[str]] = {}
         bridge_signatures: set[tuple[str, str, tuple[str, ...], tuple[str, ...], str]] = set()
 
         for source in self.sources:
             if source.topic:
                 topic_to_sources.setdefault(source.topic, []).append(source.source_id)
+            for tag in source.tags:
+                identity_to_sources.setdefault((source.site_id, source.asset_id, tag), []).append(source.source_id)
 
         for topic, source_ids in topic_to_sources.items():
             if len(source_ids) > 1:
                 issues.append(f"topic collision: {topic} used by {source_ids}")
+
+        # Multiple physical sources may intentionally observe one logical
+        # signal, but that relationship must be explicit so downstream
+        # consumers do not silently collapse or overwrite the observations.
+        declared_correlations = {
+            frozenset(group.members)
+            for group in self.correlation_groups
+            if group.strategy == "site_asset_tag"
+        }
+        for (site_id, asset_id, tag), source_ids in identity_to_sources.items():
+            if len(source_ids) > 1 and frozenset(source_ids) not in declared_correlations:
+                issues.append(
+                    f"identity collision: {site_id}/{asset_id}/{tag} used by {source_ids}; "
+                    "declare a site_asset_tag correlation group"
+                )
 
         for rule in self.bridge_rules:
             signature = (rule.mode, rule.name, rule.from_sources, rule.to_sources, rule.topic_template)

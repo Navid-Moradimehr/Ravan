@@ -19,3 +19,8 @@ Decision options:
 The platform provides contracts and adapters. Operators provide topology,
 credentials, broker/catalog infrastructure, retention, security, and training
 semantics.
+
+Manifest lint also checks identity ownership. Two physical sources may observe
+the same logical `site/asset/tag`, but the manifest must declare that intent in
+a `site_asset_tag` correlation group. This prevents downstream consumers from
+silently treating duplicate PLC/sensor observations as one authoritative value.

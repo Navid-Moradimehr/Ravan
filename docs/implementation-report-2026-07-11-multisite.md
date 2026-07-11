@@ -15,6 +15,10 @@
 - Integrations-page entries explaining the new deployment-owned surfaces.
 - Multi-site deployment and world-model user documentation mirrored in the
   Obsidian vault.
+- Manifest lint now detects duplicate logical identities (`site/asset/tag`).
+  Redundant physical sources remain supported when they are explicitly listed
+  in a `site_asset_tag` correlation group; otherwise the rollout is rejected
+  before deployment.
 
 ## Compatibility
 
