@@ -54,6 +54,26 @@ services:
     ports:
       - "18080:8080"
 
+  kafka-federation:
+    image: apache/kafka:4.1.2
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CENTRAL_KAFKA_BROKERS: ${CENTRAL_KAFKA_BROKERS:-central-kafka:9092}
+      FEDERATION_TOPICS: ${FEDERATION_TOPICS:-industrial.normalized,industrial.operational}
+    entrypoint: ["bash", "-lc"]
+    command:
+      - >-
+        sed -e "s|__CENTRAL_KAFKA_BROKERS__|$${CENTRAL_KAFKA_BROKERS}|g"
+        -e "s|__FEDERATION_TOPICS__|$${FEDERATION_TOPICS}|g"
+        /etc/kafka/mm2.properties > /tmp/mm2.properties;
+        exec /opt/kafka/bin/connect-mirror-maker.sh /tmp/mm2.properties
+    volumes:
+      - ../config/federation/mirrormaker2.properties:/etc/kafka/mm2.properties:ro
+    profiles:
+      - federation
+
   postgres:
     image: postgres:15-alpine
     command: ["postgres", "-c", "wal_level=logical"]

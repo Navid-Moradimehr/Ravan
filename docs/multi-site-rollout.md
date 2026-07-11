@@ -387,3 +387,27 @@ default fan-out sink.
 For multi-site users, treat these fields as the beginning of a controlled
 rollout: validate identity and policy in CI first, then enable a federation
 profile only after the central broker and lakehouse ownership are defined.
+
+### Optional Kafka Federation Profile
+
+The repository includes a disabled-by-default `federation` Compose profile and
+an Apache Kafka MirrorMaker 2 reference configuration at
+`config/federation/mirrormaker2.properties`.
+
+Enable it only after setting `CENTRAL_KAFKA_BROKERS` and reviewing
+`FEDERATION_TOPICS`:
+
+```powershell
+$env:CENTRAL_KAFKA_BROKERS = "central-kafka.example.internal:9092"
+$env:FEDERATION_TOPICS = "industrial.normalized,industrial.operational"
+docker compose -f docker/docker-compose.yml --profile federation up -d
+```
+
+The profile is a transport adapter, not a central control plane. The central
+Kafka cluster, TLS/SASL settings, network access, topic retention, and broker
+credentials remain operator-owned. Raw events are excluded by default because
+raw replication is a data-governance decision.
+
+The read-only API endpoint `/api/v1/metadata/federation` reports the declared
+organization, sites, allowed topics, lakehouse layout, and validation errors;
+it deliberately does not return credentials.

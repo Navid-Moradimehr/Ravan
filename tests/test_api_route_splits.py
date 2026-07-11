@@ -30,6 +30,7 @@ def test_split_domain_routes_registered():
         "/api/v1/modeling/context",
         "/api/v1/modeling/agent-runtime",
         "/api/v1/metadata",
+        "/api/v1/metadata/federation",
         "/api/v1/metadata/assets",
         "/api/v1/metadata/events",
         "/api/v1/metadata/governance",
