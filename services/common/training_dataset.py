@@ -100,7 +100,9 @@ def _read_iceberg_sources(path: str | Path) -> dict[str, list[dict[str, Any]]]:
         namespace = str(table_ref.get("namespace", "industrial"))
         table_name = str(table_ref.get("table", logical_name))
         table = catalog.load_table((namespace, table_name))
-        records[str(logical_name)] = table.scan().to_arrow().to_pylist()
+        row_filter = table_ref.get("row_filter")
+        scan = table.scan(row_filter=str(row_filter)) if row_filter else table.scan()
+        records[str(logical_name)] = scan.to_arrow().to_pylist()
     return records
 
 
@@ -141,6 +143,23 @@ def _quality_signals(records: list[dict[str, Any]]) -> dict[str, Any]:
         "missing_source_timestamps": missing_source_timestamps,
         "late_events_over_60s": late_events,
     }
+
+
+def _quality_gate_errors(quality: dict[str, Any], gates: dict[str, Any]) -> list[str]:
+    limits = {
+        "duplicate_event_ids": int(gates.get("max_duplicate_event_ids", 0)),
+        "missing_source_timestamps": int(gates.get("max_missing_source_timestamps", 0)),
+        "late_events_over_60s": int(gates.get("max_late_events_over_60s", 0)),
+    }
+    totals = {name: 0 for name in limits}
+    for signals in quality.get("signals", {}).values():
+        for name in totals:
+            totals[name] += int(signals.get(name, 0))
+    return [
+        f"quality gate exceeded: {name}={totals[name]} > {limit}"
+        for name, limit in limits.items()
+        if totals[name] > limit
+    ]
 
 
 def compile_bundle(
@@ -189,5 +208,13 @@ def compile_bundle(
         "site_ids": sorted({str(record.get("site_id", record.get("site", ""))) for records in records_by_name.values() for record in records if record.get("site_id", record.get("site", ""))}),
         "signals": {name: _quality_signals(records) for name, records in records_by_name.items()},
     }
+    gate_errors = _quality_gate_errors(quality, manifest.get("quality_gates") or {})
+    quality["gate_errors"] = gate_errors
     (destination / "quality-report.json").write_text(json.dumps(quality, indent=2, sort_keys=True), encoding="utf-8")
-    return {"dataset_id": manifest["dataset_id"], "output_dir": str(destination), "quality": quality, "validation": validation.to_dict()}
+    return {
+        "dataset_id": manifest["dataset_id"],
+        "output_dir": str(destination),
+        "quality": quality,
+        "validation": validation.to_dict(),
+        "valid": validation.valid and not gate_errors,
+    }

@@ -9,3 +9,7 @@ manifest, lineage, and quality report as file-backed compilation.
 
 This is a deliberate batch operation. It does not turn the dashboard into a
 lakehouse query engine and it does not automatically scan every table.
+
+Use an explicit Iceberg `row_filter` for bounded scans. Dataset manifests can
+also define quality gates; failed gates produce evidence but return
+`valid: false` to release automation.

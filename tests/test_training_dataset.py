@@ -71,3 +71,16 @@ def test_quality_report_counts_duplicates_missing_and_late_events(tmp_path: Path
     assert signals["duplicate_event_ids"] == 1
     assert signals["missing_source_timestamps"] == 1
     assert signals["late_events_over_60s"] == 1
+
+
+def test_quality_gates_mark_bundle_invalid_without_blocking_artifacts(tmp_path: Path) -> None:
+    manifest = _manifest()
+    manifest["quality_gates"] = {"max_duplicate_event_ids": 0}
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
+    observations = tmp_path / "observations.jsonl"
+    observations.write_text("{\"event_id\": \"e1\"}\n{\"event_id\": \"e1\"}\n", encoding="utf-8")
+    result = compile_bundle(manifest_path, tmp_path / "bundle", observations=observations)
+    assert result["valid"] is False
+    assert result["quality"]["gate_errors"]
+    assert (tmp_path / "bundle" / "quality-report.json").exists()

@@ -102,6 +102,11 @@ Review `quality-report.json` and `lineage.json` before training. Do not treat a
 successful compile as proof that the data is physically or causally sufficient
 for a world model.
 
+Use Iceberg `row_filter` values in the source configuration to bound reads at
+the table-scan layer. Add `quality_gates` to the dataset manifest when a
+training release must stop on duplicate IDs, missing timestamps, or excessive
+late arrivals.
+
 For a central writer, run `python -m services.federation.kafka_lakehouse_bridge`
 in the central environment with `CENTRAL_KAFKA_BROKERS`,
 `FEDERATION_INPUT_TOPIC`, and the lakehouse variables configured. The bridge

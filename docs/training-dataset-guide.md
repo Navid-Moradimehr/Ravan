@@ -96,6 +96,26 @@ This is an explicit batch read, not a background lakehouse service. Users
 should bound the selected tables and time ranges, and should use the dataset
 manifest for site, topology, provenance, and quality restrictions.
 
+Each Iceberg source may include a PyIceberg `row_filter`, for example:
+
+```json
+"observations": {
+  "namespace": "industrial_plant-a",
+  "table": "events",
+  "row_filter": "ts_source >= '2026-01-01T00:00:00Z' AND ts_source < '2026-02-01T00:00:00Z'"
+}
+```
+
+The filter is passed to the Iceberg scan so the catalog/storage layer can
+perform predicate pushdown. Do not compile an unbounded table for a production
+training job.
+
+Manifests may define `quality_gates` such as
+`max_duplicate_event_ids`, `max_missing_source_timestamps`, and
+`max_late_events_over_60s`. Gate failures still produce the bundle and its
+quality report, but the compiler returns `valid: false` so release automation
+can stop before training.
+
 Every compiled bundle now includes non-blocking quality signals for duplicate
 event IDs, missing source timestamps, and events arriving more than 60 seconds
 after their source timestamp. These signals are evidence for dataset review;
