@@ -146,11 +146,18 @@ def _quality_signals(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _quality_gate_errors(quality: dict[str, Any], gates: dict[str, Any]) -> list[str]:
-    limits = {
-        "duplicate_event_ids": int(gates.get("max_duplicate_event_ids", 0)),
-        "missing_source_timestamps": int(gates.get("max_missing_source_timestamps", 0)),
-        "late_events_over_60s": int(gates.get("max_late_events_over_60s", 0)),
+    gate_fields = {
+        "max_duplicate_event_ids": "duplicate_event_ids",
+        "max_missing_source_timestamps": "missing_source_timestamps",
+        "max_late_events_over_60s": "late_events_over_60s",
     }
+    limits = {
+        signal: int(gates[key])
+        for key, signal in gate_fields.items()
+        if key in gates
+    }
+    if not limits:
+        return []
     totals = {name: 0 for name in limits}
     for signals in quality.get("signals", {}).values():
         for name in totals:

@@ -13,3 +13,6 @@ lakehouse query engine and it does not automatically scan every table.
 Use an explicit Iceberg `row_filter` for bounded scans. Dataset manifests can
 also define quality gates; failed gates produce evidence but return
 `valid: false` to release automation.
+
+Gates are opt-in. Without configured thresholds, quality signals remain
+informational and do not invalidate the bundle.

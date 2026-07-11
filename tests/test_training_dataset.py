@@ -84,3 +84,12 @@ def test_quality_gates_mark_bundle_invalid_without_blocking_artifacts(tmp_path: 
     assert result["valid"] is False
     assert result["quality"]["gate_errors"]
     assert (tmp_path / "bundle" / "quality-report.json").exists()
+
+
+def test_quality_gates_are_opt_in(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(_manifest()), encoding="utf-8")
+    observations = tmp_path / "observations.jsonl"
+    observations.write_text("{\"event_id\": \"e1\"}\n", encoding="utf-8")
+    result = compile_bundle(manifest_path, tmp_path / "bundle", observations=observations)
+    assert result["valid"] is True

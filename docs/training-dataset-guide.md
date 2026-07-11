@@ -116,6 +116,9 @@ Manifests may define `quality_gates` such as
 quality report, but the compiler returns `valid: false` so release automation
 can stop before training.
 
+Quality gates are opt-in. Without a `quality_gates` section, the compiler still
+reports quality signals but does not mark the bundle invalid.
+
 Every compiled bundle now includes non-blocking quality signals for duplicate
 event IDs, missing source timestamps, and events arriving more than 60 seconds
 after their source timestamp. These signals are evidence for dataset review;
