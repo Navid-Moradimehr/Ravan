@@ -162,7 +162,7 @@ class LakehouseSink:
                 row.setdefault("source_config_version", row.get("source_config_version", ""))
                 row.setdefault("payload_json", json.dumps(row, sort_keys=True, default=str))
                 rows.append({name: row.get(name) for name in columns})
-            arrow_table = pa.Table.from_pylist(rows)
+            arrow_table = pa.Table.from_pylist(rows, schema=self._table.schema().as_arrow())
             self._table.append(arrow_table)
             self._buffer.clear()
         except Exception as exc:  # pragma: no cover - lakehouse runtime failure

@@ -1,5 +1,12 @@
 # Implementation Log
 
+## 2026-07-11 - Iceberg Arrow Schema Compatibility
+
+The first live MinIO/SQL-catalog append reached Iceberg but failed because
+PyArrow inferred `int64` for `int32` Iceberg fields and omitted an all-null
+payload column. The lakehouse writer now projects rows using the existing
+Iceberg Arrow schema, covering both new and older tables.
+
 ## 2026-07-11 - Lakehouse SQL Catalog Runtime Dependency
 
 The first live Docker append exposed that the processor image had PyIceberg
