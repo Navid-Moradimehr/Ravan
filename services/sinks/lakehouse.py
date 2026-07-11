@@ -148,21 +148,7 @@ class LakehouseSink:
             self._ensure_table()
             import pyarrow as pa
 
-            # Older user-created tables may not have the enriched columns yet.
-            # Project rows onto the existing table schema so upgrades remain
-            # append-compatible; new tables receive the full schema above.
-            columns = [field.name for field in self._table.schema().fields]
-            rows = []
-            for event in self._buffer:
-                row = dict(event)
-                row.setdefault("event_stage", "normalized")
-                row.setdefault("ts_ingest", row.get("ts_source", ""))
-                row.setdefault("project_id", row.get("site", ""))
-                row.setdefault("mapping_version", row.get("mapping_version", ""))
-                row.setdefault("source_config_version", row.get("source_config_version", ""))
-                row.setdefault("payload_json", json.dumps(row, sort_keys=True, default=str))
-                rows.append({name: row.get(name) for name in columns})
-            arrow_table = pa.Table.from_pylist(rows, schema=self._table.schema().as_arrow())
+            arrow_table = self._build_arrow_table(pa)
             self._table.append(arrow_table)
             self._buffer.clear()
         except Exception as exc:  # pragma: no cover - lakehouse runtime failure
@@ -174,9 +160,24 @@ class LakehouseSink:
         self._ensure_table()
         import pyarrow as pa
 
-        arrow_table = pa.Table.from_pylist(self._buffer)
+        arrow_table = self._build_arrow_table(pa)
         self._table.append(arrow_table)
         self._buffer.clear()
+
+    def _build_arrow_table(self, pa: Any) -> Any:
+        """Project rows onto the current Iceberg schema with exact Arrow types."""
+        columns = [field.name for field in self._table.schema().fields]
+        rows = []
+        for event in self._buffer:
+            row = dict(event)
+            row.setdefault("event_stage", "normalized")
+            row.setdefault("ts_ingest", row.get("ts_source", ""))
+            row.setdefault("project_id", row.get("site", ""))
+            row.setdefault("mapping_version", row.get("mapping_version", ""))
+            row.setdefault("source_config_version", row.get("source_config_version", 0))
+            row.setdefault("payload_json", json.dumps(row, sort_keys=True, default=str))
+            rows.append({name: row.get(name) for name in columns})
+        return pa.Table.from_pylist(rows, schema=self._table.schema().as_arrow())
 
     def close(self) -> None:
         self.flush()
