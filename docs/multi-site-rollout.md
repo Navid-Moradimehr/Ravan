@@ -358,3 +358,32 @@ What still needs to be finished for a true multi-site production rollout:
 ## Recommended Next Step
 
 Implement a site profile contract and an operator-facing release checklist, then run the same benchmark and soak suite against at least two different site profiles.
+
+## Optional World-Model Federation Contract
+
+The platform now exposes additive project-level contracts for organizations that
+operate more than one site. These contracts do not change the default local
+pipeline and do not start federation automatically.
+
+`organization_id`, `project_id`, `site_id`, and local entity IDs can be combined
+into a stable qualified identity. Existing schema-version-1 manifests derive
+`organization_id` from `project_id`, so older deployments remain valid.
+
+The manifest can also declare:
+
+- approved federation topics and whether raw events may leave a site
+- the intended lakehouse layout: `single-table`, `per-site`, or
+  `shared-partitioned`
+- clock-quality policy and late-event thresholds
+
+These fields describe the deployment contract. They do not replace Kafka
+configuration, secret management, network routing, or the operator's choice of
+MirrorMaker, a Kafka sink, or an external replication service.
+
+For ordinary single-site users, no action is required. The generated site
+environment keeps federation disabled and the historian remains the only
+default fan-out sink.
+
+For multi-site users, treat these fields as the beginning of a controlled
+rollout: validate identity and policy in CI first, then enable a federation
+profile only after the central broker and lakehouse ownership are defined.

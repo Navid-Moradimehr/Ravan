@@ -38,6 +38,33 @@ def test_manifest_source_site_map():
     assert site_map["line-a-pump-vibration"] == "plant-a"
 
 
+def test_manifest_identity_and_optional_policies_are_backward_compatible():
+    manifest = load_project_manifest(MANIFEST)
+    assert manifest.organization_id == "demo-industrial-fleet"
+    assert manifest.entity_id("plant-a", "Pump-03") == "demo-industrial-fleet:demo-industrial-fleet:plant-a:Pump-03"
+    env = manifest.to_site_envs()["demo-site"]
+    assert env["DATASTREAM_ORGANIZATION_ID"] == "demo-industrial-fleet"
+    assert env["FEDERATION_ENABLED"] == "false"
+    assert env["LAKEHOUSE_LAYOUT"] == "single-table"
+
+
+def test_manifest_v1_without_new_sections_remains_valid(tmp_path: Path):
+    path = tmp_path / "legacy.yaml"
+    path.write_text(
+        MANIFEST.read_text(encoding="utf-8").replace("organization_id: demo-industrial-fleet\n", "")
+        if "organization_id:" in MANIFEST.read_text(encoding="utf-8")
+        else "schema_version: 1\nproject_id: demo\nname: Demo\nsites: []\n",
+        encoding="utf-8",
+    )
+    # An explicitly minimal legacy manifest should still parse; normal
+    # validation reports its missing site as expected.
+    minimal = tmp_path / "minimal.yaml"
+    minimal.write_text("schema_version: 1\nproject_id: demo\nname: Demo\nsites: []\n", encoding="utf-8")
+    parsed = load_project_manifest(minimal)
+    assert parsed.organization_id == "demo"
+    assert any("at least one site" in item for item in validate_project_manifest(parsed))
+
+
 def test_manifest_export_bundles(tmp_path: Path):
     manifest = load_project_manifest(MANIFEST)
     written = manifest.export_bundles(tmp_path, site_id="demo-site", fmt="both")

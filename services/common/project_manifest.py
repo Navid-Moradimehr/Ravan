@@ -16,6 +16,8 @@ from services.common.site_profiles import load_site_profile, validate_site_profi
 VALID_BRIDGE_MODES = {"replicate", "fanout", "correlate", "rollup"}
 VALID_EXPORT_LAYOUTS = {"flat", "systemd", "windows", "kubernetes", "package"}
 VALID_EXPORT_FORMATS = {"env", "yaml", "both"}
+VALID_LAKEHOUSE_LAYOUTS = {"single-table", "per-site", "shared-partitioned"}
+VALID_CLOCK_POLICIES = {"observe", "warn", "reject"}
 
 
 @dataclass(frozen=True)
@@ -82,6 +84,44 @@ class ProjectRetention:
 
 
 @dataclass(frozen=True)
+class FederationPolicy:
+    """Optional cross-site transport policy.
+
+    This is deliberately declarative. It describes what may be replicated;
+    the broker/operator owns the actual federation implementation.
+    """
+
+    enabled: bool = False
+    topics: tuple[str, ...] = field(default_factory=lambda: ("industrial.normalized", "industrial.operational"))
+    central_cluster: str = ""
+    raw_enabled: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class LakehousePolicy:
+    layout: str = "single-table"
+    namespace_template: str = "industrial"
+    table_template: str = "events"
+    central_writer: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class QualityPolicy:
+    clock_mode: str = "observe"
+    max_clock_offset_seconds: float = 300.0
+    late_event_seconds: float = 60.0
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ProjectManifest:
     schema_version: int
     project_id: str
@@ -92,6 +132,10 @@ class ProjectManifest:
     bridge_rules: tuple[BridgeRule, ...] = field(default_factory=tuple)
     correlation_groups: tuple[CorrelationGroup, ...] = field(default_factory=tuple)
     retention: ProjectRetention = field(default_factory=ProjectRetention)
+    organization_id: str = ""
+    federation: FederationPolicy = field(default_factory=FederationPolicy)
+    lakehouse: LakehousePolicy = field(default_factory=LakehousePolicy)
+    quality: QualityPolicy = field(default_factory=QualityPolicy)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -104,7 +148,16 @@ class ProjectManifest:
             "bridge_rules": [rule.to_dict() for rule in self.bridge_rules],
             "correlation_groups": [group.to_dict() for group in self.correlation_groups],
             "retention": self.retention.to_dict(),
+            "organization_id": self.organization_id or self.project_id,
+            "federation": self.federation.to_dict(),
+            "lakehouse": self.lakehouse.to_dict(),
+            "quality": self.quality.to_dict(),
         }
+
+    def entity_id(self, site_id: str, local_id: str) -> str:
+        """Return a stable organization/project/site-qualified identifier."""
+        values = (self.organization_id or self.project_id, self.project_id, site_id, local_id)
+        return ":".join(value.strip() for value in values if value and value.strip())
 
     def site_profile_paths(self) -> dict[str, Path]:
         return {site.site_id: Path(site.profile_path) for site in self.sites}
@@ -122,6 +175,12 @@ class ProjectManifest:
             env = profile.to_env()
             env["DATASTREAM_PROJECT_ID"] = self.project_id
             env["DATASTREAM_PROJECT_NAME"] = self.name
+            env["DATASTREAM_ORGANIZATION_ID"] = self.organization_id or self.project_id
+            env["DATASTREAM_SITE_ID"] = site.site_id
+            env["FEDERATION_ENABLED"] = str(self.federation.enabled).lower()
+            env["FEDERATION_TOPICS"] = ",".join(self.federation.topics)
+            env["LAKEHOUSE_LAYOUT"] = self.lakehouse.layout
+            env["QUALITY_CLOCK_MODE"] = self.quality.clock_mode
             env["DATASTREAM_PROJECT_RETENTION_DAYS"] = str(self.retention.historian_days)
             envs[site.site_id] = env
         return envs
@@ -869,6 +928,35 @@ def _load_group(data: dict[str, Any]) -> CorrelationGroup:
     )
 
 
+def _load_federation(data: dict[str, Any] | None) -> FederationPolicy:
+    data = data or {}
+    return FederationPolicy(
+        enabled=bool(data.get("enabled", False)),
+        topics=tuple(str(item).strip() for item in data.get("topics", FederationPolicy().topics) if str(item).strip()),
+        central_cluster=str(data.get("central_cluster", "")).strip(),
+        raw_enabled=bool(data.get("raw_enabled", False)),
+    )
+
+
+def _load_lakehouse(data: dict[str, Any] | None) -> LakehousePolicy:
+    data = data or {}
+    return LakehousePolicy(
+        layout=str(data.get("layout", "single-table")).strip(),
+        namespace_template=str(data.get("namespace_template", "industrial")).strip(),
+        table_template=str(data.get("table_template", "events")).strip(),
+        central_writer=bool(data.get("central_writer", True)),
+    )
+
+
+def _load_quality(data: dict[str, Any] | None) -> QualityPolicy:
+    data = data or {}
+    return QualityPolicy(
+        clock_mode=str(data.get("clock_mode", "observe")).strip(),
+        max_clock_offset_seconds=float(data.get("max_clock_offset_seconds", 300.0)),
+        late_event_seconds=float(data.get("late_event_seconds", 60.0)),
+    )
+
+
 def _resolve_relative(base: Path, value: str) -> Path:
     candidate = Path(value)
     return candidate if candidate.is_absolute() else (base / candidate)
@@ -897,6 +985,7 @@ def load_project_manifest(path: Path | str) -> ProjectManifest:
         project_id=str(data.get("project_id", "")).strip(),
         name=str(data.get("name", "")).strip(),
         description=str(data.get("description", "")).strip(),
+        organization_id=str(data.get("organization_id", data.get("project_id", ""))).strip(),
         sites=tuple(sites),
         sources=_load_tuple(data.get("sources"), _load_source),
         bridge_rules=_load_tuple(data.get("bridge_rules"), _load_bridge),
@@ -907,12 +996,15 @@ def load_project_manifest(path: Path | str) -> ProjectManifest:
             compressed_days=int(retention.get("compressed_days", 7)),
             backup_days=int(retention.get("backup_days", 30)),
         ),
+        federation=_load_federation(data.get("federation")),
+        lakehouse=_load_lakehouse(data.get("lakehouse")),
+        quality=_load_quality(data.get("quality")),
     )
 
 
 def validate_project_manifest(manifest: ProjectManifest) -> list[str]:
     errors: list[str] = []
-    if manifest.schema_version != 1:
+    if manifest.schema_version not in {1, 2}:
         errors.append(f"unsupported schema_version: {manifest.schema_version}")
     if not manifest.project_id:
         errors.append("project_id is required")
@@ -920,6 +1012,16 @@ def validate_project_manifest(manifest: ProjectManifest) -> list[str]:
         errors.append("name is required")
     if not manifest.sites:
         errors.append("at least one site is required")
+    if not manifest.organization_id:
+        errors.append("organization_id is required")
+    if manifest.lakehouse.layout not in VALID_LAKEHOUSE_LAYOUTS:
+        errors.append(f"lakehouse.layout must be one of {sorted(VALID_LAKEHOUSE_LAYOUTS)}")
+    if manifest.quality.clock_mode not in VALID_CLOCK_POLICIES:
+        errors.append(f"quality.clock_mode must be one of {sorted(VALID_CLOCK_POLICIES)}")
+    if manifest.quality.max_clock_offset_seconds < 0 or manifest.quality.late_event_seconds < 0:
+        errors.append("quality timing thresholds must be non-negative")
+    if manifest.federation.enabled and not manifest.federation.topics:
+        errors.append("federation.topics is required when federation is enabled")
 
     site_ids = {site.site_id for site in manifest.sites}
     source_site_map = manifest.source_site_map()
