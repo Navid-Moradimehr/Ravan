@@ -10,7 +10,8 @@ from prometheus_client import Counter, Gauge, Histogram
 from services.common.native_fastpath import encode_event_bundle
 from services.common.normalize import to_legacy_iot_event
 from services.common.stream_scope import stream_partition_key
-from services.edge_ingest.model import IndustrialEvent, to_json_bytes, validate_event
+from services.common.clock_quality import clock_quality_issue
+from services.edge_ingest.model import DeadLetterEvent, IndustrialEvent, to_json_bytes, validate_event
 from services.edge_ingest.settings import Settings
 from services.edge_ingest.disk_spool import DiskEventSpool
 
@@ -30,6 +31,11 @@ overflow_total = Counter(
 store_forward_spooled = Counter("edge_store_forward_spooled_total", "Events written to the local edge spool", ["topic"])
 store_forward_replayed = Counter("edge_store_forward_replayed_total", "Events replayed from the local edge spool", ["topic"])
 store_forward_pending = Gauge("edge_store_forward_pending", "Events currently pending in the local edge spool")
+clock_violations = Counter(
+    "edge_ingest_clock_violations_total",
+    "Source timestamps outside the configured clock-quality bound",
+    ["mode", "action"],
+)
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +149,29 @@ class EdgePublisher:
         else:
             assert event is not None
             event_dict = event.model_dump(mode="json")
+            clock_issue = clock_quality_issue(
+                event.ts_source,
+                max_offset_seconds=max(self.settings.max_clock_offset_seconds, 0.0),
+            )
+            if clock_issue:
+                mode = self.settings.clock_mode if self.settings.clock_mode in {"observe", "warn", "reject"} else "observe"
+                action = "rejected" if mode == "reject" else "accepted"
+                clock_violations.labels(mode=mode, action=action).inc()
+                if mode == "reject":
+                    rejected = DeadLetterEvent(
+                        source_protocol=event.source_protocol,
+                        source_id=event.source_id,
+                        error=f"clock_policy_reject: {clock_issue}",
+                        payload=event_dict,
+                    )
+                    self._buffer.append(
+                        (self.settings.dlq_topic, event.source_id.encode("utf-8"), to_json_bytes(rejected))
+                    )
+                    dlq_total.labels(protocol=event.source_protocol).inc()
+                    self._maybe_flush()
+                    return
+                if mode == "warn":
+                    logger.warning("clock quality warning for %s: %s", event.source_id, clock_issue)
             bundle = encode_event_bundle(event_dict)
             if bundle is None:
                 key = stream_partition_key(event_dict)

@@ -102,6 +102,8 @@ class Settings:
     historian_batch_size: int = int(os.getenv("EDGE_HISTORIAN_BATCH_SIZE", "1024"))
     mqtt_queue_size: int = int(os.getenv("EDGE_MQTT_QUEUE_SIZE", "10000"))
     max_message_bytes: int = int(os.getenv("EDGE_MAX_MESSAGE_BYTES", "1048576"))
+    clock_mode: str = os.getenv("QUALITY_CLOCK_MODE", "observe").strip().lower()
+    max_clock_offset_seconds: float = float(os.getenv("QUALITY_MAX_CLOCK_OFFSET_SECONDS", "300"))
 
     def source_connections(self) -> tuple[SourceRuntime, ...]:
         """Return enabled registry sources, or one legacy source per protocol.

@@ -19,6 +19,9 @@
   Redundant physical sources remain supported when they are explicitly listed
   in a `site_asset_tag` correlation group; otherwise the rollout is rejected
   before deployment.
+- Edge clock quality is now enforced consistently with the manifest policy:
+  `observe` and `warn` accept records with telemetry, while `reject` routes the
+  validated record to the DLQ and preserves the original raw event.
 
 ## Compatibility
 

@@ -84,6 +84,48 @@ def test_buffer_error_triggers_poll_then_retry(monkeypatch):
     assert calls["n"] >= 2  # first raised, second succeeded
 
 
+def test_reject_clock_policy_keeps_raw_but_routes_normalized_event_to_dlq(monkeypatch):
+    produced: list[tuple[str, bytes, bytes]] = []
+
+    class FakeProducer:
+        def __init__(self, *a, **k):
+            pass
+
+        def produce(self, topic, key=None, value=None, on_delivery=None):
+            produced.append((topic, key, value))
+            if on_delivery is not None:
+                on_delivery(None, None)
+
+        def poll(self, timeout=None):
+            return 0
+
+        def flush(self, timeout=None):
+            return 0
+
+    from services.edge_ingest import publisher as publisher_mod
+
+    monkeypatch.setattr(publisher_mod, "Producer", FakeProducer)
+    settings = Settings(clock_mode="reject", max_clock_offset_seconds=1)
+    publisher = publisher_mod.EdgePublisher(settings, batch_size=64)
+    publisher.publish_event(
+        {
+            "source_protocol": "mqtt",
+            "source_id": "factory/line-01/Pump-01/Temperature",
+            "asset_id": "Pump-01",
+            "tag": "Temperature",
+            "value": 51.2,
+            "quality": "good",
+            "ts_source": "2020-01-01T00:00:00Z",
+        }
+    )
+    publisher.flush()
+
+    topics = [topic for topic, _key, _value in produced]
+    assert "industrial.raw" in topics
+    assert "industrial.dlq" in topics
+    assert "industrial.normalized" not in topics
+
+
 def test_oversize_message_routed_to_dlq(monkeypatch):
     """Messages exceeding max_message_bytes are routed to the DLQ, not dropped."""
     produced: list[tuple[str, bytes, bytes]] = []

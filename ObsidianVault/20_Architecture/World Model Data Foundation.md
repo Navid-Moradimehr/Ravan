@@ -41,3 +41,8 @@ routing, raw archival, quality signals, and direct lakehouse dataset readers.
 The dataset compiler now emits quality evidence for duplicate event IDs,
 missing source timestamps, and late arrivals. This is intentionally a training
 and curation gate, not a new live-ingestion rejection policy.
+
+The live edge path now has a separate clock-quality policy. Raw payloads remain
+replayable; `observe` and `warn` accept out-of-bound source timestamps with
+telemetry, while `reject` routes the validated record to the DLQ before
+normalized processing. Clock synchronization remains user-owned.
