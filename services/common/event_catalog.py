@@ -47,6 +47,16 @@ CANONICAL_EVENT_TOPICS: tuple[EventCatalogEntry, ...] = (
         retained=True,
     ),
     EventCatalogEntry(
+        topic="industrial.operational",
+        stage="operational",
+        description="Versioned actions, outcomes, context changes, and episode boundaries supplied by company systems.",
+        category="operational",
+        producers=("operational.api", "user.adapters"),
+        consumers=("operational.fanout", "dataset.builder", "replay"),
+        site_scoped=True,
+        retained=True,
+    ),
+    EventCatalogEntry(
         topic="industrial.dlq",
         stage="dlq",
         description="Rejected or oversized industrial events requiring operator review.",

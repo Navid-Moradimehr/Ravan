@@ -1,5 +1,13 @@
 # Implementation Log
 
+## 2026-07-11 - Operational Event Contract
+
+Added the domain-neutral `OperationalEvent` envelope, `/api/v1/operational/events`,
+the `industrial.operational` topic catalog entry, and an optional operational
+fan-out archive path. The contract supports actions, outcomes, context,
+boundaries, maintenance, and annotations without adding manufacturing-only
+fields. Added the user guide and Obsidian architecture note.
+
 ## 2026-07-11 - UI Hardening Verification Note
 
 The UI build passed after the broader error-hardening batch. Browser smoke

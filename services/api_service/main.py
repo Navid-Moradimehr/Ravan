@@ -244,6 +244,7 @@ from services.api_service.routers.observability import router as observability_r
 from services.api_service.routers.lineage import router as lineage_router
 from services.api_service.routers.semantic import router as semantic_router
 from services.api_service.routers.external import router as external_router
+from services.api_service.routers.operational_events import router as operational_events_router
 from services.api_service.routers.support import router as support_router
 from services.api_service.routers.admin import router as admin_router
 from services.api_service.routers.historian import ingest_batch, ingest_event
@@ -265,6 +266,7 @@ app.include_router(observability_router)
 app.include_router(lineage_router)
 app.include_router(semantic_router)
 app.include_router(external_router)
+app.include_router(operational_events_router)
 app.include_router(support_router)
 app.include_router(admin_router)
 app.include_router(realtime_router)

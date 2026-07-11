@@ -21,6 +21,7 @@ def test_from_env_builds_sink():
     assert sink._table_name == "events"
     assert sink._warehouse == "s3://lh/"
     assert sink._batch_size == 2
+    assert sink._catalog_uri.endswith("/stream_engine")
 
 
 def test_from_env_uses_defaults():
