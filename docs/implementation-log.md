@@ -1,5 +1,12 @@
 # Implementation Log
 
+## 2026-07-11 - World-Model Benchmark Pass
+
+Ran the existing simulator, CGR-style slice, metadata, semantic-query, and
+training-bundle benchmarks plus Docker Kafka producer/consumer and live
+Iceberg/MinIO append/scan workloads. Results are recorded in
+`docs/benchmark-results-2026-07-11-world-model.md` and the Obsidian vault.
+
 ## 2026-07-11 - Documentation Accuracy Correction
 
 Clarified that the current Iceberg path archives normalized events, while
