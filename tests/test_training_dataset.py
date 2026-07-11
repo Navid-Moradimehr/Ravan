@@ -50,3 +50,24 @@ def test_iceberg_reader_is_optional_and_does_not_change_file_path(tmp_path: Path
     observations.write_text(json.dumps({"event_id": "e1", "site_id": "plant-a"}) + "\n", encoding="utf-8")
     result = compile_bundle(manifest_path, tmp_path / "bundle", observations=observations)
     assert result["quality"]["records"]["observations"] == 1
+
+
+def test_quality_report_counts_duplicates_missing_and_late_events(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(_manifest()), encoding="utf-8")
+    observations = tmp_path / "observations.jsonl"
+    observations.write_text(
+        "\n".join(
+            [
+                json.dumps({"event_id": "e1", "ts_source": "2026-01-01T00:00:00Z", "ts_ingest": "2026-01-01T00:02:00Z"}),
+                json.dumps({"event_id": "e1"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    result = compile_bundle(manifest_path, tmp_path / "bundle", observations=observations)
+    signals = result["quality"]["signals"]["observations"]
+    assert signals["duplicate_event_ids"] == 1
+    assert signals["missing_source_timestamps"] == 1
+    assert signals["late_events_over_60s"] == 1

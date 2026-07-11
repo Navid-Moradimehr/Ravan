@@ -95,3 +95,8 @@ datastreamctl training-dataset compile `
 This is an explicit batch read, not a background lakehouse service. Users
 should bound the selected tables and time ranges, and should use the dataset
 manifest for site, topology, provenance, and quality restrictions.
+
+Every compiled bundle now includes non-blocking quality signals for duplicate
+event IDs, missing source timestamps, and events arriving more than 60 seconds
+after their source timestamp. These signals are evidence for dataset review;
+they do not change the live ingestion acceptance policy.

@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -111,6 +112,37 @@ def _write_parquet(path: Path, records: list[dict[str, Any]]) -> None:
     pq.write_table(table, path, compression="zstd")
 
 
+def _quality_signals(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Compute portable quality signals without changing source records."""
+    ids = [str(record.get("event_id", "")) for record in records if record.get("event_id")]
+    duplicates = len(ids) - len(set(ids))
+    missing_source_timestamps = sum(
+        1 for record in records if not (record.get("ts_source") or record.get("timestamp") or record.get("time"))
+    )
+    late_events = 0
+    for record in records:
+        source = record.get("ts_source") or record.get("timestamp")
+        ingest = record.get("ts_ingest")
+        if not source or not ingest:
+            continue
+        try:
+            source_dt = datetime.fromisoformat(str(source).replace("Z", "+00:00"))
+            ingest_dt = datetime.fromisoformat(str(ingest).replace("Z", "+00:00"))
+            if source_dt.tzinfo is None:
+                source_dt = source_dt.replace(tzinfo=timezone.utc)
+            if ingest_dt.tzinfo is None:
+                ingest_dt = ingest_dt.replace(tzinfo=timezone.utc)
+            if (ingest_dt - source_dt).total_seconds() > 60:
+                late_events += 1
+        except (TypeError, ValueError):
+            continue
+    return {
+        "duplicate_event_ids": duplicates,
+        "missing_source_timestamps": missing_source_timestamps,
+        "late_events_over_60s": late_events,
+    }
+
+
 def compile_bundle(
     manifest_path: str | Path,
     output_dir: str | Path,
@@ -155,6 +187,7 @@ def compile_bundle(
         "records": {name: len(records) for name, records in records_by_name.items()},
         "warnings": list(validation.warnings),
         "site_ids": sorted({str(record.get("site_id", record.get("site", ""))) for records in records_by_name.values() for record in records if record.get("site_id", record.get("site", ""))}),
+        "signals": {name: _quality_signals(records) for name, records in records_by_name.items()},
     }
     (destination / "quality-report.json").write_text(json.dumps(quality, indent=2, sort_keys=True), encoding="utf-8")
     return {"dataset_id": manifest["dataset_id"], "output_dir": str(destination), "quality": quality, "validation": validation.to_dict()}

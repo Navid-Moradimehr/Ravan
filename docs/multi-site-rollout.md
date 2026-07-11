@@ -411,3 +411,7 @@ raw replication is a data-governance decision.
 The read-only API endpoint `/api/v1/metadata/federation` reports the declared
 organization, sites, allowed topics, lakehouse layout, and validation errors;
 it deliberately does not return credentials.
+
+Dataset compilation also reports duplicate IDs, missing source timestamps, and
+late events. Sites may tighten those checks in their training gates without
+making the operational ingest path reject records by default.

@@ -37,3 +37,7 @@ synchronization, ontology content, GPU capacity, and model training.
 
 Next implementation phases are optional Kafka federation, site-aware lakehouse
 routing, raw archival, quality signals, and direct lakehouse dataset readers.
+
+The dataset compiler now emits quality evidence for duplicate event IDs,
+missing source timestamps, and late arrivals. This is intentionally a training
+and curation gate, not a new live-ingestion rejection policy.
