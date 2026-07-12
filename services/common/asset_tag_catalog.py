@@ -95,6 +95,41 @@ def record_observed_asset_tags(events: list[dict[str, Any]]) -> int:
     return len(rows)
 
 
+def reconcile_observed_asset_tags(*, hours: int = 168, site_id: str | None = None) -> dict[str, Any]:
+    """Backfill the catalog from a bounded historian window on operator demand."""
+    if hours < 1 or hours > 24 * 365:
+        raise ValueError("hours must be between 1 and 8760")
+    ensure_catalog_table()
+    with _connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT site, asset_id, tag, MAX(unit), MIN(time), MAX(time)
+                   FROM industrial_events
+                   WHERE time >= now() - (%s * interval '1 hour')
+                     AND (%s IS NULL OR site = %s)
+                   GROUP BY site, asset_id, tag""",
+                (hours, site_id, site_id),
+            )
+            rows = cur.fetchall()
+            if rows:
+                from psycopg2.extras import execute_values
+
+                execute_values(
+                    cur,
+                    """INSERT INTO metadata_asset_tags
+                       (site_id, asset_id, tag, unit, source, first_seen, last_seen, active, updated_at)
+                       VALUES %s
+                       ON CONFLICT (site_id, asset_id, tag) DO UPDATE SET
+                         unit=COALESCE(NULLIF(EXCLUDED.unit, ''), metadata_asset_tags.unit),
+                         last_seen=GREATEST(metadata_asset_tags.last_seen, EXCLUDED.last_seen),
+                         active=TRUE, updated_at=now()""",
+                    [(site, asset, tag, unit or "", "reconciled", first_seen, last_seen, True, last_seen) for site, asset, tag, unit, first_seen, last_seen in rows],
+                )
+        conn.commit()
+    invalidate_asset_tag_cache()
+    return {"ok": True, "hours": hours, "site_id": site_id, "reconciled": len(rows)}
+
+
 def _registry_items(asset_config: Path | str, site_id: str | None) -> list[dict[str, Any]]:
     snapshot = build_asset_registry_snapshot(asset_config=asset_config, site_id=site_id)
     items: list[dict[str, Any]] = []

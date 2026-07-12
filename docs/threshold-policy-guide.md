@@ -45,9 +45,10 @@ The fan-out historian sink upserts observed `(site, asset, tag)` pairs into the
 metadata catalog after a successful write. Catalog reads use indexed metadata
 queries and a versioned in-process cache. Registry file changes and catalog
 updates change the catalog version. Existing historical rows from before the
-catalog migration are not silently inferred on every UI request; use the
-reconciliation/backfill operation when an already-populated historian must be
-discovered.
+catalog migration are not silently inferred on every UI request. An operator
+can run `POST /api/v1/metadata/asset-tags/reconcile?hours=168` to backfill a
+bounded historian window; this is an explicit operational scan, not a UI
+request.
 
 This is intentionally not a Spark job. Dropdown discovery is a small metadata
 query; Spark belongs in batch analytics or dataset construction, not in an

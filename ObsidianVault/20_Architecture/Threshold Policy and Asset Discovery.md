@@ -6,7 +6,7 @@
 - Observed catalog updates: implemented on successful historian fan-out.
 - Threshold policy table and API: implemented.
 - Operator policy editor: implemented on Integrations.
-- Full historical catalog reconciliation: follow-up operational command.
+- Full historical catalog reconciliation: implemented as a bounded operator API.
 - Distributed alarm lifecycle state in Flink keyed state: follow-up hardening.
 
 ## Connections

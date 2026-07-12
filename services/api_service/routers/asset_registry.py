@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter
 
 from services.common.asset_registry import build_asset_registry_snapshot
-from services.common.asset_tag_catalog import list_asset_tags
+from services.common.asset_tag_catalog import list_asset_tags, reconcile_observed_asset_tags
 
 
 router = APIRouter(tags=["asset-registry"])
@@ -36,3 +36,8 @@ async def asset_registry_snapshot(
         asset_config=Path(asset_config) if asset_config else Path("config/assets.yaml"),
         site_id=site_id,
     )
+
+
+@router.post("/api/v1/metadata/asset-tags/reconcile")
+async def reconcile_asset_tag_catalog(hours: int = 168, site_id: str | None = None) -> dict[str, Any]:
+    return reconcile_observed_asset_tags(hours=hours, site_id=site_id)
