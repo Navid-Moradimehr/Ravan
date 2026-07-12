@@ -45,3 +45,14 @@ This note turns the readiness gap report into a checklist with owners and exit c
 
 - Treat the platform as pilot-ready now.
 - Treat enterprise-scale production readiness as blocked on real multi-node and real-device validation.
+# Local Hardening Completed
+
+The platform now includes a deterministic local resilience campaign and a
+deployment preflight. The resilience campaign exercises malformed, duplicate,
+out-of-order, outage, spool, and replay cases without requiring real PLCs or
+Kafka. The preflight composes existing site-profile, project-manifest, compose,
+and soak-scenario validators. Contract tests verify context preservation from
+canonical event validation through normalization and runtime enrichment.
+
+These checks improve release confidence but do not prove site-specific driver,
+network, storage, or failover behavior.

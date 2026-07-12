@@ -72,6 +72,7 @@ from services.historian.backup import (
     restore_backup,
 )
 from services.common.metadata_artifacts import build_metadata_artifact_bundle, write_metadata_artifact_bundle
+from services.common.preflight import run_preflight
 
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
 DEFAULT_AI_BASE = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080")
@@ -985,6 +986,24 @@ def cmd_config(args: argparse.Namespace) -> int:
     _print_row("API health", _http_get(f"{args.api_base}/health")[0])
     _print_row("AI health", _http_get(f"{args.ai_base}/health")[0])
     return 0
+
+
+def cmd_preflight(args: argparse.Namespace) -> int:
+    report = run_preflight(
+        site_profile=args.site_profile,
+        project_manifest=args.project_manifest,
+        soak_scenario=args.soak_scenario,
+        compose_file=args.compose_file,
+    )
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print("datastream preflight")
+        print("=" * 40)
+        for check in report.checks:
+            print(f"{'OK' if check.passed else 'FAIL':<6}{check.name:<28}{check.detail}")
+        _print_row("passed", str(report.passed).lower())
+    return 0 if report.passed else 2
 
 
 def cmd_site_profile(args: argparse.Namespace) -> int:
@@ -2455,6 +2474,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("doctor", help="Run health/diagnostic checks").set_defaults(func=cmd_doctor)
     sub.add_parser("config", help="Show effective control configuration").set_defaults(func=cmd_config)
+    preflight = sub.add_parser("preflight", help="Validate deployment files and contracts before startup")
+    preflight.add_argument("--site-profile", default="config/site-profiles/single-site.yaml")
+    preflight.add_argument("--project-manifest", default="config/project-manifest.yaml")
+    preflight.add_argument("--soak-scenario", default="config/benchmarks/industrial-soak.yaml")
+    preflight.add_argument("--compose-file", default="docker/docker-compose.yml")
+    preflight.add_argument("--json", action="store_true")
+    preflight.set_defaults(func=cmd_preflight)
 
     agent_runtime = sub.add_parser("agent-runtime", help="Inspect the read-only diagnostic runtime and supervised action scaffold")
     agent_runtime_sub = agent_runtime.add_subparsers(dest="action", required=True)
