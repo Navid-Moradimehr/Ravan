@@ -91,7 +91,7 @@ export function SourceConnectionPanel() {
       <CardContent className="space-y-4 p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Connection name" />
-          <select value={protocol} onChange={(event) => setProtocol(event.target.value)} className="h-9 rounded-lg border border-border-subtle bg-surface-0 px-3 text-sm text-text-primary">
+          <select value={protocol} onChange={(event) => setProtocol(event.target.value)} className="app-select">
             <option value="opcua">OPC UA</option><option value="mqtt">MQTT</option><option value="modbus">Modbus TCP</option><option value="modbus_rtu">Modbus RTU</option><option value="rest">REST</option>
           </select>
           <Input value={siteId} onChange={(event) => setSiteId(event.target.value)} placeholder="Site ID" />

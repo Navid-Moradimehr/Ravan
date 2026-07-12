@@ -5,6 +5,7 @@ import {
   AreaChart,
   Bar,
   BarChart,
+  Cell,
   CartesianGrid,
   Line,
   LineChart,
@@ -21,6 +22,7 @@ import { SectionHeader } from "@/components/section-header";
 import { Activity, AlertOctagon, Gauge, ShieldCheck } from "lucide-react";
 import type { ObservabilitySnapshot } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { HelpTip } from "@/components/help-tip";
 
 const throughputConfig = {
   mqtt: { label: "MQTT", color: "var(--chart-2)" },
@@ -101,7 +103,7 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="app-card overflow-hidden xl:col-span-2">
           <CardHeader className="app-card-header rounded-none border-b px-5 py-4">
-            <CardTitle className="text-base font-semibold">Ingest throughput</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">Ingest throughput <HelpTip label="Ingest throughput help" content="Shows the live event rate reported by edge ingestion, grouped by protocol. It measures events entering the platform, not database rows or dashboard refreshes." /></CardTitle>
             <CardDescription className="text-text-secondary">Live rate by protocol from the edge stream.</CardDescription>
           </CardHeader>
           <CardContent className="p-5">
@@ -130,7 +132,7 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
         <Card className="app-card overflow-hidden">
           <CardHeader className="app-card-header rounded-none border-b px-5 py-4">
             <CardTitle className="flex items-center justify-between gap-3 text-base font-semibold">
-              <span>Grafana</span>
+              <span className="flex items-center gap-2">Grafana <HelpTip label="Grafana help" content="Grafana is the external observability workspace. Use it for persistent dashboards and Prometheus exploration; this panel only reports availability and links to it." /></span>
               <Badge variant="outline" className={cn("font-medium", grafanaTone)}>
                 {grafanaLabel}
               </Badge>
@@ -166,7 +168,7 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="app-card overflow-hidden">
           <CardHeader className="app-card-header rounded-none border-b px-5 py-4">
-            <CardTitle className="text-base font-semibold">AI latency</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">AI latency <HelpTip label="AI latency help" content="The plotted p95 is the 95th percentile request latency reported by the AI gateway. Batch size is shown alongside it to explain throughput and latency changes." /></CardTitle>
             <CardDescription className="text-text-secondary">Model response time and batch size.</CardDescription>
           </CardHeader>
           <CardContent className="p-5">
@@ -193,7 +195,7 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
 
         <Card className="app-card overflow-hidden">
           <CardHeader className="app-card-header rounded-none border-b px-5 py-4">
-            <CardTitle className="text-base font-semibold">Protocol mix</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">Protocol mix <HelpTip label="Protocol mix help" content="Shows the current cumulative event counters grouped by ingestion protocol. It helps identify which connector is contributing traffic." /></CardTitle>
             <CardDescription className="text-text-secondary">Current totals by source type.</CardDescription>
           </CardHeader>
           <CardContent className="p-5">
@@ -219,7 +221,7 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
 
         <Card className="app-card overflow-hidden xl:col-span-2">
           <CardHeader className="app-card-header rounded-none border-b px-5 py-4">
-            <CardTitle className="text-base font-semibold">Severity mix</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">Severity mix <HelpTip label="Severity mix help" content="Shows processor output grouped into normal, warning, and critical events. The values are counters from telemetry, not the number of pixels or chart categories." /></CardTitle>
             <CardDescription className="text-text-secondary">Live processor output grouped by severity.</CardDescription>
           </CardHeader>
           <CardContent className="p-5">
@@ -231,7 +233,9 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
                     <XAxis dataKey="label" {...axisProps} />
                     <YAxis {...axisProps} width={32} />
                     <Tooltip content={<ChartTooltipContent indicator="dot" />} />
-                    <Bar dataKey="total" radius={[4, 4, 0, 0]} fill="var(--chart-3)" />
+                  <Bar dataKey="total" barSize={44} maxBarSize={44} radius={[5, 5, 0, 0]}>
+                    {snapshot.severity.map((item) => <Cell key={item.label} fill={severityConfig[item.label as keyof typeof severityConfig]?.color ?? "var(--chart-3)"} />)}
+                  </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>

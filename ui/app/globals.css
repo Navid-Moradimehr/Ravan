@@ -192,6 +192,28 @@ body {
     border-color: var(--color-border-strong);
   }
 
+  .app-select {
+    width: 100%;
+    min-height: 2.25rem;
+    appearance: none;
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-0);
+    background-image: linear-gradient(45deg, transparent 50%, var(--color-text-secondary) 50%), linear-gradient(135deg, var(--color-text-secondary) 50%, transparent 50%);
+    background-position: calc(100% - 1rem) 50%, calc(100% - 0.72rem) 50%;
+    background-size: 0.28rem 0.28rem, 0.28rem 0.28rem;
+    background-repeat: no-repeat;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 0.45rem 2.25rem 0.45rem 0.75rem;
+    font: inherit;
+    line-height: 1.25;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .app-select:hover { border-color: var(--color-border-strong); background-color: var(--color-surface-2); }
+  .app-select:focus-visible { border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent); outline: none; }
+  .app-select:disabled { cursor: not-allowed; opacity: 0.6; }
+  .app-select option { color: var(--color-text-primary); background: var(--color-surface-raised); }
+
   .nav-active {
     background: var(--color-accent-subtle);
     color: var(--color-text-primary);

@@ -2,6 +2,11 @@
 
 The Observability page is the monitoring surface for the platform. It is where users go when they want to know whether the stack is healthy, how fast it is moving, and where the pressure is building. It is not the ingest page, not the historian page, and not the runtime-processing page. Its job is to turn platform metrics into something operators can read quickly.
 
+Each chart panel has a `?` help tip beside its title. Hover it to see what the
+metric means and which service supplies it. Severity Mix uses bounded,
+per-severity bars with normal, warning, and critical colors; it is a categorical
+counter view rather than a time-series plot.
+
 ## What the page shows
 
 The page has four parts:

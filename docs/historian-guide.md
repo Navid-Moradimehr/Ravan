@@ -15,3 +15,9 @@ When the platform sees live source traffic but no mapping match yet, the histori
 The historian is intentionally after storage, not part of the raw ingest path. That matters because it keeps the live pipeline simple: Kafka carries the stream, processing services score it, and the historian stores the result for later use. Users should think of this page as the answer to “what happened?” rather than “how do I ingest data?”
 
 The live panels are fed by the API service through HTTP polling from the browser. The alarms panel asks the backend for alarm history at the chosen interval, and the raw events panel asks for the selected table at the chosen interval. The browser is not inventing data; it is rendering the current historian state coming from the backend, just on a cadence the operator can control.
+
+The Historical Trend panel also includes an Asset tag selector. It is populated
+from the registry plus the observed asset/tag catalog. Selecting a value there
+or clicking a tag in Asset Hierarchy drives the same historian query. If the
+selector is empty, start normalized fan-out or run the bounded catalog
+reconciliation endpoint described in the threshold policy guide.

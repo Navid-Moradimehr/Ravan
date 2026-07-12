@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getHistorianTrend, getAssetHierarchy, getScenarios, getReplayStatus, getHistorianEvents, getAlarms, startReplay, stopReplay } from "@/lib/api";
+import { getHistorianTrend, getAssetHierarchy, getAssetTagCatalog, getScenarios, getReplayStatus, getHistorianEvents, getAlarms, startReplay, stopReplay } from "@/lib/api";
 import { requestJson } from "@/lib/http";
 import { formatErrorMessage } from "@/lib/http";
 import { showToast } from "@/components/toaster";
@@ -194,6 +194,7 @@ export function HistorianDashboard() {
 
   const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, 1) : Promise.resolve([]), enabled: !!selectedAsset });
   const assetsQuery = useQuery({ queryKey: ["historian", "assets"], queryFn: getAssetHierarchy });
+  const catalogQuery = useQuery({ queryKey: ["historian", "asset-tag-catalog"], queryFn: getAssetTagCatalog });
   const scenariosQuery = useQuery({ queryKey: ["historian", "scenarios"], queryFn: getScenarios });
   const replayQuery = useQuery({ queryKey: ["historian", "replay"], queryFn: getReplayStatus, refetchInterval: 10000 });
   const sourceHealthQuery = useQuery({ queryKey: ["historian", "source-health"], queryFn: getSourceHealth, refetchInterval: 10000 });
@@ -272,6 +273,7 @@ export function HistorianDashboard() {
   const queryErrors = [
     trendQuery.isError ? `Trend: ${formatErrorMessage(trendQuery.error, "Unable to load trend data.")}` : null,
     assetsQuery.isError ? `Assets: ${formatErrorMessage(assetsQuery.error, "Unable to load the asset hierarchy.")}` : null,
+    catalogQuery.isError ? `Asset catalog: ${formatErrorMessage(catalogQuery.error, "Unable to load selectable asset tags.")}` : null,
     scenariosQuery.isError ? `Scenarios: ${formatErrorMessage(scenariosQuery.error, "Unable to load scenarios.")}` : null,
     replayQuery.isError ? `Replay: ${formatErrorMessage(replayQuery.error, "Unable to load replay status.")}` : null,
     sourceHealthQuery.isError ? `Source health: ${formatErrorMessage(sourceHealthQuery.error, "Unable to load source health.")}` : null,
@@ -432,8 +434,27 @@ export function HistorianDashboard() {
             <CardDescription className="text-text-secondary">{selectedAsset ? `${selectedAsset.assetId}.${selectedAsset.tag}` : "Select an asset tag"}</CardDescription>
           </CardHeader>
           <CardContent className="p-4">
+            <label className="mb-4 block space-y-1.5 text-xs font-medium text-text-secondary">
+              <span>Asset tag</span>
+              <select
+                className="app-select"
+                value={selectedAsset ? `${selectedAsset.assetId}::${selectedAsset.tag}` : "::"}
+                onChange={(event) => {
+                  const [assetId, tag] = event.target.value.split("::");
+                  setSelectedAsset(assetId && tag ? { assetId, tag } : null);
+                }}
+                disabled={catalogQuery.isLoading}
+              >
+                <option value="::">Select an asset tag</option>
+                {(catalogQuery.data?.items ?? []).map((item) => (
+                  <option key={`${item.site_id}::${item.asset_id}::${item.tag}`} value={`${item.asset_id}::${item.tag}`}>
+                    {item.site_id} / {item.asset_name} / {item.tag} ({item.source})
+                  </option>
+                ))}
+              </select>
+            </label>
             {selectedAsset ? (trendQuery.isLoading ? <Skeleton className="h-32 w-full bg-surface-2" /> : <TrendChart data={trendQuery.data?.map((d: any) => ({ time: d.time, value: d.value })) ?? []} />) : (
-              <p className="py-8 text-center text-sm text-text-secondary">Select a tag from the asset hierarchy to view its trend</p>
+              <p className="py-8 text-center text-sm text-text-secondary">Select a tag above or click one in the asset hierarchy to view its trend.</p>
             )}
           </CardContent>
 </Card>

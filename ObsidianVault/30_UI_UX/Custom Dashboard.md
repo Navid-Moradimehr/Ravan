@@ -43,3 +43,12 @@ registry can preserve the same panel contract for shared site dashboards.
 Add backend dashboard persistence only when site identity, ownership, sharing,
 and permissions are configured. Do not turn the quick builder into a second
 Grafana; integrate with Grafana for advanced dashboards.
+# Custom Dashboard UI Updates
+
+The dashboard trend selector now uses the shared themed select control and the
+observed asset/tag catalog. Manual asset and tag fields remain as a fallback
+for deployments that have not populated the catalog.
+
+Historian Trend has the same catalog-backed selector, so users no longer need
+to discover a tag only through the hierarchy tree. Observability chart cards
+now expose `?` help tips, and Severity Mix renders compact categorical bars.
