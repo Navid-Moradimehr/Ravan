@@ -76,6 +76,7 @@ from services.historian.backup import (
 )
 from services.common.metadata_artifacts import build_metadata_artifact_bundle, write_metadata_artifact_bundle
 from services.common.preflight import run_preflight
+from services.common.flink_capacity import decide_scaling, plan_capacity
 
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
 DEFAULT_AI_BASE = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080")
@@ -1007,6 +1008,86 @@ def cmd_preflight(args: argparse.Namespace) -> int:
             print(f"{'OK' if check.passed else 'FAIL':<6}{check.name:<28}{check.detail}")
         _print_row("passed", str(report.passed).lower())
     return 0 if report.passed else 2
+
+
+def _kafka_partition_count(brokers: str, topic: str) -> int:
+    from confluent_kafka import Consumer
+
+    consumer = Consumer({"bootstrap.servers": brokers, "group.id": "datastream-capacity-plan", "enable.auto.commit": False})
+    try:
+        metadata = consumer.list_topics(topic=topic, timeout=5)
+        topic_metadata = metadata.topics.get(topic)
+        if topic_metadata is None or topic_metadata.error:
+            raise RuntimeError(f"Kafka topic metadata unavailable for {topic}")
+        return len(topic_metadata.partitions)
+    finally:
+        consumer.close()
+
+
+def cmd_flink(args: argparse.Namespace) -> int:
+    if args.action == "capacity-plan":
+        partitions = args.partitions or _kafka_partition_count(args.brokers, args.topic)
+        host = _host_profile()
+        plan = plan_capacity(
+            topic=args.topic,
+            partitions=partitions,
+            host_cpu=args.host_cpu or host.get("cpu_count"),
+            host_memory_mb=args.host_memory_mb or int(float(host.get("memory_gb") or 4) * 1024),
+            min_parallelism=args.min_parallelism,
+            max_parallelism=args.max_parallelism,
+            slots_per_taskmanager=args.slots_per_taskmanager,
+            reserved_cpu=args.reserved_cpu,
+            reserved_memory_mb=args.reserved_memory_mb,
+            memory_per_slot_mb=args.memory_per_slot_mb,
+            events_per_second=args.events_per_second,
+            events_per_second_per_slot=args.events_per_second_per_slot,
+        )
+        if args.apply:
+            output = Path(args.output)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(
+                "\n".join([
+                    f"FLINK_PARALLELISM={plan.parallelism}",
+                    f"FLINK_MAX_PARALLELISM={plan.max_parallelism}",
+                    f"FLINK_TASKMANAGER_SLOTS={plan.slots_per_taskmanager}",
+                    f"FLINK_TASKMANAGER_REPLICAS={plan.taskmanager_replicas}",
+                    "RUNTIME_MODE=flink-production",
+                    "",
+                ]),
+                encoding="utf-8",
+            )
+        payload = plan.to_dict()
+        if args.apply:
+            payload["applied_file"] = str(Path(args.output))
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print("flink capacity plan")
+            print("=" * 40)
+            for key in ("topic", "partitions", "parallelism", "taskmanager_replicas", "slots_per_taskmanager", "total_slots", "estimated_capacity_events_per_second", "capacity_limited"):
+                _print_row(key, payload[key])
+            for warning in plan.warnings:
+                print(f"WARNING {warning}")
+            if args.apply:
+                _print_row("applied_file", args.output)
+        return 0
+
+    if args.action == "scaling-decision":
+        decision = decide_scaling(
+            current_parallelism=args.current_parallelism,
+            min_parallelism=args.min_parallelism,
+            max_parallelism=args.max_parallelism,
+            partitions=args.partitions,
+            lag=args.lag,
+            busy_time=args.busy_time,
+            lag_scale_up=args.lag_scale_up,
+            lag_scale_down=args.lag_scale_down,
+        )
+        payload = {"action": decision.action, "target_parallelism": decision.target_parallelism, "reason": decision.reason}
+        print(json.dumps(payload, indent=2) if args.json else f"action={decision.action} target_parallelism={decision.target_parallelism} reason={decision.reason}")
+        return 0
+
+    raise ValueError(f"unknown flink action: {args.action}")
 
 
 def cmd_site_profile(args: argparse.Namespace) -> int:
@@ -2500,6 +2581,38 @@ def build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--compose-file", default="docker/docker-compose.yml")
     preflight.add_argument("--json", action="store_true")
     preflight.set_defaults(func=cmd_preflight)
+
+    flink = sub.add_parser("flink", help="Inspect and plan bounded Flink capacity")
+    flink_sub = flink.add_subparsers(dest="action", required=True)
+    capacity_plan = flink_sub.add_parser("capacity-plan", help="Calculate capacity from Kafka partitions and host resources")
+    capacity_plan.add_argument("--topic", default="industrial.normalized")
+    capacity_plan.add_argument("--brokers", default=os.getenv("KAFKA_BROKERS", "localhost:19092"))
+    capacity_plan.add_argument("--partitions", type=int, default=None, help="Override Kafka metadata for offline planning")
+    capacity_plan.add_argument("--host-cpu", type=int, default=None)
+    capacity_plan.add_argument("--host-memory-mb", type=int, default=None)
+    capacity_plan.add_argument("--min-parallelism", type=int, default=1)
+    capacity_plan.add_argument("--max-parallelism", type=int, default=None)
+    capacity_plan.add_argument("--slots-per-taskmanager", type=int, default=1)
+    capacity_plan.add_argument("--reserved-cpu", type=int, default=1)
+    capacity_plan.add_argument("--reserved-memory-mb", type=int, default=1024)
+    capacity_plan.add_argument("--memory-per-slot-mb", type=int, default=1024)
+    capacity_plan.add_argument("--events-per-second", type=float, default=None)
+    capacity_plan.add_argument("--events-per-second-per-slot", type=float, default=250.0)
+    capacity_plan.add_argument("--apply", action="store_true", help="Write a generated environment file; does not restart services")
+    capacity_plan.add_argument("--output", default=".datastream/flink-capacity.env")
+    capacity_plan.add_argument("--json", action="store_true")
+    capacity_plan.set_defaults(func=cmd_flink)
+    scaling_decision = flink_sub.add_parser("scaling-decision", help="Calculate a bounded lag/busy-time scaling recommendation")
+    scaling_decision.add_argument("--current-parallelism", type=int, required=True)
+    scaling_decision.add_argument("--min-parallelism", type=int, default=1)
+    scaling_decision.add_argument("--max-parallelism", type=int, required=True)
+    scaling_decision.add_argument("--partitions", type=int, required=True)
+    scaling_decision.add_argument("--lag", type=float, required=True)
+    scaling_decision.add_argument("--busy-time", type=float, required=True)
+    scaling_decision.add_argument("--lag-scale-up", type=int, default=1000)
+    scaling_decision.add_argument("--lag-scale-down", type=int, default=10)
+    scaling_decision.add_argument("--json", action="store_true")
+    scaling_decision.set_defaults(func=cmd_flink)
 
     agent_runtime = sub.add_parser("agent-runtime", help="Inspect the read-only diagnostic runtime and supervised action scaffold")
     agent_runtime_sub = agent_runtime.add_subparsers(dest="action", required=True)
