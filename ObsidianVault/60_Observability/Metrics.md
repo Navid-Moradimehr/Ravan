@@ -4,6 +4,15 @@
 
 - Ingest messages per second
 - Consumer lag by topic and group
+
+## Industrial Soak Campaigns
+
+The versioned scenario contract at `config/benchmarks/industrial-soak.yaml`
+defines the future end-to-end soak workload. It is intended to account for
+generated, raw, normalized, processed, persisted, DLQ, and recovered events,
+alongside Kafka lag, latency, CPU, memory, disk, reconnect, and dashboard
+health. In-process replay numbers must not be presented as equivalent to this
+live protocol path.
 - Processing latency
 - LLM request latency
 - LLM batch size

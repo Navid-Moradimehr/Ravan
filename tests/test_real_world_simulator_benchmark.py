@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from services.benchmarks.real_world_simulator import format_result, run_suite
+from services.benchmarks.industrial_soak import load_scenario
 
 
 def test_run_real_world_simulator_suite() -> None:
@@ -35,3 +36,12 @@ def test_run_real_world_simulator_suite() -> None:
     assert "multi-plc-line" in format_result(result)
     assert "dropout-reconnect" in format_result(result)
     assert "multi-site-correlation" in format_result(result)
+
+
+def test_default_industrial_soak_scenario_is_valid():
+    scenario = load_scenario("config/benchmarks/industrial-soak.yaml")
+    assert scenario.duration_seconds == 900
+    assert scenario.configured_events_per_second == 47
+    assert [phase.name for phase in scenario.phases] == [
+        "warmup", "sustained", "burst", "reconnect", "restart", "recovery", "drain"
+    ]
