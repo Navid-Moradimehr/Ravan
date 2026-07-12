@@ -52,3 +52,11 @@ for deployments that have not populated the catalog.
 Historian Trend has the same catalog-backed selector, so users no longer need
 to discover a tag only through the hierarchy tree. Observability chart cards
 now expose `?` help tips, and Severity Mix renders compact categorical bars.
+
+The Historian Trend selector and Raw Events table selector are searchable
+controls. Historical Trend now uses the responsive Recharts implementation
+used by custom trend panels, with time and value-axis labels, units where
+available, gridlines, and hover tooltips. Custom Dashboard event/statistics
+panels select from the supported historian projections instead of accepting an
+unvalidated table-name string. Panel titles remain free text because they are
+operator labels rather than data references.

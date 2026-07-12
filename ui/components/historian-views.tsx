@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Activity, AlertTriangle, ChevronDown, ChevronUp, Clock3, Database, FolderTree, Play, RefreshCcw, Square, TrendingUp } from "lucide-react";
+import { CartesianGrid, Label, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,8 @@ import { requestJson } from "@/lib/http";
 import { formatErrorMessage } from "@/lib/http";
 import { showToast } from "@/components/toaster";
 import { HelpTip } from "@/components/help-tip";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { SearchableSelect } from "@/components/searchable-select";
 
 type RefreshOption = {
   label: string;
@@ -122,28 +125,24 @@ function RefreshMenu({
   );
 }
 
-function TrendChart({ data }: { data: { time: string; value: number }[] }) {
+function TrendChart({ data, tag, unit }: { data: { time: string; value: number }[]; tag: string; unit?: string }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
-  const values = data.map((d) => d.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const width = 400;
-  const height = 120;
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((d.value - min) / range) * height;
-    return `${x},${y}`;
-  }).join(" ");
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-32">
-      <polyline fill="none" stroke="var(--accent)" strokeWidth={2} points={points} />
-      {data.map((d, i) => {
-        const x = (i / (data.length - 1)) * width;
-        const y = height - ((d.value - min) / range) * height;
-        return <circle key={i} cx={x} cy={y} r={3} fill="var(--accent)" />;
-      })}
-    </svg>
+    <ChartContainer config={{ value: { label: unit ? `${tag} (${unit})` : tag, color: "var(--chart-1)" } }} className="h-[280px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 10, right: 16, left: 10, bottom: 26 }}>
+          <CartesianGrid stroke="var(--color-border-subtle)" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="time" tickFormatter={formatEventTime} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}>
+            <Label value="Time" position="insideBottom" offset={-18} fill="var(--color-text-secondary)" fontSize={11} />
+          </XAxis>
+          <YAxis tickLine={false} axisLine={false} width={52} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}>
+            <Label value={unit ? `${tag} (${unit})` : tag} angle={-90} position="insideLeft" offset={-2} fill="var(--color-text-secondary)" fontSize={11} />
+          </YAxis>
+          <Tooltip content={<ChartTooltipContent indicator="line" labelFormatter={(value) => formatEventTime(value)} />} />
+          <Line type="monotone" dataKey="value" name={unit ? `${tag} (${unit})` : tag} stroke="var(--chart-1)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartContainer>
   );
 }
 
@@ -436,24 +435,23 @@ export function HistorianDashboard() {
           <CardContent className="p-4">
             <label className="mb-4 block space-y-1.5 text-xs font-medium text-text-secondary">
               <span>Asset tag</span>
-              <select
-                className="app-select"
-                value={selectedAsset ? `${selectedAsset.assetId}::${selectedAsset.tag}` : "::"}
-                onChange={(event) => {
-                  const [assetId, tag] = event.target.value.split("::");
+              <SearchableSelect
+                value={selectedAsset ? `${selectedAsset.assetId}::${selectedAsset.tag}` : ""}
+                onChange={(value) => {
+                  const [assetId, tag] = value.split("::");
                   setSelectedAsset(assetId && tag ? { assetId, tag } : null);
                 }}
+                placeholder="Select an asset tag"
+                searchPlaceholder="Search assets and tags..."
                 disabled={catalogQuery.isLoading}
-              >
-                <option value="::">Select an asset tag</option>
-                {(catalogQuery.data?.items ?? []).map((item) => (
-                  <option key={`${item.site_id}::${item.asset_id}::${item.tag}`} value={`${item.asset_id}::${item.tag}`}>
-                    {item.site_id} / {item.asset_name} / {item.tag} ({item.source})
-                  </option>
-                ))}
-              </select>
+                options={(catalogQuery.data?.items ?? []).map((item) => ({
+                  value: `${item.asset_id}::${item.tag}`,
+                  label: `${item.site_id} / ${item.asset_name} / ${item.tag} (${item.source})`,
+                  searchText: `${item.site_id} ${item.asset_id} ${item.asset_name} ${item.tag} ${item.source}`,
+                }))}
+              />
             </label>
-            {selectedAsset ? (trendQuery.isLoading ? <Skeleton className="h-32 w-full bg-surface-2" /> : <TrendChart data={trendQuery.data?.map((d: any) => ({ time: d.time, value: d.value })) ?? []} />) : (
+            {selectedAsset ? (trendQuery.isLoading ? <Skeleton className="h-64 w-full bg-surface-2" /> : <TrendChart data={trendQuery.data?.map((d: any) => ({ time: d.time, value: d.value })) ?? []} tag={selectedAsset.tag} unit={catalogQuery.data?.items.find((item) => item.asset_id === selectedAsset.assetId && item.tag === selectedAsset.tag)?.unit} />) : (
               <p className="py-8 text-center text-sm text-text-secondary">Select a tag above or click one in the asset hierarchy to view its trend.</p>
             )}
           </CardContent>
@@ -582,16 +580,18 @@ export function HistorianDashboard() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="inline-flex h-9 w-full max-w-[12rem] items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{selectedTable === "industrial_events" ? "Industrial" : selectedTable === "processed_events" ? "Processed" : "AI Enriched"}</button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setSelectedTable("industrial_events")}>Industrial</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedTable("processed_events")}>Processed</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedTable("ai_enriched")}>AI Enriched</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <SearchableSelect
+              value={selectedTable}
+              onChange={setSelectedTable}
+              placeholder="Select historian table"
+              searchPlaceholder="Search historian tables..."
+              className="w-full max-w-[16rem]"
+              options={[
+                { value: "industrial_events", label: "Industrial events", searchText: "raw telemetry industrial" },
+                { value: "processed_events", label: "Processed events", searchText: "normalized scored" },
+                { value: "ai_enriched", label: "AI-enriched events", searchText: "predictions summaries" },
+              ]}
+            />
         </div>
           <Table>
             <TableHeader>

@@ -42,14 +42,18 @@ pipeline or read Kafka directly from the browser.
 
 ## Panel Configuration
 
-For a trend panel, select a configured asset tag and choose a time window in
-hours. If the asset registry has no tags, enter the historian row's asset ID and
-tag manually. The values must match the historian data; the dashboard does not
-guess a tag from arbitrary rows.
+For a trend panel, search the configured asset-tag selector by site, asset, tag,
+or source and choose a time window in hours. If the asset registry has no tags,
+the manual asset ID and tag fields remain available as a deployment fallback.
+The values must match the historian data; the dashboard does not guess a tag
+from arbitrary rows.
 
-For an events or statistics panel, enter the historian table name. The default
-is `industrial_events`. The panel samples the newest rows and refreshes them
-according to its refresh setting.
+For an events or statistics panel, choose a historian table from the searchable
+catalog. The current supported projections are `industrial_events`,
+`processed_events`, and `ai_enriched`; the default is `industrial_events`. The
+panel samples the newest rows and refreshes them according to its refresh
+setting. Panel titles intentionally remain free-text because they are labels
+chosen by the operator, not dataset identifiers.
 
 Alarm rows include the timestamp, asset, tag, triggering value and unit when
 the processed historian row contains them, severity, and acknowledgement

@@ -21,3 +21,14 @@ from the registry plus the observed asset/tag catalog. Selecting a value there
 or clicking a tag in Asset Hierarchy drives the same historian query. If the
 selector is empty, start normalized fan-out or run the bounded catalog
 reconciliation endpoint described in the threshold policy guide.
+
+The selector is searchable: type a site, asset ID, asset name, tag, or source
+to narrow the candidates. The rendered trend is a responsive line chart with a
+`Time` x-axis, the selected tag and unit on the y-axis, gridlines, and a hover
+tooltip. If the catalog has no unit, the tag name is used as the value-axis
+label.
+
+The Raw Events table also has a searchable selector for the supported historian
+projections: `industrial_events`, `processed_events`, and `ai_enriched`. This
+selection is intentionally limited to the historian API contract and does not
+scan arbitrary database tables.

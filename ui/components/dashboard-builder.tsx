@@ -45,6 +45,7 @@ import {
   type ObservabilitySnapshot,
 } from "@/lib/api";
 import { formatErrorMessage } from "@/lib/http";
+import { SearchableSelect } from "@/components/searchable-select";
 
 export type PanelType = "trend" | "alarms" | "events" | "stats" | "observability";
 
@@ -62,6 +63,12 @@ export interface DashboardPanel {
 }
 
 const STORAGE_KEY = "lse.historian.custom-dashboard.v2";
+
+const HISTORIAN_TABLE_OPTIONS = [
+  { value: "industrial_events", label: "Industrial events", searchText: "raw telemetry industrial" },
+  { value: "processed_events", label: "Processed events", searchText: "normalized scored" },
+  { value: "ai_enriched", label: "AI-enriched events", searchText: "predictions summaries" },
+];
 
 const PANEL_TYPES: { type: PanelType; label: string; description: string }[] = [
   { type: "trend", label: "Historian trend", description: "Plot one asset tag over a selected time window." },
@@ -231,7 +238,7 @@ function PanelSettings({ panel, assets, onConfigChange, onTitleChange }: { panel
   return <div className="grid gap-3 rounded-lg border border-border-subtle bg-surface-2 p-3 sm:grid-cols-2">
     <label className="space-y-1 text-xs text-text-secondary"><span>Panel title</span><Input value={panel.title} onChange={(event) => onTitleChange(event.target.value)} /></label>
     {panel.type === "trend" ? <div className="space-y-2"><label className="space-y-1 text-xs text-text-secondary"><span>Asset tag</span><select value={`${panel.config.asset_id}::${panel.config.tag}`} onChange={(event) => { const [asset_id, tag] = event.target.value.split("::"); update({ asset_id, tag }); }} className="app-select"><option value="::">Select a configured asset tag</option>{assets.map((item) => <option key={`${item.asset_id}::${item.tag}`} value={`${item.asset_id}::${item.tag}`}>{item.label}</option>)}</select></label><div className="grid gap-2 sm:grid-cols-2"><Input aria-label="Manual asset id" placeholder="Asset ID" value={panel.config.asset_id} onChange={(event) => update({ asset_id: event.target.value })} /><Input aria-label="Manual tag" placeholder="Tag" value={panel.config.tag} onChange={(event) => update({ tag: event.target.value })} /></div><p className="text-[11px] leading-4 text-text-secondary">Use manual values when the observed catalog is not populated yet. They must match historian rows.</p></div> : null}
-    {panel.type === "events" || panel.type === "stats" ? <label className="space-y-1 text-xs text-text-secondary"><span>Historian table</span><Input value={panel.config.table} onChange={(event) => update({ table: event.target.value })} /></label> : null}
+    {panel.type === "events" || panel.type === "stats" ? <label className="space-y-1 text-xs text-text-secondary"><span>Historian table</span><SearchableSelect value={panel.config.table} options={HISTORIAN_TABLE_OPTIONS} onChange={(table) => update({ table })} placeholder="Select historian table" searchPlaceholder="Search historian tables..." /><p className="text-[11px] leading-4 text-text-secondary">Choose the historian table sampled by this panel. Panel title remains editable text because it is your operator label.</p></label> : null}
     {panel.type === "trend" ? <label className="space-y-1 text-xs text-text-secondary"><span>Hours</span><Input type="number" min={1} max={168} value={panel.config.hours} onChange={(event) => update({ hours: Math.max(1, Number(event.target.value) || 1) })} /></label> : null}
     <label className="space-y-1 text-xs text-text-secondary"><span>Refresh seconds, 0 pauses</span><Input type="number" min={0} max={3600} value={panel.config.refresh_seconds} onChange={(event) => update({ refresh_seconds: Math.max(0, Number(event.target.value) || 0) })} /></label>
   </div>;
