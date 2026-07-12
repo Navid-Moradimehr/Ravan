@@ -282,6 +282,39 @@ def evaluate_threshold(value: float, policy: dict[str, Any], *, quality: str = "
     return {"severity": severity, "status": "breached" if severity != "normal" else "normal", "breached": severity != "normal"}
 
 
+def transition_threshold_state(
+    previous_severity: str,
+    candidate_since: float | None,
+    value: float,
+    policy: dict[str, Any],
+    *,
+    quality: str = "good",
+    now: float | None = None,
+) -> tuple[dict[str, Any], str | None, float | None]:
+    """Evaluate one transition using caller-owned state.
+
+    The returned state can be stored in Python memory or Flink keyed state.
+    """
+    instant = evaluate_threshold(value, policy, quality=quality)
+    candidate = str(instant["severity"])
+    deadband = float(policy.get("deadband", 0) or 0)
+    if candidate == "normal" and previous_severity != "normal" and deadband:
+        near_boundary = any(
+            bound is not None and abs(value - float(bound)) <= deadband
+            for bound in (policy.get("warning_low"), policy.get("warning_high"))
+        )
+        if near_boundary:
+            candidate = previous_severity
+    if candidate == previous_severity:
+        return {"severity": previous_severity, "status": "breached" if previous_severity != "normal" else instant["status"], "breached": previous_severity != "normal"}, None, None
+    delay = float(policy.get("off_delay_seconds" if candidate == "normal" else "on_delay_seconds", 0) or 0)
+    clock = time.monotonic() if now is None else now
+    since = clock if candidate_since is None else candidate_since
+    if delay > 0 and clock - since < delay:
+        return {"severity": previous_severity, "status": "pending", "breached": previous_severity != "normal"}, candidate, since
+    return {"severity": candidate, "status": "breached" if candidate != "normal" else "normal", "breached": candidate != "normal"}, None, None
+
+
 def evaluate_threshold_runtime(
     key: str,
     value: float,
@@ -292,30 +325,23 @@ def evaluate_threshold_runtime(
 ) -> dict[str, Any]:
     """Apply optional deadband and transition delays in the local runtime.
 
-    This is deliberately process-local for the Python fallback. A distributed
-    Flink deployment must move the same state machine into keyed state before
-    claiming cross-worker alarm lifecycle guarantees.
+    This is the process-local adapter for the Python fallback. The distributed
+    Flink adapter calls ``transition_threshold_state`` directly and stores its
+    returned state in keyed state.
     """
     instant = evaluate_threshold(value, policy, quality=quality)
     previous = _RUNTIME_STATE.get(key, {"severity": "normal", "candidate": None, "since": None})
     previous_severity = str(previous.get("severity", "normal"))
     candidate = str(instant["severity"])
     deadband = float(policy.get("deadband", 0) or 0)
-    if candidate == "normal" and previous_severity != "normal" and deadband:
-        bounds = [policy.get("warning_low"), policy.get("warning_high")]
-        near_boundary = any(bound is not None and abs(value - float(bound)) <= deadband for bound in bounds)
-        if near_boundary:
-            candidate = previous_severity
-    delay = float(policy.get("off_delay_seconds" if candidate == "normal" else "on_delay_seconds", 0) or 0)
     clock = time.monotonic() if now is None else now
-    if candidate != previous_severity and delay > 0:
-        if previous.get("candidate") != candidate:
-            previous = {"severity": previous_severity, "candidate": candidate, "since": clock}
-        elif clock - float(previous.get("since") or clock) < delay:
-            return {
-                "severity": previous_severity,
-                "status": "pending",
-                "breached": previous_severity != "normal",
-            }
-    _RUNTIME_STATE[key] = {"severity": candidate, "candidate": None, "since": None}
-    return {"severity": candidate, "status": "breached" if candidate != "normal" else "normal", "breached": candidate != "normal"}
+    result, next_candidate, next_since = transition_threshold_state(
+        previous_severity,
+        previous.get("since") if previous.get("candidate") == candidate else None,
+        value,
+        policy,
+        quality=quality,
+        now=clock,
+    )
+    _RUNTIME_STATE[key] = {"severity": result["severity"], "candidate": next_candidate, "since": next_since}
+    return result

@@ -44,6 +44,7 @@ except ModuleNotFoundError:  # pragma: no cover - repo/test environments without
 from services.common.brokers import resolve_kafka_brokers
 
 from services.common.runtime_event import RuntimeEventRecord
+from services.common.threshold_policy import resolve_threshold_policy, transition_threshold_state
 from services.common.stream_scope import stream_partition_key
 from dataclasses import dataclass
 from services.processor.runtime_pipeline import build_runtime_event_payload
@@ -175,6 +176,9 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
         self._sample_state = None
         self._temperature_sum_state = None
         self._vibration_sum_state = None
+        self._threshold_severity_state = None
+        self._threshold_candidate_state = None
+        self._threshold_since_state = None
 
     def open(self, runtime_context) -> None:  # type: ignore[override]
         self._sample_state = runtime_context.get_list_state(
@@ -185,6 +189,15 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
         )
         self._vibration_sum_state = runtime_context.get_state(
             ValueStateDescriptor("industrial_vibration_sum", Types.FLOAT())
+        )
+        self._threshold_severity_state = runtime_context.get_state(
+            ValueStateDescriptor("industrial_threshold_severity", Types.STRING())
+        )
+        self._threshold_candidate_state = runtime_context.get_state(
+            ValueStateDescriptor("industrial_threshold_candidate", Types.STRING())
+        )
+        self._threshold_since_state = runtime_context.get_state(
+            ValueStateDescriptor("industrial_threshold_candidate_since", Types.FLOAT())
         )
 
     def process_element(self, value: str, ctx) -> Iterable[str]:  # type: ignore[override]
@@ -225,11 +238,31 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
         window_size = len(samples)
         temperature_avg = temperature_sum / window_size if window_size else 0.0
         vibration_avg = vibration_sum / window_size if window_size else 0.0
+        policy = resolve_threshold_policy(event.site_id, event.asset_id, event.tag)
+        previous_severity = self._threshold_severity_state.value() or "normal"
+        candidate = self._threshold_candidate_state.value()
+        candidate_since = self._threshold_since_state.value()
+        threshold_result, next_candidate, next_since = transition_threshold_state(
+            previous_severity,
+            candidate_since if candidate else None,
+            event.value,
+            policy,
+            quality=event.quality,
+            now=ctx.timer_service().current_processing_time() / 1000.0,
+        )
+        self._threshold_severity_state.update(str(threshold_result["severity"]))
+        if next_candidate:
+            self._threshold_candidate_state.update(next_candidate)
+            self._threshold_since_state.update(float(next_since or 0))
+        else:
+            self._threshold_candidate_state.clear()
+            self._threshold_since_state.clear()
         payload = build_runtime_event_payload(
             event,
             temperature_avg_c=temperature_avg,
             vibration_avg_mm_s=vibration_avg,
             window_size=window_size,
+            threshold_result=threshold_result,
         )
         yield json.dumps(payload, separators=(",", ":"))
 

@@ -27,6 +27,7 @@ def build_runtime_event_payload(
     temperature_avg_c: float,
     vibration_avg_mm_s: float,
     window_size: int,
+    threshold_result: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Apply the shared runtime enrichment contract and return the serialized payload.
 
@@ -40,6 +41,7 @@ def build_runtime_event_payload(
         temperature_avg_c=temperature_avg_c,
         vibration_avg_mm_s=vibration_avg_mm_s,
         window_size=window_size,
+        threshold_result=threshold_result,
     )
     payload = event.to_dict()
     payload["temperature_avg_c"] = result.temperature_avg_c
@@ -61,15 +63,13 @@ def enrich_runtime_event(
     temperature_avg_c: float,
     vibration_avg_mm_s: float,
     window_size: int,
+    threshold_result: dict[str, object] | None = None,
 ) -> RuntimeEnrichmentResult:
     anomaly_score = score_event(event, temperature_avg_c, vibration_avg_mm_s)
     anomaly_severity = severity_for(anomaly_score)
     policy = resolve_threshold_policy(event.site_id, event.asset_id, event.tag)
-    threshold = evaluate_threshold_runtime(
-        f"{event.site_id}:{event.asset_id}:{event.tag}",
-        event.value,
-        policy,
-        quality=event.quality,
+    threshold = threshold_result or evaluate_threshold_runtime(
+        f"{event.site_id}:{event.asset_id}:{event.tag}", event.value, policy, quality=event.quality
     )
     severity_rank = {"normal": 0, "warning": 1, "critical": 2}
     severity = max((anomaly_severity, threshold["severity"]), key=lambda item: severity_rank[item])

@@ -27,6 +27,10 @@ class ThresholdPolicyRequest(BaseModel):
     source: str = "user"
 
 
+class ThresholdPolicyImportRequest(BaseModel):
+    policies: list[ThresholdPolicyRequest] = Field(default_factory=list)
+
+
 router = APIRouter(prefix="/api/v1/metadata", tags=["threshold-policies"])
 
 
@@ -41,3 +45,16 @@ async def put_threshold_policy(request: ThresholdPolicyRequest) -> dict[str, Any
         return {"ok": True, "policy": upsert_threshold_policy(request.model_dump())}
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/threshold-policies/import")
+async def import_threshold_policies(request: ThresholdPolicyImportRequest) -> dict[str, Any]:
+    imported: list[dict[str, Any]] = []
+    try:
+        for item in request.policies:
+            payload = item.model_dump()
+            payload["source"] = "external_import"
+            imported.append(upsert_threshold_policy(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"ok": True, "imported": imported, "count": len(imported)}

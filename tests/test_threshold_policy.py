@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from services.common.threshold_policy import evaluate_threshold, validate_policy
+from services.common.threshold_policy import evaluate_threshold, transition_threshold_state, validate_policy
 
 
 def test_outside_range_policy_prioritizes_critical_over_warning() -> None:
@@ -38,3 +38,18 @@ def test_invalid_policy_is_rejected() -> None:
         assert "warning_low" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("invalid range was accepted")
+
+
+def test_transition_state_honors_on_delay_and_clears_after_off_delay() -> None:
+    policy = validate_policy({"mode": "above", "warning_high": 80, "critical_high": 100, "on_delay_seconds": 5, "off_delay_seconds": 3, "enabled": True})
+    first, candidate, since = transition_threshold_state("normal", None, 85, policy, now=100)
+    assert first["severity"] == "normal"
+    assert candidate == "warning"
+    second, candidate, since = transition_threshold_state("normal", since, 85, policy, now=106)
+    assert second["severity"] == "warning"
+    assert candidate is None
+    third, candidate, since = transition_threshold_state("warning", None, 50, policy, now=106)
+    assert third["severity"] == "warning"
+    assert candidate == "normal"
+    fourth, _, _ = transition_threshold_state("warning", since, 50, policy, now=110)
+    assert fourth["severity"] == "normal"

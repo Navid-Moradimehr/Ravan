@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Save } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Save, Upload } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ export function ThresholdPolicyPanel() {
   const [policy, setPolicy] = useState<ThresholdPolicy | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.all([getAssetTagCatalog(), getThresholdPolicies()])
@@ -65,6 +66,25 @@ export function ThresholdPolicyPanel() {
     }
   };
 
+  const importPolicies = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null); setMessage(null);
+    try {
+      const parsed = JSON.parse(await file.text()) as { policies?: ThresholdPolicy[] } | ThresholdPolicy[];
+      const incoming = Array.isArray(parsed) ? parsed : parsed.policies ?? [];
+      if (!incoming.length) throw new Error("The policy file contains no policies.");
+      for (const item of incoming) await saveThresholdPolicy({ ...item, source: "external_import" });
+      const current = await getThresholdPolicies();
+      setPolicies(current.policies);
+      setMessage(`${incoming.length} external policies imported. They now take precedence over manifest defaults.`);
+      if (selectedItem) selectItem(`${selectedItem.site_id}::${selectedItem.asset_id}::${selectedItem.tag}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The policy file could not be imported.");
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };
+
   return <Card className="app-card" id="threshold-policies">
     <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
       <CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="size-4 text-accent" />Alarm and threshold policies <HelpTip label="Threshold policy help" content="Choose a discovered signal, review the registry or imported limits, and save an explicit platform policy. User policies take precedence over imported and manifest defaults. Delays and deadband are stored with the policy for deterministic runtime handling." /></CardTitle>
@@ -74,6 +94,7 @@ export function ThresholdPolicyPanel() {
       {error ? <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm">{error}</p> : null}
       {message ? <p className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">{message}</p> : null}
       <label className="block space-y-1 text-sm"><span className="text-text-secondary">Asset and tag</span><select value={selected} onChange={(event) => selectItem(event.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"><option value="">Select a discovered signal</option>{items.map((item) => <option key={`${item.site_id}::${item.asset_id}::${item.tag}`} value={`${item.site_id}::${item.asset_id}::${item.tag}`}>{item.site_id} / {item.asset_name} / {item.tag} ({item.source})</option>)}</select></label>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-2 px-3 py-2 text-xs text-text-secondary"><span>Import limits exported by a PLC, OPC UA/DCS tool, or approved site workflow as JSON.</span><><input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => importPolicies(event.target.files?.[0])} /><Button type="button" variant="outline" size="sm" onClick={() => importInputRef.current?.click()}><Upload className="mr-2 size-4" />Import JSON</Button></></div>
       {policy ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-1 text-xs text-text-secondary"><span>Mode</span><select value={policy.mode} onChange={(event) => update({ mode: event.target.value as ThresholdPolicy["mode"] })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"><option value="outside_range">Outside range</option><option value="above">Above</option><option value="below">Below</option><option value="between_range">Between range</option><option value="bad_quality">Bad quality</option></select></label>
         {(["warning_low", "warning_high", "critical_low", "critical_high"] as const).map((field) => <label key={field} className="space-y-1 text-xs text-text-secondary"><span>{field.replaceAll("_", " ")}</span><Input type="number" value={policy[field] ?? ""} onChange={(event) => update({ [field]: event.target.value === "" ? null : Number(event.target.value) })} /></label>)}

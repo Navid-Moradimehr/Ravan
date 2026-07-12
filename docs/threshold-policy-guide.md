@@ -34,9 +34,20 @@ yet produced an event may still be added to `config/assets.yaml` first.
 The supported modes are `outside_range`, `above`, `below`, `between_range`, and
 `bad_quality`. `deadband`, `on_delay_seconds`, and `off_delay_seconds` are
 available to avoid alarm chatter. The Python fallback applies these lifecycle
-controls in process-local state. A production Flink deployment must implement
-the same state machine as keyed state before claiming alarm lifecycle
-continuity across worker restarts or rescaling.
+controls in process-local state, and the Flink job now stores the same
+transition state per keyed asset/tag stream with checkpoints. This means the
+distributed path can preserve the lifecycle state across normal Flink
+restarts when checkpoint storage is configured correctly.
+
+## Importing external limits
+
+An operator can import a JSON array from an approved PLC, OPC UA/DCS export, or
+site engineering workflow using **Import JSON** in the policy panel. The file
+can be either an array of policy objects or `{ "policies": [...] }`. Each
+object must contain `site_id`, `asset_id`, `tag`, and the limit fields. The
+platform marks imported rows as `source: external_import`; a later explicit
+operator save still takes precedence. The generic import does not guess vendor
+semantics or write anything back to equipment.
 
 ## Discovery and caching
 

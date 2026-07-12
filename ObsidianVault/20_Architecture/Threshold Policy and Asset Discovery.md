@@ -7,7 +7,9 @@
 - Threshold policy table and API: implemented.
 - Operator policy editor: implemented on Integrations.
 - Full historical catalog reconciliation: implemented as a bounded operator API.
-- Distributed alarm lifecycle state in Flink keyed state: follow-up hardening.
+- Distributed alarm lifecycle state in Flink keyed state: implemented with
+  checkpointed value state.
+- External limit import: implemented through the Integrations JSON importer.
 
 ## Connections
 
