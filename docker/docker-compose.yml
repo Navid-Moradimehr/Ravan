@@ -558,6 +558,9 @@ services:
         -c "CREATE UNIQUE INDEX IF NOT EXISTS industrial_events_event_id_uniq ON industrial_events (time, event_id);"
         -c "CREATE UNIQUE INDEX IF NOT EXISTS processed_events_event_id_uniq ON processed_events (time, event_id);"
         -c "CREATE UNIQUE INDEX IF NOT EXISTS dead_letter_events_event_id_uniq ON dead_letter_events (time, event_id);"
+        -c "CREATE TABLE IF NOT EXISTS metadata_asset_tags (site_id TEXT NOT NULL, asset_id TEXT NOT NULL, tag TEXT NOT NULL, unit TEXT, source TEXT NOT NULL DEFAULT 'observed', first_seen TIMESTAMPTZ, last_seen TIMESTAMPTZ, active BOOLEAN NOT NULL DEFAULT TRUE, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (site_id, asset_id, tag));"
+        -c "CREATE INDEX IF NOT EXISTS metadata_asset_tags_lookup_idx ON metadata_asset_tags (site_id, asset_id, tag);"
+        -c "CREATE INDEX IF NOT EXISTS metadata_asset_tags_updated_idx ON metadata_asset_tags (updated_at DESC);"
 
 
   redis:

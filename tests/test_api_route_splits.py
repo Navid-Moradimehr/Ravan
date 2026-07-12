@@ -32,6 +32,7 @@ def test_split_domain_routes_registered():
         "/api/v1/metadata",
         "/api/v1/metadata/federation",
         "/api/v1/metadata/assets",
+        "/api/v1/metadata/asset-tags",
         "/api/v1/metadata/events",
         "/api/v1/metadata/governance",
         "/api/v1/metadata/operational",

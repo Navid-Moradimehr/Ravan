@@ -32,6 +32,12 @@ class TimescaleHistorianSink:
             return 0
         try:
             historian_client.insert_industrial_events(events)
+            try:
+                from services.common.asset_tag_catalog import record_observed_asset_tags
+
+                record_observed_asset_tags(events)
+            except Exception as catalog_exc:  # metadata must not block historian delivery
+                logger.warning("asset/tag catalog update failed: %s", catalog_exc)
             return len(events)
         except Exception as exc:
             logger.warning("historian batch insert failed, trying per-event fallback: %s", exc)
@@ -41,6 +47,12 @@ class TimescaleHistorianSink:
             for event in events:
                 try:
                     historian_client.insert_industrial_event(event)
+                    try:
+                        from services.common.asset_tag_catalog import record_observed_asset_tags
+
+                        record_observed_asset_tags([event])
+                    except Exception as catalog_exc:  # metadata must not block historian delivery
+                        logger.warning("asset/tag catalog update failed: %s", catalog_exc)
                     accepted += 1
                 except Exception as inner_exc:  # pragma: no cover - logged failure path
                     logger.warning("historian single-event insert failed: %s", inner_exc)

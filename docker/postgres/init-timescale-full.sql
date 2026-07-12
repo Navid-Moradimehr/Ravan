@@ -1,5 +1,21 @@
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
+CREATE TABLE IF NOT EXISTS metadata_asset_tags (
+    site_id TEXT NOT NULL,
+    asset_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    unit TEXT,
+    source TEXT NOT NULL DEFAULT 'observed',
+    first_seen TIMESTAMPTZ,
+    last_seen TIMESTAMPTZ,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (site_id, asset_id, tag)
+);
+
+CREATE INDEX IF NOT EXISTS metadata_asset_tags_lookup_idx ON metadata_asset_tags (site_id, asset_id, tag);
+CREATE INDEX IF NOT EXISTS metadata_asset_tags_updated_idx ON metadata_asset_tags (updated_at DESC);
+
 CREATE TABLE IF NOT EXISTS industrial_events (
     time TIMESTAMPTZ NOT NULL,
     event_id UUID NOT NULL,
