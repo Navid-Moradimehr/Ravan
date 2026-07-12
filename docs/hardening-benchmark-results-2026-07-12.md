@@ -71,3 +71,9 @@ MirrorMaker deployment, network, lakehouse, PLC, or firewall configuration.
 The stack was restarted before this verification. The migration and topic-init
 containers exited after completing their initialization work, which is expected
 for one-shot jobs.
+
+The live `industrial-soak --smoke` command was also attempted. It exceeded the
+local command timeout during Docker rebuild/reconciliation before producing a
+campaign report; no service failure was observed afterward and the stack
+returned to the healthy state above. The deterministic resilience and
+multi-site campaigns are the completed release-gate results for this session.

@@ -19,3 +19,9 @@ Historian, and Prometheus readiness. The Flink anomaly processor was RUNNING.
 These results validate local contracts and the current simulated deployment.
 They are not a substitute for real PLC, network, Kafka federation, lakehouse,
 or long-duration plant validation.
+
+The Docker-backed `industrial-soak --smoke` attempt exceeded the local command
+timeout during stack rebuild/reconciliation before emitting a report. The
+stack was healthy afterward and the API, dashboard, Prometheus, and Flink
+checks passed. A longer dedicated soak window is still required for a true
+live throughput/restart acceptance result.
