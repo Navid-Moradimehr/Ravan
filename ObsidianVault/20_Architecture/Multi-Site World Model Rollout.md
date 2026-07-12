@@ -24,3 +24,11 @@ Manifest lint also checks identity ownership. Two physical sources may observe
 the same logical `site/asset/tag`, but the manifest must declare that intent in
 a `site_asset_tag` correlation group. This prevents downstream consumers from
 silently treating duplicate PLC/sensor observations as one authoritative value.
+# Local Validation Update
+
+The repository now has a contract-level multi-site simulator. It demonstrates
+the expected edge-to-central behavior with independent per-site spools,
+site-qualified event IDs, outage recovery, normalization, scoring, and
+cross-site isolation checks. The simulator is intentionally separate from the
+live Docker soak path so it can run without real PLCs or a federated Kafka
+cluster.

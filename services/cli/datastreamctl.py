@@ -61,6 +61,9 @@ from services.benchmarks.multi_site_failure import run_benchmark as run_multi_si
 from services.benchmarks.resilience import format_report as format_resilience_report
 from services.benchmarks.resilience import run_campaign as run_resilience_campaign
 from services.benchmarks.resilience import write_report as write_resilience_report
+from services.benchmarks.multi_site_simulator import format_report as format_multi_site_simulation_report
+from services.benchmarks.multi_site_simulator import run_simulation as run_multi_site_simulation
+from services.benchmarks.multi_site_simulator import write_report as write_multi_site_simulation_report
 from services.benchmarks.industrial_soak_runner import format_report as format_industrial_soak_report
 from services.benchmarks.industrial_soak_runner import run_live as run_industrial_soak
 from services.historian.backup import (
@@ -1671,6 +1674,21 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
 
 
 def cmd_benchmark(args: argparse.Namespace) -> int:
+    if args.action == "multi-site-simulation":
+        result = run_multi_site_simulation(
+            sites=args.sites,
+            events_per_site=args.events_per_site,
+            outage_events_per_site=args.outage_events_per_site,
+            spool_root=args.spool_root,
+        )
+        if args.report_dir:
+            write_multi_site_simulation_report(result, args.report_dir)
+        payload = asdict(result)
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print(format_multi_site_simulation_report(result))
+        return 0 if result.passed else 2
     if args.action == "resilience":
         result = run_resilience_campaign(
             events=args.events,
@@ -2696,6 +2714,14 @@ def build_parser() -> argparse.ArgumentParser:
     resilience.add_argument("--report-dir", default=None)
     resilience.add_argument("--json", action="store_true")
     resilience.set_defaults(func=cmd_benchmark)
+    multi_site_simulation = benchmark_sub.add_parser("multi-site-simulation", help="Run a multi-site event, outage, replay, and isolation simulation")
+    multi_site_simulation.add_argument("--sites", type=int, default=3)
+    multi_site_simulation.add_argument("--events-per-site", type=int, default=1000)
+    multi_site_simulation.add_argument("--outage-events-per-site", type=int, default=250)
+    multi_site_simulation.add_argument("--spool-root", default=None)
+    multi_site_simulation.add_argument("--report-dir", default=None)
+    multi_site_simulation.add_argument("--json", action="store_true")
+    multi_site_simulation.set_defaults(func=cmd_benchmark)
     site_profile_matrix = benchmark_sub.add_parser("site-profile-matrix", help="Benchmark real-world simulator runs per site profile")
     site_profile_matrix.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
     site_profile_matrix.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
