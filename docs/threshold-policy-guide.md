@@ -39,6 +39,11 @@ transition state per keyed asset/tag stream with checkpoints. This means the
 distributed path can preserve the lifecycle state across normal Flink
 restarts when checkpoint storage is configured correctly.
 
+The Compose profile defaults Flink to parallelism `1` because its local
+TaskManager exposes two slots and the job uses multiple operators. Set
+`FLINK_PARALLELISM` explicitly only after adding enough TaskManager slots for a
+distributed deployment.
+
 ## Importing external limits
 
 An operator can import a JSON array from an approved PLC, OPC UA/DCS export, or

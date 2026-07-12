@@ -369,7 +369,9 @@ services:
       KAFKA_BROKERS: kafka:9092
       IOT_TOPIC: iot.raw
       PROCESSED_TOPIC: iot.processed
-      FLINK_PARALLELISM: ${FLINK_PARALLELISM:-4}
+      # Single-node Compose has two TaskManager slots. Operators can raise
+      # this explicitly after provisioning enough distributed slots.
+      FLINK_PARALLELISM: ${FLINK_PARALLELISM:-1}
       FLINK_CHECKPOINT_INTERVAL_MS: ${FLINK_CHECKPOINT_INTERVAL_MS:-10000}
 
   prometheus:

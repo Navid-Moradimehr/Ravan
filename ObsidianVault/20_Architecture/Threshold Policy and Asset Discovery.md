@@ -10,6 +10,8 @@
 - Distributed alarm lifecycle state in Flink keyed state: implemented with
   checkpointed value state.
 - External limit import: implemented through the Integrations JSON importer.
+- Single-node Flink capacity default: Compose uses parallelism 1; distributed
+  deployments must size slots before increasing it.
 
 ## Connections
 
