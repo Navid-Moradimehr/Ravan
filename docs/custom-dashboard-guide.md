@@ -36,13 +36,16 @@ pipeline or read Kafka directly from the browser.
    table, or runtime health panel.
 7. Move panels with the up/down buttons or remove them with the `X` button.
 8. Use **Reset layout** to restore the default two-panel layout.
+9. Use **Export JSON** to save a portable dashboard definition.
+10. Use **Import JSON** to load a dashboard definition from another browser or
+    site. Imported files are validated and limited to 20 panels.
 
 ## Panel Configuration
 
 For a trend panel, select a configured asset tag and choose a time window in
-hours. If the asset registry has no tags, the panel remains empty and explains
-that an asset registry entry is required. This is intentional: the dashboard
-does not guess a tag from arbitrary historian rows.
+hours. If the asset registry has no tags, enter the historian row's asset ID and
+tag manually. The values must match the historian data; the dashboard does not
+guess a tag from arbitrary rows.
 
 For an events or statistics panel, enter the historian table name. The default
 is `industrial_events`. The panel samples the newest rows and refreshes them
@@ -55,9 +58,10 @@ Set refresh seconds to `0` to pause polling.
 ## Persistence And Scope
 
 The current builder saves its dashboard definition in the browser's
-`localStorage`. This makes it usable without adding authentication, a new
-database, or a new service. The layout is therefore local to one browser
-profile and is not yet shared between operators, sites, or machines.
+`localStorage` and supports validated JSON export/import. This makes it usable
+without adding authentication, a new database, or a new service. The layout is
+therefore local to one browser profile unless an operator explicitly exports
+and imports it on another system.
 
 Grafana should be used when a dashboard must be centrally managed, shared,
 versioned, or parameterized across sites. A future metadata-backed dashboard
@@ -75,4 +79,3 @@ the platform's user and site identity model is configured.
   unavailable telemetry.
 - Browser-only layout reset: clear the dashboard's local storage or use
   **Reset layout**. This does not delete historian data.
-

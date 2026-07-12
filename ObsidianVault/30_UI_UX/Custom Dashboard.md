@@ -18,10 +18,11 @@ to access Kafka or TimescaleDB directly. Grafana remains the advanced dashboard
 surface for Prometheus variables, transformations, sharing, and centralized
 dashboard administration.
 
-Panel definitions are currently persisted in browser `localStorage`. This is
-deliberate because authentication and multi-user identity are user-owned in the
-open-source deployment model. A future metadata-backed registry can preserve
-the same panel contract for shared site dashboards.
+Panel definitions are currently persisted in browser `localStorage`, with
+validated JSON export/import for moving a layout between browsers or sites.
+This is deliberate because authentication and multi-user identity are
+user-owned in the open-source deployment model. A future metadata-backed
+registry can preserve the same panel contract for shared site dashboards.
 
 ## Verification
 
@@ -30,6 +31,9 @@ the same panel contract for shared site dashboards.
 - Trend panels require an explicit asset/tag from the asset registry.
 - Empty and API-error states are rendered inside the panel instead of showing
   fake data.
+- Trend panels support manual asset/tag values when a site has not populated
+  the asset registry yet.
+- Dashboard JSON import/export is available without server-side identity.
 
 ## Future Extension
 

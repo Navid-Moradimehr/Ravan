@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -83,6 +83,26 @@ const defaultPanels = (): DashboardPanel[] => [
   { id: "stats", type: "stats", title: "Historian overview", config: defaultConfig() },
   { id: "alarms", type: "alarms", title: "Latest alarms", config: defaultConfig() },
 ];
+
+function sanitizePanels(value: unknown): DashboardPanel[] {
+  if (!Array.isArray(value)) throw new Error("Dashboard file must contain a panel array.");
+  const allowed = new Set<PanelType>(PANEL_TYPES.map((item) => item.type));
+  const panels = value.map((item, index) => {
+    if (!item || typeof item !== "object") throw new Error(`Panel ${index + 1} is invalid.`);
+    const candidate = item as Partial<DashboardPanel>;
+    if (!candidate.id || !candidate.title || !candidate.type || !allowed.has(candidate.type)) {
+      throw new Error(`Panel ${index + 1} has an invalid id, title, or type.`);
+    }
+    return {
+      id: String(candidate.id),
+      type: candidate.type,
+      title: String(candidate.title),
+      config: { ...defaultConfig(), ...(candidate.config ?? {}) },
+    } as DashboardPanel;
+  });
+  if (panels.length > 20) throw new Error("Dashboard files may contain at most 20 panels.");
+  return panels;
+}
 
 function formatTime(value: unknown): string {
   if (!value) return "n/a";
@@ -218,11 +238,11 @@ function PanelBody({ panel }: { panel: DashboardPanel }) {
   return <StatsPanel panel={panel} />;
 }
 
-function PanelSettings({ panel, assets, onChange }: { panel: DashboardPanel; assets: Array<{ asset_id: string; tag: string; label: string }>; onChange: (config: DashboardPanel["config"]) => void }) {
-  const update = (patch: Partial<DashboardPanel["config"]>) => onChange({ ...panel.config, ...patch });
+function PanelSettings({ panel, assets, onConfigChange, onTitleChange }: { panel: DashboardPanel; assets: Array<{ asset_id: string; tag: string; label: string }>; onConfigChange: (config: DashboardPanel["config"]) => void; onTitleChange: (title: string) => void }) {
+  const update = (patch: Partial<DashboardPanel["config"]>) => onConfigChange({ ...panel.config, ...patch });
   return <div className="grid gap-3 rounded-lg border border-border-subtle bg-surface-2 p-3 sm:grid-cols-2">
-    <label className="space-y-1 text-xs text-text-secondary"><span>Panel title</span><Input value={panel.title} onChange={(event) => onChange({ ...panel.config, title: event.target.value } as DashboardPanel["config"])} /></label>
-    {panel.type === "trend" ? <label className="space-y-1 text-xs text-text-secondary"><span>Asset tag</span><select value={`${panel.config.asset_id}::${panel.config.tag}`} onChange={(event) => { const [asset_id, tag] = event.target.value.split("::"); update({ asset_id, tag }); }} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"><option value="::">Select a configured asset tag</option>{assets.map((item) => <option key={`${item.asset_id}::${item.tag}`} value={`${item.asset_id}::${item.tag}`}>{item.label}</option>)}</select></label> : null}
+    <label className="space-y-1 text-xs text-text-secondary"><span>Panel title</span><Input value={panel.title} onChange={(event) => onTitleChange(event.target.value)} /></label>
+    {panel.type === "trend" ? <div className="space-y-2"><label className="space-y-1 text-xs text-text-secondary"><span>Asset tag</span><select value={`${panel.config.asset_id}::${panel.config.tag}`} onChange={(event) => { const [asset_id, tag] = event.target.value.split("::"); update({ asset_id, tag }); }} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"><option value="::">Select a configured asset tag</option>{assets.map((item) => <option key={`${item.asset_id}::${item.tag}`} value={`${item.asset_id}::${item.tag}`}>{item.label}</option>)}</select></label><div className="grid gap-2 sm:grid-cols-2"><Input aria-label="Manual asset id" placeholder="Asset ID" value={panel.config.asset_id} onChange={(event) => update({ asset_id: event.target.value })} /><Input aria-label="Manual tag" placeholder="Tag" value={panel.config.tag} onChange={(event) => update({ tag: event.target.value })} /></div><p className="text-[11px] leading-4 text-text-secondary">Use manual values when the asset registry is not populated yet. They must match historian rows.</p></div> : null}
     {panel.type === "events" || panel.type === "stats" ? <label className="space-y-1 text-xs text-text-secondary"><span>Historian table</span><Input value={panel.config.table} onChange={(event) => update({ table: event.target.value })} /></label> : null}
     {panel.type === "trend" ? <label className="space-y-1 text-xs text-text-secondary"><span>Hours</span><Input type="number" min={1} max={168} value={panel.config.hours} onChange={(event) => update({ hours: Math.max(1, Number(event.target.value) || 1) })} /></label> : null}
     <label className="space-y-1 text-xs text-text-secondary"><span>Refresh seconds, 0 pauses</span><Input type="number" min={0} max={3600} value={panel.config.refresh_seconds} onChange={(event) => update({ refresh_seconds: Math.max(0, Number(event.target.value) || 0) })} /></label>
@@ -235,6 +255,7 @@ export function DashboardBuilder() {
   const [editing, setEditing] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const assetsQuery = useQuery({ queryKey: ["custom-dashboard", "assets"], queryFn: getAssetHierarchy });
   const assets = flattenTags(assetsQuery.data ?? []);
 
@@ -242,8 +263,7 @@ export function DashboardBuilder() {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved) as DashboardPanel[];
-        if (Array.isArray(parsed)) setPanels(parsed.map((panel) => ({ ...panel, config: { ...defaultConfig(), ...(panel.config ?? {}) } })));
+        setPanels(sanitizePanels(JSON.parse(saved)));
       }
     } catch {
       setStorageWarning("The saved dashboard could not be loaded. The default layout is being used.");
@@ -279,6 +299,29 @@ export function DashboardBuilder() {
     setShowAdd(false);
     setEditing(id);
   };
+  const exportDashboard = () => {
+    const blob = new Blob([JSON.stringify({ version: 2, panels }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "industrial-dashboard.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  const importDashboard = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        setPanels(sanitizePanels(parsed.panels ?? parsed));
+        setStorageWarning(null);
+      } catch (error) {
+        setStorageWarning(error instanceof Error ? error.message : "Dashboard file could not be imported.");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   return <Card className="app-card">
     <CardHeader className="app-card-header">
@@ -291,12 +334,12 @@ export function DashboardBuilder() {
       <div className="grid gap-4 xl:grid-cols-2">
         {panels.map((panel, index) => <div key={panel.id} className="rounded-xl border border-border-subtle bg-surface-2/60 p-4">
           <div className="mb-3 flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><GripVertical className="size-4 shrink-0 text-text-muted" /><div className="min-w-0"><div className="truncate text-sm font-semibold">{panel.title}</div><div className="text-xs text-text-secondary">{PANEL_TYPES.find((item) => item.type === panel.type)?.description}</div></div></div><div className="flex shrink-0 items-center gap-1"><Button variant="ghost" size="icon-xs" aria-label="Move panel up" disabled={index === 0} onClick={() => movePanel(panel.id, -1)}><ChevronUp className="size-4" /></Button><Button variant="ghost" size="icon-xs" aria-label="Move panel down" disabled={index === panels.length - 1} onClick={() => movePanel(panel.id, 1)}><ChevronDown className="size-4" /></Button><Button variant="ghost" size="icon-xs" aria-label="Configure panel" onClick={() => setEditing(editing === panel.id ? null : panel.id)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-xs" aria-label="Remove panel" onClick={() => savePanels(panels.filter((item) => item.id !== panel.id))}><X className="size-4 text-error" /></Button></div></div>
-          {editing === panel.id ? <PanelSettings panel={panel} assets={assets} onChange={(config) => updatePanel(panel.id, { config, ...(Object.prototype.hasOwnProperty.call(config, "title") ? { title: (config as DashboardPanel["config"] & { title?: string }).title ?? panel.title } : {}) })} /> : null}
+          {editing === panel.id ? <PanelSettings panel={panel} assets={assets} onConfigChange={(config) => updatePanel(panel.id, { config })} onTitleChange={(title) => updatePanel(panel.id, { title })} /> : null}
           <div className="mt-3"><PanelBody panel={panel} /></div>
         </div>)}
       </div>
       {showAdd ? <div className="grid gap-2 rounded-lg border border-border-subtle bg-surface-2 p-3 sm:grid-cols-2 lg:grid-cols-3">{PANEL_TYPES.map((item) => <Button key={item.type} variant="outline" className="h-auto justify-start whitespace-normal p-3 text-left" onClick={() => addPanel(item.type)}><span><span className="block font-medium">{item.label}</span><span className="mt-1 block text-xs font-normal text-text-secondary">{item.description}</span></span></Button>)}</div> : null}
-      <div className="flex flex-wrap items-center gap-2"><Button variant="outline" onClick={() => setShowAdd(!showAdd)}><Plus className="mr-1 size-4" />{showAdd ? "Close panel library" : "Add panel"}</Button><Button variant="ghost" onClick={() => savePanels(defaultPanels())}>Reset layout</Button><span className="text-xs text-text-secondary">Panels query existing platform APIs; no new datasource or storage service is introduced.</span></div>
+      <div className="flex flex-wrap items-center gap-2"><Button variant="outline" onClick={() => setShowAdd(!showAdd)}><Plus className="mr-1 size-4" />{showAdd ? "Close panel library" : "Add panel"}</Button><Button variant="ghost" onClick={() => savePanels(defaultPanels())}>Reset layout</Button><Button variant="ghost" onClick={exportDashboard}>Export JSON</Button><Button variant="ghost" onClick={() => importInputRef.current?.click()}>Import JSON</Button><input ref={importInputRef} type="file" accept="application/json" className="hidden" onChange={(event) => { importDashboard(event.target.files?.[0]); event.currentTarget.value = ""; }} /><span className="text-xs text-text-secondary">Export/import shares a layout without adding server-side identity or permissions.</span></div>
     </CardContent>
   </Card>;
 }
