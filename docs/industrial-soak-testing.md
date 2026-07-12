@@ -55,3 +55,11 @@ be compared as a delivery ratio. The current edge metrics do not expose a
 DLQ-total or delivery-failure counter in this Compose profile, so the report
 records those values as unavailable. A production acceptance gate should add
 those counters before claiming lossless delivery.
+
+The full default campaign on the same date also passed. It ran for 900 seconds,
+generated 102,904 simulator events, observed 109,205 edge events, reached a
+peak lag of 29 messages during the 470 events/sec burst, and returned to 0
+messages after recovery and drain. Peak aggregate container memory was
+6,463.1 MB and the historian write counter increased from 3 to 459. API and AI
+health were healthy at completion. These are local Docker results, not a claim
+of capacity for a production industrial site.

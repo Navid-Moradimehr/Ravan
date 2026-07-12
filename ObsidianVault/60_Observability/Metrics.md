@@ -89,3 +89,10 @@ Latest local Docker smoke (2026-07-12): passed. The rebuilt campaign generated
 0 -> 0, peaked at 6,255.1 MB aggregate container memory, and reported 38
 historian writes at the final snapshot. DLQ and delivery-failure totals remain
 unavailable in the current edge metric surface; they are not treated as zero.
+
+Full default campaign (900 seconds, 2026-07-12): passed. It generated
+102,904 simulator events and observed 109,205 edge events. Peak measured lag
+was 29 messages during the burst and returned to 0 after recovery/drain.
+Peak aggregate container memory was 6,463.1 MB; historian writes increased
+from 3 to 459. This is a local Docker benchmark, not a production capacity
+claim. DLQ/delivery-failure counters remain a release-hardening gap.
