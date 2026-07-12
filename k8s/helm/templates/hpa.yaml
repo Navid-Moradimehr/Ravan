@@ -102,7 +102,7 @@ spec:
 
 ---
 {{- /* Flink Job HPA */ -}}
-{{- if and .Values.flinkJob.enabled .Values.autoScaling.flinkJob.enabled (or (eq $runtimeMode "flink-local") (eq $runtimeMode "flink-production")) }}
+{{- if and .Values.flinkJob.enabled .Values.autoScaling.flinkJob.enabled (eq .Values.flinkJob.autoscaling.mode "hpa") (or (eq $runtimeMode "flink-local") (eq $runtimeMode "flink-production")) }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:

@@ -9,3 +9,14 @@ data:
 {{- range $key, $value := .Values.env }}
   {{ $key }}: {{ $value | quote }}
 {{- end }}
+  FLINK_CAPACITY_AUTOSCALING_MODE: {{ .Values.flinkJob.autoscaling.mode | quote }}
+  FLINK_CAPACITY_PARALLELISM: {{ .Values.flinkJob.capacity.parallelism | quote }}
+  FLINK_CAPACITY_MAX_PARALLELISM: {{ .Values.flinkJob.capacity.maxParallelism | quote }}
+  FLINK_CAPACITY_TASKMANAGER_SLOTS: {{ .Values.flinkJob.capacity.taskmanagerSlots | quote }}
+  FLINK_CAPACITY_TASKMANAGER_REPLICAS: {{ .Values.flinkJob.capacity.taskmanagerReplicas | quote }}
+  FLINK_OPERATOR_ENABLED: {{ .Values.flinkJob.operator.enabled | quote }}
+  FLINK_OPERATOR_AUTOSCALER_ENABLED: {{ .Values.flinkJob.operator.autoscalerEnabled | quote }}
+  FLINK_OPERATOR_TARGET_UTILIZATION: {{ .Values.flinkJob.operator.targetUtilization | quote }}
+  FLINK_OPERATOR_CATCH_UP_DURATION: {{ .Values.flinkJob.operator.catchUpDuration | quote }}
+  FLINK_OPERATOR_METRICS_WINDOW: {{ .Values.flinkJob.operator.metricsWindow | quote }}
+  FLINK_OPERATOR_STABILIZATION_INTERVAL: {{ .Values.flinkJob.operator.stabilizationInterval | quote }}

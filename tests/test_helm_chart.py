@@ -64,6 +64,7 @@ def test_hpa_template_exists():
     assert "processor" in content
     assert "flink-job" in content
     assert "edge-ingest" in content
+    assert 'flinkJob.autoscaling.mode "hpa"' in content
 
 
 def test_helm_values_include_autoscaling():
@@ -72,6 +73,9 @@ def test_helm_values_include_autoscaling():
     assert "minReplicas:" in values
     assert "maxReplicas:" in values
     assert "targetCPUUtilizationPercentage:" in values
+    assert "mode: operator" in values
+    assert "maxParallelism:" in values
+    assert "taskmanagerSlots:" in values
 
 
 def test_helm_values_include_namespace_override():

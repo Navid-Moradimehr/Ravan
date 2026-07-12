@@ -58,6 +58,24 @@ processor:
 flinkJob:
   enabled: false
   replicaCount: 1
+  autoscaling:
+    mode: operator
+  capacity:
+    parallelism: 1
+    maxParallelism: 120
+    taskmanagerSlots: 1
+    taskmanagerReplicas: 1
+  operator:
+    enabled: false
+    autoscalerEnabled: false
+    minParallelism: 1
+    maxParallelism: 120
+    targetUtilization: 0.7
+    catchUpDuration: 10m
+    metricsWindow: 15m
+    stabilizationInterval: 5m
+    checkpointDir: ""
+    savepointDir: ""
   resources:
     limits:
       cpu: 1000m
@@ -144,6 +162,9 @@ env:
   LLM_ENDPOINT_URL: "http://host.docker.internal:1234/v1"
   LLM_MODEL_ID: "openai/gpt-oss-20B"
   LLM_LOCAL_ONLY: "true"
+  FLINK_PARALLELISM: "1"
+  FLINK_MAX_PARALLELISM: "120"
+  FLINK_TASKMANAGER_SLOTS: "1"
   # Protocol TLS (optional)
   MQTT_CA_CERT: ""
   MQTT_CERTFILE: ""
