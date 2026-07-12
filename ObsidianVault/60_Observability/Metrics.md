@@ -96,3 +96,14 @@ was 29 messages during the burst and returned to 0 after recovery/drain.
 Peak aggregate container memory was 6,463.1 MB; historian writes increased
 from 3 to 459. This is a local Docker benchmark, not a production capacity
 claim. DLQ/delivery-failure counters remain a release-hardening gap.
+# Local Resilience Campaign
+
+The repository now has a deterministic broker-free resilience campaign at
+`datastreamctl benchmark resilience`. It exercises the canonical validator and
+edge disk spool with malformed events, duplicate identities, out-of-order
+timestamps, a simulated outage, and replay recovery. It reports unaccounted
+events, queued/replayed records, pending spool records, and peak memory.
+
+This complements, rather than replaces, the Docker-backed industrial soak
+campaign. The local campaign validates accounting and recovery contracts; the
+Docker campaign validates service, broker, historian, and container behavior.

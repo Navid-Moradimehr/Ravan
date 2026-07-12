@@ -58,6 +58,9 @@ from services.benchmarks.site_profile_matrix import format_result as format_site
 from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
 from services.benchmarks.multi_site_failure import format_result as format_multi_site_failure_result
 from services.benchmarks.multi_site_failure import run_benchmark as run_multi_site_failure_benchmark
+from services.benchmarks.resilience import format_report as format_resilience_report
+from services.benchmarks.resilience import run_campaign as run_resilience_campaign
+from services.benchmarks.resilience import write_report as write_resilience_report
 from services.benchmarks.industrial_soak_runner import format_report as format_industrial_soak_report
 from services.benchmarks.industrial_soak_runner import run_live as run_industrial_soak
 from services.historian.backup import (
@@ -1649,6 +1652,23 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
 
 
 def cmd_benchmark(args: argparse.Namespace) -> int:
+    if args.action == "resilience":
+        result = run_resilience_campaign(
+            events=args.events,
+            outage_events=args.outage_events,
+            malformed_every=args.malformed_every,
+            duplicate_every=args.duplicate_every,
+            out_of_order_every=args.out_of_order_every,
+            spool_dir=args.spool_dir,
+        )
+        if args.report_dir:
+            write_resilience_report(result, args.report_dir)
+        payload = asdict(result)
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print(format_resilience_report(result))
+        return 0 if result.passed else 2
     if args.action == "industrial-soak":
         report = run_industrial_soak(
             Path(args.scenario),
@@ -2640,6 +2660,16 @@ def build_parser() -> argparse.ArgumentParser:
     industrial_soak.add_argument("--report-dir", default=None)
     industrial_soak.add_argument("--json", action="store_true")
     industrial_soak.set_defaults(func=cmd_benchmark)
+    resilience = benchmark_sub.add_parser("resilience", help="Run a deterministic local fault-injection and recovery campaign")
+    resilience.add_argument("--events", type=int, default=10_000)
+    resilience.add_argument("--outage-events", type=int, default=2_000)
+    resilience.add_argument("--malformed-every", type=int, default=97)
+    resilience.add_argument("--duplicate-every", type=int, default=113)
+    resilience.add_argument("--out-of-order-every", type=int, default=71)
+    resilience.add_argument("--spool-dir", default=None)
+    resilience.add_argument("--report-dir", default=None)
+    resilience.add_argument("--json", action="store_true")
+    resilience.set_defaults(func=cmd_benchmark)
     site_profile_matrix = benchmark_sub.add_parser("site-profile-matrix", help="Benchmark real-world simulator runs per site profile")
     site_profile_matrix.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
     site_profile_matrix.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
