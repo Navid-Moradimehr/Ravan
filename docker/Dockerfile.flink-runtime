@@ -8,6 +8,7 @@ RUN apt-get update \
     && ln -sf /usr/bin/python3 /usr/local/bin/python \
     && cp /opt/flink/opt/flink-python-1.20.0.jar /opt/flink/lib/flink-python-1.20.0.jar \
     && python3 -c "import zipfile; zipfile.ZipFile('/opt/flink/opt/python/pyflink.zip').extractall('/opt/flink/opt/python')" \
+    && chmod +x /opt/flink/opt/python/pyflink/bin/pyflink-udf-runner.sh \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONPATH=/opt/flink/opt/python:/opt/flink/opt/python/py4j-0.10.9.7-src.zip
