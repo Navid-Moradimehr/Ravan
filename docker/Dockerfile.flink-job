@@ -5,7 +5,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl python3 python3-pip \
     && curl -fsSL https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/3.3.0-1.20/flink-connector-kafka-3.3.0-1.20.jar -o /opt/flink/lib/flink-connector-kafka-3.3.0-1.20.jar \
     && curl -fsSL https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.8.1/kafka-clients-3.8.1.jar -o /opt/flink/lib/kafka-clients-3.8.1.jar \
-    && python3 -m pip install --no-cache-dir protobuf ruamel.yaml \
+    && python3 -m pip install --no-cache-dir protobuf ruamel.yaml PyYAML \
     && ln -sf /usr/bin/python3 /usr/local/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
