@@ -16,7 +16,7 @@ from typing import Any
 
 from services.benchmarks.industrial_soak import IndustrialSoakScenario, SoakPhase, load_scenario
 
-METRIC_RE = re.compile(r"^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{[^}]*\})?\s+([-+0-9.eE]+)$")
+METRIC_RE = re.compile(r"^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{([^}]*)\})?\s+([-+0-9.eE]+)$")
 
 
 @dataclass(frozen=True)
@@ -81,7 +81,7 @@ def _read_json(url: str, timeout: float = 3.0) -> dict[str, Any] | None:
         return None
 
 
-def _metric_total(text: str | None, metric_name: str) -> int | None:
+def _metric_total(text: str | None, metric_name: str, labels: dict[str, str] | None = None) -> int | None:
     if text is None:
         return None
     total = 0.0
@@ -90,8 +90,12 @@ def _metric_total(text: str | None, metric_name: str) -> int | None:
         match = METRIC_RE.match(line.strip())
         if not match or match.group(1) != metric_name:
             continue
+        if labels:
+            observed = dict(re.findall(r'(\w+)="([^"]*)"', match.group(2) or ""))
+            if any(observed.get(key) != value for key, value in labels.items()):
+                continue
         try:
-            total += float(match.group(2))
+            total += float(match.group(3))
             found = True
         except ValueError:
             continue
@@ -150,9 +154,14 @@ def collect_snapshot(
     ai_url: str = "http://localhost:8080",
     prometheus_url: str = "http://localhost:19090",
     simulator_urls: tuple[str, ...] = ("http://localhost:18091", "http://localhost:18092", "http://localhost:18093"),
+    fanout_url: str = "http://localhost:18095",
+    ai_fanout_url: str = "http://localhost:18096",
+    include_ai: bool = False,
 ) -> RuntimeSnapshot:
     edge_metrics = _read_text(edge_url)
     api_metrics = _read_text(f"{api_url}/metrics")
+    fanout_metrics = _read_text(fanout_url)
+    ai_fanout_metrics = _read_text(ai_fanout_url)
     simulator_values = [_metric_total(_read_text(url), "industrial_simulator_events_generated_total") for url in simulator_urls]
     available = [value for value in simulator_values if value is not None]
     api_health = _read_json(f"{api_url}/health")
@@ -165,13 +174,18 @@ def collect_snapshot(
         edge_dlq=_metric_total(edge_metrics, "edge_ingest_dlq_total"),
         reconnects=_metric_total(edge_metrics, "edge_ingest_reconnects_total"),
         delivery_failures=_metric_total(edge_metrics, "edge_ingest_delivery_failures_total"),
-        historian_writes=_metric_total(api_metrics, "historian_write_total"),
-        historian_failures=None,
+        historian_writes=_metric_total(fanout_metrics, "historian_write_total", {"status": "ok"}),
+        historian_failures=_metric_total(fanout_metrics, "historian_write_total", {"status": "failed"}),
         api_ok=bool(api_health and api_health.get("status") in {"ok", "degraded"}),
         ai_ok=bool(ai_health and ai_health.get("status") in {"ok", "degraded"}),
         container_cpu_percent=cpu,
         container_memory_mb=memory,
-        consumer_lag=_prometheus_scalar(prometheus_url, "sum(datastream_broker_consumer_lag_messages)"),
+        consumer_lag=_prometheus_scalar(
+            prometheus_url,
+            "sum(datastream_broker_consumer_lag_messages)"
+            if include_ai
+            else 'sum(datastream_broker_consumer_lag_messages{service!="ai_gateway",service!="ai_enriched_fanout"})',
+        ),
     )
 
 
@@ -207,6 +221,17 @@ def _delta(after: int | None, before: int | None) -> int | None:
     return after - before if after is not None and before is not None else None
 
 
+def _campaign_delta(snapshots: list[RuntimeSnapshot], field: str) -> int | None:
+    """Accumulate a counter across phases, tolerating process restarts."""
+    values = [getattr(snapshot, field) for snapshot in snapshots]
+    if any(value is None for value in values):
+        return None
+    total = 0
+    for before, after in zip(values, values[1:]):
+        total += after - before if after >= before else after
+    return total
+
+
 def run_live(
     scenario_path: Path | str,
     *,
@@ -228,7 +253,7 @@ def run_live(
     env = os.environ.copy()
     _compose(compose_path, "up", "-d", "--build", env=env)
     time.sleep(5)
-    initial = collect_snapshot(compose_file=compose_path)
+    initial = collect_snapshot(compose_file=compose_path, include_ai=scenario.ai_enabled)
     phase_results: list[SoakPhaseResult] = []
     for phase in phases:
         env["MQTT_RATE_PER_SECOND"] = str(_phase_rate(scenario, phase))
@@ -241,9 +266,10 @@ def run_live(
         if phase.restart_service:
             _compose(compose_path, "restart", phase.restart_service, env=env)
         time.sleep(phase.duration_seconds)
-        phase_results.append(SoakPhaseResult(phase.name, phase.duration_seconds, sum(source.events_per_second for source in scenario.sources) * phase.rate_multiplier, collect_snapshot(compose_file=compose_path)))
+        phase_results.append(SoakPhaseResult(phase.name, phase.duration_seconds, sum(source.events_per_second for source in scenario.sources) * phase.rate_multiplier, collect_snapshot(compose_file=compose_path, include_ai=scenario.ai_enabled)))
     final = phase_results[-1].snapshot if phase_results else collect_snapshot(compose_file=compose_path)
-    generated = _delta(final.simulator_events, initial.simulator_events)
+    snapshots = [initial, *(result.snapshot for result in phase_results)]
+    generated = _campaign_delta(snapshots, "simulator_events")
     edge_events = _delta(final.edge_events, initial.edge_events)
     dlq = _delta(final.edge_dlq, initial.edge_dlq)
     unaccounted = max(generated - (edge_events or 0) - (dlq or 0), 0) if generated is not None and edge_events is not None and dlq is not None else None
