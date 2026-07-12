@@ -43,6 +43,14 @@ const HISTORIAN_REFRESH_OPTIONS: RefreshOption[] = [
 
 const HISTORIAN_REFRESH_STORAGE_KEY = "lse.historian.refresh";
 const HISTORIAN_EVENTS_REFRESH_STORAGE_KEY = "lse.historian.events-refresh";
+const HISTORIAN_TREND_RANGE_STORAGE_KEY = "lse.historian.trend-range-hours";
+
+const HISTORIAN_TREND_RANGE_OPTIONS = [
+  { label: "Last hour", hours: 1 },
+  { label: "Last 6 hours", hours: 6 },
+  { label: "Last 24 hours", hours: 24 },
+  { label: "Last 7 days", hours: 168 },
+];
 
 async function getSourceHealth(): Promise<{ current: SourceHealth[] }> {
   return requestJson("/api/observability/source-health");
@@ -186,12 +194,13 @@ export function HistorianDashboard() {
   const [selectedDataset, setSelectedDataset] = useState("ai4i");
   const [alarmsRefreshMs, setAlarmsRefreshMs] = useState<number | null>(2000);
   const [eventsRefreshMs, setEventsRefreshMs] = useState<number | null>(2000);
+  const [trendHours, setTrendHours] = useState(1);
   const [alarmsExpanded, setAlarmsExpanded] = useState(false);
   const [eventsExpanded, setEventsExpanded] = useState(false);
   const [refreshPreferencesReady, setRefreshPreferencesReady] = useState(false);
   const queryClient = useQueryClient();
 
-  const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, 1) : Promise.resolve([]), enabled: !!selectedAsset });
+  const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag, trendHours], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, trendHours) : Promise.resolve([]), enabled: !!selectedAsset });
   const assetsQuery = useQuery({ queryKey: ["historian", "assets"], queryFn: getAssetHierarchy });
   const catalogQuery = useQuery({ queryKey: ["historian", "asset-tag-catalog"], queryFn: getAssetTagCatalog });
   const scenariosQuery = useQuery({ queryKey: ["historian", "scenarios"], queryFn: getScenarios });
@@ -211,6 +220,10 @@ export function HistorianDashboard() {
   });
 
   useEffect(() => {
+    const storedTrendHours = readStoredRefresh(HISTORIAN_TREND_RANGE_STORAGE_KEY);
+    if (storedTrendHours !== undefined && storedTrendHours !== null && HISTORIAN_TREND_RANGE_OPTIONS.some((option) => option.hours === storedTrendHours)) {
+      setTrendHours(storedTrendHours);
+    }
     const storedAlarms = readStoredRefresh(HISTORIAN_REFRESH_STORAGE_KEY);
     const storedEvents = readStoredRefresh(HISTORIAN_EVENTS_REFRESH_STORAGE_KEY);
     if (storedAlarms !== undefined) {
@@ -221,6 +234,10 @@ export function HistorianDashboard() {
     }
     setRefreshPreferencesReady(true);
   }, []);
+
+  useEffect(() => {
+    writeStoredRefresh(HISTORIAN_TREND_RANGE_STORAGE_KEY, trendHours);
+  }, [trendHours]);
 
   useEffect(() => {
     if (!refreshPreferencesReady) return;
@@ -433,8 +450,9 @@ export function HistorianDashboard() {
             <CardDescription className="text-text-secondary">{selectedAsset ? `${selectedAsset.assetId}.${selectedAsset.tag}` : "Select an asset tag"}</CardDescription>
           </CardHeader>
           <CardContent className="p-4">
-            <label className="mb-4 block space-y-1.5 text-xs font-medium text-text-secondary">
-              <span>Asset tag</span>
+            <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+              <label className="block space-y-1.5 text-xs font-medium text-text-secondary">
+                <span>Asset tag</span>
               <SearchableSelect
                 value={selectedAsset ? `${selectedAsset.assetId}::${selectedAsset.tag}` : ""}
                 onChange={(value) => {
@@ -449,8 +467,15 @@ export function HistorianDashboard() {
                   label: `${item.site_id} / ${item.asset_name} / ${item.tag} (${item.source})`,
                   searchText: `${item.site_id} ${item.asset_id} ${item.asset_name} ${item.tag} ${item.source}`,
                 }))}
-              />
-            </label>
+                />
+              </label>
+              <label className="block space-y-1.5 text-xs font-medium text-text-secondary">
+                <span>Time span</span>
+                <select className="app-select" value={trendHours} onChange={(event) => setTrendHours(Number(event.target.value))}>
+                  {HISTORIAN_TREND_RANGE_OPTIONS.map((option) => <option key={option.hours} value={option.hours}>{option.label}</option>)}
+                </select>
+              </label>
+            </div>
             {selectedAsset ? (trendQuery.isLoading ? <Skeleton className="h-64 w-full bg-surface-2" /> : <TrendChart data={trendQuery.data?.map((d: any) => ({ time: d.time, value: d.value })) ?? []} tag={selectedAsset.tag} unit={catalogQuery.data?.items.find((item) => item.asset_id === selectedAsset.assetId && item.tag === selectedAsset.tag)?.unit} />) : (
               <p className="py-8 text-center text-sm text-text-secondary">Select a tag above or click one in the asset hierarchy to view its trend.</p>
             )}

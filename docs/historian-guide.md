@@ -23,7 +23,10 @@ selector is empty, start normalized fan-out or run the bounded catalog
 reconciliation endpoint described in the threshold policy guide.
 
 The selector is searchable: type a site, asset ID, asset name, tag, or source
-to narrow the candidates. The rendered trend is a responsive line chart with a
+to narrow the candidates. The **Time span** selector controls the historian
+window independently of the live refresh setting and supports the last hour,
+6 hours, 24 hours, or 7 days. The selected span is remembered in the browser.
+The rendered trend is a responsive line chart with a
 `Time` x-axis, the selected tag and unit on the y-axis, gridlines, and a hover
 tooltip. If the catalog has no unit, the tag name is used as the value-axis
 label.

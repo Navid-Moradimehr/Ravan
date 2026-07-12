@@ -43,7 +43,9 @@ pipeline or read Kafka directly from the browser.
 ## Panel Configuration
 
 For a trend panel, search the configured asset-tag selector by site, asset, tag,
-or source and choose a time window in hours. If the asset registry has no tags,
+or source and choose a time window in hours. The Historian page's main trend
+view offers 1 hour, 6 hours, 24 hours, and 7 days; the Custom Dashboard trend
+panel keeps its own numeric hours setting. If the asset registry has no tags,
 the manual asset ID and tag fields remain available as a deployment fallback.
 The values must match the historian data; the dashboard does not guess a tag
 from arbitrary rows.

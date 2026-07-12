@@ -60,3 +60,7 @@ available, gridlines, and hover tooltips. Custom Dashboard event/statistics
 panels select from the supported historian projections instead of accepting an
 unvalidated table-name string. Panel titles remain free text because they are
 operator labels rather than data references.
+
+The main Historian Trend view now has a separate persisted time-span selector
+(1 hour, 6 hours, 24 hours, or 7 days). This controls the query window and is
+independent from the live refresh cadence.
