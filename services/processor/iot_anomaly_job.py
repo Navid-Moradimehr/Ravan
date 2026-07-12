@@ -123,7 +123,15 @@ def configure_checkpoints(env, settings: CheckpointSettings) -> None:
     """
     if not PYFLINK_AVAILABLE:  # pragma: no cover - guarded at call site
         return
-    from pyflink.datastream import CheckpointConfig, CheckpointingMode, ExternalizedCheckpointCleanup  # noqa: WPS433
+    from pyflink.datastream import CheckpointConfig  # noqa: WPS433
+    try:
+        from pyflink.datastream import CheckpointingMode  # noqa: WPS433
+    except ImportError:  # compatibility with older PyFlink/test stubs
+        from pyflink.common import CheckpointingMode  # type: ignore[no-redef] # noqa: WPS433
+    try:
+        from pyflink.datastream import ExternalizedCheckpointCleanup  # noqa: WPS433
+    except ImportError:  # compatibility with older PyFlink/test stubs
+        ExternalizedCheckpointCleanup = CheckpointConfig.ExternalizedCheckpointCleanup  # type: ignore[attr-defined]
 
     if settings.interval_ms <= 0:
         return
