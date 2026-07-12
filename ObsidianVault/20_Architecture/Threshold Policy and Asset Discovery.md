@@ -13,6 +13,15 @@
 - Single-node Flink capacity default: Compose uses parallelism 1; distributed
   deployments must size slots before increasing it.
 
+## Local verification
+
+Use `docker compose -f docker/docker-compose.yml up -d --build`, open
+`http://localhost:3006/integrations`, and use the **Alarm and threshold
+policies** panel. Verify the distributed runtime at
+`http://localhost:18088/jobs/overview`; the `iot-anomaly-processor` job should
+be `RUNNING`. The runtime image supplies PyFlink's classpath, Python worker,
+Beam/grpc dependencies, and checkpoint-compatible worker state.
+
 ## Connections
 
 ```text

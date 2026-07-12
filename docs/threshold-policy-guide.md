@@ -31,6 +31,23 @@ imported values, select a mode, edit warning and critical boundaries, and save.
 The next processed events use the saved policy version. A signal that has not
 yet produced an event may still be added to `config/assets.yaml` first.
 
+## How to verify the changes locally
+
+1. Start or rebuild the stack with `docker compose -f docker/docker-compose.yml
+   up -d --build`.
+2. Open `http://localhost:3006/integrations`.
+3. In **Alarm and threshold policies**, select a configured or observed signal.
+4. Save a policy, or use **Import JSON** for an approved external policy file.
+5. Open Historian and inspect the next processed/alarm rows. Their evaluation
+   contains the threshold source and policy version.
+6. Check `http://localhost:18088/jobs/overview`; the
+   `iot-anomaly-processor` job should be `RUNNING` for the Flink path.
+
+The single-node Compose profile builds a PyFlink runtime image with the Python
+worker, Beam dependencies, and `flink-python` classpath setup. It defaults to
+parallelism `1`; increase `FLINK_PARALLELISM` only after sizing TaskManager
+slots.
+
 The supported modes are `outside_range`, `above`, `below`, `between_range`, and
 `bad_quality`. `deadband`, `on_delay_seconds`, and `off_delay_seconds` are
 available to avoid alarm chatter. The Python fallback applies these lifecycle
