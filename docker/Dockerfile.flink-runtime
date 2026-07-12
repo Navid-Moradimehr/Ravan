@@ -3,4 +3,8 @@ FROM flink:1.20.0-scala_2.12-java17
 # PyFlink's bundled runtime is shipped under opt in the upstream image, but
 # the JobManager/TaskManager classloader needs it in lib for Python operators.
 USER root
-RUN cp /opt/flink/opt/flink-python-1.20.0.jar /opt/flink/lib/flink-python-1.20.0.jar
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 \
+    && ln -sf /usr/bin/python3 /usr/local/bin/python \
+    && cp /opt/flink/opt/flink-python-1.20.0.jar /opt/flink/lib/flink-python-1.20.0.jar \
+    && rm -rf /var/lib/apt/lists/*
