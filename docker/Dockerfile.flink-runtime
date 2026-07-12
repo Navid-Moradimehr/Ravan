@@ -7,7 +7,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 python3-pip \
     && ln -sf /usr/bin/python3 /usr/local/bin/python \
     && cp /opt/flink/opt/flink-python-1.20.0.jar /opt/flink/lib/flink-python-1.20.0.jar \
-    && python3 -m pip install --no-cache-dir apache-beam==2.48.0 avro-python3 grpcio protobuf \
+    && python3 -m pip install --no-cache-dir apache-beam==2.48.0 avro-python3 grpcio protobuf PyYAML \
     && python3 -c "import zipfile; zipfile.ZipFile('/opt/flink/opt/python/pyflink.zip').extractall('/opt/flink/opt/python')" \
     && chmod +x /opt/flink/opt/python/pyflink/bin/pyflink-udf-runner.sh \
     && rm -rf /var/lib/apt/lists/*
