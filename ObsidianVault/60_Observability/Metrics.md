@@ -83,3 +83,9 @@ scenario without Docker. Use `--smoke` for the 30-second Compose campaign and
 the default command for the staged 15-minute campaign. Reports are written as
 JSON and Markdown and combine simulator generation, edge acceptance, DLQ,
 consumer lag, resource, API, and AI signals.
+
+Latest local Docker smoke (2026-07-12): passed. The rebuilt campaign generated
+6,815 simulator events, observed 9,030 edge events, measured consumer lag at
+0 -> 0, peaked at 6,255.1 MB aggregate container memory, and reported 38
+historian writes at the final snapshot. DLQ and delivery-failure totals remain
+unavailable in the current edge metric surface; they are not treated as zero.

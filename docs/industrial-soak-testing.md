@@ -40,3 +40,18 @@ Consumer lag is evaluated relative to the campaign's initial snapshot. A reused
 development broker may already contain backlog; that backlog is reported but
 does not fail the campaign unless the soak increases it. A clean release run
 should start with zero lag or record the pre-existing backlog explicitly.
+
+## Latest Local Smoke Result
+
+On 2026-07-12, the rebuilt Docker smoke campaign passed all enabled gates. It
+generated 6,815 simulator events, observed 9,030 edge-ingest events, held the
+measured processing lag at 0 messages before and after the campaign, reached
+6,255.1 MB peak aggregate container memory, and reported 38 historian writes at
+the final snapshot. Reconnect, processor restart, recovery, and drain phases
+completed.
+
+The simulator and edge counters are different pipeline counters and should not
+be compared as a delivery ratio. The current edge metrics do not expose a
+DLQ-total or delivery-failure counter in this Compose profile, so the report
+records those values as unavailable. A production acceptance gate should add
+those counters before claiming lossless delivery.
