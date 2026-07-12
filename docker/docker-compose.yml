@@ -155,6 +155,8 @@ services:
       PROCESSOR_METRICS_PORT: 8094
     ports:
       - "18094:8094"
+    profiles:
+      - python-fallback
 
   fanout:
     build:
@@ -357,7 +359,7 @@ services:
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
-        taskmanager.numberOfTaskSlots: 2
+        taskmanager.numberOfTaskSlots: ${FLINK_TASKMANAGER_SLOTS:-2}
     volumes:
       - ../services/processor:/opt/processor:ro
 
@@ -373,9 +375,12 @@ services:
       KAFKA_BROKERS: kafka:9092
       IOT_TOPIC: iot.raw
       PROCESSED_TOPIC: iot.processed
-      # Single-node Compose has two TaskManager slots. Operators can raise
-      # this explicitly after provisioning enough distributed slots.
+      RUNTIME_MODE: flink-production
+      # Compose starts one TaskManager by default. Operators can use the
+      # capacity planner and `docker compose --scale taskmanager=N` after
+      # provisioning enough local resources.
       FLINK_PARALLELISM: ${FLINK_PARALLELISM:-1}
+      FLINK_MAX_PARALLELISM: ${FLINK_MAX_PARALLELISM:-3}
       FLINK_CHECKPOINT_INTERVAL_MS: ${FLINK_CHECKPOINT_INTERVAL_MS:-10000}
 
   prometheus:

@@ -47,6 +47,18 @@ py -3.13 -m services.cli.datastreamctl benchmark industrial-soak `
   --report-dir .datastream/reports/industrial-soak-15m
 ```
 
+Compose uses Flink as the default processing runtime. The Python processor is
+an explicit fallback profile:
+
+```powershell
+docker compose -f docker/docker-compose.yml --profile python-fallback up -d processor
+```
+
+Do not run that fallback profile together with `flink-job` for normal operation;
+both consumers read the same raw stream. For an 18-partition local deployment,
+run the capacity planner first and apply the reported slot count with
+`FLINK_TASKMANAGER_SLOTS` and `docker compose --scale taskmanager=N`.
+
 ## Interpreting Results
 
 - `unaccounted_events=0` means every unique valid event was either written or
