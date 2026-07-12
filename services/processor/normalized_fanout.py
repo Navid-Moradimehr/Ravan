@@ -20,6 +20,7 @@ import signal
 import time
 
 from confluent_kafka import Consumer, TopicPartition
+from prometheus_client import start_http_server
 
 from services.common.brokers import resolve_kafka_brokers
 from services.common.runtime_metrics import set_consumer_lag
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
+    start_http_server(int(os.getenv("FANOUT_METRICS_PORT", "8095")))
     brokers = resolve_kafka_brokers("localhost:19092")
     input_topic = os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized")
     group_id = os.getenv("FANOUT_GROUP_ID", "normalized-fanout")

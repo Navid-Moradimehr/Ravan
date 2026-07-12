@@ -75,3 +75,11 @@ all referencing metrics the services actually emit:
 
 - `comparission.md` pillar 07
 - [[20_Architecture/Sink Architecture]] (historian write failures stall fan-out)
+
+## Industrial Soak Campaigns
+
+Run `datastreamctl benchmark industrial-soak --dry-run --smoke` to validate a
+scenario without Docker. Use `--smoke` for the 30-second Compose campaign and
+the default command for the staged 15-minute campaign. Reports are written as
+JSON and Markdown and combine simulator generation, edge acceptance, DLQ,
+consumer lag, resource, API, and AI signals.

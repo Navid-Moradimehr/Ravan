@@ -226,7 +226,7 @@ def run_live(
         return report
 
     env = os.environ.copy()
-    _compose(compose_path, "up", "-d", env=env)
+    _compose(compose_path, "up", "-d", "--build", env=env)
     time.sleep(5)
     initial = collect_snapshot(compose_file=compose_path)
     phase_results: list[SoakPhaseResult] = []
@@ -252,8 +252,14 @@ def run_live(
         failures.append("API service was not healthy at the end of the campaign")
     if final.ai_ok is False:
         failures.append("AI gateway was not healthy at the end of the campaign")
-    if final.consumer_lag is not None and final.consumer_lag > 0:
-        failures.append(f"consumer lag remained above zero after drain: {final.consumer_lag}")
+    if (
+        final.consumer_lag is not None
+        and initial.consumer_lag is not None
+        and final.consumer_lag > initial.consumer_lag
+    ):
+        failures.append(
+            f"consumer lag increased during campaign: {initial.consumer_lag} -> {final.consumer_lag}"
+        )
     if unaccounted is not None and unaccounted > scenario.acceptance.max_unaccounted_events:
         failures.append(f"unaccounted events exceeded limit: {unaccounted}")
     report = IndustrialSoakReport(scenario.scenario_id, started_at, datetime.now(timezone.utc).isoformat(), smoke, False, tuple(phase_results), initial, final, generated, edge_events, dlq, unaccounted, not failures, tuple(failures))

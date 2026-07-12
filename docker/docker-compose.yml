@@ -152,6 +152,9 @@ services:
       IOT_TOPIC: iot.raw
       PROCESSED_TOPIC: iot.processed
       INDUSTRIAL_NORMALIZED_TOPIC: industrial.normalized
+      PROCESSOR_METRICS_PORT: 8094
+    ports:
+      - "18094:8094"
 
   fanout:
     build:
@@ -186,6 +189,9 @@ services:
       LAKEHOUSE_S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:-minio12345}
       LAKEHOUSE_S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
       LAKEHOUSE_BATCH_SIZE: ${LAKEHOUSE_BATCH_SIZE:-1024}
+      FANOUT_METRICS_PORT: 8095
+    ports:
+      - "18095:8095"
     volumes:
       - api-data:/data:ro
 
@@ -208,6 +214,9 @@ services:
       AI_ENRICHED_TOPIC: iot.ai_enriched
       AI_ENRICHED_FANOUT_GROUP_ID: ai-enriched-fanout
       DATASTREAM_SINK_ROUTING_PATH: /data/sink-routes.json
+      AI_FANOUT_METRICS_PORT: 8096
+    ports:
+      - "18096:8096"
     volumes:
       - api-data:/data:ro
 

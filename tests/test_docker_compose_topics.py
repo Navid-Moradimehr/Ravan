@@ -97,3 +97,12 @@ def test_dashboard_profile_starts_api_service_for_same_origin_proxies():
     assert "ui" in services["api-service"].get("profiles", [])
     depends = services["dashboard"].get("depends_on", {})
     assert depends.get("api-service") == {"condition": "service_started"}
+
+
+def test_soak_metrics_are_exposed_by_processing_workers():
+    services = _compose()["services"]
+    assert services["processor"]["environment"]["PROCESSOR_METRICS_PORT"] == 8094
+    assert services["fanout"]["environment"]["FANOUT_METRICS_PORT"] == 8095
+    assert services["ai-fanout"]["environment"]["AI_FANOUT_METRICS_PORT"] == 8096
+    for name, host_port in (("processor", "18094:8094"), ("fanout", "18095:8095"), ("ai-fanout", "18096:8096")):
+        assert host_port in services[name]["ports"]

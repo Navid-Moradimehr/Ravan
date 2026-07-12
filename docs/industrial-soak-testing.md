@@ -30,8 +30,13 @@ Run the full staged campaign with:
 datastreamctl benchmark industrial-soak --report-dir reports/industrial-soak
 ```
 
-The runner starts the Compose stack, exposes simulator counters on host ports
+The runner builds and starts the Compose stack, exposes simulator counters on host ports
 `18091`-`18093`, samples edge/API/AI/Prometheus metrics, restarts the configured
 source or processor phases, and writes JSON and Markdown reports. The older
 PowerShell soak scripts remain supported compatibility wrappers for simpler
 edge-only tests.
+
+Consumer lag is evaluated relative to the campaign's initial snapshot. A reused
+development broker may already contain backlog; that backlog is reported but
+does not fail the campaign unless the soak increases it. A clean release run
+should start with zero lag or record the pre-existing backlog explicitly.

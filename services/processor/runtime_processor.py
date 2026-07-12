@@ -7,6 +7,7 @@ import signal
 import time
 
 from confluent_kafka import Consumer, Producer, TopicPartition
+from prometheus_client import start_http_server
 from services.common.brokers import resolve_kafka_brokers
 from services.common.normalize import normalize_runtime_event
 from services.common.runtime_metrics import set_consumer_lag
@@ -114,6 +115,7 @@ def _prune_windows(
 
 
 def main() -> None:
+    start_http_server(int(os.getenv("PROCESSOR_METRICS_PORT", "8094")))
     brokers = resolve_kafka_brokers("localhost:19092")
     input_topic = os.getenv("IOT_TOPIC", os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized"))
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
