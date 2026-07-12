@@ -123,8 +123,7 @@ def configure_checkpoints(env, settings: CheckpointSettings) -> None:
     """
     if not PYFLINK_AVAILABLE:  # pragma: no cover - guarded at call site
         return
-    from pyflink.datastream import CheckpointConfig  # noqa: WPS433
-    from pyflink.datastream import CheckpointingMode  # noqa: WPS433
+    from pyflink.datastream import CheckpointConfig, CheckpointingMode, ExternalizedCheckpointCleanup  # noqa: WPS433
 
     if settings.interval_ms <= 0:
         return
@@ -142,9 +141,9 @@ def configure_checkpoints(env, settings: CheckpointSettings) -> None:
     cfg.set_max_concurrent_checkpoints(settings.max_concurrent)
     cfg.enable_unaligned_checkpoints(settings.unaligned)
     if settings.externalized_cleanup == "retain":
-        cfg.enable_externalized_checkpoints(CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION)
+        cfg.enable_externalized_checkpoints(ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION)
     else:
-        cfg.enable_externalized_checkpoints(CheckpointConfig.ExternalizedCheckpointCleanup.DELETE_ON_CANCELLATION)
+        cfg.enable_externalized_checkpoints(ExternalizedCheckpointCleanup.DELETE_ON_CANCELLATION)
 
     # RocksDB state backend enables incremental checkpoints and off-heap state,
     # so keyed state survives restarts and is not bounded by task-manager RAM.
