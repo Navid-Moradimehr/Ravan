@@ -1,158 +1,302 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { LayoutDashboard, Plus, X, GripVertical } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  Database,
+  GripVertical,
+  LayoutDashboard,
+  Plus,
+  Settings2,
+  X,
+} from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import {
+  getAlarms,
+  getAssetHierarchy,
+  getHistorianEvents,
+  getHistorianTrend,
+  getObservability,
+  type AlarmEvent,
+  type AssetHierarchyNode,
+  type HistorianEvent,
+  type HistorianTrendPoint,
+  type ObservabilitySnapshot,
+} from "@/lib/api";
+import { formatErrorMessage } from "@/lib/http";
 
-export type PanelType = "trend" | "alarms" | "events" | "sql" | "webhooks" | "notifications" | "stats";
+export type PanelType = "trend" | "alarms" | "events" | "stats" | "observability";
 
-// Fully functional dashboard builder with localStorage persistence
-interface DashboardPanel {
+export interface DashboardPanel {
   id: string;
   type: PanelType;
   title: string;
-  config?: Record<string, any>;
+  config: {
+    asset_id: string;
+    tag: string;
+    table: string;
+    hours: number;
+    refresh_seconds: number;
+  };
 }
 
-const PANEL_TYPES: { type: PanelType; label: string; icon: string }[] = [
-  { type: "trend", label: "Trend Chart", icon: "TrendingUp" },
-  { type: "alarms", label: "Alarms Table", icon: "AlertTriangle" },
-  { type: "events", label: "Events Table", icon: "Database" },
-  { type: "sql", label: "SQL Query", icon: "Code" },
-  { type: "stats", label: "Stats Cards", icon: "BarChart3" },
+const STORAGE_KEY = "lse.historian.custom-dashboard.v2";
+
+const PANEL_TYPES: { type: PanelType; label: string; description: string }[] = [
+  { type: "trend", label: "Historian trend", description: "Plot one asset tag over a selected time window." },
+  { type: "stats", label: "Historian stats", description: "Show event count, latest value, and alarm count." },
+  { type: "alarms", label: "Alarm table", description: "Show the latest historian alarms." },
+  { type: "events", label: "Events table", description: "Show the latest rows from a historian table." },
+  { type: "observability", label: "Runtime health", description: "Show live throughput and processing health." },
 ];
 
+const defaultConfig = (): DashboardPanel["config"] => ({
+  asset_id: "",
+  tag: "",
+  table: "industrial_events",
+  hours: 1,
+  refresh_seconds: 5,
+});
+
+const defaultPanels = (): DashboardPanel[] => [
+  { id: "stats", type: "stats", title: "Historian overview", config: defaultConfig() },
+  { id: "alarms", type: "alarms", title: "Latest alarms", config: defaultConfig() },
+];
+
+function formatTime(value: unknown): string {
+  if (!value) return "n/a";
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "n/a" : date.toLocaleTimeString();
+}
+
+function formatValue(value: unknown): string {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number.toFixed(2) : "n/a";
+}
+
+function flattenTags(nodes: AssetHierarchyNode[]): Array<{ asset_id: string; tag: string; label: string }> {
+  const result: Array<{ asset_id: string; tag: string; label: string }> = [];
+  const visit = (items: AssetHierarchyNode[]) => {
+    for (const node of items) {
+      if (node.type === "asset" && node.tags) {
+        for (const tag of node.tags) {
+          result.push({ asset_id: node.id, tag: tag.name, label: `${node.name} / ${tag.name}` });
+        }
+      }
+      if (node.children?.length) visit(node.children);
+    }
+  };
+  visit(nodes);
+  return result;
+}
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return <p className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-8 text-center text-sm text-text-secondary">{children}</p>;
+}
+
+function QueryError({ error }: { error: unknown }) {
+  return <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-3 text-sm text-text-primary">{formatErrorMessage(error, "This panel could not load its data.")}</p>;
+}
+
+function TrendPanel({ panel }: { panel: DashboardPanel }) {
+  const query = useQuery<HistorianTrendPoint[]>({
+    queryKey: ["custom-dashboard", panel.id, "trend", panel.config.asset_id, panel.config.tag, panel.config.hours],
+    queryFn: () => getHistorianTrend(panel.config.asset_id, panel.config.tag, panel.config.hours),
+    enabled: Boolean(panel.config.asset_id && panel.config.tag),
+    refetchInterval: panel.config.refresh_seconds > 0 ? panel.config.refresh_seconds * 1000 : false,
+  });
+  if (!panel.config.asset_id || !panel.config.tag) return <EmptyState>Open Settings and choose an asset tag to configure this trend.</EmptyState>;
+  if (query.isError) return <QueryError error={query.error} />;
+  if (query.isLoading) return <EmptyState>Loading historian trend...</EmptyState>;
+  if (!query.data?.length) return <EmptyState>No historian samples match this asset, tag, and time window.</EmptyState>;
+  return (
+    <ChartContainer config={{ value: { label: panel.config.tag, color: "var(--chart-1)" } }} className="h-[230px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={query.data}>
+          <CartesianGrid stroke="var(--color-border-subtle)" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="time" tickFormatter={formatTime} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
+          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} width={42} />
+          <Tooltip content={<ChartTooltipContent indicator="line" labelFormatter={(value) => formatTime(value)} />} />
+          <Line type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+}
+
+function EventsPanel({ panel }: { panel: DashboardPanel }) {
+  const query = useQuery<HistorianEvent[]>({
+    queryKey: ["custom-dashboard", panel.id, "events", panel.config.table],
+    queryFn: () => getHistorianEvents(panel.config.table, 25),
+    refetchInterval: panel.config.refresh_seconds > 0 ? panel.config.refresh_seconds * 1000 : false,
+  });
+  if (query.isError) return <QueryError error={query.error} />;
+  if (query.isLoading) return <EmptyState>Loading historian events...</EmptyState>;
+  if (!query.data?.length) return <EmptyState>No events are available in this historian table.</EmptyState>;
+  return (
+    <div className="max-h-72 overflow-auto rounded-lg border border-border-subtle">
+      <Table>
+        <TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Asset</TableHead><TableHead>Tag</TableHead><TableHead>Value</TableHead><TableHead>Quality</TableHead></TableRow></TableHeader>
+        <TableBody>{query.data.map((event) => <TableRow key={`${event.event_id}-${event.time}`}><TableCell className="whitespace-nowrap text-xs">{formatTime(event.time)}</TableCell><TableCell>{event.asset_id}</TableCell><TableCell>{event.tag}</TableCell><TableCell>{formatValue(event.value)}</TableCell><TableCell><Badge variant="outline">{event.quality || "unknown"}</Badge></TableCell></TableRow>)}</TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function AlarmsPanel({ panel }: { panel: DashboardPanel }) {
+  const query = useQuery<AlarmEvent[]>({
+    queryKey: ["custom-dashboard", panel.id, "alarms"],
+    queryFn: () => getAlarms(25),
+    refetchInterval: panel.config.refresh_seconds > 0 ? panel.config.refresh_seconds * 1000 : false,
+  });
+  if (query.isError) return <QueryError error={query.error} />;
+  if (query.isLoading) return <EmptyState>Loading alarms...</EmptyState>;
+  if (!query.data?.length) return <EmptyState>No alarms are currently recorded.</EmptyState>;
+  return (
+    <div className="max-h-72 overflow-auto rounded-lg border border-border-subtle">
+      <Table>
+        <TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Asset</TableHead><TableHead>Tag</TableHead><TableHead>Severity</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+        <TableBody>{query.data.map((alarm, index) => <TableRow key={`${alarm.time}-${alarm.asset_id}-${alarm.tag}-${index}`}><TableCell className="whitespace-nowrap text-xs">{formatTime(alarm.time)}</TableCell><TableCell>{alarm.asset_id}</TableCell><TableCell>{alarm.tag}</TableCell><TableCell><Badge variant="outline">{alarm.severity}</Badge></TableCell><TableCell>{alarm.acknowledged ? "Acknowledged" : "Open"}</TableCell></TableRow>)}</TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function StatsPanel({ panel }: { panel: DashboardPanel }) {
+  const events = useQuery<HistorianEvent[]>({ queryKey: ["custom-dashboard", panel.id, "stats-events"], queryFn: () => getHistorianEvents(panel.config.table, 100), refetchInterval: panel.config.refresh_seconds > 0 ? panel.config.refresh_seconds * 1000 : false });
+  const alarms = useQuery<AlarmEvent[]>({ queryKey: ["custom-dashboard", panel.id, "stats-alarms"], queryFn: () => getAlarms(100), refetchInterval: panel.config.refresh_seconds > 0 ? panel.config.refresh_seconds * 1000 : false });
+  if (events.isError || alarms.isError) return <QueryError error={events.error ?? alarms.error} />;
+  const latest = events.data?.[0];
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      <div className="rounded-lg border border-border-subtle bg-surface-2 p-3"><div className="text-xs text-text-secondary">Rows sampled</div><div className="mt-1 text-2xl font-semibold">{events.data?.length ?? "..."}</div></div>
+      <div className="rounded-lg border border-border-subtle bg-surface-2 p-3"><div className="text-xs text-text-secondary">Latest value</div><div className="mt-1 text-2xl font-semibold">{latest ? formatValue(latest.value) : "..."}</div><div className="text-xs text-text-secondary">{latest?.tag ?? "waiting for data"}</div></div>
+      <div className="rounded-lg border border-border-subtle bg-surface-2 p-3"><div className="text-xs text-text-secondary">Alarms sampled</div><div className="mt-1 text-2xl font-semibold">{alarms.data?.length ?? "..."}</div></div>
+    </div>
+  );
+}
+
+function ObservabilityPanel({ panel }: { panel: DashboardPanel }) {
+  const query = useQuery<ObservabilitySnapshot>({ queryKey: ["custom-dashboard", panel.id, "observability"], queryFn: getObservability, refetchInterval: panel.config.refresh_seconds > 0 ? panel.config.refresh_seconds * 1000 : false });
+  if (query.isError) return <QueryError error={query.error} />;
+  if (!query.data) return <EmptyState>Loading runtime health...</EmptyState>;
+  const points = query.data.throughput ?? [];
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-border-subtle bg-surface-2 p-3"><div className="text-xs text-text-secondary">Throughput</div><div className="mt-1 text-xl font-semibold">{formatValue(query.data.summary.total_throughput)} /s</div></div><div className="rounded-lg border border-border-subtle bg-surface-2 p-3"><div className="text-xs text-text-secondary">DLQ</div><div className="mt-1 text-xl font-semibold">{query.data.summary.dlq_total}</div></div><div className="rounded-lg border border-border-subtle bg-surface-2 p-3"><div className="text-xs text-text-secondary">Prometheus</div><div className="mt-1 text-xl font-semibold">{query.data.prometheus.status}</div></div></div>
+      {points.length ? <ChartContainer config={{ mqtt: { label: "MQTT", color: "var(--chart-2)" }, opcua: { label: "OPC UA", color: "var(--chart-1)" }, modbus: { label: "Modbus", color: "var(--chart-3)" } }} className="h-[190px] w-full"><ResponsiveContainer width="100%" height="100%"><AreaChart data={points}><CartesianGrid stroke="var(--color-border-subtle)" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="timestamp" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} width={35} /><Tooltip content={<ChartTooltipContent indicator="line" />} /><Area type="monotone" dataKey="mqtt" stroke="var(--chart-2)" fill="var(--chart-2)" fillOpacity={0.12} /><Area type="monotone" dataKey="opcua" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.12} /><Area type="monotone" dataKey="modbus" stroke="var(--chart-3)" fill="var(--chart-3)" fillOpacity={0.12} /></AreaChart></ResponsiveContainer></ChartContainer> : <EmptyState>No runtime samples are available yet.</EmptyState>}
+    </div>
+  );
+}
+
+function PanelBody({ panel }: { panel: DashboardPanel }) {
+  if (panel.type === "trend") return <TrendPanel panel={panel} />;
+  if (panel.type === "events") return <EventsPanel panel={panel} />;
+  if (panel.type === "alarms") return <AlarmsPanel panel={panel} />;
+  if (panel.type === "observability") return <ObservabilityPanel panel={panel} />;
+  return <StatsPanel panel={panel} />;
+}
+
+function PanelSettings({ panel, assets, onChange }: { panel: DashboardPanel; assets: Array<{ asset_id: string; tag: string; label: string }>; onChange: (config: DashboardPanel["config"]) => void }) {
+  const update = (patch: Partial<DashboardPanel["config"]>) => onChange({ ...panel.config, ...patch });
+  return <div className="grid gap-3 rounded-lg border border-border-subtle bg-surface-2 p-3 sm:grid-cols-2">
+    <label className="space-y-1 text-xs text-text-secondary"><span>Panel title</span><Input value={panel.title} onChange={(event) => onChange({ ...panel.config, title: event.target.value } as DashboardPanel["config"])} /></label>
+    {panel.type === "trend" ? <label className="space-y-1 text-xs text-text-secondary"><span>Asset tag</span><select value={`${panel.config.asset_id}::${panel.config.tag}`} onChange={(event) => { const [asset_id, tag] = event.target.value.split("::"); update({ asset_id, tag }); }} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"><option value="::">Select a configured asset tag</option>{assets.map((item) => <option key={`${item.asset_id}::${item.tag}`} value={`${item.asset_id}::${item.tag}`}>{item.label}</option>)}</select></label> : null}
+    {panel.type === "events" || panel.type === "stats" ? <label className="space-y-1 text-xs text-text-secondary"><span>Historian table</span><Input value={panel.config.table} onChange={(event) => update({ table: event.target.value })} /></label> : null}
+    {panel.type === "trend" ? <label className="space-y-1 text-xs text-text-secondary"><span>Hours</span><Input type="number" min={1} max={168} value={panel.config.hours} onChange={(event) => update({ hours: Math.max(1, Number(event.target.value) || 1) })} /></label> : null}
+    <label className="space-y-1 text-xs text-text-secondary"><span>Refresh seconds, 0 pauses</span><Input type="number" min={0} max={3600} value={panel.config.refresh_seconds} onChange={(event) => update({ refresh_seconds: Math.max(0, Number(event.target.value) || 0) })} /></label>
+  </div>;
+}
+
 export function DashboardBuilder() {
-  const defaultPanels: DashboardPanel[] = [
-    { id: "1", type: "stats", title: "Overview" },
-    { id: "2", type: "alarms", title: "Active Alarms" },
-  ];
   const [panels, setPanels] = useState<DashboardPanel[]>(defaultPanels);
   const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const assetsQuery = useQuery({ queryKey: ["custom-dashboard", "assets"], queryFn: getAssetHierarchy });
+  const assets = flattenTags(assetsQuery.data ?? []);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("dashboard_panels");
+      const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        setPanels(JSON.parse(saved) as DashboardPanel[]);
+        const parsed = JSON.parse(saved) as DashboardPanel[];
+        if (Array.isArray(parsed)) setPanels(parsed.map((panel) => ({ ...panel, config: { ...defaultConfig(), ...(panel.config ?? {}) } })));
       }
     } catch {
-      setStorageWarning("Saved dashboard layout could not be loaded in this browser. The default layout is being used.");
-      setPanels(defaultPanels);
+      setStorageWarning("The saved dashboard could not be loaded. The default layout is being used.");
     } finally {
       setHydrated(true);
     }
   }, []);
 
-  const savePanels = useCallback((next: DashboardPanel[]) => {
-    setPanels(next);
-    if (hydrated) {
-      try {
-        localStorage.setItem("dashboard_panels", JSON.stringify(next));
-        setStorageWarning(null);
-      } catch {
-        setStorageWarning("Dashboard layout changes could not be saved in this browser.");
-      }
-    }
-  }, [hydrated]);
-
   useEffect(() => {
-    if (hydrated) {
-      try {
-        localStorage.setItem("dashboard_panels", JSON.stringify(panels));
-      } catch {
-        setStorageWarning("Dashboard layout changes could not be saved in this browser.");
-      }
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(panels));
+      setStorageWarning(null);
+    } catch {
+      setStorageWarning("Dashboard changes could not be saved in this browser.");
     }
   }, [hydrated, panels]);
 
-  const createPanelId = useCallback(() => {
-    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-      return crypto.randomUUID();
-    }
-    return Math.random().toString(36).slice(2);
-  }, []);
-
-  const addPanel = useCallback((type: PanelType) => {
-    const label = PANEL_TYPES.find((p) => p.type === type)?.label || type;
-    const next = [...panels, { id: createPanelId(), type, title: label }];
-    savePanels(next);
-    setShowAdd(false);
-  }, [createPanelId, panels, savePanels]);
-
-  const removePanel = useCallback((id: string) => {
-    savePanels(panels.filter((p) => p.id !== id));
-  }, [panels, savePanels]);
-
-  const movePanel = useCallback((id: string, direction: -1 | 1) => {
-    const idx = panels.findIndex((p) => p.id === id);
-    if (idx < 0) return;
-    const newIdx = idx + direction;
-    if (newIdx < 0 || newIdx >= panels.length) return;
+  const savePanels = useCallback((next: DashboardPanel[]) => setPanels(next), []);
+  const updatePanel = (id: string, patch: Partial<DashboardPanel>) => savePanels(panels.map((panel) => panel.id === id ? { ...panel, ...patch } : panel));
+  const movePanel = (id: string, direction: -1 | 1) => {
+    const index = panels.findIndex((panel) => panel.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= panels.length) return;
     const next = [...panels];
-    [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+    [next[index], next[target]] = [next[target], next[index]];
     savePanels(next);
-  }, [panels, savePanels]);
+  };
+  const addPanel = (type: PanelType) => {
+    const definition = PANEL_TYPES.find((item) => item.type === type);
+    const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${type}-${Date.now()}`;
+    savePanels([...panels, { id, type, title: definition?.label ?? type, config: defaultConfig() }]);
+    setShowAdd(false);
+    setEditing(id);
+  };
 
-  return (
-    <Card className="app-card">
-      <CardHeader className="app-card-header">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          <LayoutDashboard className="size-4 text-accent" />
-          Custom Dashboard
-        </CardTitle>
-        <CardDescription className="text-text-secondary">
-          Build your own monitoring view
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 p-4">
-        {storageWarning ? (
-          <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text-primary">
-            {storageWarning}
-          </p>
-        ) : null}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {panels.map((panel) => (
-            <div key={panel.id} className="relative rounded-lg border border-border-subtle p-4 bg-surface-2">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <GripVertical className="size-4 text-text-muted" />
-                  <span className="text-sm font-medium">{panel.title}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => movePanel(panel.id, -1)}>{"<"}</Button>
-                  <Button variant="ghost" size="sm" onClick={() => movePanel(panel.id, 1)}>{">"}</Button>
-                  <Button variant="ghost" size="sm" onClick={() => removePanel(panel.id)}>
-                    <X className="size-4 text-error" />
-                  </Button>
-                </div>
-              </div>
-              <div className="flex h-32 items-center justify-center text-sm text-text-secondary">
-                {panel.type} panel placeholder
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {showAdd ? (
-          <div className="flex flex-wrap gap-2">
-            {PANEL_TYPES.map((pt) => (
-              <Button key={pt.type} variant="outline" size="sm" onClick={() => addPanel(pt.type)}>
-                <Plus className="size-4 mr-1" />
-                {pt.label}
-              </Button>
-            ))}
-          </div>
-        ) : (
-          <Button variant="outline" onClick={() => setShowAdd(true)}>
-            <Plus className="size-4 mr-1" />
-            Add Panel
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
+  return <Card className="app-card">
+    <CardHeader className="app-card-header">
+      <CardTitle className="flex items-center gap-2 text-base font-semibold"><LayoutDashboard className="size-4 text-accent" />Custom Dashboard <Badge variant="outline">Browser saved</Badge></CardTitle>
+      <CardDescription className="text-text-secondary">Compose a focused operator view from live historian and observability data. Grafana remains the advanced dashboard surface.</CardDescription>
+    </CardHeader>
+    <CardContent className="space-y-4 p-4">
+      {storageWarning ? <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text-primary">{storageWarning}</p> : null}
+      {assetsQuery.isError ? <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text-primary">Asset tags could not be loaded. Trend panels can be added, but they need an asset registry entry before they can display samples.</p> : null}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {panels.map((panel, index) => <div key={panel.id} className="rounded-xl border border-border-subtle bg-surface-2/60 p-4">
+          <div className="mb-3 flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><GripVertical className="size-4 shrink-0 text-text-muted" /><div className="min-w-0"><div className="truncate text-sm font-semibold">{panel.title}</div><div className="text-xs text-text-secondary">{PANEL_TYPES.find((item) => item.type === panel.type)?.description}</div></div></div><div className="flex shrink-0 items-center gap-1"><Button variant="ghost" size="icon-xs" aria-label="Move panel up" disabled={index === 0} onClick={() => movePanel(panel.id, -1)}><ChevronUp className="size-4" /></Button><Button variant="ghost" size="icon-xs" aria-label="Move panel down" disabled={index === panels.length - 1} onClick={() => movePanel(panel.id, 1)}><ChevronDown className="size-4" /></Button><Button variant="ghost" size="icon-xs" aria-label="Configure panel" onClick={() => setEditing(editing === panel.id ? null : panel.id)}><Settings2 className="size-4" /></Button><Button variant="ghost" size="icon-xs" aria-label="Remove panel" onClick={() => savePanels(panels.filter((item) => item.id !== panel.id))}><X className="size-4 text-error" /></Button></div></div>
+          {editing === panel.id ? <PanelSettings panel={panel} assets={assets} onChange={(config) => updatePanel(panel.id, { config, ...(Object.prototype.hasOwnProperty.call(config, "title") ? { title: (config as DashboardPanel["config"] & { title?: string }).title ?? panel.title } : {}) })} /> : null}
+          <div className="mt-3"><PanelBody panel={panel} /></div>
+        </div>)}
+      </div>
+      {showAdd ? <div className="grid gap-2 rounded-lg border border-border-subtle bg-surface-2 p-3 sm:grid-cols-2 lg:grid-cols-3">{PANEL_TYPES.map((item) => <Button key={item.type} variant="outline" className="h-auto justify-start whitespace-normal p-3 text-left" onClick={() => addPanel(item.type)}><span><span className="block font-medium">{item.label}</span><span className="mt-1 block text-xs font-normal text-text-secondary">{item.description}</span></span></Button>)}</div> : null}
+      <div className="flex flex-wrap items-center gap-2"><Button variant="outline" onClick={() => setShowAdd(!showAdd)}><Plus className="mr-1 size-4" />{showAdd ? "Close panel library" : "Add panel"}</Button><Button variant="ghost" onClick={() => savePanels(defaultPanels())}>Reset layout</Button><span className="text-xs text-text-secondary">Panels query existing platform APIs; no new datasource or storage service is introduced.</span></div>
+    </CardContent>
+  </Card>;
 }
