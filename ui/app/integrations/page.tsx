@@ -5,6 +5,7 @@ import { SectionHeader } from "@/components/section-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HelpTip } from "@/components/help-tip";
 import { SourceConnectionPanel } from "@/components/source-connection-panel";
+import { ThresholdPolicyPanel } from "@/components/threshold-policy-panel";
 
 type SurfaceAction = {
   label: string;
@@ -255,6 +256,7 @@ export default function IntegrationsPage() {
         <div id="source-connections" className="scroll-mt-24">
           <SourceConnectionPanel />
         </div>
+        <ThresholdPolicyPanel />
 
         <SectionHeader
           title="Editable surfaces"

@@ -16,6 +16,28 @@ CREATE TABLE IF NOT EXISTS metadata_asset_tags (
 CREATE INDEX IF NOT EXISTS metadata_asset_tags_lookup_idx ON metadata_asset_tags (site_id, asset_id, tag);
 CREATE INDEX IF NOT EXISTS metadata_asset_tags_updated_idx ON metadata_asset_tags (updated_at DESC);
 
+CREATE TABLE IF NOT EXISTS metadata_threshold_policies (
+    site_id TEXT NOT NULL,
+    asset_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    unit TEXT,
+    mode TEXT NOT NULL DEFAULT 'outside_range',
+    warning_low DOUBLE PRECISION,
+    warning_high DOUBLE PRECISION,
+    critical_low DOUBLE PRECISION,
+    critical_high DOUBLE PRECISION,
+    deadband DOUBLE PRECISION NOT NULL DEFAULT 0,
+    on_delay_seconds DOUBLE PRECISION NOT NULL DEFAULT 0,
+    off_delay_seconds DOUBLE PRECISION NOT NULL DEFAULT 0,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    source TEXT NOT NULL DEFAULT 'user',
+    version INTEGER NOT NULL DEFAULT 1,
+    effective_from TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (site_id, asset_id, tag)
+);
+CREATE INDEX IF NOT EXISTS metadata_threshold_policies_site_idx ON metadata_threshold_policies (site_id, asset_id, tag);
+
 CREATE TABLE IF NOT EXISTS industrial_events (
     time TIMESTAMPTZ NOT NULL,
     event_id UUID NOT NULL,
@@ -63,6 +85,11 @@ CREATE TABLE IF NOT EXISTS processed_events (
     vibration_avg_mm_s DOUBLE PRECISION NOT NULL DEFAULT 0,
     anomaly_score DOUBLE PRECISION NOT NULL DEFAULT 0,
     severity TEXT NOT NULL DEFAULT 'normal',
+    threshold_severity TEXT NOT NULL DEFAULT 'normal',
+    threshold_status TEXT NOT NULL DEFAULT 'unconfigured',
+    threshold_source TEXT NOT NULL DEFAULT 'unconfigured',
+    threshold_policy_version INTEGER NOT NULL DEFAULT 0,
+    threshold_breached BOOLEAN NOT NULL DEFAULT FALSE,
     triggered_rules TEXT[] NOT NULL DEFAULT '{}',
     baseline JSONB,
     evaluation JSONB

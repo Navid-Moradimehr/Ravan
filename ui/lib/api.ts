@@ -84,6 +84,57 @@ export type AssetHierarchyNode = {
   }>;
 };
 
+export type AssetTagCatalogItem = {
+  site_id: string;
+  asset_id: string;
+  asset_name: string;
+  tag: string;
+  tag_id: string;
+  unit: string;
+  warning_low?: number | null;
+  warning_high?: number | null;
+  critical_low?: number | null;
+  critical_high?: number | null;
+  source: "registry" | "observed";
+  active: boolean;
+};
+
+export type ThresholdPolicy = {
+  site_id: string;
+  asset_id: string;
+  tag: string;
+  unit: string;
+  mode: "above" | "below" | "outside_range" | "between_range" | "bad_quality";
+  warning_low: number | null;
+  warning_high: number | null;
+  critical_low: number | null;
+  critical_high: number | null;
+  deadband: number;
+  on_delay_seconds: number;
+  off_delay_seconds: number;
+  enabled: boolean;
+  source: string;
+  version?: number;
+  configured?: boolean;
+};
+
+export async function getAssetTagCatalog(): Promise<{ items: AssetTagCatalogItem[] }> {
+  return requestJson("/api/metadata/asset-tags");
+}
+
+export async function getThresholdPolicies(siteId?: string): Promise<{ policies: ThresholdPolicy[] }> {
+  const query = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+  return requestJson(`/api/threshold-policies${query}`);
+}
+
+export async function saveThresholdPolicy(policy: ThresholdPolicy): Promise<{ ok: boolean; policy: ThresholdPolicy }> {
+  return requestJson("/api/threshold-policies", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+}
+
 export type ScenarioInfo = {
   id: string;
   name: string;

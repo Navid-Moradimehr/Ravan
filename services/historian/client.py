@@ -352,8 +352,10 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                         site_id, source_protocol, quality,
                         schema_version, temperature_c, vibration_mm_s, pressure_bar,
                         processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
-                        anomaly_score, severity, triggered_rules, baseline, evaluation
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        anomaly_score, severity, threshold_severity, threshold_status,
+                        threshold_source, threshold_policy_version, threshold_breached,
+                        triggered_rules, baseline, evaluation
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (time, event_id) DO NOTHING
                     """,
                     (
@@ -377,6 +379,11 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                         event.get("vibration_avg_mm_s", 0),
                         event.get("anomaly_score", 0),
                         event.get("severity", "normal"),
+                        event.get("threshold_severity", "normal"),
+                        event.get("threshold_status", "unconfigured"),
+                        event.get("threshold_source", "unconfigured"),
+                        event.get("threshold_policy_version", 0),
+                        bool(event.get("threshold_breached", False)),
                         list(event.get("triggered_rules") or []),
                         Json(event.get("baseline")),
                         Json(event.get("evaluation")),
@@ -414,6 +421,11 @@ def insert_processed_events(events: list[dict[str, Any]]) -> None:
                 event.get("vibration_avg_mm_s", 0),
                 event.get("anomaly_score", 0),
                 event.get("severity", "normal"),
+                event.get("threshold_severity", "normal"),
+                event.get("threshold_status", "unconfigured"),
+                event.get("threshold_source", "unconfigured"),
+                event.get("threshold_policy_version", 0),
+                bool(event.get("threshold_breached", False)),
                 list(event.get("triggered_rules") or []),
                 Json(event.get("baseline")),
                 Json(event.get("evaluation")),
@@ -427,7 +439,9 @@ def insert_processed_events(events: list[dict[str, Any]]) -> None:
             site_id, source_protocol, quality,
             schema_version, temperature_c, vibration_mm_s, pressure_bar,
             processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
-            anomaly_score, severity, triggered_rules, baseline, evaluation
+            anomaly_score, severity, threshold_severity, threshold_status,
+            threshold_source, threshold_policy_version, threshold_breached,
+            triggered_rules, baseline, evaluation
         ) VALUES %s
         ON CONFLICT (time, event_id) DO NOTHING
         """,

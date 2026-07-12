@@ -35,12 +35,11 @@ import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { HelpTip } from "@/components/help-tip";
 import {
   getAlarms,
-  getAssetHierarchy,
+  getAssetTagCatalog,
   getHistorianEvents,
   getHistorianTrend,
   getObservability,
   type AlarmEvent,
-  type AssetHierarchyNode,
   type HistorianEvent,
   type HistorianTrendPoint,
   type ObservabilitySnapshot,
@@ -116,20 +115,8 @@ function formatValue(value: unknown): string {
   return Number.isFinite(number) ? number.toFixed(2) : "n/a";
 }
 
-function flattenTags(nodes: AssetHierarchyNode[]): Array<{ asset_id: string; tag: string; label: string }> {
-  const result: Array<{ asset_id: string; tag: string; label: string }> = [];
-  const visit = (items: AssetHierarchyNode[]) => {
-    for (const node of items) {
-      if (node.type === "asset" && node.tags) {
-        for (const tag of node.tags) {
-          result.push({ asset_id: node.id, tag: tag.name, label: `${node.name} / ${tag.name}` });
-        }
-      }
-      if (node.children?.length) visit(node.children);
-    }
-  };
-  visit(nodes);
-  return result;
+function flattenTags(items: Awaited<ReturnType<typeof getAssetTagCatalog>>["items"]): Array<{ asset_id: string; tag: string; label: string }> {
+  return items.map((item) => ({ asset_id: item.asset_id, tag: item.tag, label: `${item.site_id} / ${item.asset_name} / ${item.tag}` }));
 }
 
 function EmptyState({ children }: { children: React.ReactNode }) {
@@ -257,8 +244,8 @@ export function DashboardBuilder() {
   const [hydrated, setHydrated] = useState(false);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
-  const assetsQuery = useQuery({ queryKey: ["custom-dashboard", "assets"], queryFn: getAssetHierarchy });
-  const assets = flattenTags(assetsQuery.data ?? []);
+  const assetsQuery = useQuery({ queryKey: ["custom-dashboard", "asset-tag-catalog"], queryFn: getAssetTagCatalog });
+  const assets = flattenTags(assetsQuery.data?.items ?? []);
 
   useEffect(() => {
     try {

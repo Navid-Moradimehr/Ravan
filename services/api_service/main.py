@@ -237,6 +237,7 @@ from services.api_service.routers.search import router as search_router
 from services.api_service.routers.retrieval import router as retrieval_router
 from services.api_service.routers.metadata import router as metadata_router
 from services.api_service.routers.asset_registry import router as asset_registry_router
+from services.api_service.routers.threshold_policies import router as threshold_policies_router
 from services.api_service.routers.event_catalog import router as event_catalog_router
 from services.api_service.routers.governance import router as governance_router
 from services.api_service.routers.operational_memory import router as operational_memory_router
@@ -259,6 +260,7 @@ app.include_router(search_router)
 app.include_router(retrieval_router)
 app.include_router(metadata_router)
 app.include_router(asset_registry_router)
+app.include_router(threshold_policies_router)
 app.include_router(event_catalog_router)
 app.include_router(governance_router)
 app.include_router(operational_memory_router)

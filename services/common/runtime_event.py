@@ -91,6 +91,11 @@ class RuntimeEventRecord:
     vibration_avg_mm_s: float = 0.0
     anomaly_score: float = 0.0
     severity: str = "normal"
+    threshold_severity: str = "normal"
+    threshold_status: str = "unconfigured"
+    threshold_source: str = "unconfigured"
+    threshold_policy_version: int = 0
+    threshold_breached: bool = False
     triggered_rules: tuple[str, ...] = field(default_factory=tuple)
     baseline: dict[str, Any] | None = None
     evaluation: dict[str, Any] | None = None
@@ -137,6 +142,11 @@ class RuntimeEventRecord:
         vibration_avg_mm_s: float = 0.0,
         anomaly_score: float = 0.0,
         severity: str = "normal",
+        threshold_severity: str = "normal",
+        threshold_status: str = "unconfigured",
+        threshold_source: str = "unconfigured",
+        threshold_policy_version: int = 0,
+        threshold_breached: bool = False,
         triggered_rules: tuple[str, ...] | None = None,
         baseline: dict[str, Any] | None = None,
         evaluation: dict[str, Any] | None = None,
@@ -147,6 +157,11 @@ class RuntimeEventRecord:
         self.vibration_avg_mm_s = vibration_avg_mm_s
         self.anomaly_score = anomaly_score
         self.severity = severity
+        self.threshold_severity = threshold_severity
+        self.threshold_status = threshold_status
+        self.threshold_source = threshold_source
+        self.threshold_policy_version = threshold_policy_version
+        self.threshold_breached = threshold_breached
         if triggered_rules is not None:
             self.triggered_rules = triggered_rules
         self.baseline = baseline
@@ -184,6 +199,11 @@ class RuntimeEventRecord:
             "vibration_avg_mm_s": self.vibration_avg_mm_s,
             "anomaly_score": self.anomaly_score,
             "severity": self.severity,
+            "threshold_severity": self.threshold_severity,
+            "threshold_status": self.threshold_status,
+            "threshold_source": self.threshold_source,
+            "threshold_policy_version": self.threshold_policy_version,
+            "threshold_breached": self.threshold_breached,
             "triggered_rules": list(self.triggered_rules),
         }
         if self.baseline is not None:
