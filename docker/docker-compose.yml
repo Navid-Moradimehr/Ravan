@@ -230,6 +230,9 @@ services:
       MQTT_HOST: mqtt-broker
       MQTT_PORT: 1883
       MQTT_RATE_PER_SECOND: ${MQTT_RATE_PER_SECOND:-25}
+      SIM_METRICS_PORT: 8091
+    ports:
+      - "18091:8091"
     profiles:
       - edge
 
@@ -240,6 +243,9 @@ services:
     command: ["python", "-m", "services.edge_ingest.opcua_simulator"]
     ports:
       - "14840:4840"
+      - "18092:8092"
+    environment:
+      SIM_METRICS_PORT: 8092
     profiles:
       - edge
 
@@ -250,6 +256,9 @@ services:
     command: ["python", "-m", "services.edge_ingest.modbus_simulator"]
     ports:
       - "15020:5020"
+      - "18093:8093"
+    environment:
+      SIM_METRICS_PORT: 8093
     profiles:
       - edge
 

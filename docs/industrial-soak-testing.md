@@ -12,7 +12,26 @@ reconnect, a processor restart, recovery, and a drain period. The scenario is
 deliberately separate from customer data and does not claim to certify a real
 PLC, sensor, network, or production disk.
 
-The initial implementation phase adds the versioned scenario contract. The next
-phase adds the live Docker runner and end-to-end report collection. Until that
-runner is enabled, the existing `edge-soak.ps1` and `site-profile-soak.ps1`
-remain the supported live smoke harnesses.
+Run a validation-only campaign with:
+
+```text
+datastreamctl benchmark industrial-soak --dry-run --smoke
+```
+
+Run the short live smoke campaign with:
+
+```text
+datastreamctl benchmark industrial-soak --smoke --report-dir reports/industrial-soak
+```
+
+Run the full staged campaign with:
+
+```text
+datastreamctl benchmark industrial-soak --report-dir reports/industrial-soak
+```
+
+The runner starts the Compose stack, exposes simulator counters on host ports
+`18091`-`18093`, samples edge/API/AI/Prometheus metrics, restarts the configured
+source or processor phases, and writes JSON and Markdown reports. The older
+PowerShell soak scripts remain supported compatibility wrappers for simpler
+edge-only tests.

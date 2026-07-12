@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusServerContext, ModbusSlaveContext
 from pymodbus.server import StartAsyncTcpServer
+from services.benchmarks.simulator_metrics import SimulatorMetrics
 
 
 async def update_registers(context: ModbusServerContext) -> None:
+    metrics = SimulatorMetrics("modbus", int(os.getenv("SIM_METRICS_PORT", "8093")))
+    metrics.start()
     while True:
         values = [
             int(random.gauss(48, 5) * 10),
@@ -15,6 +19,7 @@ async def update_registers(context: ModbusServerContext) -> None:
             int(random.gauss(6.2, 0.4) * 10),
         ]
         context[1].setValues(3, 0, values)
+        metrics.increment(3)
         await asyncio.sleep(1)
 
 

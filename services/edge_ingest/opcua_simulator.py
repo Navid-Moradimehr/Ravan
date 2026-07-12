@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import random
+import os
 
 from asyncua import Server
+from services.benchmarks.simulator_metrics import SimulatorMetrics
 
 
 async def main() -> None:
+    metrics = SimulatorMetrics("opcua", int(os.getenv("SIM_METRICS_PORT", "8092")))
+    metrics.start()
     server = Server()
     await server.init()
     server.set_endpoint("opc.tcp://0.0.0.0:4840/freeopcua/server/")
@@ -24,6 +28,7 @@ async def main() -> None:
             await temperature.write_value(round(random.gauss(48, 5), 2))
             await vibration.write_value(round(random.gauss(3, 1), 2))
             await pressure.write_value(round(random.gauss(6.2, 0.4), 2))
+            metrics.increment(3)
             await asyncio.sleep(1)
 
 

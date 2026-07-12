@@ -10,6 +10,7 @@ from paho.mqtt import client as mqtt
 
 from services.edge_ingest.model import IndustrialEvent, to_json_bytes, utc_now
 from services.scenarios.engine import ScenarioState, apply_scenario, advance_scenario, load_scenario_from_env
+from services.benchmarks.simulator_metrics import SimulatorMetrics
 
 
 def main() -> None:
@@ -17,6 +18,8 @@ def main() -> None:
     port = int(os.getenv("MQTT_PORT", "1883"))
     rate = int(os.getenv("MQTT_RATE_PER_SECOND", "25"))
     max_events = int(os.getenv("MQTT_MAX_EVENTS", "0"))
+    metrics = SimulatorMetrics("mqtt", int(os.getenv("SIM_METRICS_PORT", "8091")))
+    metrics.start()
     running = True
 
     def stop(_signum: int, _frame: object) -> None:
@@ -51,6 +54,7 @@ def main() -> None:
             ts_source=utc_now(),
         )
         client.publish(f"factory/line-01/{asset}/{tag}", payload=to_json_bytes(event), qos=1)
+        metrics.increment()
         produced += 1
         advance_scenario(scenario_state)
         if max_events and produced >= max_events:

@@ -58,6 +58,8 @@ from services.benchmarks.site_profile_matrix import format_result as format_site
 from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
 from services.benchmarks.multi_site_failure import format_result as format_multi_site_failure_result
 from services.benchmarks.multi_site_failure import run_benchmark as run_multi_site_failure_benchmark
+from services.benchmarks.industrial_soak_runner import format_report as format_industrial_soak_report
+from services.benchmarks.industrial_soak_runner import run_live as run_industrial_soak
 from services.historian.backup import (
     collect_historian_snapshot,
     compare_historian_snapshots,
@@ -1647,6 +1649,20 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
 
 
 def cmd_benchmark(args: argparse.Namespace) -> int:
+    if args.action == "industrial-soak":
+        report = run_industrial_soak(
+            Path(args.scenario),
+            compose_file=Path(args.compose_file),
+            duration=args.duration,
+            smoke=args.smoke,
+            dry_run=args.dry_run,
+            report_dir=args.report_dir,
+        )
+        if args.json:
+            print(json.dumps(asdict(report), indent=2))
+        else:
+            print(format_industrial_soak_report(report))
+        return 0 if report.passed else 2
     if args.action == "deployment-pack":
         result = run_deployment_pack_benchmark(
             Path(args.manifest),
@@ -2615,6 +2631,15 @@ def build_parser() -> argparse.ArgumentParser:
     real_world_simulator.add_argument("--cases", default=None, help="Comma-separated cases: mock-normal,mock-drift,mock-spike,industrial-benchmark")
     real_world_simulator.add_argument("--json", action="store_true")
     real_world_simulator.set_defaults(func=cmd_benchmark)
+    industrial_soak = benchmark_sub.add_parser("industrial-soak", help="Run a live Docker-backed industrial soak campaign")
+    industrial_soak.add_argument("--scenario", default="config/benchmarks/industrial-soak.yaml")
+    industrial_soak.add_argument("--compose-file", default="docker/docker-compose.yml")
+    industrial_soak.add_argument("--duration", type=int, default=None, help="Override scenario duration in seconds")
+    industrial_soak.add_argument("--smoke", action="store_true", help="Scale the campaign to a 30-second smoke run")
+    industrial_soak.add_argument("--dry-run", action="store_true", help="Validate and print the campaign without starting Docker")
+    industrial_soak.add_argument("--report-dir", default=None)
+    industrial_soak.add_argument("--json", action="store_true")
+    industrial_soak.set_defaults(func=cmd_benchmark)
     site_profile_matrix = benchmark_sub.add_parser("site-profile-matrix", help="Benchmark real-world simulator runs per site profile")
     site_profile_matrix.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
     site_profile_matrix.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
