@@ -39,3 +39,8 @@ Focused validation after the change: 35 tests passed. The live soak result
 remains the same baseline until a new Flink-only run is executed after scaling
 TaskManagers, so no performance improvement is claimed from configuration
 contracts alone.
+
+The soak harness was then updated to preserve `FLINK_TASKMANAGER_REPLICAS`
+across its own Compose refreshes. That makes the next 15-minute campaign a
+true scaled Flink-only measurement instead of a startup-only scale that later
+collapses back to the default service count.

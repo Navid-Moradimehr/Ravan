@@ -137,6 +137,8 @@ duplicate scoring and makes lag measurements meaningful.
 partition count, host CPU/memory, slot size, and optional event-rate estimates.
 It writes environment values but does not silently restart services. Compose
 operators apply the resulting TaskManager count with `docker compose --scale`.
+The soak runner now also reads `FLINK_TASKMANAGER_REPLICAS` so a long-running
+measurement stays on the scaled layout through its own refresh cycles.
 
 Kubernetes keeps the capacity contract in Helm values and defaults stateful
 autoscaling to the Apache Flink Kubernetes Operator. CPU-only HPA is opt-in,

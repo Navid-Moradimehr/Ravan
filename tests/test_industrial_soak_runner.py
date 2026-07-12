@@ -42,3 +42,38 @@ def test_snapshot_exposes_per_service_lag(monkeypatch, tmp_path: Path):
     snapshot = collect_snapshot(compose_file=tmp_path / "compose.yml")
     assert snapshot.consumer_lag_by_service["processor"] == 7.0
     assert snapshot.consumer_lag_by_service["fanout"] == 0.0
+
+
+def test_compose_up_preserves_requested_taskmanager_scale(monkeypatch, tmp_path: Path):
+    import services.benchmarks.industrial_soak_runner as runner
+
+    captured = {}
+
+    def fake_run(command, check, env):
+        captured["command"] = command
+        captured["check"] = check
+        captured["env"] = env
+        return None
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    runner._compose(tmp_path / "docker-compose.yml", "up", "-d", "--build", env={"A": "B"}, taskmanager_replicas=3)
+    assert captured["command"].count("--scale") == 1
+    assert "taskmanager=3" in captured["command"]
+    assert captured["check"] is True
+    assert captured["env"] == {"A": "B"}
+
+
+def test_compose_up_keeps_scaled_services_in_service_list(monkeypatch, tmp_path: Path):
+    import services.benchmarks.industrial_soak_runner as runner
+
+    captured = {}
+
+    def fake_run(command, check, env):
+        captured["command"] = command
+        return None
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    runner._compose(tmp_path / "docker-compose.yml", "up", "-d", "--force-recreate", "mqtt-sim", env={}, taskmanager_replicas=3)
+    assert "mqtt-sim" in captured["command"]
+    assert "taskmanager" in captured["command"]
+    assert "flink-job" in captured["command"]

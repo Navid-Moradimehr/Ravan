@@ -2754,7 +2754,10 @@ stateful savepoint rescaling has a stable ceiling.
 6. Extended the industrial soak report with per-service consumer lag for the
 processor, fanout, and AI paths. This distinguishes Flink capacity problems
 from downstream sink or AI backlogs.
-7. Verification: focused tests `35 passed`; Docker Compose configuration
+7. Soak harness now preserves `FLINK_TASKMANAGER_REPLICAS` across its own
+Compose refreshes so a scaled benchmark stays scaled for the full run.
+8. Verification: focused tests `35 passed`; Docker Compose configuration
 validation passed. The prior 15-minute simulation remains a failing burst-drain
-baseline: peak aggregate lag 40,335 and final lag 26,391. No improvement is
-claimed until a Flink-only scaled soak is measured.
+baseline: peak aggregate lag 40,335 and final lag 26,391. A Flink-only scaled
+soak must still be measured against the preserved replica count before a
+capacity claim is made.

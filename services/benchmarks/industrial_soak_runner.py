@@ -215,8 +215,33 @@ def _scaled_phases(scenario: IndustrialSoakScenario, duration: int | None, smoke
     return tuple(phases)
 
 
-def _compose(compose_file: Path, *args: str, env: dict[str, str] | None = None) -> None:
-    command = ["docker", "compose", "-f", str(compose_file), "--profile", "edge", "--profile", "api", "--profile", "ui", *args]
+def _taskmanager_replicas_from_env() -> int | None:
+    raw = os.getenv("FLINK_TASKMANAGER_REPLICAS", "").strip()
+    if not raw:
+        return None
+    try:
+        replicas = int(raw)
+    except ValueError:
+        return None
+    return replicas if replicas > 0 else None
+
+
+def _compose(compose_file: Path, *args: str, env: dict[str, str] | None = None, taskmanager_replicas: int | None = None) -> None:
+    command = ["docker", "compose", "-f", str(compose_file), "--profile", "edge", "--profile", "api", "--profile", "ui"]
+    if args and args[0] == "up" and taskmanager_replicas:
+        command.extend(["up", "--scale", f"taskmanager={taskmanager_replicas}"])
+        extra_args = list(args[1:])
+        if not extra_args:
+            extra_args = ["taskmanager", "flink-job"]
+        else:
+            services = [arg for arg in extra_args if not arg.startswith("-")]
+            if "taskmanager" not in services:
+                extra_args.append("taskmanager")
+            if "flink-job" not in services:
+                extra_args.append("flink-job")
+        command.extend(extra_args)
+    else:
+        command.extend(args)
     subprocess.run(command, check=True, env=env)
 
 
@@ -253,6 +278,7 @@ def run_live(
     scenario = load_scenario(scenario_path)
     compose_path = Path(compose_file)
     phases = _scaled_phases(scenario, duration, smoke)
+    taskmanager_replicas = _taskmanager_replicas_from_env()
     started_at = datetime.now(timezone.utc).isoformat()
     if dry_run:
         report = IndustrialSoakReport(scenario.scenario_id, started_at, datetime.now(timezone.utc).isoformat(), smoke, True, (), None, None, None, None, None, None, True, ())
@@ -260,7 +286,9 @@ def run_live(
         return report
 
     env = os.environ.copy()
-    _compose(compose_path, "up", "-d", *("--build",) if build else (), env=env)
+    # Preserve the chosen TaskManager scale across the benchmark's own
+    # compose refreshes so the soak actually measures the scaled layout.
+    _compose(compose_path, "up", "-d", *("--build",) if build else (), env=env, taskmanager_replicas=taskmanager_replicas)
     # Compose keeps an existing Prometheus container alive when only its
     # bind-mounted scrape configuration changes; restart it so this campaign
     # measures the current worker endpoints rather than stale target state.
@@ -273,7 +301,7 @@ def run_live(
         if phase.rate_multiplier == 0:
             _compose(compose_path, "stop", "mqtt-sim", env=env)
         elif phase.name in {"warmup", "sustained", "burst", "recovery"}:
-            _compose(compose_path, "up", "-d", "--force-recreate", "mqtt-sim", env=env)
+            _compose(compose_path, "up", "-d", "--force-recreate", "mqtt-sim", env=env, taskmanager_replicas=taskmanager_replicas)
         if phase.fault == "source_disconnect_reconnect":
             _compose(compose_path, "restart", "mqtt-sim", env=env)
         if phase.restart_service:

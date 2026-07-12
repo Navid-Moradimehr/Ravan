@@ -20,7 +20,12 @@ py -3.13 -m services.cli.datastreamctl flink capacity-plan `
 
 The planner limits parallelism by Kafka partitions, host CPU, host memory, and
 configured bounds. For the resulting TaskManager count, set
-`FLINK_TASKMANAGER_SLOTS` and use `docker compose --scale taskmanager=N`.
+`FLINK_TASKMANAGER_SLOTS` and `FLINK_TASKMANAGER_REPLICAS`, then use
+`docker compose --scale taskmanager=N`.
+
+The soak harness also respects `FLINK_TASKMANAGER_REPLICAS` so a long-running
+benchmark remains on the scaled layout instead of collapsing back to the
+default single replica when the runner refreshes the Compose stack.
 
 ## Kubernetes
 

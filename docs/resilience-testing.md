@@ -47,6 +47,22 @@ py -3.13 -m services.cli.datastreamctl benchmark industrial-soak `
   --report-dir .datastream/reports/industrial-soak-15m
 ```
 
+To keep the run scaled, set `FLINK_TASKMANAGER_REPLICAS` before launching the
+campaign. The soak runner reads that environment variable and preserves the
+same TaskManager count across its own compose refreshes:
+
+```powershell
+$env:FLINK_PARALLELISM = "3"
+$env:FLINK_MAX_PARALLELISM = "3"
+$env:FLINK_TASKMANAGER_SLOTS = "1"
+$env:FLINK_TASKMANAGER_REPLICAS = "3"
+py -3.13 -m services.cli.datastreamctl benchmark industrial-soak `
+  --scenario config/benchmarks/industrial-soak.yaml `
+  --duration 900 `
+  --no-build `
+  --report-dir .datastream/reports/industrial-soak-15m-scaled
+```
+
 Compose uses Flink as the default processing runtime. The Python processor is
 an explicit fallback profile:
 
@@ -57,7 +73,8 @@ docker compose -f docker/docker-compose.yml --profile python-fallback up -d proc
 Do not run that fallback profile together with `flink-job` for normal operation;
 both consumers read the same raw stream. For an 18-partition local deployment,
 run the capacity planner first and apply the reported slot count with
-`FLINK_TASKMANAGER_SLOTS` and `docker compose --scale taskmanager=N`.
+`FLINK_TASKMANAGER_SLOTS`, `FLINK_TASKMANAGER_REPLICAS`, and
+`docker compose --scale taskmanager=N`.
 
 ## Interpreting Results
 
