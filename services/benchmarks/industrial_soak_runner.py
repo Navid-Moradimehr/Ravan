@@ -252,6 +252,10 @@ def run_live(
 
     env = os.environ.copy()
     _compose(compose_path, "up", "-d", "--build", env=env)
+    # Compose keeps an existing Prometheus container alive when only its
+    # bind-mounted scrape configuration changes; restart it so this campaign
+    # measures the current worker endpoints rather than stale target state.
+    _compose(compose_path, "restart", "prometheus", env=env)
     time.sleep(5)
     initial = collect_snapshot(compose_file=compose_path, include_ai=scenario.ai_enabled)
     phase_results: list[SoakPhaseResult] = []
