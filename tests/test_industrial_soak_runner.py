@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from services.benchmarks.industrial_soak import load_scenario
-from services.benchmarks.industrial_soak_runner import _metric_total, _scaled_phases, run_live
+from services.benchmarks.industrial_soak_runner import _metric_total, _scaled_phases, collect_snapshot, run_live
 
 
 def test_metric_total_sums_labeled_series():
@@ -30,3 +30,15 @@ def test_dry_run_validates_without_starting_docker(tmp_path: Path):
     assert report.dry_run
     assert (tmp_path / "industrial-soak.json").exists()
     assert (tmp_path / "industrial-soak.md").exists()
+
+
+def test_snapshot_exposes_per_service_lag(monkeypatch, tmp_path: Path):
+    import services.benchmarks.industrial_soak_runner as runner
+
+    monkeypatch.setattr(runner, "_read_text", lambda url: "")
+    monkeypatch.setattr(runner, "_read_json", lambda url: {"status": "ok"})
+    monkeypatch.setattr(runner, "_docker_resources", lambda compose_file: (1.0, 100.0))
+    monkeypatch.setattr(runner, "_prometheus_scalar", lambda base_url, query: 7.0 if 'service="processor"' in query else 0.0)
+    snapshot = collect_snapshot(compose_file=tmp_path / "compose.yml")
+    assert snapshot.consumer_lag_by_service["processor"] == 7.0
+    assert snapshot.consumer_lag_by_service["fanout"] == 0.0

@@ -348,7 +348,8 @@ def main() -> None:
     input_topic = os.getenv("IOT_TOPIC", os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized"))
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
     window_limit = max(1, int(os.getenv("RUNTIME_WINDOW_LIMIT", "25")))
-    parallelism = int(os.getenv("FLINK_PARALLELISM", "4"))
+    parallelism = max(1, int(os.getenv("FLINK_PARALLELISM", "4")))
+    max_parallelism = max(parallelism, int(os.getenv("FLINK_MAX_PARALLELISM", "120")))
     starting_offsets = os.getenv("FLINK_STARTING_OFFSETS", "latest").strip().lower()
 
     connector_jars = [
@@ -365,6 +366,8 @@ def main() -> None:
             existing_jars.append(jar_uri)
 
     configuration = Configuration()
+    # Keep the rescaling ceiling stable so keyed state can be restored from a savepoint.
+    configuration.set_integer("pipeline.max-parallelism", max_parallelism)
     if existing_jars:
         configuration.set_string("pipeline.jars", ";".join(existing_jars))
 

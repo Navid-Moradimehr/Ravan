@@ -125,3 +125,26 @@ When the Python gate is off, the processor still produces to `iot.processed` and
 commits offsets, but skips the `processed_events` historian write - letting
 open-source operators run it as a pure topic fan-out when their endpoint is a
 lakehouse or a non-Timescale store. See [[20_Architecture/Sink Architecture]].
+
+## Flink Capacity And Runtime Selection (2026-07-12)
+
+Flink is the default production processor in Docker Compose. The Python
+processor is an explicit fallback profile and must not run concurrently with
+Flink against the same input topic during normal operation. This avoids
+duplicate scoring and makes lag measurements meaningful.
+
+`datastreamctl flink capacity-plan` computes a bounded startup plan from Kafka
+partition count, host CPU/memory, slot size, and optional event-rate estimates.
+It writes environment values but does not silently restart services. Compose
+operators apply the resulting TaskManager count with `docker compose --scale`.
+
+Kubernetes keeps the capacity contract in Helm values and defaults stateful
+autoscaling to the Apache Flink Kubernetes Operator. CPU-only HPA is opt-in,
+not the recommended stateful path. The operator owns checkpoint/savepoint
+coordination and bounded adaptive rescaling; the platform does not implement a
+competing custom autoscaler.
+
+The 2026-07-12 15-minute Docker simulation showed zero lag in warmup and
+sustained phases but a burst/recovery drain failure. Reports now separate
+processor, fanout, and AI lag so future tuning can target the actual saturated
+consumer instead of treating the entire pipeline as one bottleneck.

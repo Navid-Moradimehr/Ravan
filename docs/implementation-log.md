@@ -2733,3 +2733,28 @@ source/ingest timing and provenance fields while older tables remain readable
 through schema projection. Added `docs/lakehouse-and-s3-guide.md` and the
 matching Obsidian runbook. Focused verification: `6 passed`; Compose config
 validation passed.
+## 2026-07-12 - Bounded Flink Capacity Planning And Lag Attribution
+
+1. Added `services/common/flink_capacity.py`, a pure capacity planner and
+bounded scaling-decision helper. It uses Kafka partitions, host resources,
+slots, optional event-rate estimates, lag, and busy time to produce a
+recommendation without mutating a deployment.
+2. Added `datastreamctl flink capacity-plan` and
+`datastreamctl flink scaling-decision`. Capacity plans can be written to an
+environment file for explicit operator review; they do not restart services.
+3. Made Flink the default Docker Compose processing runtime. The Python
+processor is behind the explicit `python-fallback` profile, preventing two
+consumer groups from processing the same input during normal operation.
+4. Added Helm capacity/operator contracts. The chart defaults to Flink
+Operator autoscaling semantics; generic CPU HPA is opt-in for deployments that
+explicitly accept that tradeoff. The chart does not install cluster-scoped
+operator CRDs.
+5. Applied `FLINK_MAX_PARALLELISM` to the PyFlink pipeline configuration so
+stateful savepoint rescaling has a stable ceiling.
+6. Extended the industrial soak report with per-service consumer lag for the
+processor, fanout, and AI paths. This distinguishes Flink capacity problems
+from downstream sink or AI backlogs.
+7. Verification: focused tests `35 passed`; Docker Compose configuration
+validation passed. The prior 15-minute simulation remains a failing burst-drain
+baseline: peak aggregate lag 40,335 and final lag 26,391. No improvement is
+claimed until a Flink-only scaled soak is measured.

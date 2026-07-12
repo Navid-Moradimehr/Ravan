@@ -34,6 +34,7 @@ class RuntimeSnapshot:
     container_cpu_percent: float | None
     container_memory_mb: float | None
     consumer_lag: float | None
+    consumer_lag_by_service: dict[str, float | None] | None = None
 
 
 @dataclass(frozen=True)
@@ -186,6 +187,13 @@ def collect_snapshot(
             if include_ai
             else 'sum(datastream_broker_consumer_lag_messages{service!="ai_gateway",service!="ai_enriched_fanout"})',
         ),
+        consumer_lag_by_service={
+            service: _prometheus_scalar(
+                prometheus_url,
+                f'sum(datastream_broker_consumer_lag_messages{{service="{service}"}})',
+            )
+            for service in ("processor", "fanout", "ai_gateway", "ai_enriched_fanout")
+        },
     )
 
 
@@ -304,9 +312,10 @@ def _write_report(report: IndustrialSoakReport, report_dir: Path | str | None) -
     path = Path(report_dir)
     path.mkdir(parents=True, exist_ok=True)
     (path / "industrial-soak.json").write_text(json.dumps(asdict(report), indent=2), encoding="utf-8")
-    lines = [f"# Industrial Soak: {report.scenario_id}", "", f"- Passed: `{str(report.passed).lower()}`", f"- Generated events: `{report.generated_events}`", f"- Edge events: `{report.edge_events}`", f"- DLQ events: `{report.dlq_events}`", f"- Unaccounted events: `{report.unaccounted_events}`", "", "## Phases", "", "| Phase | Seconds | Configured events/sec | Consumer lag | Memory MB |", "|---|---:|---:|---:|---:|"]
+    lines = [f"# Industrial Soak: {report.scenario_id}", "", f"- Passed: `{str(report.passed).lower()}`", f"- Generated events: `{report.generated_events}`", f"- Edge events: `{report.edge_events}`", f"- DLQ events: `{report.dlq_events}`", f"- Unaccounted events: `{report.unaccounted_events}`", "", "## Phases", "", "| Phase | Seconds | Configured events/sec | Aggregate lag | Processor lag | Fanout lag | AI lag | Memory MB |", "|---|---:|---:|---:|---:|---:|---:|---:|"]
     for phase in report.phases:
-        lines.append(f"| {phase.name} | {phase.duration_seconds} | {phase.configured_rate_per_second} | {phase.snapshot.consumer_lag} | {phase.snapshot.container_memory_mb} |")
+        lag = phase.snapshot.consumer_lag_by_service or {}
+        lines.append(f"| {phase.name} | {phase.duration_seconds} | {phase.configured_rate_per_second} | {phase.snapshot.consumer_lag} | {lag.get('processor')} | {lag.get('fanout')} | {lag.get('ai_gateway')} | {phase.snapshot.container_memory_mb} |")
     if report.failures:
         lines.extend(["", "## Failures", "", *[f"- {failure}" for failure in report.failures]])
     (path / "industrial-soak.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -315,7 +324,7 @@ def _write_report(report: IndustrialSoakReport, report_dir: Path | str | None) -
 def format_report(report: IndustrialSoakReport) -> str:
     lines = ["industrial soak", "=" * 40, f"scenario={report.scenario_id}", f"passed={str(report.passed).lower()}", f"generated={report.generated_events} edge={report.edge_events} dlq={report.dlq_events} unaccounted={report.unaccounted_events}"]
     for phase in report.phases:
-        lines.append(f"{phase.name}: seconds={phase.duration_seconds} configured_rate={phase.configured_rate_per_second} lag={phase.snapshot.consumer_lag} memory_mb={phase.snapshot.container_memory_mb}")
+        lines.append(f"{phase.name}: seconds={phase.duration_seconds} configured_rate={phase.configured_rate_per_second} lag={phase.snapshot.consumer_lag} lag_by_service={phase.snapshot.consumer_lag_by_service} memory_mb={phase.snapshot.container_memory_mb}")
     for failure in report.failures:
         lines.append(f"FAIL: {failure}")
     return "\n".join(lines)

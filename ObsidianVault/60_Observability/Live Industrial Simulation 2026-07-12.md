@@ -21,3 +21,21 @@ and historian write throughput.
 
 The dashboard image was rebuilt after the run and the new Historical Trend
 time-span selector is present in Docker.
+
+## Capacity-plan follow-up
+
+The next implementation phase added a bounded Flink capacity planner and made
+the runtime choice explicit. The planner considers Kafka partitions, available
+CPU/memory, slots per TaskManager, configured minimum/maximum parallelism, and
+optional throughput estimates. It does not pretend that a single local host
+can guarantee industrial capacity.
+
+The soak report now breaks lag down by `processor`, `fanout`, `ai_gateway`, and
+`ai_enriched_fanout`. This is important because increasing Flink parallelism
+cannot repair a separate AI or sink backlog. The default Compose deployment
+uses Flink only; Python is an opt-in fallback profile.
+
+Focused validation after the change: 35 tests passed. The live soak result
+remains the same baseline until a new Flink-only run is executed after scaling
+TaskManagers, so no performance improvement is claimed from configuration
+contracts alone.
