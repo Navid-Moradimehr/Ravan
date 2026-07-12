@@ -239,6 +239,7 @@ def run_live(
     duration: int | None = None,
     smoke: bool = False,
     dry_run: bool = False,
+    build: bool = True,
     report_dir: Path | str | None = None,
 ) -> IndustrialSoakReport:
     scenario = load_scenario(scenario_path)
@@ -251,7 +252,7 @@ def run_live(
         return report
 
     env = os.environ.copy()
-    _compose(compose_path, "up", "-d", "--build", env=env)
+    _compose(compose_path, "up", "-d", *("--build",) if build else (), env=env)
     # Compose keeps an existing Prometheus container alive when only its
     # bind-mounted scrape configuration changes; restart it so this campaign
     # measures the current worker endpoints rather than stale target state.

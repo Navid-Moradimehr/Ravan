@@ -35,6 +35,18 @@ For longer campaigns, omit `--smoke` or set `--duration`. Real site acceptance
 still requires customer validation with their PLCs, network behavior, storage,
 retention policy, and failure procedures.
 
+For a measured run on an already-prepared Docker stack, use
+`--no-build`. This avoids rebuilding every image as part of the measurement
+window:
+
+```powershell
+py -3.13 -m services.cli.datastreamctl benchmark industrial-soak `
+  --scenario config/benchmarks/industrial-soak.yaml `
+  --duration 900 `
+  --no-build `
+  --report-dir .datastream/reports/industrial-soak-15m
+```
+
 ## Interpreting Results
 
 - `unaccounted_events=0` means every unique valid event was either written or

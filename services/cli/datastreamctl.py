@@ -1713,6 +1713,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             duration=args.duration,
             smoke=args.smoke,
             dry_run=args.dry_run,
+            build=not args.no_build,
             report_dir=args.report_dir,
         )
         if args.json:
@@ -2701,6 +2702,7 @@ def build_parser() -> argparse.ArgumentParser:
     industrial_soak.add_argument("--duration", type=int, default=None, help="Override scenario duration in seconds")
     industrial_soak.add_argument("--smoke", action="store_true", help="Scale the campaign to a 30-second smoke run")
     industrial_soak.add_argument("--dry-run", action="store_true", help="Validate and print the campaign without starting Docker")
+    industrial_soak.add_argument("--no-build", action="store_true", help="Use the existing Docker images and start the stack without rebuilding")
     industrial_soak.add_argument("--report-dir", default=None)
     industrial_soak.add_argument("--json", action="store_true")
     industrial_soak.set_defaults(func=cmd_benchmark)
