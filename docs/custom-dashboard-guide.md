@@ -51,13 +51,16 @@ For an events or statistics panel, enter the historian table name. The default
 is `industrial_events`. The panel samples the newest rows and refreshes them
 according to its refresh setting.
 
-For alarms and runtime health, configuration is limited to the title and
-refresh interval because their APIs already define the appropriate dataset.
+Alarm rows include the timestamp, asset, tag, triggering value and unit when
+the processed historian row contains them, severity, and acknowledgement
+status. Runtime health configuration is limited to the title and refresh
+interval because its API already defines the appropriate dataset.
 Set refresh seconds to `0` to pause polling.
 
 ## Persistence And Scope
 
-The current builder saves its dashboard definition in the browser's
+The `?` help tip beside **Custom Dashboard** explains this scope in the UI. The
+current builder saves its dashboard definition in the browser's
 `localStorage` and supports validated JSON export/import. This makes it usable
 without adding authentication, a new database, or a new service. The layout is
 therefore local to one browser profile unless an operator explicitly exports

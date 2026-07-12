@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { HelpTip } from "@/components/help-tip";
 import {
   getAlarms,
   getAssetHierarchy,
@@ -196,8 +197,8 @@ function AlarmsPanel({ panel }: { panel: DashboardPanel }) {
   return (
     <div className="max-h-72 overflow-auto rounded-lg border border-border-subtle">
       <Table>
-        <TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Asset</TableHead><TableHead>Tag</TableHead><TableHead>Severity</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-        <TableBody>{query.data.map((alarm, index) => <TableRow key={`${alarm.time}-${alarm.asset_id}-${alarm.tag}-${index}`}><TableCell className="whitespace-nowrap text-xs">{formatTime(alarm.time)}</TableCell><TableCell>{alarm.asset_id}</TableCell><TableCell>{alarm.tag}</TableCell><TableCell><Badge variant="outline">{alarm.severity}</Badge></TableCell><TableCell>{alarm.acknowledged ? "Acknowledged" : "Open"}</TableCell></TableRow>)}</TableBody>
+        <TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Asset</TableHead><TableHead>Tag</TableHead><TableHead>Value</TableHead><TableHead>Severity</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+        <TableBody>{query.data.map((alarm, index) => <TableRow key={`${alarm.time}-${alarm.asset_id}-${alarm.tag}-${index}`}><TableCell className="whitespace-nowrap text-xs">{formatTime(alarm.time)}</TableCell><TableCell>{alarm.asset_id}</TableCell><TableCell>{alarm.tag}</TableCell><TableCell>{alarm.value == null ? "n/a" : `${formatValue(alarm.value)} ${alarm.unit ?? ""}`}</TableCell><TableCell><Badge variant="outline">{alarm.severity}</Badge></TableCell><TableCell>{alarm.acknowledged ? "Acknowledged" : "Open"}</TableCell></TableRow>)}</TableBody>
       </Table>
     </div>
   );
@@ -325,7 +326,7 @@ export function DashboardBuilder() {
 
   return <Card className="app-card">
     <CardHeader className="app-card-header">
-      <CardTitle className="flex items-center gap-2 text-base font-semibold"><LayoutDashboard className="size-4 text-accent" />Custom Dashboard <Badge variant="outline">Browser saved</Badge></CardTitle>
+      <CardTitle className="flex items-center gap-2 text-base font-semibold"><LayoutDashboard className="size-4 text-accent" />Custom Dashboard <HelpTip label="Custom dashboard help" content="Build a small operator view from historian and runtime APIs. Layouts are saved in this browser and can be moved with Export JSON and Import JSON. Use Grafana for shared, advanced, or cross-site dashboards." /></CardTitle>
       <CardDescription className="text-text-secondary">Compose a focused operator view from live historian and observability data. Grafana remains the advanced dashboard surface.</CardDescription>
     </CardHeader>
     <CardContent className="space-y-4 p-4">

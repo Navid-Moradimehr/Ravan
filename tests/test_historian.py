@@ -267,6 +267,29 @@ def test_insert_processed_events_uses_on_conflict(monkeypatch) -> None:
     assert captured["committed"] is True
 
 
+def test_query_alarms_includes_triggering_value_and_unit(monkeypatch) -> None:
+    from services.historian import client
+
+    monkeypatch.setattr(
+        client,
+        "_fetch_rows",
+        lambda *args, **kwargs: [{
+            "time": "2026-06-27T10:01:00+00:00",
+            "asset_id": "Pump-01",
+            "tag": "Temperature",
+            "value": 96.5,
+            "unit": "degC",
+            "severity": "critical",
+            "triggered_rules": ["temp_high"],
+        }],
+    )
+
+    alarms = client.query_alarms(5)
+
+    assert alarms[0]["value"] == 96.5
+    assert alarms[0]["unit"] == "degC"
+
+
 def test_query_sql_readonly_applies_timeout_and_tracks_handle(monkeypatch) -> None:
     from services.historian import client
 

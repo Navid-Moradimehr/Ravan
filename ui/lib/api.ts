@@ -94,6 +94,8 @@ export type AlarmEvent = {
   time: string;
   asset_id: string;
   tag: string;
+  value?: number | null;
+  unit?: string | null;
   severity: string;
   message: string;
   triggered_rules: string[];

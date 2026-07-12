@@ -34,6 +34,9 @@ registry can preserve the same panel contract for shared site dashboards.
 - Trend panels support manual asset/tag values when a site has not populated
   the asset registry yet.
 - Dashboard JSON import/export is available without server-side identity.
+- Alarm panels show the processed triggering value and unit when available.
+- The browser-persistence boundary is explained through the standard `?` help
+  tip rather than a status badge.
 
 ## Future Extension
 

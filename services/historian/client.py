@@ -542,7 +542,7 @@ def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
         "processed_events",
         "alarms",
         """
-        SELECT time, asset_id, tag, severity, triggered_rules, evaluation
+        SELECT time, asset_id, tag, value, unit, severity, triggered_rules, evaluation
         FROM processed_events
         WHERE severity IN ('warning', 'critical')
         ORDER BY time DESC
@@ -555,6 +555,8 @@ def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
             "time": row["time"],
             "asset_id": row["asset_id"],
             "tag": row["tag"],
+            "value": row.get("value"),
+            "unit": row.get("unit"),
             "severity": row["severity"],
             "message": f"Anomaly detected on {row['asset_id']}.{row['tag']}",
             "triggered_rules": row.get("triggered_rules", []),
