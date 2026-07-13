@@ -7,6 +7,10 @@
   semantic, retrieval, and replay contracts.
 - The dashboard production build exposes the expected same-origin proxy routes
   under `/api/*`.
+- Added a legacy-compatible historian alias route so older browser bundles that
+  still call `/api/historian/assets`, `/api/historian/scenarios`, or
+  `/api/historian/replay` are forwarded to the canonical historian contract
+  instead of surfacing 404s.
 - Fixed the KPI Builder, which had called `/api/v1/kpis` directly from browser
   code even though its Next.js proxy is `/api/kpis`. KPI list, create, and
   delete now use the proxy and encode KPI identifiers.

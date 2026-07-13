@@ -23,6 +23,13 @@ The proxy surface covers the editable UI operations:
 - Notification list/create/delete
 - Observability, federation, and source-health snapshots
 
+Historian browser clients should use the canonical same-origin query form
+`/api/historian?action=events|trend|assets|scenarios|alarms|replay`. For
+backward compatibility with cached or older browser bundles, the dashboard also
+accepts legacy path aliases such as `/api/historian/assets`,
+`/api/historian/scenarios`, and `/api/historian/replay` and forwards them to
+the same backend historian contracts.
+
 Authorization headers are forwarded on mutation proxies. No identity provider,
 token issuer, RBAC model, or reverse proxy is imposed by the project; operators
 may place their chosen authentication system in front of the dashboard and API.
