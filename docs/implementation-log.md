@@ -2764,3 +2764,6 @@ capacity claim is made.
 9. Added a concrete Apache Flink Kubernetes Operator example manifest and
 README under `k8s/flink-operator/` so the deployment-owned operator path is
 documented separately from user-owned secrets, registry, and storage setup.
+10. Added a Kubernetes install/apply runbook and linked it from the self-host
+install guide so operators can follow the Helm + `kubectl` path without
+guessing where the Flink operator example lives.

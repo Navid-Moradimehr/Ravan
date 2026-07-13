@@ -56,6 +56,10 @@ datastreamctl project-manifest package config/project-manifest.yaml /tmp/datastr
 
 Then install the generated `systemd/install.sh` on the target host.
 
+For Kubernetes deployments, use the Flink operator runbook at
+[`docs/flink-operator-runbook.md`](docs/flink-operator-runbook.md) and the
+example deployment in `k8s/flink-operator/flinkdeployment.yaml`.
+
 ## Windows example
 
 Use the same package export flow and keep the runtime rooted under a local directory that the operator controls.
