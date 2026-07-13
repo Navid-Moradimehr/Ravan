@@ -131,6 +131,8 @@ export type ThresholdPolicySyncState = {
   policy_count: number;
 };
 
+const DEFAULT_API_WS_BASE_URL = process.env.NEXT_PUBLIC_API_WS_BASE_URL ?? "ws://localhost:8020";
+
 export async function getAssetTagCatalog(): Promise<{ items: AssetTagCatalogItem[] }> {
   return requestJson("/api/metadata/asset-tags");
 }
@@ -236,7 +238,7 @@ export function subscribeHistorianStream(
     onConnect?: () => void;
     onDisconnect?: () => void;
   },
-  baseUrl: string = "ws://localhost:8020",
+  baseUrl: string = DEFAULT_API_WS_BASE_URL,
 ): () => void {
   let ws: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -290,7 +292,7 @@ export function subscribeEventsWebSocket(
     onConnect?: () => void;
     onDisconnect?: () => void;
   },
-  baseUrl: string = "ws://localhost:8020",
+  baseUrl: string = DEFAULT_API_WS_BASE_URL,
 ): () => void {
   let ws: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -344,7 +346,7 @@ export function subscribeTelemetryWebSocket(
     onConnect?: () => void;
     onDisconnect?: () => void;
   },
-  baseUrl: string = "ws://localhost:8020",
+  baseUrl: string = DEFAULT_API_WS_BASE_URL,
 ): () => void {
   let ws: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

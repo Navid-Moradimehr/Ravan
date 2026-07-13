@@ -1,4 +1,24 @@
-# API System Audit (2026-07-06)\n\n**Status: 5/5 fixes applied.**
+# API System Audit (2026-07-13)\n\n**Status: route wiring verified; browser proxy fixes applied.**
+
+## 2026-07-13 Verification
+
+- FastAPI imports successfully and exposes 128 OpenAPI paths, including the
+  historian, metadata, connection, KPI, webhook, notification, observability,
+  semantic, retrieval, and replay contracts.
+- The dashboard production build exposes the expected same-origin proxy routes
+  under `/api/*`.
+- Fixed the KPI Builder, which had called `/api/v1/kpis` directly from browser
+  code even though its Next.js proxy is `/api/kpis`. KPI list, create, and
+  delete now use the proxy and encode KPI identifiers.
+- WebSocket clients now read `NEXT_PUBLIC_API_WS_BASE_URL` instead of baking
+  `ws://localhost:8020` into the client library. Compose sets the local value;
+  installed deployments can set an externally reachable `ws://` or `wss://`
+  endpoint.
+- Static scans found no remaining client-component calls that bypass the
+  same-origin proxy with `/api/v1/*`.
+- Container HTTP verification was not possible in this pass because Docker
+  Desktop was unavailable (`dockerDesktopLinuxEngine` pipe missing). The
+  FastAPI route contract tests passed and the UI production build passed.
 
 ## Findings
 

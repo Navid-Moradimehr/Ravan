@@ -23,11 +23,11 @@ type KPIFormula = {
 };
 
 async function getKPIs(): Promise<KPIFormula[]> {
-  return requestJson("/api/v1/kpis");
+  return requestJson("/api/kpis");
 }
 
 async function createKPI(kpi: KPIFormula): Promise<{ ok: boolean }> {
-  return requestJson("/api/v1/kpis", {
+  return requestJson("/api/kpis", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(kpi),
@@ -35,7 +35,7 @@ async function createKPI(kpi: KPIFormula): Promise<{ ok: boolean }> {
 }
 
 async function deleteKPI(kpi_id: string): Promise<{ ok: boolean }> {
-  return requestJson(`/api/v1/kpis/${kpi_id}`, { method: "DELETE" });
+  return requestJson(`/api/kpis/${encodeURIComponent(kpi_id)}`, { method: "DELETE" });
 }
 
 export function KPIBuilder() {
