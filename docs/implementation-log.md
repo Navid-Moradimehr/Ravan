@@ -2761,3 +2761,6 @@ validation passed. The prior 15-minute simulation remains a failing burst-drain
 baseline: peak aggregate lag 40,335 and final lag 26,391. A Flink-only scaled
 soak must still be measured against the preserved replica count before a
 capacity claim is made.
+9. Added a concrete Apache Flink Kubernetes Operator example manifest and
+README under `k8s/flink-operator/` so the deployment-owned operator path is
+documented separately from user-owned secrets, registry, and storage setup.

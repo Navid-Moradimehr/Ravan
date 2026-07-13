@@ -145,6 +145,9 @@ autoscaling to the Apache Flink Kubernetes Operator. CPU-only HPA is opt-in,
 not the recommended stateful path. The operator owns checkpoint/savepoint
 coordination and bounded adaptive rescaling; the platform does not implement a
 competing custom autoscaler.
+The repository also includes a concrete `k8s/flink-operator/flinkdeployment.yaml`
+example so operators can see how the deployment-owned Flink resource maps to
+the platform's native job image and storage contract.
 
 The 2026-07-12 15-minute Docker simulation showed zero lag in warmup and
 sustained phases but a burst/recovery drain failure. Reports now separate

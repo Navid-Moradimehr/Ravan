@@ -41,6 +41,11 @@ rescaling, job lifecycle, and its lag/busy-time autoscaler. The platform chart
 keeps these values in the site configuration but does not install the cluster-
 scoped operator CRD automatically.
 
+A concrete example manifest now lives at `k8s/flink-operator/flinkdeployment.yaml`.
+It shows how the platform-owned Flink job maps into an operator-managed
+application resource. Users should still publish the image into their own
+registry and fill in their own checkpoint/savepoint storage.
+
 Recommended controls are:
 
 - `maxParallelism` with useful divisors for future rescaling;

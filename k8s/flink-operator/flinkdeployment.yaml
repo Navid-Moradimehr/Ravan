@@ -1,0 +1,37 @@
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: data-stream-flink-job
+  namespace: data-stream
+  labels:
+    app.kubernetes.io/name: data-stream
+    app.kubernetes.io/component: flink-job
+spec:
+  image: data-stream/flink-job:latest
+  flinkVersion: v1_20
+  serviceAccount: data-stream-flink
+  mode: native
+  jobManager:
+    resource:
+      cpu: 1
+      memory: "1024m"
+  taskManager:
+    resource:
+      cpu: 1
+      memory: "1024m"
+  job:
+    jarURI: local:///opt/stream/services/processor/iot_anomaly_job.py
+    entryClass: ""
+    parallelism: 3
+    upgradeMode: savepoint
+    state: running
+    initialSavepointPath: ""
+  restartNonce: 1
+  flinkConfiguration:
+    high-availability: org.apache.flink.kubernetes.highavailability.KubernetesHaServicesFactory
+    high-availability.storageDir: s3://datastream-state/ha/
+    pipeline.max-parallelism: "3"
+    taskmanager.numberOfTaskSlots: "1"
+    state.checkpoints.dir: s3://datastream-checkpoints/checkpoints/
+    state.savepoints.dir: s3://datastream-checkpoints/savepoints/
+    execution.checkpointing.interval: "10000"
