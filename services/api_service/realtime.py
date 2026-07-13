@@ -64,7 +64,7 @@ async def _alarm_broadcaster() -> None:
     last_data: list[dict[str, Any]] = []
     while True:
         try:
-            data = query_alarms(50)
+            data = await asyncio.to_thread(query_alarms, 50)
             if data != last_data:
                 last_data = data
                 service_state.mark_ok()
@@ -83,7 +83,7 @@ async def _event_broadcaster() -> None:
     while True:
         for table in tables:
             try:
-                data = query_historian_events(table, 100)
+                data = await asyncio.to_thread(query_historian_events, table, 100)
                 if data != last_data.get(table):
                     last_data[table] = data
                     service_state.mark_ok()

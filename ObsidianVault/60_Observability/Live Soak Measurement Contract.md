@@ -16,9 +16,12 @@ covered by unit tests.
 - Measurement foundation implemented and committed.
 - Generator scheduling no longer accumulates per-event sleep drift.
 - Delivery failures and producer queue saturation are visible.
-- Existing single-site and multisite scripts remain compatible wrappers.
-- Full stage-level accounting and resource time-series collection remain in the
-  next implementation phase.
+- Windows runners wait for graceful generator completion before fallback
+  termination.
+- Fanout stage metrics are bounded and available in Prometheus.
+- A valid 15-minute single-site and three-site comparison has passed with
+  acknowledged delivery, historian attribution, zero duplicates, and zero
+  final fanout lag.
 
 Fan-out services now expose bounded Prometheus counters and histograms for
 batch outcomes, accepted/rejected events, failed writes, and sink latency.
@@ -39,6 +42,22 @@ limits of this result.
 The Docker Flink lifecycle now cancels previously active jobs with the owned
 job name before submitting a replacement. The runtime check must show one
 active job and no duplicate consumers.
+
+## 2026-07-13 acceptance results
+
+| Run | attempted | acknowledged | raw rows | processed rows | final lag |
+|---|---:|---:|---:|---:|---:|
+| single-site, 15 minutes | 89,996 | 89,996 | 89,996 | 89,996 | 0 |
+| three-site, 15 minutes | 269,992 | 269,992 | 269,992 | 269,992 | 0 |
+
+The prior low totals were invalid because the old harness stopped the producer
+before delivery callbacks and final reports were flushed. The corrected
+measurement uses acknowledged Kafka deliveries and downstream row deltas.
+
+The fresh deterministic runtime gate measured 9,026.12 events/sec, p50
+0.0630 ms, p95 0.1622 ms, and p99 0.3143 ms. Relative to the pre-cache
+132.53 events/sec baseline, the measured throughput improvement is 6,710%.
+This is a local reference result, not an end-to-end Docker capacity promise.
 
 ## Interpretation rule
 

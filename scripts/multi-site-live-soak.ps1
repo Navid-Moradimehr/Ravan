@@ -48,7 +48,7 @@ docker compose -f docker/docker-compose.yml stop mqtt-sim opcua-sim modbus-sim e
 
   $processes = @()
   for ($index = 1; $index -le $Sites; $index++) {
-    $siteId = ("site-{0:00}" -f $index)
+    $siteId = "$runId-site-$index"
     $siteRate = [math]::Max(1, $RatePerSecond)
     $processes += Start-Generator -SiteId $siteId -Rate $siteRate
   }
@@ -85,7 +85,7 @@ Write-Host ("processes_started={0}" -f $processes.Count)
 Write-Host ("run_id={0}" -f $runId)
 
 for ($index = 1; $index -le $Sites; $index++) {
-  $siteId = ("site-{0:00}" -f $index)
+  $siteId = "$runId-site-$index"
   $reportPath = Join-Path $logRoot "$siteId.report.json"
   if (Test-Path $reportPath) {
     $generatorReport = Get-Content $reportPath -Raw | ConvertFrom-Json
@@ -110,22 +110,28 @@ try {
     Write-Host "processor_metrics=unavailable"
   }
 
-  $fanoutMetrics = (Invoke-WebRequest -UseBasicParsing http://localhost:18095 -TimeoutSec 10).Content
-  $processedFanoutMetrics = (Invoke-WebRequest -UseBasicParsing http://localhost:18097 -TimeoutSec 10).Content
-  $aiFanoutMetrics = (Invoke-WebRequest -UseBasicParsing http://localhost:18096 -TimeoutSec 10).Content
-  $apiHealth = Invoke-RestMethod http://localhost:8020/health -TimeoutSec 10
-  $aiHealth = Invoke-RestMethod http://localhost:8080/health -TimeoutSec 10
+  function Get-OptionalContent([string]$Url) {
+    try { return (Invoke-WebRequest -UseBasicParsing $Url -TimeoutSec 5).Content } catch { return $null }
+  }
+  function Get-OptionalJson([string]$Url) {
+    try { return Invoke-RestMethod $Url -TimeoutSec 5 } catch { return $null }
+  }
+  $fanoutMetrics = Get-OptionalContent "http://localhost:18095"
+  $processedFanoutMetrics = Get-OptionalContent "http://localhost:18097"
+  $aiFanoutMetrics = Get-OptionalContent "http://localhost:18096"
+  $apiHealth = Get-OptionalJson "http://localhost:8020/health"
+  $aiHealth = Get-OptionalJson "http://localhost:8080/health"
 
   if ($processorMetrics) {
     Write-Host ("processor_consumer_lag={0}" -f (Get-MetricValue -MetricsText $processorMetrics -MetricName "datastream_broker_consumer_lag_messages"))
   }
-  Write-Host ("fanout_consumer_lag={0}" -f (Get-MetricValue -MetricsText $fanoutMetrics -MetricName "datastream_broker_consumer_lag_messages"))
-  Write-Host ("processed_fanout_consumer_lag={0}" -f (Get-MetricValue -MetricsText $processedFanoutMetrics -MetricName "datastream_broker_consumer_lag_messages"))
-  Write-Host ("ai_fanout_consumer_lag={0}" -f (Get-MetricValue -MetricsText $aiFanoutMetrics -MetricName "datastream_broker_consumer_lag_messages"))
-  Write-Host ("api_status={0}" -f $apiHealth.status)
-  Write-Host ("ai_status={0}" -f $aiHealth.status)
-  Write-Host ("ai_provider={0}" -f $aiHealth.provider)
-  Write-Host ("ai_model={0}" -f $aiHealth.model)
+  Write-Host ("fanout_consumer_lag={0}" -f $(if ($fanoutMetrics) { Get-MetricValue -MetricsText $fanoutMetrics -MetricName "datastream_broker_consumer_lag_messages" } else { "unavailable" }))
+  Write-Host ("processed_fanout_consumer_lag={0}" -f $(if ($processedFanoutMetrics) { Get-MetricValue -MetricsText $processedFanoutMetrics -MetricName "datastream_broker_consumer_lag_messages" } else { "unavailable" }))
+  Write-Host ("ai_fanout_consumer_lag={0}" -f $(if ($aiFanoutMetrics) { Get-MetricValue -MetricsText $aiFanoutMetrics -MetricName "datastream_broker_consumer_lag_messages" } else { "unavailable" }))
+  Write-Host ("api_status={0}" -f $(if ($apiHealth) { $apiHealth.status } else { "unavailable" }))
+  Write-Host ("ai_status={0}" -f $(if ($aiHealth) { $aiHealth.status } else { "unavailable" }))
+  Write-Host ("ai_provider={0}" -f $(if ($aiHealth) { $aiHealth.provider } else { "unavailable" }))
+  Write-Host ("ai_model={0}" -f $(if ($aiHealth) { $aiHealth.model } else { "unavailable" }))
 }
 catch {
   Write-Host "Could not collect all runtime counters: $($_.Exception.Message)"

@@ -356,9 +356,22 @@ async def health() -> HealthResponse:
     except ImportError:
         from auth import auth_security_status  # type: ignore
 
-    kafka_ok = await asyncio.to_thread(probe_kafka)
-    historian_ok = await asyncio.to_thread(probe_historian)
-    ai_ok = await asyncio.to_thread(probe_ai_gateway)
+    # Probes are independent. Running them concurrently keeps a slow local
+    # model or historian from serially extending the health response.
+    try:
+        kafka_ok, historian_ok, ai_ok = await asyncio.wait_for(
+            asyncio.gather(
+                asyncio.to_thread(probe_kafka),
+                asyncio.to_thread(probe_historian),
+                asyncio.to_thread(probe_ai_gateway),
+            ),
+            timeout=2.5,
+        )
+    except asyncio.TimeoutError:
+        # A health endpoint must remain useful when a dependency probe itself
+        # misbehaves. The next request can retry while this one reports the
+        # dependency state conservatively.
+        kafka_ok = historian_ok = ai_ok = False
 
     auth_status = auth_security_status()
     dep_down = not (kafka_ok and historian_ok and ai_ok)

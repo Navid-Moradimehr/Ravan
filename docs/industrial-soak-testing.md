@@ -119,33 +119,53 @@ of capacity for a production industrial site.
 
 ## Latest Single-Site vs Multisite Live Comparison
 
-On 2026-07-13, the same local machine was used for two 15-minute wall-clock
-soaks with the same downstream stack and the same configured per-site generator
-rate:
+On 2026-07-13, the same local Docker stack was used for valid 15-minute
+wall-clock soaks. Each generator ran for the full duration, flushed Kafka
+delivery callbacks, and wrote an acknowledged-delivery report. The configured
+rate was 100 events/sec per site:
 
-- single-site: one generator at 100 events/sec
-- multisite: three generators at 100 events/sec each
+- single-site: one run-qualified site
+- multisite: three run-qualified sites
 
-Both runs kept fanout lag at 0 during the final snapshots and the Flink
-`iot-anomaly-processor` job stayed `RUNNING` with two tasks.
+The Flink `iot-anomaly-processor` job was `RUNNING` with two tasks and the
+replace-safe entrypoint verified that only one owned job was active. All
+generators reported zero failed deliveries and zero producer queue saturation.
 
-Final historian-write counters from the live runs:
+| Run | attempted | acknowledged | raw rows | processed rows | final fanout lag |
+|---|---:|---:|---:|---:|---:|
+| single-site | 89,996 | 89,996 | 89,996 | 89,996 | 0 |
+| multisite | 269,992 | 269,992 | 269,992 | 269,992 | 0 |
 
-| Run | industrial_events | processed_events | ai_enriched |
-|---|---:|---:|---:|
-| single-site | 2,226 | 2,210 | 1,754 |
-| multisite | 3,049 | 3,036 | 2,171 |
+The multisite run retained site identity and attributed the 269,992 rows to
+the three sites as 89,997, 89,998, and 89,997 rows. Raw duplicate event IDs
+were zero in the corrected attribution check. The multisite acknowledged rate
+was effectively three times the single-site rate, within the generator timing
+tolerance, rather than the 37% result recorded by the earlier harness.
 
-Interpretation:
+The earlier `2,226` single-site and `3,049` multisite totals are retained only
+as historical context. They were not valid capacity measurements because the
+old Windows wrapper terminated generators before delivery reports were
+flushed and therefore under-admitted the configured traffic.
 
-- multisite produced about 37% more historian writes than single-site on the
-  same node, not 3x more
-- the downstream path stayed healthy, but the node did not scale linearly with
-  the added sites
-- the single-node setup is acceptable for a pilot or a small site, but a
-  sustained multi-site rollout should plan for additional nodes earlier than a
-  naive throughput model would suggest
+## Current Deterministic Runtime Gate
 
-This is the most important local signal from the soak: the platform is
-operationally stable, but the single-node ceiling is visible once multiple
-equal-rate sites are added.
+The fresh 5,000-event local reference run used the production Flink runtime
+contract with 500 warmup events and a batch size of 256:
+
+| Metric | Result |
+|---|---:|
+| throughput | 9,026.12 events/sec |
+| p50 latency | 0.0630 ms |
+| p95 latency | 0.1622 ms |
+| p99 latency | 0.3143 ms |
+| invalid events | 0 |
+
+Against the pre-cache production baseline of 132.53 events/sec, this is a
+6,710% throughput improvement. This is an in-process/reference runtime gate,
+not a claim that a Docker node will sustain the same rate over Kafka and
+TimescaleDB. The measured bottleneck was repeated manifest policy parsing;
+the mtime-aware cache removed that work from the keyed hot path.
+
+AI enrichment is reported separately from the deterministic gate. Local AI
+gateway runs may be `degraded` when the configured model endpoint is busy or
+unavailable; that does not invalidate the Kafka-to-Flink-to-historian result.

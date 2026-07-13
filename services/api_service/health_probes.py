@@ -11,6 +11,8 @@ import logging
 import os
 import socket
 
+import psycopg2
+
 logger = logging.getLogger(__name__)
 
 _PROBE_TIMEOUT_SECONDS = 1.5
@@ -35,22 +37,34 @@ def probe_kafka() -> bool:
 def probe_historian() -> bool:
     """Probe the historian by running a cheap ``SELECT 1``.
 
-    Imports the client module (not the name) so tests can patch
-    ``historian_client.get_connection`` and the probe observes the patch.
+    Uses a short-lived connection instead of the application pool so a pool
+    exhausted by ingestion cannot make the health endpoint wait indefinitely.
     """
     try:
         from services.historian import client as historian_client
+        dsn = historian_client._connection_string()
     except Exception:
         return False
+    connection = None
     try:
-        with historian_client.get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
-                cur.fetchone()
+        connection = psycopg2.connect(
+            dsn,
+            connect_timeout=max(1, int(_PROBE_TIMEOUT_SECONDS)),
+            options=f"-c statement_timeout={int(_PROBE_TIMEOUT_SECONDS * 1000)}",
+        )
+        with connection.cursor() as cur:
+            cur.execute("SELECT 1")
+            cur.fetchone()
         return True
     except Exception as exc:
         logger.debug("historian probe failed: %s", exc)
         return False
+    finally:
+        if connection is not None:
+            try:
+                connection.close()
+            except Exception:
+                pass
 
 
 def probe_ai_gateway() -> bool:

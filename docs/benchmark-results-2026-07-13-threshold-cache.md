@@ -35,3 +35,12 @@ fallback behavior are unchanged.
 - Live 20-second single-site smoke after the measurement changes: 2,000
   attempted, 2,000 acknowledged, zero producer failures, zero queue-full
   events, zero final deterministic lag.
+
+## Fresh runtime gate
+
+A fresh 5,000-event run with 500 warmup events and batch size 256 measured the
+production Flink runtime contract at 9,026.12 events/sec, p50 0.0630 ms, p95
+0.1622 ms, and p99 0.3143 ms. This is within normal local-run variance of the
+earlier 9,050.56 events/sec reference result. The result is intentionally kept
+separate from the end-to-end Docker soak because it measures the deterministic
+runtime slice rather than broker, network, database, and AI gateway capacity.

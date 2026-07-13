@@ -60,8 +60,6 @@ def test_probe_kafka_false_on_failure(monkeypatch):
 def test_probe_historian_true_on_select_one(monkeypatch):
     """probe_historian returns True when SELECT 1 succeeds."""
     from services.api_service import health_probes
-    from services.historian import client as historian_client
-
     class _Cur:
         def __enter__(self):
             return self
@@ -76,28 +74,23 @@ def test_probe_historian_true_on_select_one(monkeypatch):
             return (1,)
 
     class _Conn:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return None
-
         def cursor(self):
             return _Cur()
 
-    monkeypatch.setattr(historian_client, "get_connection", lambda: _Conn())
+        def close(self):
+            pass
+
+    monkeypatch.setattr(health_probes.psycopg2, "connect", lambda *a, **k: _Conn(), raising=False)
     assert health_probes.probe_historian() is True
 
 
 def test_probe_historian_false_on_failure(monkeypatch):
     """probe_historian returns False (never raises) on DB error."""
     from services.api_service import health_probes
-    from services.historian import client as historian_client
-
-    def boom():
+    def boom(*args, **kwargs):
         raise RuntimeError("db down")
 
-    monkeypatch.setattr(historian_client, "get_connection", boom)
+    monkeypatch.setattr(health_probes.psycopg2, "connect", boom, raising=False)
     assert health_probes.probe_historian() is False
 
 

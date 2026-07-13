@@ -155,6 +155,47 @@ def test_insert_industrial_events_uses_execute_values(monkeypatch) -> None:
     assert captured["committed"] is True
 
 
+def test_insert_industrial_events_preserves_canonical_site_id(monkeypatch) -> None:
+    from services.historian import client
+
+    captured: dict[str, object] = {}
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(client, "get_connection", lambda: FakeConn())
+    monkeypatch.setattr(client, "execute_values", lambda cur, query, rows, page_size=None: captured.update(rows=list(rows)))
+
+    client.insert_industrial_events(
+        [{
+            "event_id": "site-event-1",
+            "site_id": "plant-a",
+            "asset_id": "Pump-01",
+            "tag": "Temperature",
+            "value": 42,
+        }]
+    )
+
+    assert captured["rows"][0][12] == "plant-a"
+
+
 def test_insert_processed_events_uses_execute_values(monkeypatch) -> None:
     from services.historian import client
 
