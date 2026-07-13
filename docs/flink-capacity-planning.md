@@ -87,3 +87,9 @@ docker compose -f docker/docker-compose.yml up -d
 This prevents duplicate consumers and makes capacity measurements attributable
 to the selected runtime. Python remains available only through the explicit
 `python-fallback` profile or a site profile that selects it.
+
+Compose Flink job lifecycle is also replace-safe. Recreating `flink-job` now
+queries the JobManager and cancels existing active jobs named
+`iot-anomaly-processor` before submitting the replacement. This prevents a
+container restart or image update from leaving two Flink consumers attached to
+the same Kafka topic.

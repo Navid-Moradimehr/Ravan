@@ -14,7 +14,8 @@ WORKDIR /opt/stream
 COPY services /opt/stream/services
 COPY config /opt/stream/config
 COPY requirements.txt /opt/stream/requirements.txt
+COPY docker/flink-job-entrypoint.sh /opt/stream/flink-job-entrypoint.sh
 
 ENV PYTHONPATH=/opt/stream
 
-CMD ["bash", "-lc", "flink run -m jobmanager:8081 -py /opt/stream/services/processor/iot_anomaly_job.py -pyfs /opt/stream"]
+CMD ["bash", "/opt/stream/flink-job-entrypoint.sh"]

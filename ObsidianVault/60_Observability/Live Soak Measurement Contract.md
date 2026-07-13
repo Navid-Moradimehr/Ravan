@@ -36,6 +36,10 @@ events/sec, while p95 latency fell from 11.9697 ms to 0.1267 ms. See
 `docs/benchmark-results-2026-07-13-threshold-cache.md` for the exact method and
 limits of this result.
 
+The Docker Flink lifecycle now cancels previously active jobs with the owned
+job name before submitting a replacement. The runtime check must show one
+active job and no duplicate consumers.
+
 ## Interpretation rule
 
 Never compare historian totals to the configured rate alone. First verify the

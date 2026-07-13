@@ -81,6 +81,10 @@ The threshold-policy cache optimization is documented in
 asset-hierarchy parsing from the keyed runtime path while preserving explicit
 policy precedence.
 
+The Flink Compose deployment is replace-safe: after a job-image update, the
+owned job is canceled before the replacement is submitted. A valid benchmark
+must show exactly one active `iot-anomaly-processor` job.
+
 The accounting helpers in `services/benchmarks/live_soak_accounting.py` are
 pure and unit-tested. They calculate counter deltas, latency percentiles, and
 the consecutive-zero drain condition used by the production soak runner.
