@@ -46,8 +46,8 @@ export default function HistorianPage() {
                   and use webhooks or notifications if you want to connect the historian to external systems.
                 </p>
                 <p>
-                  If you are new to the platform, think of the historian as the place where you ask, “What happened?”, while Kafka UI is
-                  the place where you ask, “Did the event move through the broker?”
+                  If you are new to the platform, think of the historian as the place where you ask, "What happened?", while Kafka UI is
+                  the place where you ask, "Did the event move through the broker?"
                 </p>
               </TabsContent>
             </Tabs>
