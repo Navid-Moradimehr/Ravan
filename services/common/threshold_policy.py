@@ -19,6 +19,7 @@ from services.assets.model import load_hierarchy
 POLICY_MODES = {"above", "below", "outside_range", "between_range", "bad_quality"}
 _CACHE_LOCK = Lock()
 _POLICY_CACHE: tuple[float, dict[tuple[str, str, str], dict[str, Any]]] | None = None
+_MANIFEST_POLICY_CACHE: dict[str, tuple[float, dict[tuple[str, str, str], dict[str, Any]]]] = {}
 _RUNTIME_STATE: dict[str, dict[str, Any]] = {}
 
 
@@ -93,41 +94,58 @@ def validate_policy(policy: dict[str, Any]) -> dict[str, Any]:
 
 
 def _manifest_policy(site_id: str, asset_id: str, tag: str, asset_config: str) -> dict[str, Any] | None:
+    path = str(asset_config)
+    try:
+        modified_at = os.path.getmtime(path)
+    except OSError:
+        modified_at = -1.0
+
+    # Asset manifests are metadata, not telemetry. Loading and walking the
+    # hierarchy for every event made threshold resolution the dominant cost of
+    # the keyed runtime path. Rebuild only when the source file changes.
+    with _CACHE_LOCK:
+        cached = _MANIFEST_POLICY_CACHE.get(path)
+        if cached and cached[0] == modified_at:
+            return cached[1].get((site_id, asset_id, tag))
+
     try:
         hierarchy = load_hierarchy(asset_config)
     except (OSError, KeyError, TypeError, ValueError):
+        with _CACHE_LOCK:
+            _MANIFEST_POLICY_CACHE[path] = (modified_at, {})
         return None
-    site = hierarchy.sites.get(site_id)
-    if not site:
-        return None
-    for area in site.areas.values():
-        for line in area.lines.values():
-            for cell in line.cells.values():
-                asset = cell.assets.get(asset_id)
-                if not asset:
-                    continue
-                metadata = asset.tags.get(tag) or next((item for item in asset.tags.values() if item.name == tag), None)
-                if not metadata:
-                    continue
-                return {
-                    "site_id": site_id,
-                    "asset_id": asset_id,
-                    "tag": tag,
-                    "unit": metadata.unit,
-                    "mode": "outside_range",
-                    "warning_low": metadata.warning_low,
-                    "warning_high": metadata.warning_high,
-                    "critical_low": metadata.critical_low,
-                    "critical_high": metadata.critical_high,
-                    "deadband": 0,
-                    "on_delay_seconds": 0,
-                    "off_delay_seconds": 0,
-                    "enabled": True,
-                    "source": "manifest",
-                    "version": 0,
-                    "configured": True,
-                }
-    return None
+    policies: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for current_site_id, site in hierarchy.sites.items():
+        for area in site.areas.values():
+            for line in area.lines.values():
+                for cell in line.cells.values():
+                    for current_asset_id, asset in cell.assets.items():
+                        for current_tag, metadata in asset.tags.items():
+                            tag_name = str(getattr(metadata, "name", "") or current_tag)
+                            policy = {
+                                "site_id": current_site_id,
+                                "asset_id": current_asset_id,
+                                "tag": tag_name,
+                                "unit": metadata.unit,
+                                "mode": "outside_range",
+                                "warning_low": metadata.warning_low,
+                                "warning_high": metadata.warning_high,
+                                "critical_low": metadata.critical_low,
+                                "critical_high": metadata.critical_high,
+                                "deadband": 0,
+                                "on_delay_seconds": 0,
+                                "off_delay_seconds": 0,
+                                "enabled": True,
+                                "source": "manifest",
+                                "version": 0,
+                                "configured": True,
+                            }
+                            policies[(str(current_site_id), str(current_asset_id), tag_name)] = policy
+                            policies[(str(current_site_id), str(current_asset_id), str(current_tag))] = policy
+
+    with _CACHE_LOCK:
+        _MANIFEST_POLICY_CACHE[path] = (modified_at, policies)
+    return policies.get((site_id, asset_id, tag))
 
 
 def _load_explicit_policies() -> dict[tuple[str, str, str], dict[str, Any]]:
@@ -169,6 +187,7 @@ def invalidate_policy_cache() -> None:
     global _POLICY_CACHE
     with _CACHE_LOCK:
         _POLICY_CACHE = None
+        _MANIFEST_POLICY_CACHE.clear()
 
 
 def resolve_threshold_policy(

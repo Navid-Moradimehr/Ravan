@@ -76,6 +76,11 @@ rejected events, failed writes, and sink-write latency. The labels are limited
 to service, topic, and status; site, asset, tag, and event IDs are deliberately
 excluded to prevent Prometheus cardinality growth.
 
+The threshold-policy cache optimization is documented in
+`docs/benchmark-results-2026-07-13-threshold-cache.md`. It removed repeated
+asset-hierarchy parsing from the keyed runtime path while preserving explicit
+policy precedence.
+
 The accounting helpers in `services/benchmarks/live_soak_accounting.py` are
 pure and unit-tested. They calculate counter deltas, latency percentiles, and
 the consecutive-zero drain condition used by the production soak runner.

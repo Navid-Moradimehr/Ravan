@@ -28,6 +28,14 @@ The Windows runners use a generator duration rather than immediately killing
 the child process. This is required for delivery callbacks and final JSON
 reports to be flushed reliably.
 
+## Measured optimization
+
+The threshold-policy manifest lookup is now cached by asset-file modification
+time. The 5,000-event reference pipeline increased from 132.53 to 10,690.41
+events/sec, while p95 latency fell from 11.9697 ms to 0.1267 ms. See
+`docs/benchmark-results-2026-07-13-threshold-cache.md` for the exact method and
+limits of this result.
+
 ## Interpretation rule
 
 Never compare historian totals to the configured rate alone. First verify the

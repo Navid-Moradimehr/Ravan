@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from services.common.threshold_policy import evaluate_threshold, transition_threshold_state, validate_policy
+from types import SimpleNamespace
+
+from services.common import threshold_policy
+from services.common.threshold_policy import evaluate_threshold, invalidate_policy_cache, resolve_threshold_policy, transition_threshold_state, validate_policy
 
 
 def test_outside_range_policy_prioritizes_critical_over_warning() -> None:
@@ -53,3 +56,50 @@ def test_transition_state_honors_on_delay_and_clears_after_off_delay() -> None:
     assert candidate == "normal"
     fourth, _, _ = transition_threshold_state("warning", since, 50, policy, now=110)
     assert fourth["severity"] == "normal"
+
+
+def test_manifest_policy_resolution_is_cached(monkeypatch, tmp_path) -> None:
+    asset_file = tmp_path / "assets.yaml"
+    asset_file.write_text("assets", encoding="utf-8")
+    metadata = SimpleNamespace(
+        name="temperature",
+        unit="c",
+        warning_low=None,
+        warning_high=80,
+        critical_low=None,
+        critical_high=100,
+    )
+    hierarchy = SimpleNamespace(
+        sites={
+            "site-01": SimpleNamespace(
+                areas={
+                    "area": SimpleNamespace(
+                        lines={
+                            "line": SimpleNamespace(
+                                cells={
+                                    "cell": SimpleNamespace(
+                                        assets={"Pump-01": SimpleNamespace(tags={"temperature": metadata})}
+                                    )
+                                }
+                            )
+                        }
+                    )
+                }
+            )
+        }
+    )
+    calls = 0
+
+    def load(_path):
+        nonlocal calls
+        calls += 1
+        return hierarchy
+
+    monkeypatch.setattr(threshold_policy, "load_hierarchy", load)
+    invalidate_policy_cache()
+    first = resolve_threshold_policy("site-01", "Pump-01", "temperature", asset_config=str(asset_file))
+    second = resolve_threshold_policy("site-01", "Pump-01", "temperature", asset_config=str(asset_file))
+
+    assert first["source"] == "manifest"
+    assert second["warning_high"] == 80
+    assert calls == 1
