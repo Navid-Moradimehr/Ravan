@@ -66,6 +66,11 @@ use the acknowledged count and the downstream historian/Kafka accounting.
 This prevents a slow local generator or producer queue from being mistaken for
 pipeline capacity.
 
+On Windows, generators stop through their duration control so Kafka delivery
+callbacks and the final report are flushed before process exit. The PowerShell
+wrappers wait for graceful exit and use process termination only as a timeout
+fallback.
+
 Fan-out workers now export bounded stage metrics for batch count, accepted and
 rejected events, failed writes, and sink-write latency. The labels are limited
 to service, topic, and status; site, asset, tag, and event IDs are deliberately

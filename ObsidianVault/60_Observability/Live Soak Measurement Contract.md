@@ -24,6 +24,10 @@ Fan-out services now expose bounded Prometheus counters and histograms for
 batch outcomes, accepted/rejected events, failed writes, and sink latency.
 Metrics are labelled only by service, topic, and status.
 
+The Windows runners use a generator duration rather than immediately killing
+the child process. This is required for delivery callbacks and final JSON
+reports to be flushed reliably.
+
 ## Interpretation rule
 
 Never compare historian totals to the configured rate alone. First verify the

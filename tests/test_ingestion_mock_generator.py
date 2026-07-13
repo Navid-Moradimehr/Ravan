@@ -24,3 +24,4 @@ def test_generator_stats_accounts_delivery_outcomes() -> None:
     assert report["acknowledged"] == 1
     assert report["failed"] == 1
     assert report["effective_attempt_rate"] == 3.0
+

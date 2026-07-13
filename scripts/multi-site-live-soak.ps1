@@ -30,6 +30,7 @@ function Start-Generator {
   $env:MOCK_RATE_PER_SECOND = "$Rate"
   $env:MOCK_DEVICE_COUNT = "$DeviceCount"
   $env:MOCK_MAX_EVENTS = "0"
+  $env:MOCK_DURATION_SECONDS = "$Seconds"
   $env:IOT_TOPIC = $Topic
   $env:MOCK_REPORT_PATH = (Join-Path $logRoot "$SiteId.report.json")
   Start-Process -WindowStyle Hidden -FilePath "py" -ArgumentList @(
@@ -52,14 +53,13 @@ docker compose -f docker/docker-compose.yml stop mqtt-sim opcua-sim modbus-sim e
     $processes += Start-Generator -SiteId $siteId -Rate $siteRate
   }
 
-Start-Sleep -Seconds $Seconds
+Start-Sleep -Seconds ($Seconds + 2)
 
 foreach ($process in $processes) {
-  try {
+  if (!$process.HasExited) {
     Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
   }
-  catch {
-  }
+  Wait-Process -Id $process.Id -Timeout 10 -ErrorAction SilentlyContinue
 }
 
 Start-Sleep -Seconds 5

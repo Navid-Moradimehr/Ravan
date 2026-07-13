@@ -106,6 +106,7 @@ def main() -> None:
     rate_per_second = env_int("MOCK_RATE_PER_SECOND", 100)
     device_count = env_int("MOCK_DEVICE_COUNT", 50)
     max_events = env_int("MOCK_MAX_EVENTS", 0)
+    duration_seconds = max(0, env_int("MOCK_DURATION_SECONDS", 0))
     site_id = os.getenv("MOCK_SITE_ID", "").strip() or None
     delay = 1 / max(rate_per_second, 1)
     running = True
@@ -132,6 +133,9 @@ def main() -> None:
     next_emit = time.monotonic()
 
     while running:
+        if duration_seconds and time.time() - stats.started_at >= duration_seconds:
+            running = False
+            break
         event = build_event(device_count, scenario_state, site_id=site_id)
         payload = json.dumps(asdict(event), separators=(",", ":")).encode("utf-8")
         try:
