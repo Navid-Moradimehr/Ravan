@@ -40,3 +40,34 @@ federated Kafka design, or independent site installations that write to a
 central lakehouse. The platform provides the event, site, mapping, lineage, and
 replay contracts; the customer's network and storage topology remain owned by
 the deployment team.
+
+## Latest Local Result
+
+On 2026-07-13, the current Docker-backed multi-site simulation passed with:
+
+- `3` simulated sites
+- `10,000` events per site
+- `2,000` queued outage events per site
+- `30,000` total central events written
+- `0` duplicate central IDs
+- `0` cross-site contamination events
+- `0` site isolation errors
+- `100%` replay recovery for every site
+
+The run completed in `3.673992` seconds and reported `8,165.50` events/sec
+for the local contract simulation. It did not expose any new pipeline defects.
+This remains a contract-level simulation, not a certification of real plant
+hardware, site networking, or customer storage topology.
+
+## Live Soak Comparison
+
+On 2026-07-13, a separate 15-minute wall-clock live soak was run on the same
+machine with the same downstream stack.
+
+- single-site live soak: `industrial_events=2,226`, `processed_events=2,210`, `ai_enriched=1,754`
+- multisite live soak: `industrial_events=3,049`, `processed_events=3,036`, `ai_enriched=2,171`
+
+The multisite run kept final fanout lag at 0, but it only produced about 37%
+more historian writes than the single-site run. That is the clearest local
+signal that the platform is stable on one node but will need additional nodes
+for real multisite growth if the operator wants near-linear scaling.

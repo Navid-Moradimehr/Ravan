@@ -35,7 +35,7 @@ def env_int(name: str, default: int) -> int:
     return int(raw_value) if raw_value else default
 
 
-def build_event(device_count: int, scenario_state: ScenarioState) -> SensorEvent:
+def build_event(device_count: int, scenario_state: ScenarioState, *, site_id: str | None = None) -> SensorEvent:
     device_number = random.randint(1, device_count)
     base_temp = random.gauss(48, 5)
     base_vib = random.gauss(3, 1.2)
@@ -46,11 +46,12 @@ def build_event(device_count: int, scenario_state: ScenarioState) -> SensorEvent
     press = apply_scenario(base_press, scenario_state)
 
     label = scenario_state.label()
+    resolved_site_id = site_id or f"site-{random.randint(1, 4):02d}"
 
     return SensorEvent(
         event_id=str(uuid.uuid4()),
         device_id=f"device-{device_number:03d}",
-        site_id=f"site-{random.randint(1, 4):02d}",
+        site_id=resolved_site_id,
         timestamp=datetime.now(timezone.utc).isoformat(),
         temperature_c=round(temp, 2),
         vibration_mm_s=round(vib, 2),
@@ -68,6 +69,7 @@ def main() -> None:
     rate_per_second = env_int("MOCK_RATE_PER_SECOND", 100)
     device_count = env_int("MOCK_DEVICE_COUNT", 50)
     max_events = env_int("MOCK_MAX_EVENTS", 0)
+    site_id = os.getenv("MOCK_SITE_ID", "").strip() or None
     delay = 1 / max(rate_per_second, 1)
     running = True
     scenario_state = load_scenario_from_env()
@@ -84,7 +86,7 @@ def main() -> None:
     started_at = time.time()
 
     while running:
-        event = build_event(device_count, scenario_state)
+        event = build_event(device_count, scenario_state, site_id=site_id)
         payload = json.dumps(asdict(event), separators=(",", ":")).encode("utf-8")
         producer.produce(topic, key=event.device_id.encode("utf-8"), value=payload)
         producer.poll(0)
