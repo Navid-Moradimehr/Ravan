@@ -24,8 +24,10 @@ deterministic reference slice, not proof of networked Flink throughput.
 When no explicit database policy existed, threshold resolution loaded and
 walked the complete asset hierarchy for every event. The implementation now
 caches the derived manifest-policy map and invalidates it when the asset file's
-modification time changes. Explicit database policy precedence and manifest
-fallback behavior are unchanged.
+modification time changes. The current release keeps the same explicit policy
+precedence but also publishes policy edits through a compacted Kafka topic so
+steady-state runtime consumers can stay on a lookup-only snapshot instead of
+re-querying the historian on every sample.
 
 ## Validation
 

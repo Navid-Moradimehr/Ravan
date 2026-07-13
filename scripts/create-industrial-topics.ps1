@@ -7,7 +7,8 @@ $topics = @(
   "industrial.dlq",
   "iot.raw",
   "iot.processed",
-  "iot.ai_enriched"
+  "iot.ai_enriched",
+  "platform.metadata.threshold-policies"
 )
 
 foreach ($topic in $topics) {
@@ -16,5 +17,9 @@ foreach ($topic in $topics) {
     Write-Host "Topic may already exist: $topic"
   } else {
     Write-Host "Created topic: $topic"
+  }
+  if ($topic -eq "platform.metadata.threshold-policies") {
+    docker compose -f $compose exec -T kafka /opt/kafka/bin/kafka-configs.sh --alter --bootstrap-server localhost:9092 --entity-type topics --entity-name $topic --add-config cleanup.policy=compact
+    Write-Host "Configured compact cleanup policy: $topic"
   }
 }

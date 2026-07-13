@@ -36,6 +36,7 @@ def test_split_domain_routes_registered():
         "/api/v1/metadata/asset-tags/reconcile",
         "/api/v1/metadata/threshold-policies",
         "/api/v1/metadata/threshold-policies/import",
+        "/api/v1/metadata/threshold-policies/sync",
         "/api/v1/metadata/events",
         "/api/v1/metadata/governance",
         "/api/v1/metadata/operational",

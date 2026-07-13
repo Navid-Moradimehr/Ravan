@@ -12,6 +12,7 @@ $topics = @(
     @{ Name = "iot.raw"; Partitions = 3; Compact = $false },
     @{ Name = "iot.processed"; Partitions = 3; Compact = $false },
     @{ Name = "iot.ai_enriched"; Partitions = 3; Compact = $false },
+    @{ Name = "platform.metadata.threshold-policies"; Partitions = 3; Compact = $true },
     @{ Name = "connect_configs"; Partitions = 1; Compact = $true },
     @{ Name = "connect_offsets"; Partitions = 1; Compact = $true },
     @{ Name = "connect_statuses"; Partitions = 1; Compact = $true }

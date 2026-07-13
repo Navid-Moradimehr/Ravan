@@ -13,7 +13,16 @@ from datetime import datetime, timezone
 from threading import Lock
 from typing import Any
 
+from psycopg2.extras import Json
+
 from services.assets.model import load_hierarchy
+from services.common.threshold_policy_sync import (
+    apply_threshold_snapshot,
+    cache_policy as cache_threshold_policy,
+    get_cached_policy,
+    list_cached_policies,
+    threshold_policy_sync_state,
+)
 
 
 POLICY_MODES = {"above", "below", "outside_range", "between_range", "bad_quality"}
@@ -21,6 +30,7 @@ _CACHE_LOCK = Lock()
 _POLICY_CACHE: tuple[float, dict[tuple[str, str, str], dict[str, Any]]] | None = None
 _MANIFEST_POLICY_CACHE: dict[str, tuple[float, dict[tuple[str, str, str], dict[str, Any]]]] = {}
 _RUNTIME_STATE: dict[str, dict[str, Any]] = {}
+_RESOLVED_POLICY_CACHE: dict[tuple[str, str, str], dict[str, Any]] = {}
 
 
 def _connection():
@@ -150,11 +160,16 @@ def _manifest_policy(site_id: str, asset_id: str, tag: str, asset_config: str) -
 
 def _load_explicit_policies() -> dict[tuple[str, str, str], dict[str, Any]]:
     global _POLICY_CACHE
-    ttl = max(0.0, float(os.getenv("THRESHOLD_POLICY_CACHE_SECONDS", "30")))
+    cached = list_cached_policies()
+    if cached:
+        policies: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for item in cached:
+            key = (str(item.get("site_id", "")), str(item.get("asset_id", "")), str(item.get("tag", "")))
+            policies[key] = item
+        with _CACHE_LOCK:
+            _POLICY_CACHE = (time.monotonic(), policies)
+        return policies
     now = time.monotonic()
-    with _CACHE_LOCK:
-        if _POLICY_CACHE and now - _POLICY_CACHE[0] < ttl:
-            return _POLICY_CACHE[1]
     try:
         ensure_policy_table()
     except Exception:
@@ -180,6 +195,7 @@ def _load_explicit_policies() -> dict[tuple[str, str, str], dict[str, Any]]:
         return {}
     with _CACHE_LOCK:
         _POLICY_CACHE = (now, policies)
+    apply_threshold_snapshot(list(policies.values()), source="bootstrap", status="synced")
     return policies
 
 
@@ -188,6 +204,7 @@ def invalidate_policy_cache() -> None:
     with _CACHE_LOCK:
         _POLICY_CACHE = None
         _MANIFEST_POLICY_CACHE.clear()
+        _RESOLVED_POLICY_CACHE.clear()
 
 
 def resolve_threshold_policy(
@@ -197,13 +214,23 @@ def resolve_threshold_policy(
     *,
     asset_config: str = "config/assets.yaml",
 ) -> dict[str, Any]:
-    explicit = _load_explicit_policies().get((site_id, asset_id, tag))
+    lookup_key = (site_id, asset_id, tag)
+    explicit = get_cached_policy(site_id, asset_id, tag)
     if explicit:
         return explicit
+    explicit = _load_explicit_policies().get(lookup_key)
+    if explicit:
+        return explicit
+    with _CACHE_LOCK:
+        cached = _RESOLVED_POLICY_CACHE.get(lookup_key)
+    if cached:
+        return cached
     manifest = _manifest_policy(site_id, asset_id, tag, asset_config)
     if manifest:
+        with _CACHE_LOCK:
+            _RESOLVED_POLICY_CACHE[lookup_key] = manifest
         return manifest
-    return {
+    fallback = {
         "site_id": site_id,
         "asset_id": asset_id,
         "tag": tag,
@@ -214,20 +241,31 @@ def resolve_threshold_policy(
         "version": 0,
         "configured": False,
     }
+    with _CACHE_LOCK:
+        _RESOLVED_POLICY_CACHE[lookup_key] = fallback
+    return fallback
 
 
 def list_threshold_policies(*, site_id: str | None = None) -> dict[str, Any]:
     policies = list(_load_explicit_policies().values())
     if site_id:
         policies = [item for item in policies if item.get("site_id") == site_id]
+    sync_state = threshold_policy_sync_state()
+    augmented = []
+    for item in policies:
+        copy = dict(item)
+        copy["policy_key"] = f"{copy.get('site_id', '')}|{copy.get('asset_id', '')}|{copy.get('tag', '')}"
+        copy["sync_status"] = copy.get("sync_status", sync_state.get("status", "synced"))
+        augmented.append(copy)
     return {
-        "policies": policies,
+        "policies": augmented,
         "source_precedence": ["user", "external_import", "manifest", "anomaly_score"],
         "contracts": {
             "user_policy_wins": True,
             "manifest_is_default_only": True,
             "runtime_does_not_query_historian": True,
         },
+        "sync": sync_state,
     }
 
 
@@ -267,9 +305,58 @@ def upsert_threshold_policy(policy: dict[str, Any]) -> dict[str, Any]:
                     normalized["enabled"], normalized["source"], version,
                 ),
             )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS metadata_threshold_policy_outbox (
+                    outbox_id BIGSERIAL PRIMARY KEY,
+                    policy_key TEXT NOT NULL,
+                    site_id TEXT NOT NULL,
+                    asset_id TEXT NOT NULL,
+                    tag TEXT NOT NULL,
+                    policy_version INTEGER NOT NULL,
+                    payload JSONB NOT NULL,
+                    sync_status TEXT NOT NULL DEFAULT 'pending',
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    published_at TIMESTAMPTZ
+                )
+                """
+            )
+            payload = {
+                **normalized,
+                "site_id": policy["site_id"],
+                "asset_id": policy["asset_id"],
+                "tag": policy["tag"],
+                "version": version,
+                "configured": True,
+            }
+            cur.execute(
+                """
+                INSERT INTO metadata_threshold_policy_outbox (
+                    policy_key, site_id, asset_id, tag, policy_version, payload, sync_status, attempts, updated_at
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,0,now())
+                """,
+                (
+                    f"{policy['site_id']}|{policy['asset_id']}|{policy['tag']}",
+                    policy["site_id"],
+                    policy["asset_id"],
+                    policy["tag"],
+                    version,
+                    Json(payload),
+                    "pending",
+                ),
+            )
         conn.commit()
-    invalidate_policy_cache()
-    return {**normalized, "site_id": policy["site_id"], "asset_id": policy["asset_id"], "tag": policy["tag"], "version": version, "configured": True}
+    cache_threshold_policy(payload)
+    with _CACHE_LOCK:
+        _RESOLVED_POLICY_CACHE[(policy["site_id"], policy["asset_id"], policy["tag"])] = payload
+    return {
+        **payload,
+        "policy_key": f"{policy['site_id']}|{policy['asset_id']}|{policy['tag']}",
+        "sync_status": "pending",
+    }
 
 
 def _outside(value: float, low: float | None, high: float | None) -> bool:

@@ -118,6 +118,19 @@ export type ThresholdPolicy = {
   configured?: boolean;
 };
 
+export type ThresholdPolicySyncState = {
+  topic: string;
+  status: string;
+  version: number;
+  published: number;
+  consumed: number;
+  pending_outbox: number;
+  last_error: string;
+  last_published_at: string | null;
+  last_consumed_at: string | null;
+  policy_count: number;
+};
+
 export async function getAssetTagCatalog(): Promise<{ items: AssetTagCatalogItem[] }> {
   return requestJson("/api/metadata/asset-tags");
 }
@@ -133,6 +146,10 @@ export async function saveThresholdPolicy(policy: ThresholdPolicy): Promise<{ ok
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(policy),
   });
+}
+
+export async function getThresholdPolicySync(): Promise<ThresholdPolicySyncState> {
+  return requestJson("/api/threshold-policies/sync");
 }
 
 export type ScenarioInfo = {

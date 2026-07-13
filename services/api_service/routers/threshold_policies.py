@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from services.common.threshold_policy import list_threshold_policies, upsert_threshold_policy
+from services.common.threshold_policy_sync import threshold_policy_sync_state
 
 
 class ThresholdPolicyRequest(BaseModel):
@@ -37,6 +38,11 @@ router = APIRouter(prefix="/api/v1/metadata", tags=["threshold-policies"])
 @router.get("/threshold-policies")
 async def get_threshold_policies(site_id: str | None = None) -> dict[str, Any]:
     return list_threshold_policies(site_id=site_id)
+
+
+@router.get("/threshold-policies/sync")
+async def get_threshold_policy_sync() -> dict[str, Any]:
+    return threshold_policy_sync_state()
 
 
 @router.put("/threshold-policies")

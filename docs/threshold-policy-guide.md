@@ -22,6 +22,13 @@ decision. The fields `threshold_severity`, `threshold_status`,
 the decision auditable. Existing anomaly scoring is not removed: the final
 severity is the more severe of the anomaly result and the threshold result.
 
+Threshold policies are now also published as compacted Kafka events on
+`platform.metadata.threshold-policies`. The historian database remains the
+authoritative source of truth, while Kafka is the distribution channel that
+keeps API, runtime processor, and Flink workers aligned without re-querying the
+historian for every event. If Kafka is unavailable, the policy is saved as
+`pending` and the outbox relay retries publication when the broker recovers.
+
 ## How an operator configures limits
 
 Open **Integrations**, then **Alarm and threshold policies**. Select a signal
@@ -54,7 +61,9 @@ available to avoid alarm chatter. The Python fallback applies these lifecycle
 controls in process-local state, and the Flink job now stores the same
 transition state per keyed asset/tag stream with checkpoints. This means the
 distributed path can preserve the lifecycle state across normal Flink
-restarts when checkpoint storage is configured correctly.
+restarts when checkpoint storage is configured correctly. The runtime now also
+keeps an in-memory policy snapshot, so once the compacted policy topic is
+consumed the steady-state path is lookup-only.
 
 The Compose profile defaults Flink to parallelism `1` because its local
 TaskManager exposes two slots and the job uses multiple operators. Set
@@ -69,7 +78,12 @@ can be either an array of policy objects or `{ "policies": [...] }`. Each
 object must contain `site_id`, `asset_id`, `tag`, and the limit fields. The
 platform marks imported rows as `source: external_import`; a later explicit
 operator save still takes precedence. The generic import does not guess vendor
-semantics or write anything back to equipment.
+semantics or write anything back to equipment. Imported and edited policies
+carry a `policy_key`, `version`, and `sync_status` so operators can see whether
+the change is still pending broker publication or already published.
+
+The API also exposes `GET /api/v1/metadata/threshold-policies/sync` so the UI
+can show the current publish state without scanning the historian.
 
 ## Discovery and caching
 

@@ -45,6 +45,7 @@ from services.common.brokers import resolve_kafka_brokers
 
 from services.common.runtime_event import RuntimeEventRecord
 from services.common.threshold_policy import resolve_threshold_policy, transition_threshold_state
+from services.common.threshold_policy_sync import start_policy_sync_workers
 from services.common.stream_scope import stream_partition_key
 from dataclasses import dataclass
 from services.processor.runtime_pipeline import build_runtime_event_payload
@@ -186,8 +187,18 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
         self._threshold_severity_state = None
         self._threshold_candidate_state = None
         self._threshold_since_state = None
+        self._policy_sync_stop = None
 
     def open(self, runtime_context) -> None:  # type: ignore[override]
+        subtask_index = 0
+        try:
+            subtask_index = int(runtime_context.get_index_of_this_subtask())
+        except Exception:
+            pass
+        self._policy_sync_stop, _threads = start_policy_sync_workers(
+            role=f"flink-worker-{subtask_index}",
+            enable_relay=False,
+        )
         self._sample_state = runtime_context.get_list_state(
             ListStateDescriptor("industrial_window_samples", Types.TUPLE([Types.FLOAT(), Types.FLOAT()]))
         )
@@ -269,9 +280,14 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
             temperature_avg_c=temperature_avg,
             vibration_avg_mm_s=vibration_avg,
             window_size=window_size,
+            threshold_policy=policy,
             threshold_result=threshold_result,
         )
         yield json.dumps(payload, separators=(",", ":"))
+
+    def close(self) -> None:  # type: ignore[override]
+        if self._policy_sync_stop is not None:
+            self._policy_sync_stop.set()
 
 
 

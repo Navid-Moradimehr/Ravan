@@ -38,6 +38,24 @@ CREATE TABLE IF NOT EXISTS metadata_threshold_policies (
 );
 CREATE INDEX IF NOT EXISTS metadata_threshold_policies_site_idx ON metadata_threshold_policies (site_id, asset_id, tag);
 
+CREATE TABLE IF NOT EXISTS metadata_threshold_policy_outbox (
+    outbox_id BIGSERIAL PRIMARY KEY,
+    policy_key TEXT NOT NULL,
+    site_id TEXT NOT NULL,
+    asset_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    policy_version INTEGER NOT NULL,
+    payload JSONB NOT NULL,
+    sync_status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    published_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS metadata_threshold_policy_outbox_status_idx ON metadata_threshold_policy_outbox (sync_status, outbox_id);
+CREATE INDEX IF NOT EXISTS metadata_threshold_policy_outbox_policy_idx ON metadata_threshold_policy_outbox (policy_key, policy_version);
+
 CREATE TABLE IF NOT EXISTS industrial_events (
     time TIMESTAMPTZ NOT NULL,
     event_id UUID NOT NULL,

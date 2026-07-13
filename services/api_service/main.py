@@ -205,6 +205,7 @@ def get_tls_context() -> ssl.SSLContext | None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     tasks = create_realtime_tasks()
+    policy_stop = None
     # Best-effort: self-configure compression/retention on startup so a fresh
     # deploy doesn't silently keep uncompressed data forever. Non-fatal.
     if os.getenv("HISTORIAN_AUTO_SETUP", "1") == "1":
@@ -216,7 +217,20 @@ async def lifespan(_app: FastAPI):
             setup_retention_policies()
         except Exception:
             pass
+    try:
+        from services.common.threshold_policy import list_threshold_policies
+        from services.common.threshold_policy_sync import start_policy_sync_workers
+
+        policy_stop, _policy_threads = start_policy_sync_workers(
+            role="api-service",
+            enable_relay=True,
+            initial_bootstrap=lambda: list_threshold_policies()["policies"],
+        )
+    except Exception:
+        policy_stop = None
     yield
+    if policy_stop is not None:
+        policy_stop.set()
     for t in tasks:
         t.cancel()
         try:

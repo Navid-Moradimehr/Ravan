@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import threading
 from types import SimpleNamespace
+
+from fastapi.testclient import TestClient
 
 from services.common import threshold_policy
 from services.common.threshold_policy import evaluate_threshold, invalidate_policy_cache, resolve_threshold_policy, transition_threshold_state, validate_policy
@@ -103,3 +106,70 @@ def test_manifest_policy_resolution_is_cached(monkeypatch, tmp_path) -> None:
     assert first["source"] == "manifest"
     assert second["warning_high"] == 80
     assert calls == 1
+
+
+def test_threshold_policy_sync_route_returns_state(monkeypatch) -> None:
+    monkeypatch.setattr(threshold_policy, "list_threshold_policies", lambda *a, **k: {"policies": []})
+    import services.common.threshold_policy_sync as sync_mod
+
+    monkeypatch.setattr(sync_mod, "start_policy_sync_workers", lambda *a, **k: (threading.Event(), []))
+    from services.api_service.main import app
+
+    client = TestClient(app)
+    response = client.get("/api/v1/metadata/threshold-policies/sync")
+    assert response.status_code == 200
+    body = response.json()
+    assert "status" in body
+    assert "topic" in body
+
+
+def test_resolved_fallback_policy_is_cached(monkeypatch, tmp_path) -> None:
+    asset_file = tmp_path / "assets.yaml"
+    asset_file.write_text("assets", encoding="utf-8")
+    metadata = SimpleNamespace(
+        name="temperature",
+        unit="c",
+        warning_low=None,
+        warning_high=80,
+        critical_low=None,
+        critical_high=100,
+    )
+    hierarchy = SimpleNamespace(
+        sites={
+            "site-01": SimpleNamespace(
+                areas={
+                    "area": SimpleNamespace(
+                        lines={
+                            "line": SimpleNamespace(
+                                cells={
+                                    "cell": SimpleNamespace(
+                                        assets={"Pump-01": SimpleNamespace(tags={"temperature": metadata})}
+                                    )
+                                }
+                            )
+                        }
+                    )
+                }
+            )
+        }
+    )
+    calls = {"load": 0, "stat": 0}
+
+    def load(_path):
+        calls["load"] += 1
+        return hierarchy
+
+    def stat(_path):
+        calls["stat"] += 1
+        return 1.0
+
+    monkeypatch.setattr(threshold_policy, "load_hierarchy", load)
+    monkeypatch.setattr(threshold_policy.os.path, "getmtime", stat)
+    invalidate_policy_cache()
+    first = resolve_threshold_policy("site-01", "Pump-01", "temperature", asset_config=str(asset_file))
+    second = resolve_threshold_policy("site-01", "Pump-01", "temperature", asset_config=str(asset_file))
+
+    assert first["source"] == "manifest"
+    assert second["warning_high"] == 80
+    assert calls["load"] == 1
+    assert calls["stat"] == 1

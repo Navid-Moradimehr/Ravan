@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { HelpTip } from "@/components/help-tip";
-import { getAssetTagCatalog, getThresholdPolicies, saveThresholdPolicy, type AssetTagCatalogItem, type ThresholdPolicy } from "@/lib/api";
+import { getAssetTagCatalog, getThresholdPolicies, getThresholdPolicySync, saveThresholdPolicy, type AssetTagCatalogItem, type ThresholdPolicy, type ThresholdPolicySyncState } from "@/lib/api";
 
 const emptyPolicy = (item: AssetTagCatalogItem): ThresholdPolicy => ({
   site_id: item.site_id,
@@ -28,6 +28,7 @@ const emptyPolicy = (item: AssetTagCatalogItem): ThresholdPolicy => ({
 export function ThresholdPolicyPanel() {
   const [items, setItems] = useState<AssetTagCatalogItem[]>([]);
   const [policies, setPolicies] = useState<ThresholdPolicy[]>([]);
+  const [sync, setSync] = useState<ThresholdPolicySyncState | null>(null);
   const [selected, setSelected] = useState("");
   const [policy, setPolicy] = useState<ThresholdPolicy | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -35,8 +36,8 @@ export function ThresholdPolicyPanel() {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    Promise.all([getAssetTagCatalog(), getThresholdPolicies()])
-      .then(([catalog, current]) => { setItems(catalog.items); setPolicies(current.policies); })
+    Promise.all([getAssetTagCatalog(), getThresholdPolicies(), getThresholdPolicySync()])
+      .then(([catalog, current, syncState]) => { setItems(catalog.items); setPolicies(current.policies); setSync(syncState); })
       .catch((reason) => setError(reason instanceof Error ? reason.message : "Threshold policies could not be loaded."));
   }, []);
 
@@ -86,9 +87,15 @@ export function ThresholdPolicyPanel() {
   };
 
   return <Card className="app-card" id="threshold-policies">
-    <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
-      <CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="size-4 text-accent" />Alarm and threshold policies <HelpTip label="Threshold policy help" content="Choose a discovered signal, review the registry or imported limits, and save an explicit platform policy. User policies take precedence over imported and manifest defaults. Delays and deadband are stored with the policy for deterministic runtime handling." /></CardTitle>
+      <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
+        <CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="size-4 text-accent" />Alarm and threshold policies <HelpTip label="Threshold policy help" content="Choose a discovered signal, review the registry or imported limits, and save an explicit platform policy. User policies take precedence over imported and manifest defaults. Delays and deadband are stored with the policy for deterministic runtime handling." /></CardTitle>
       <CardDescription>Configure warning and critical boundaries without changing connector code. The catalog includes configured and observed signals.</CardDescription>
+      {sync ? <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+        <span className="rounded-full border border-border-subtle bg-surface-2 px-2 py-1">Sync {sync.status}</span>
+        <span>Published {sync.published}</span>
+        <span>Pending {sync.pending_outbox}</span>
+        {sync.last_error ? <span className="text-error">{sync.last_error}</span> : null}
+      </div> : null}
     </CardHeader>
     <CardContent className="space-y-4 p-4">
       {error ? <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm">{error}</p> : null}

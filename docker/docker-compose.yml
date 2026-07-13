@@ -33,12 +33,13 @@ services:
       - -lc
       - |
         set -e
-        for topic in industrial.raw industrial.normalized industrial.operational industrial.dlq iot.raw iot.processed iot.ai_enriched; do
+        for topic in industrial.raw industrial.normalized industrial.operational industrial.dlq iot.raw iot.processed iot.ai_enriched platform.metadata.threshold-policies; do
           /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
             --topic "$$topic" \
             --bootstrap-server kafka:9092 \
             --partitions 3 \
-            --replication-factor 1 || true
+            --replication-factor 1 \
+            --config cleanup.policy=compact || true
         done
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
 
@@ -613,6 +614,9 @@ services:
         -c "CREATE INDEX IF NOT EXISTS metadata_asset_tags_updated_idx ON metadata_asset_tags (updated_at DESC);"
         -c "CREATE TABLE IF NOT EXISTS metadata_threshold_policies (site_id TEXT NOT NULL, asset_id TEXT NOT NULL, tag TEXT NOT NULL, unit TEXT, mode TEXT NOT NULL DEFAULT 'outside_range', warning_low DOUBLE PRECISION, warning_high DOUBLE PRECISION, critical_low DOUBLE PRECISION, critical_high DOUBLE PRECISION, deadband DOUBLE PRECISION NOT NULL DEFAULT 0, on_delay_seconds DOUBLE PRECISION NOT NULL DEFAULT 0, off_delay_seconds DOUBLE PRECISION NOT NULL DEFAULT 0, enabled BOOLEAN NOT NULL DEFAULT TRUE, source TEXT NOT NULL DEFAULT 'user', version INTEGER NOT NULL DEFAULT 1, effective_from TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (site_id, asset_id, tag));"
         -c "CREATE INDEX IF NOT EXISTS metadata_threshold_policies_site_idx ON metadata_threshold_policies (site_id, asset_id, tag);"
+        -c "CREATE TABLE IF NOT EXISTS metadata_threshold_policy_outbox (outbox_id BIGSERIAL PRIMARY KEY, policy_key TEXT NOT NULL, site_id TEXT NOT NULL, asset_id TEXT NOT NULL, tag TEXT NOT NULL, policy_version INTEGER NOT NULL, payload JSONB NOT NULL, sync_status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), published_at TIMESTAMPTZ);"
+        -c "CREATE INDEX IF NOT EXISTS metadata_threshold_policy_outbox_status_idx ON metadata_threshold_policy_outbox (sync_status, outbox_id);"
+        -c "CREATE INDEX IF NOT EXISTS metadata_threshold_policy_outbox_policy_idx ON metadata_threshold_policy_outbox (policy_key, policy_version);"
         -c "ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS threshold_severity TEXT NOT NULL DEFAULT 'normal';"
         -c "ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS threshold_status TEXT NOT NULL DEFAULT 'unconfigured';"
         -c "ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS threshold_source TEXT NOT NULL DEFAULT 'unconfigured';"

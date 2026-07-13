@@ -79,7 +79,9 @@ excluded to prevent Prometheus cardinality growth.
 The threshold-policy cache optimization is documented in
 `docs/benchmark-results-2026-07-13-threshold-cache.md`. It removed repeated
 asset-hierarchy parsing from the keyed runtime path while preserving explicit
-policy precedence.
+policy precedence. The current release extends that idea with an event-driven
+policy snapshot and compacted Kafka distribution, so steady-state lookups do
+not re-scan the historian or manifest on every event.
 
 The Flink Compose deployment is replace-safe: after a job-image update, the
 owned job is canceled before the replacement is submitted. A valid benchmark

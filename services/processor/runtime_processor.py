@@ -12,6 +12,8 @@ from services.common.brokers import resolve_kafka_brokers
 from services.common.normalize import normalize_runtime_event
 from services.common.runtime_metrics import set_consumer_lag
 from services.common.runtime_event import RollingWindowState, RuntimeEventRecord
+from services.common.threshold_policy import resolve_threshold_policy
+from services.common.threshold_policy_sync import start_policy_sync_workers
 from services.edge_ingest.model import to_json_bytes
 from services.historian.client import insert_processed_event, insert_processed_events
 from services.processor.runtime_pipeline import build_runtime_event_payload
@@ -116,6 +118,10 @@ def _prune_windows(
 
 def main() -> None:
     start_http_server(int(os.getenv("PROCESSOR_METRICS_PORT", "8094")))
+    policy_stop, _policy_threads = start_policy_sync_workers(
+        role="python-processor",
+        enable_relay=False,
+    )
     brokers = resolve_kafka_brokers("localhost:19092")
     input_topic = os.getenv("IOT_TOPIC", os.getenv("INDUSTRIAL_NORMALIZED_TOPIC", "industrial.normalized"))
     output_topic = os.getenv("PROCESSED_TOPIC", "iot.processed")
@@ -200,11 +206,15 @@ def main() -> None:
 
             window_last_seen[processing_key] = now_ts
             temperature_avg, vibration_avg, window_size = device_window.append(event)
+            policy = resolve_threshold_policy(event.site_id, event.asset_id, event.tag)
+            threshold_result = None
             processed_event = build_runtime_event_payload(
                 event,
                 temperature_avg_c=temperature_avg,
                 vibration_avg_mm_s=vibration_avg,
                 window_size=window_size,
+                threshold_policy=policy,
+                threshold_result=threshold_result,
             )
 
             producer.produce(
@@ -231,6 +241,7 @@ def main() -> None:
                 elapsed = max(time.time() - started_at, 0.001)
                 print(f"processed={processed} rate={processed / elapsed:.1f}/sec topic={output_topic}")
     finally:
+        policy_stop.set()
         flush_processed_buffer(force=True)
         consumer.close()
         producer.flush(10)
