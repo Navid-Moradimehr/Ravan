@@ -85,7 +85,7 @@ services:
       - "15432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stream -d stream_engine"]
       interval: 10s
@@ -149,7 +149,7 @@ services:
       TIMESCALE_HOST: timescaledb
       TIMESCALE_PORT: 5432
       KAFKA_BROKERS: kafka:9092
-      IOT_TOPIC: iot.raw
+      IOT_TOPIC: ${IOT_TOPIC:-industrial.normalized}
       PROCESSED_TOPIC: iot.processed
       INDUSTRIAL_NORMALIZED_TOPIC: industrial.normalized
       PROCESSOR_METRICS_PORT: 8094
@@ -194,6 +194,28 @@ services:
       FANOUT_METRICS_PORT: 8095
     ports:
       - "18095:8095"
+    volumes:
+      - api-data:/data:ro
+
+  processed-fanout:
+    build:
+      context: ..
+      dockerfile: services/processor/Dockerfile
+    command: ["python", "-m", "services.processor.processed_fanout"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      timescaledb-migrate:
+        condition: service_completed_successfully
+    environment:
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      KAFKA_BROKERS: kafka:9092
+      PROCESSED_TOPIC: iot.processed
+      PROCESSED_FANOUT_GROUP_ID: processed-historian
+      PROCESSED_FANOUT_METRICS_PORT: 8097
+    ports:
+      - "18097:8097"
     volumes:
       - api-data:/data:ro
 
@@ -307,7 +329,7 @@ services:
       INDUSTRIAL_RAW_TOPIC: industrial.raw
       INDUSTRIAL_NORMALIZED_TOPIC: industrial.normalized
       INDUSTRIAL_DLQ_TOPIC: industrial.dlq
-      IOT_TOPIC: iot.raw
+      IOT_TOPIC: ${IOT_TOPIC:-industrial.normalized}
     ports:
       - "8090:8090"
     volumes:
@@ -373,7 +395,7 @@ services:
       - kafka
     environment:
       KAFKA_BROKERS: kafka:9092
-      IOT_TOPIC: iot.raw
+      IOT_TOPIC: ${IOT_TOPIC:-industrial.normalized}
       PROCESSED_TOPIC: iot.processed
       RUNTIME_MODE: flink-production
       # Compose starts one TaskManager by default. Operators can use the
@@ -537,7 +559,7 @@ services:
       - "15433:5432"
     volumes:
       - timescale-data:/var/lib/postgresql/data
-      - ./docker/postgres/init-timescale-full.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      - ./postgres/init-timescale-full.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stream -d stream_engine"]
       interval: 10s

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from services.benchmarks.industrial_soak import load_scenario
-from services.benchmarks.industrial_soak_runner import _metric_total, _scaled_phases, collect_snapshot, run_live
+from services.benchmarks.industrial_soak_runner import _consumer_lag_failures, _metric_total, _scaled_phases, collect_snapshot, run_live
 
 
 def test_metric_total_sums_labeled_series():
@@ -42,6 +42,16 @@ def test_snapshot_exposes_per_service_lag(monkeypatch, tmp_path: Path):
     snapshot = collect_snapshot(compose_file=tmp_path / "compose.yml")
     assert snapshot.consumer_lag_by_service["processor"] == 7.0
     assert snapshot.consumer_lag_by_service["fanout"] == 0.0
+
+
+def test_individual_consumer_backlog_is_a_failure():
+    import services.benchmarks.industrial_soak_runner as runner
+
+    snapshot = runner.RuntimeSnapshot(
+        "now", 0, 0, 0, 0, 0, 0, 0, True, True, 0, 0, 0,
+        {"fanout": 0, "ai_gateway": 10, "ai_enriched_fanout": 0},
+    )
+    assert _consumer_lag_failures(snapshot, 0) == ["ai_gateway consumer lag exceeded limit: 10 > 0"]
 
 
 def test_compose_up_preserves_requested_taskmanager_scale(monkeypatch, tmp_path: Path):

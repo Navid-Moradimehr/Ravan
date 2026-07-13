@@ -83,7 +83,7 @@ def test_runtime_returns_published_event_id_and_publish_failed_status(monkeypatc
     from services.api_service import runtime
 
     monkeypatch.setattr(runtime, "resolve_kafka_brokers", lambda default="x": "localhost:19092")
-    monkeypatch.setattr(runtime, "_publish_kafka", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    monkeypatch.setattr(runtime, "_publish_kafka_batch", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
 
     result = runtime._do_ingest_event(
         {

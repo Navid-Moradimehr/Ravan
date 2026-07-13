@@ -55,3 +55,4 @@ acceptance:
   max_unaccounted_events: 0
   max_memory_growth_mb: 512
   drain_timeout_seconds: 180
+  max_consumer_lag: 0

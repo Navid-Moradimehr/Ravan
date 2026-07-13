@@ -87,9 +87,28 @@ def test_timescaledb_migrate_repairs_historian_uniqueness():
 
 def test_fanout_and_ai_services_wait_for_timescale_migration():
     services = _compose()["services"]
-    for name in ("ai-gateway", "fanout", "ai-fanout"):
+    for name in ("ai-gateway", "fanout", "processed-fanout", "ai-fanout"):
         depends = services[name].get("depends_on", {})
         assert depends.get("timescaledb-migrate") == {"condition": "service_completed_successfully"}
+
+
+def test_clean_install_mounts_are_relative_to_compose_directory():
+    services = _compose()["services"]
+    assert "./postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro" in services["postgres"]["volumes"]
+    assert "./postgres/init-timescale-full.sql:/docker-entrypoint-initdb.d/001-init.sql:ro" in services["timescaledb"]["volumes"]
+
+
+def test_default_processors_consume_canonical_normalized_topic():
+    services = _compose()["services"]
+    assert services["processor"]["environment"]["IOT_TOPIC"] == "${IOT_TOPIC:-industrial.normalized}"
+    assert services["flink-job"]["environment"]["IOT_TOPIC"] == "${IOT_TOPIC:-industrial.normalized}"
+
+
+def test_processed_historian_projection_is_independent_of_flink():
+    service = _compose()["services"]["processed-fanout"]
+    assert service["command"] == ["python", "-m", "services.processor.processed_fanout"]
+    assert service["environment"]["PROCESSED_TOPIC"] == "iot.processed"
+    assert "18097:8097" in service["ports"]
 
 
 def test_dashboard_profile_starts_api_service_for_same_origin_proxies():

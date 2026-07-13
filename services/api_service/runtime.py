@@ -93,6 +93,30 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     # Historian persistence is owned by the normalized fan-out consumer, which
     # reads industrial.normalized and writes via the sink layer. The API only
     # validates and publishes; it no longer dual-writes to the historian.
+    bundle = encode_event_bundle(event_dict)
+    if bundle is None:
+        key = stream_partition_key(event_dict)
+        normalized_bytes = to_json_bytes(event_dict)
+        legacy_event = _to_legacy_iot_event(event_dict)
+        legacy_bytes = to_json_bytes(legacy_event)
+    else:
+        key, normalized_bytes, legacy_bytes = bundle
+    try:
+        _publish_kafka_batch(
+            brokers,
+            (
+                (raw_topic, to_json_bytes(event_dict)),
+                (normalized_topic, normalized_bytes),
+                (legacy_topic, legacy_bytes),
+            ),
+            key,
+        )
+    except Exception as e:
+        return {
+            "status": "publish_failed",
+            "event_id": str(event_dict.get("event_id", payload["event_id"])),
+            "warning": f"kafka_publish_failed: {e}",
+        }
     try:
         from services.common.semantic_store import SemanticLineageRecord, get_semantic_store
 
@@ -114,32 +138,26 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
         )
     except Exception:
         pass
-
-    bundle = encode_event_bundle(event_dict)
-    if bundle is None:
-        key = stream_partition_key(event_dict)
-        normalized_bytes = to_json_bytes(event_dict)
-        legacy_event = _to_legacy_iot_event(event_dict)
-        legacy_bytes = to_json_bytes(legacy_event)
-    else:
-        key, normalized_bytes, legacy_bytes = bundle
-    try:
-        _publish_kafka(brokers, raw_topic, key, to_json_bytes(event_dict))
-        _publish_kafka(brokers, normalized_topic, key, normalized_bytes)
-        _publish_kafka(brokers, legacy_topic, key, legacy_bytes)
-    except Exception as e:
-        return {
-            "status": "publish_failed",
-            "event_id": str(event_dict.get("event_id", payload["event_id"])),
-            "warning": f"kafka_publish_failed: {e}",
-        }
     return {"status": "ingested", "event_id": str(event_dict.get("event_id", payload["event_id"]))}
 
 
 def _publish_kafka(brokers: str, topic: str, key: bytes, value: bytes) -> None:
     producer = _get_producer(brokers)
     producer.produce(topic, key=key, value=value)
-    producer.flush(5)
+    if producer.flush(5):
+        raise RuntimeError(f"Kafka delivery timed out for topic {topic}")
+
+
+def _publish_kafka_batch(
+    brokers: str,
+    records: tuple[tuple[str, bytes], ...],
+    key: bytes,
+) -> None:
+    producer = _get_producer(brokers)
+    for topic, value in records:
+        producer.produce(topic, key=key, value=value)
+    if producer.flush(5):
+        raise RuntimeError("Kafka delivery timed out for ingest event bundle")
 
 
 @lru_cache(maxsize=4)

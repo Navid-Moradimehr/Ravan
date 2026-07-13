@@ -332,7 +332,22 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
         latency_seconds=time.monotonic() - started,
     )
     producer.produce(settings.ai_enriched_topic, value=json.dumps(enriched_payload).encode("utf-8"))
-    producer.poll(0)
+    # Do not let the input consumer commit before the AI event has reached the
+    # broker. This path is intentionally at-least-once; the historian sink is
+    # idempotent and can safely retry after a process restart.
+    flush = getattr(producer, "flush", None)
+    if callable(flush):
+        remaining = flush(max(1.0, settings.llm_timeout_seconds))
+    else:
+        # Small producer doubles used by unit tests and plugin adapters may
+        # only expose poll(). The real confluent-kafka Producer always has
+        # flush(), so this fallback is only a compatibility seam.
+        producer.poll(0)
+        remaining = 0
+    if remaining:
+        service_state.mark_degraded("AI event delivery pending", f"{remaining} Kafka event(s) not acknowledged")
+        asyncio.create_task(_broadcast_telemetry())
+        return False
     enriched_events.inc()
     last_success_epoch.set(time.time())
     if not used_fallback:

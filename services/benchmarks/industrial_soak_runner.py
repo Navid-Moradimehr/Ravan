@@ -156,6 +156,7 @@ def collect_snapshot(
     prometheus_url: str = "http://localhost:19090",
     simulator_urls: tuple[str, ...] = ("http://localhost:18091", "http://localhost:18092", "http://localhost:18093"),
     fanout_url: str = "http://localhost:18095",
+    processed_fanout_url: str = "http://localhost:18097",
     ai_fanout_url: str = "http://localhost:18096",
     include_ai: bool = False,
 ) -> RuntimeSnapshot:
@@ -192,7 +193,7 @@ def collect_snapshot(
                 prometheus_url,
                 f'sum(datastream_broker_consumer_lag_messages{{service="{service}"}})',
             )
-            for service in ("processor", "fanout", "ai_gateway", "ai_enriched_fanout")
+            for service in ("processor", "fanout", "processed_fanout", "ai_gateway", "ai_enriched_fanout")
         },
     )
 
@@ -265,6 +266,16 @@ def _campaign_delta(snapshots: list[RuntimeSnapshot], field: str) -> int | None:
     return total
 
 
+def _consumer_lag_failures(snapshot: RuntimeSnapshot | None, limit: int) -> list[str]:
+    if snapshot is None or not snapshot.consumer_lag_by_service:
+        return []
+    return [
+        f"{service} consumer lag exceeded limit: {lag} > {limit}"
+        for service, lag in snapshot.consumer_lag_by_service.items()
+        if lag is not None and lag > limit
+    ]
+
+
 def run_live(
     scenario_path: Path | str,
     *,
@@ -327,6 +338,7 @@ def run_live(
         failures.append(
             f"consumer lag increased during campaign: {initial.consumer_lag} -> {final.consumer_lag}"
         )
+    failures.extend(_consumer_lag_failures(final, scenario.acceptance.max_consumer_lag))
     if unaccounted is not None and unaccounted > scenario.acceptance.max_unaccounted_events:
         failures.append(f"unaccounted events exceeded limit: {unaccounted}")
     report = IndustrialSoakReport(scenario.scenario_id, started_at, datetime.now(timezone.utc).isoformat(), smoke, False, tuple(phase_results), initial, final, generated, edge_events, dlq, unaccounted, not failures, tuple(failures))

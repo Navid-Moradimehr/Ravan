@@ -42,6 +42,7 @@ class SoakAcceptance:
     max_unaccounted_events: int = 0
     max_memory_growth_mb: float = 512.0
     drain_timeout_seconds: int = 180
+    max_consumer_lag: int = 0
 
 
 @dataclass(frozen=True)
@@ -99,7 +100,11 @@ class IndustrialSoakScenario:
             errors.append(
                 f"phase durations must equal duration_seconds ({phase_seconds} != {self.duration_seconds})"
             )
-        if self.acceptance.max_dlq_rate < 0 or self.acceptance.max_unaccounted_events < 0:
+        if (
+            self.acceptance.max_dlq_rate < 0
+            or self.acceptance.max_unaccounted_events < 0
+            or self.acceptance.max_consumer_lag < 0
+        ):
             errors.append("acceptance limits cannot be negative")
         return errors
 
@@ -141,6 +146,7 @@ def load_scenario(path: Path | str) -> IndustrialSoakScenario:
             max_unaccounted_events=int(acceptance.get("max_unaccounted_events", 0)),
             max_memory_growth_mb=float(acceptance.get("max_memory_growth_mb", 512.0)),
             drain_timeout_seconds=int(acceptance.get("drain_timeout_seconds", 180)),
+            max_consumer_lag=int(acceptance.get("max_consumer_lag", 0)),
         ),
     )
     errors = scenario.validate()
