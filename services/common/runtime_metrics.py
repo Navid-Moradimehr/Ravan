@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 try:
-    from prometheus_client import Gauge, Histogram
+    from prometheus_client import Counter, Gauge, Histogram
 except Exception:  # pragma: no cover - metrics are optional
-    Gauge = Histogram = None  # type: ignore[assignment]
+    Counter = Gauge = Histogram = None  # type: ignore[assignment]
 
 
 def _noop_metric():
@@ -26,7 +26,7 @@ def _noop_metric():
     return _Noop()
 
 
-if Gauge is not None and Histogram is not None:
+if Counter is not None and Gauge is not None and Histogram is not None:
     historian_query_latency = Histogram(
         "datastream_historian_query_latency_seconds",
         "Historian query latency by table and operation",
@@ -52,12 +52,30 @@ if Gauge is not None and Histogram is not None:
         "Federation transport lag in messages",
         ["topic"],
     )
+    fanout_batches = Counter(
+        "datastream_fanout_batches_total",
+        "Sink batches completed by fan-out worker",
+        ["service", "topic", "status"],
+    )
+    fanout_events = Counter(
+        "datastream_fanout_events_total",
+        "Events accepted or rejected by fan-out worker",
+        ["service", "topic", "status"],
+    )
+    fanout_write_latency = Histogram(
+        "datastream_fanout_write_latency_seconds",
+        "Sink write latency by fan-out worker",
+        ["service", "topic"],
+    )
 else:  # pragma: no cover - fallback path
     historian_query_latency = _noop_metric()
     historian_result_size = _noop_metric()
     broker_consumer_lag = _noop_metric()
     websocket_delivery_lag = _noop_metric()
     federation_lag = _noop_metric()
+    fanout_batches = _noop_metric()
+    fanout_events = _noop_metric()
+    fanout_write_latency = _noop_metric()
 
 
 def observe_historian_query(table: str, operation: str, duration_seconds: float, result_count: int) -> None:
@@ -91,3 +109,21 @@ def observe_websocket_batch_delivery(channel: str, events: list[dict[str, Any]])
 
 def set_federation_lag(topic: str, lag_messages: int) -> None:
     federation_lag.labels(topic=topic).set(max(int(lag_messages), 0))
+
+
+def observe_fanout_write(
+    service: str,
+    topic: str,
+    event_count: int,
+    accepted_count: int,
+    duration_seconds: float,
+    *,
+    status: str = "success",
+) -> None:
+    """Record bounded stage metrics for a sink batch."""
+    fanout_batches.labels(service=service, topic=topic, status=status).inc()
+    fanout_events.labels(service=service, topic=topic, status="accepted").inc(max(accepted_count, 0))
+    rejected = max(event_count - accepted_count, 0)
+    if rejected:
+        fanout_events.labels(service=service, topic=topic, status="rejected").inc(rejected)
+    fanout_write_latency.labels(service=service, topic=topic).observe(max(duration_seconds, 0.0))

@@ -17,7 +17,7 @@ from confluent_kafka import Consumer, TopicPartition
 from prometheus_client import start_http_server
 
 from services.common.brokers import resolve_kafka_brokers
-from services.common.runtime_metrics import set_consumer_lag
+from services.common.runtime_metrics import observe_fanout_write, set_consumer_lag
 from services.historian.client import insert_processed_events
 
 logger = logging.getLogger(__name__)
@@ -58,8 +58,13 @@ def main() -> None:
             return
         batch = buffer[:]
         pending = offsets[:]
+        write_started = time.monotonic()
         try:
             insert_processed_events(batch)
+            observe_fanout_write(
+                "processed_fanout", topic, len(batch), len(batch),
+                time.monotonic() - write_started,
+            )
             if pending:
                 consumer.commit(
                     offsets=[
@@ -69,6 +74,10 @@ def main() -> None:
                     asynchronous=False,
                 )
         except Exception:
+            observe_fanout_write(
+                "processed_fanout", topic, len(batch), 0,
+                time.monotonic() - write_started, status="failed",
+            )
             logger.exception("processed historian batch failed; offsets remain uncommitted")
             raise
         finally:

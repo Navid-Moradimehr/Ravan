@@ -28,7 +28,7 @@ from prometheus_client import start_http_server
 
 from services.common.brokers import resolve_kafka_brokers
 from services.common.kafka_dlq import publish_malformed_record
-from services.common.runtime_metrics import set_consumer_lag
+from services.common.runtime_metrics import observe_fanout_write, set_consumer_lag
 from services.sinks.base import SinkRegistry
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,19 @@ def main() -> None:
         buffer.clear()
         offsets.clear()
 
-        accepted = sink.write_batch_strict(batch)
+        write_started = time.monotonic()
+        try:
+            accepted = sink.write_batch_strict(batch)
+        except Exception:
+            observe_fanout_write(
+                "normalized_fanout", input_topic, len(batch), 0,
+                time.monotonic() - write_started, status="failed",
+            )
+            raise
+        observe_fanout_write(
+            "normalized_fanout", input_topic, len(batch), accepted,
+            time.monotonic() - write_started,
+        )
         logger.debug("fan-out wrote %d events (%d accepted)", len(batch), accepted)
         sink.flush_strict()
 

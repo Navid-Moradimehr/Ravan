@@ -20,6 +20,10 @@ covered by unit tests.
 - Full stage-level accounting and resource time-series collection remain in the
   next implementation phase.
 
+Fan-out services now expose bounded Prometheus counters and histograms for
+batch outcomes, accepted/rejected events, failed writes, and sink latency.
+Metrics are labelled only by service, topic, and status.
+
 ## Interpretation rule
 
 Never compare historian totals to the configured rate alone. First verify the

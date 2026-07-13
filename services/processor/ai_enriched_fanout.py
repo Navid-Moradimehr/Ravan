@@ -25,7 +25,7 @@ from prometheus_client import start_http_server
 
 from services.common.brokers import resolve_kafka_brokers
 from services.common.kafka_dlq import publish_malformed_record
-from services.common.runtime_metrics import set_consumer_lag
+from services.common.runtime_metrics import observe_fanout_write, set_consumer_lag
 from services.historian.client import insert_ai_enriched
 
 logger = logging.getLogger(__name__)
@@ -106,9 +106,18 @@ def main() -> None:
                 )
                 continue
 
+            write_started = time.monotonic()
             try:
                 insert_ai_enriched(event)
+                observe_fanout_write(
+                    "ai_enriched_fanout", input_topic, 1, 1,
+                    time.monotonic() - write_started,
+                )
             except Exception as exc:  # pragma: no cover - historian failure path
+                observe_fanout_write(
+                    "ai_enriched_fanout", input_topic, 1, 0,
+                    time.monotonic() - write_started, status="failed",
+                )
                 logger.warning("ai-enriched insert failed: %s", exc)
                 continue
 

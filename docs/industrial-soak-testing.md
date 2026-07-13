@@ -66,6 +66,11 @@ use the acknowledged count and the downstream historian/Kafka accounting.
 This prevents a slow local generator or producer queue from being mistaken for
 pipeline capacity.
 
+Fan-out workers now export bounded stage metrics for batch count, accepted and
+rejected events, failed writes, and sink-write latency. The labels are limited
+to service, topic, and status; site, asset, tag, and event IDs are deliberately
+excluded to prevent Prometheus cardinality growth.
+
 The accounting helpers in `services/benchmarks/live_soak_accounting.py` are
 pure and unit-tested. They calculate counter deltas, latency percentiles, and
 the consecutive-zero drain condition used by the production soak runner.
