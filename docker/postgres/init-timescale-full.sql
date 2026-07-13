@@ -46,6 +46,10 @@ CREATE TABLE IF NOT EXISTS industrial_events (
     asset_id TEXT NOT NULL,
     tag TEXT NOT NULL,
     value DOUBLE PRECISION NOT NULL DEFAULT 0,
+    value_text TEXT,
+    value_text_raw TEXT,
+    value_bool BOOLEAN,
+    value_type TEXT NOT NULL DEFAULT 'number',
     quality TEXT NOT NULL DEFAULT 'good',
     unit TEXT,
     site TEXT NOT NULL DEFAULT 'demo-site',
@@ -54,8 +58,7 @@ CREATE TABLE IF NOT EXISTS industrial_events (
     fault_type TEXT NOT NULL DEFAULT 'normal',
     scenario_id TEXT NOT NULL DEFAULT 'sc-000',
     ground_truth_severity TEXT NOT NULL DEFAULT 'normal',
-    step INTEGER NOT NULL DEFAULT 0,
-    value_text TEXT GENERATED ALWAYS AS (value::text) STORED
+    step INTEGER NOT NULL DEFAULT 0
 );
 
 SELECT create_hypertable('industrial_events', 'time', if_not_exists => TRUE, migrate_data => TRUE);

@@ -16,10 +16,15 @@ import os
 import signal
 import time
 
-from confluent_kafka import Consumer, TopicPartition
+try:
+    from confluent_kafka import Consumer, Producer, TopicPartition
+except ImportError:  # lightweight unit-test/plugin environments
+    from confluent_kafka import Consumer, TopicPartition
+    Producer = object  # type: ignore[assignment,misc]
 from prometheus_client import start_http_server
 
 from services.common.brokers import resolve_kafka_brokers
+from services.common.kafka_dlq import publish_malformed_record
 from services.common.runtime_metrics import set_consumer_lag
 from services.historian.client import insert_ai_enriched
 
@@ -54,6 +59,7 @@ def main() -> None:
         }
     )
     consumer.subscribe([input_topic])
+    dlq_producer = Producer({"bootstrap.servers": brokers, "client.id": "ai-fanout-dlq"})
 
     processed = 0
     started_at = time.time()
@@ -84,7 +90,20 @@ def main() -> None:
             try:
                 event = json.loads(message.value().decode("utf-8"))
             except Exception as exc:
-                logger.warning("ai-enriched fan-out skipping unparseable record: %s", exc)
+                logger.exception("ai-enriched fan-out routing malformed record to DLQ: %s", exc)
+                publish_malformed_record(
+                    dlq_producer,
+                    dlq_topic=os.getenv("INDUSTRIAL_DLQ_TOPIC", "industrial.dlq"),
+                    source_topic=message.topic(),
+                    partition=message.partition(),
+                    offset=message.offset(),
+                    value=message.value(),
+                    error=f"AI fan-out decode failed: {exc}",
+                )
+                consumer.commit(
+                    offsets=[TopicPartition(message.topic(), message.partition(), message.offset() + 1)],
+                    asynchronous=False,
+                )
                 continue
 
             try:
@@ -110,6 +129,7 @@ def main() -> None:
                 elapsed = max(time.time() - started_at, 0.001)
                 print(f"ai_enriched_fanout_processed={processed} rate={processed / elapsed:.1f}/sec")
     finally:
+        dlq_producer.flush(10)
         consumer.close()
 
 

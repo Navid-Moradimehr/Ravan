@@ -188,14 +188,17 @@ def main() -> None:
 
             raw_event = json.loads(message.value().decode("utf-8"))
             event = RuntimeEventRecord.from_raw_mapping(raw_event)
-            device_id = event.device_id
+            # Keep the fallback runtime keyed exactly like Flink. A device can
+            # expose multiple tags and can appear in multiple source scopes;
+            # using only asset/device_id mixes unrelated rolling windows.
+            processing_key = event.partition_key().decode("utf-8")
             now_ts = time.time()
-            device_window = windows.get(device_id)
+            device_window = windows.get(processing_key)
             if device_window is None:
                 device_window = RollingWindowState(maxlen=window_limit)
-                windows[device_id] = device_window
+                windows[processing_key] = device_window
 
-            window_last_seen[device_id] = now_ts
+            window_last_seen[processing_key] = now_ts
             temperature_avg, vibration_avg, window_size = device_window.append(event)
             processed_event = build_runtime_event_payload(
                 event,

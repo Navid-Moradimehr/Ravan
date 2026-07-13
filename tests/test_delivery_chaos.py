@@ -142,6 +142,7 @@ def test_at_least_once_redelivery_with_event_id_dedup_no_duplicates(monkeypatch)
     same source timestamp is a no-op rather than a duplicate insert.
     """
     from services.historian import client as historian_client
+    from services.historian.client import _event_uuid
     from services.sinks.historian_sink import TimescaleHistorianSink
 
     events = _make_events()
@@ -215,8 +216,8 @@ def test_at_least_once_redelivery_with_event_id_dedup_no_duplicates(monkeypatch)
     assert len(batches_received) == 2
     ids_attempt1 = {row[1] for row in batches_received[0][1]}
     ids_attempt2 = {row[1] for row in batches_received[1][1]}
-    assert ids_attempt1 == {"evt-1", "evt-2"}
-    assert ids_attempt2 == {"evt-1", "evt-2"}
+    assert ids_attempt1 == {_event_uuid("evt-1"), _event_uuid("evt-2")}
+    assert ids_attempt2 == {_event_uuid("evt-1"), _event_uuid("evt-2")}
 
     # Both batch inserts must carry ON CONFLICT (time, event_id) DO NOTHING, which is
     # the dedup that turns redelivery into a no-op rather than a duplicate row.
@@ -241,6 +242,7 @@ def test_crash_before_commit_redelivers_uncommitted_message(monkeypatch):
     absorbs it.
     """
     from services.historian import client as historian_client
+    from services.historian.client import _event_uuid
     from services.sinks.historian_sink import TimescaleHistorianSink
 
     events = _make_events()
@@ -299,8 +301,8 @@ def test_crash_before_commit_redelivers_uncommitted_message(monkeypatch):
 
     # The same event_id and timestamp was written twice (at-least-once redelivery).
     assert len(batches_received) == 2
-    assert batches_received[0][1][0][1] == "evt-1"
-    assert batches_received[1][1][0][1] == "evt-1"
+    assert batches_received[0][1][0][1] == _event_uuid("evt-1")
+    assert batches_received[1][1][0][1] == _event_uuid("evt-1")
     # Both writes carry the dedup clause.
     for query, _rows in batches_received:
         assert "ON CONFLICT (time, event_id) DO NOTHING" in query
@@ -316,6 +318,7 @@ def test_duplicate_event_ids_in_one_batch_are_deduped_by_sql(monkeypatch):
     must still use ON CONFLICT (time, event_id) DO NOTHING so the DB rejects the dup.
     """
     from services.historian import client as historian_client
+    from services.historian.client import _event_uuid
     from services.sinks.historian_sink import TimescaleHistorianSink
 
     captured: dict[str, object] = {}
@@ -369,5 +372,5 @@ def test_duplicate_event_ids_in_one_batch_are_deduped_by_sql(monkeypatch):
     assert "ON CONFLICT (time, event_id) DO NOTHING" in captured["query"]
     assert len(captured["rows"]) == 2
     # Both rows carry the same event_id; the DB constraint resolves the dup.
-    assert captured["rows"][0][1] == "evt-dup"
-    assert captured["rows"][1][1] == "evt-dup"
+    assert captured["rows"][0][1] == _event_uuid("evt-dup")
+    assert captured["rows"][1][1] == _event_uuid("evt-dup")

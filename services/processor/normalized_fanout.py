@@ -19,10 +19,15 @@ import os
 import signal
 import time
 
-from confluent_kafka import Consumer, TopicPartition
+try:
+    from confluent_kafka import Consumer, Producer, TopicPartition
+except ImportError:  # lightweight unit-test/plugin environments
+    from confluent_kafka import Consumer, TopicPartition
+    Producer = object  # type: ignore[assignment,misc]
 from prometheus_client import start_http_server
 
 from services.common.brokers import resolve_kafka_brokers
+from services.common.kafka_dlq import publish_malformed_record
 from services.common.runtime_metrics import set_consumer_lag
 from services.sinks.base import SinkRegistry
 
@@ -118,6 +123,7 @@ def main() -> None:
             "enable.auto.offset.store": False,
         }
     )
+    dlq_producer = Producer({"bootstrap.servers": brokers, "client.id": "normalized-fanout-dlq"})
     consumer.subscribe([input_topic])
 
     try:
@@ -148,7 +154,20 @@ def main() -> None:
             try:
                 event = json.loads(message.value().decode("utf-8"))
             except Exception as exc:
-                logger.warning("fan-out skipping unparseable record: %s", exc)
+                logger.exception("fan-out routing malformed record to DLQ: %s", exc)
+                publish_malformed_record(
+                    dlq_producer,
+                    dlq_topic=os.getenv("INDUSTRIAL_DLQ_TOPIC", "industrial.dlq"),
+                    source_topic=message.topic(),
+                    partition=message.partition(),
+                    offset=message.offset(),
+                    value=message.value(),
+                    error=f"normalized fan-out decode failed: {exc}",
+                )
+                consumer.commit(
+                    offsets=[TopicPartition(message.topic(), message.partition(), message.offset() + 1)],
+                    asynchronous=False,
+                )
                 continue
 
             buffer.append(event)
@@ -162,6 +181,7 @@ def main() -> None:
     finally:
         flush(force=True)
         sink.close()
+        dlq_producer.flush(10)
         consumer.close()
 
 

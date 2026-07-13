@@ -358,11 +358,23 @@ services:
     profiles:
       - ui
 
+  flink-checkpoint-init:
+    image: flink:1.20.0-scala_2.12-java17
+    user: root
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["mkdir -p /opt/flink/checkpoints/savepoints && chown -R 9999:9999 /opt/flink/checkpoints"]
+    volumes:
+      - flink-checkpoints:/opt/flink/checkpoints
+
   jobmanager:
     build:
       context: ..
       dockerfile: docker/Dockerfile.flink-runtime
     command: jobmanager
+    depends_on:
+      flink-checkpoint-init:
+        condition: service_completed_successfully
     ports:
       - "18088:8081"
     environment:
@@ -370,6 +382,7 @@ services:
         jobmanager.rpc.address: jobmanager
     volumes:
       - ../services/processor:/opt/processor:ro
+      - flink-checkpoints:/opt/flink/checkpoints
 
   taskmanager:
     build:
@@ -377,6 +390,7 @@ services:
       dockerfile: docker/Dockerfile.flink-runtime
     depends_on:
       - jobmanager
+      - flink-checkpoint-init
     command: taskmanager
     environment:
       FLINK_PROPERTIES: |
@@ -384,6 +398,7 @@ services:
         taskmanager.numberOfTaskSlots: ${FLINK_TASKMANAGER_SLOTS:-2}
     volumes:
       - ../services/processor:/opt/processor:ro
+      - flink-checkpoints:/opt/flink/checkpoints
 
   flink-job:
     build:
@@ -404,6 +419,8 @@ services:
       FLINK_PARALLELISM: ${FLINK_PARALLELISM:-1}
       FLINK_MAX_PARALLELISM: ${FLINK_MAX_PARALLELISM:-3}
       FLINK_CHECKPOINT_INTERVAL_MS: ${FLINK_CHECKPOINT_INTERVAL_MS:-10000}
+      FLINK_CHECKPOINT_DIR: ${FLINK_CHECKPOINT_DIR:-file:///opt/flink/checkpoints}
+      FLINK_SAVEPOINT_DIR: ${FLINK_SAVEPOINT_DIR:-file:///opt/flink/checkpoints/savepoints}
 
   prometheus:
     image: prom/prometheus:v3.0.1
@@ -601,6 +618,10 @@ services:
         -c "ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS threshold_source TEXT NOT NULL DEFAULT 'unconfigured';"
         -c "ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS threshold_policy_version INTEGER NOT NULL DEFAULT 0;"
         -c "ALTER TABLE processed_events ADD COLUMN IF NOT EXISTS threshold_breached BOOLEAN NOT NULL DEFAULT FALSE;"
+        -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_text TEXT;"
+        -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_text_raw TEXT;"
+        -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_bool BOOLEAN;"
+        -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_type TEXT NOT NULL DEFAULT 'number';"
 
 
   redis:
@@ -652,6 +673,7 @@ volumes:
   kafka-data:
   postgres-data:
   prometheus-data:
+  flink-checkpoints:
   grafana-data:
   minio-data:
   timescale-data:

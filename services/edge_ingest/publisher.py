@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -64,11 +65,23 @@ class EdgePublisher:
         spool_dir = __import__("os").getenv("EDGE_STORE_FORWARD_DIR", "")
         self._spool = DiskEventSpool(spool_dir) if spool_dir else None
 
-    @staticmethod
-    def _delivery_report(err: Any, msg: Any) -> None:
+    def _delivery_report(
+        self,
+        err: Any,
+        msg: Any,
+        *,
+        topic: str,
+        key: bytes,
+        value: bytes,
+        spool_on_failure: bool = True,
+    ) -> None:
         if err is not None:
-            delivery_failures.labels(topic=msg.topic() if msg is not None else "unknown").inc()
+            delivery_failures.labels(topic=msg.topic() if msg is not None else topic).inc()
             logger.warning("kafka delivery failed: %s", err)
+            if spool_on_failure and self._spool is not None:
+                self._spool.append(topic, key, value)
+                store_forward_spooled.labels(topic=topic).inc()
+                store_forward_pending.set(self._spool.count())
 
     def _produce_safe(self, topic: str, key: bytes, value: bytes, origin: str = "unknown") -> None:
         if len(value) > self.settings.max_message_bytes:
@@ -76,7 +89,14 @@ class EdgePublisher:
             return
         while True:
             try:
-                self.producer.produce(topic, key=key, value=value, on_delivery=self._delivery_report)
+                self.producer.produce(
+                    topic,
+                    key=key,
+                    value=value,
+                    on_delivery=lambda err, msg: self._delivery_report(
+                        err, msg, topic=topic, key=key, value=value
+                    ),
+                )
                 return
             except BufferError:
                 # Internal queue full: drain delivery reports and retry so the
@@ -86,7 +106,7 @@ class EdgePublisher:
                 if self._spool is not None:
                     self._spool.append(topic, key, value)
                     store_forward_spooled.labels(topic=topic).inc()
-                    store_forward_pending.set(len(self._spool.read_all()))
+                    store_forward_pending.set(self._spool.count())
                 else:
                     self._route_oversize(topic, key, value, origin, error=type(exc).__name__)
                 return
@@ -98,8 +118,29 @@ class EdgePublisher:
         remaining = list(records)
         for index, record in enumerate(records):
             topic, key, value = self._spool.decode(record)
+            delivered = threading.Event()
+            delivery_error: list[Any] = []
+
+            def replay_delivery(err: Any, msg: Any, *, _topic=topic, _key=key, _value=value) -> None:
+                self._delivery_report(
+                    err,
+                    msg,
+                    topic=_topic,
+                    key=_key,
+                    value=_value,
+                    spool_on_failure=False,
+                )
+                if err is not None:
+                    delivery_error.append(err)
+                delivered.set()
+
             try:
-                self.producer.produce(topic, key=key, value=value, on_delivery=self._delivery_report)
+                self.producer.produce(topic, key=key, value=value, on_delivery=replay_delivery)
+                deadline = time.monotonic() + 10
+                while not delivered.is_set() and time.monotonic() < deadline:
+                    self.producer.poll(0.1)
+                if not delivered.is_set() or delivery_error:
+                    break
                 remaining = remaining[index + 1 :]
                 store_forward_replayed.labels(topic=topic).inc()
             except Exception:
@@ -125,7 +166,14 @@ class EdgePublisher:
                 self.settings.dlq_topic,
                 key=key,
                 value=to_json_bytes(dlq_payload),
-                on_delivery=self._delivery_report,
+                on_delivery=lambda err, msg: self._delivery_report(
+                    err,
+                    msg,
+                    topic=self.settings.dlq_topic,
+                    key=key,
+                    value=to_json_bytes(dlq_payload),
+                    spool_on_failure=False,
+                ),
             )
         except Exception:
             self.producer.poll(0.5)

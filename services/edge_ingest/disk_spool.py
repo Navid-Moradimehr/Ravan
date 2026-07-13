@@ -22,6 +22,11 @@ class DiskEventSpool:
             return []
         return [json.loads(line) for line in self.pending_path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
+    def count(self) -> int:
+        if not self.pending_path.exists():
+            return 0
+        return sum(1 for line in self.pending_path.read_text(encoding="utf-8").splitlines() if line.strip())
+
     def replace(self, records: list[dict[str, Any]]) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
         if not records:

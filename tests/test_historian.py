@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import psycopg2
 import pytest
 
-from services.historian.client import _connection_string
+from services.historian.client import _connection_string, _event_uuid, _industrial_dimensions, _typed_value
 
 
 def test_connection_string_uses_env_vars(monkeypatch) -> None:
@@ -17,6 +17,27 @@ def test_connection_string_uses_env_vars(monkeypatch) -> None:
     conn = _connection_string()
     assert "testhost:9999/testdb" in conn
     assert "testuser:testpass" in conn
+
+
+def test_historian_boundary_preserves_scalar_types_and_external_ids() -> None:
+    numeric = _typed_value(12.5)
+    boolean = _typed_value(True)
+    text = _typed_value("RUNNING")
+
+    assert numeric == (12.5, None, None, "number")
+    assert boolean == (1.0, None, True, "boolean")
+    assert text == (0.0, "RUNNING", None, "string")
+    assert _event_uuid("evt-808070") == _event_uuid("evt-808070")
+    assert len(_event_uuid("evt-808070")) == 36
+
+
+def test_sparse_industrial_dimensions_get_stable_defaults() -> None:
+    assert _industrial_dimensions({"event_id": "evt-1"}) == (
+        "unknown",
+        "evt-1",
+        "evt-1",
+        "value",
+    )
 
 
 def test_insert_industrial_event_builds_correct_sql() -> None:

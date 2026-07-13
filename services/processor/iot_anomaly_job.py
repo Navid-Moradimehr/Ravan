@@ -368,6 +368,16 @@ def main() -> None:
     configuration = Configuration()
     # Keep the rescaling ceiling stable so keyed state can be restored from a savepoint.
     configuration.set_integer("pipeline.max-parallelism", max_parallelism)
+    # Compose mounts this path on the JobManager and TaskManagers. Kubernetes
+    # deployments can override it with an S3-compatible URI.
+    configuration.set_string(
+        "state.checkpoints.dir",
+        os.getenv("FLINK_CHECKPOINT_DIR", "file:///opt/flink/checkpoints"),
+    )
+    configuration.set_string(
+        "state.savepoints.dir",
+        os.getenv("FLINK_SAVEPOINT_DIR", "file:///opt/flink/checkpoints/savepoints"),
+    )
     if existing_jars:
         configuration.set_string("pipeline.jars", ";".join(existing_jars))
 

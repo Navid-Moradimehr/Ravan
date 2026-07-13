@@ -3,11 +3,15 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 
-def test_historian_replay_contract_exposes_status_cycle():
+def test_historian_replay_contract_exposes_status_cycle(monkeypatch):
     import services.api_service.main as api_main
-    from services.api_service.replay_state import reset_replay_state
+    import services.api_service.replay_state as replay_state
 
-    reset_replay_state()
+    # The API contract test must not require Kafka. The live worker is covered
+    # by the Docker-backed replay smoke test.
+    monkeypatch.setattr(replay_state, "_run_replay", lambda *args: None)
+
+    replay_state.reset_replay_state()
     client = TestClient(api_main.app)
 
     response = client.get("/api/v1/historian/replay")
@@ -17,12 +21,12 @@ def test_historian_replay_contract_exposes_status_cycle():
     assert payload["dataset"] == "mock"
     assert payload["scenario"] == "normal"
 
-    response = client.post("/api/v1/historian/replay", json={"dataset": "ai4i", "scenario": "normal"})
+    response = client.post("/api/v1/historian/replay", json={"dataset": "mock", "scenario": "normal"})
     assert response.status_code == 200
     payload = response.json()
     assert payload["ok"] is True
     assert payload["replay"]["running"] is True
-    assert payload["replay"]["dataset"] == "ai4i"
+    assert payload["replay"]["dataset"] == "mock"
     assert payload["replay"]["scenario"] == "normal"
 
     response = client.get("/api/v1/historian/replay")

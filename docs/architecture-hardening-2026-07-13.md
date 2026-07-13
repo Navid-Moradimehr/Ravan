@@ -59,33 +59,90 @@ hidden by an aggregate metric.
 The default scenario uses `max_consumer_lag: 0`, which means the final drain
 must reach zero for every observed consumer.
 
-## Still open
+### Replay execution
 
-These items were not hidden by this change and remain follow-up work:
+The historian replay endpoint now launches a managed background producer for
+the built-in mock dataset. It publishes canonical events to
+`industrial.normalized`, reports acknowledged event counts and progress, and
+supports cancellation. External CSV datasets can be enabled with
+`DATASET_REPLAY_PATHS`, a JSON mapping of dataset IDs to files visible to the
+API container. A replay is deliberately not presented as completed until the
+Kafka producer flushes successfully.
 
-- Replay API state is still a control-plane scaffold; it does not yet launch a
-  managed dataset producer.
-- Python and Flink need a shared asset-level versus tag-level processing-key
-  decision and parity fixtures for interleaved multi-site signals.
-- Edge store-and-forward still needs delivery-callback-based spool removal.
-- Malformed Kafka records need an acknowledged DLQ path instead of a log-and-
-  skip path.
-- Historian value storage is numeric-only while the canonical model permits
-  strings and booleans. The contract must either become numeric-only or gain
-  typed value columns.
-- Compose Flink checkpoints need a durable host volume; Kubernetes deployments
-  need a durable S3-compatible checkpoint location.
-- Source connection changes still require an edge restart and credential
-  resolution remains deployment-owned.
+### Processing-key parity
+
+Python fallback windows now use the same composite stream partition key as the
+Flink job. Interleaved tags, sources, assets, and sites therefore do not share
+state accidentally when the fallback runtime is used.
+
+### Edge delivery and malformed records
+
+Store-and-forward records are removed only after their Kafka delivery callback
+acknowledges them. Failed callbacks remain on disk for a later replay. The
+normalized and AI fan-outs publish malformed Kafka payloads to
+`industrial.dlq`, flush the DLQ producer, and commit the source offset only
+after the DLQ write succeeds.
+
+### Typed historian values
+
+`industrial_events` preserves the canonical scalar type through
+`value_type`, `value_text_raw`, and `value_bool` while retaining the numeric
+`value` column for existing trend and SQL consumers. Older installations may
+already have a generated `value_text` column; the migration leaves that
+column intact and adds `value_text_raw` rather than attempting a destructive
+hypertable rewrite. Non-numeric measurements are no longer forced through
+`float()` at the historian boundary.
+
+Historian UUID columns also accept external event IDs such as `evt-808070`:
+valid UUIDs are preserved and other IDs are converted to deterministic UUID5
+values. Sparse protocol records receive stable `unknown`/`value` dimension
+defaults at the storage boundary instead of crashing a fan-out process.
+
+### Durable local Flink state
+
+Compose provisions a named `flink-checkpoints` volume and initializes its
+ownership before JobManager and TaskManager start. The Flink job reads
+`FLINK_CHECKPOINT_DIR` and `FLINK_SAVEPOINT_DIR`; Kubernetes or multi-site
+deployments must replace the local file URI with a durable shared or
+S3-compatible location.
+
+## Remaining deployment-owned work
+
+The following are intentionally not hidden behind application code:
+
+- Source connection credentials, authentication/authorization, and site
+  network access remain adopter-owned.
+- Source connection changes still require an edge restart; hot connector
+  reconciliation is deferred until a deployment needs it.
+- Kubernetes operators must provide durable checkpoint/savepoint storage and
+  set the corresponding Flink environment variables.
+- External lakehouse, S3/MinIO retention, backup policy, GPU sizing, and
+  multi-site federation remain deployment choices.
+- Real PLC timing, protocol certification, and plant acceptance still require
+  hardware or a vendor simulator; local simulation cannot certify a physical
+  installation.
 
 ## Verification
 
-- Targeted hardening tests: `29 passed`
-- Full backend suite before this change: `566 passed`
+- Targeted hardening tests: `32 passed`
+- Full backend suite after this change: `572 passed`
 - Frontend production build: passed
 - The previous scaled 15-minute report marked a run passed while showing
   `175361` AI consumer lag. The new acceptance logic correctly treats that as
   a failed campaign.
+
+Current verification for this change:
+
+- Python compilation: passed.
+- Docker Compose configuration validation: passed.
+- Docker Flink REST job overview: `iot-anomaly-processor` running with two
+  active tasks after checkpoint volume initialization.
+- Timescale migration: completed successfully; existing data volume retained
+  and typed columns present. Legacy generated `value_text` installations are
+  supported through the additive `value_text_raw` migration.
+- Docker projection smoke: `fanout` and `processed-fanout` remained running;
+  the running volume contained `61,247` recent industrial rows and `30,085`
+  recent processed rows during verification.
 
 ## Architecture boundary
 

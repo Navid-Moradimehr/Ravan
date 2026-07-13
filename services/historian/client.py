@@ -112,6 +112,43 @@ def _coalesce_timestamp(value: Any | None) -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _typed_value(value: Any) -> tuple[float, str | None, bool | None, str]:
+    """Preserve canonical scalar types while keeping numeric queries compatible."""
+    if isinstance(value, bool):
+        return (1.0 if value else 0.0, None, value, "boolean")
+    if isinstance(value, (int, float)):
+        return (float(value), None, None, "number")
+    text = "" if value is None else str(value)
+    try:
+        return (float(text), None, None, "number")
+    except (TypeError, ValueError):
+        return (0.0, text, None, "string")
+
+
+def _event_uuid(value: Any) -> str:
+    """Keep UUID-backed historian tables compatible with external event IDs."""
+    text = str(value or "")
+    try:
+        return str(uuid.UUID(text))
+    except (ValueError, AttributeError):
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, f"local-stream-engine:event:{text}"))
+
+
+def _industrial_dimensions(event: dict[str, Any]) -> tuple[str, str, str, str]:
+    """Apply stable boundary defaults for protocol records with sparse metadata."""
+    protocol = str(event.get("source_protocol") or "unknown")
+    source_id = str(
+        event.get("source_id")
+        or event.get("device_id")
+        or event.get("asset_id")
+        or event.get("event_id")
+        or "unknown"
+    )
+    asset_id = str(event.get("asset_id") or event.get("device_id") or source_id)
+    tag = str(event.get("tag") or "value")
+    return protocol, source_id, asset_id, tag
+
+
 
 
 @functools.lru_cache(maxsize=1)
@@ -266,6 +303,8 @@ def _execute_with_retry(table: str, op: Callable[[], None]) -> None:
 
 
 def insert_industrial_event(event: dict[str, Any]) -> None:
+    protocol, source_id, asset_id, tag = _industrial_dimensions(event)
+
     def do_write() -> None:
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -273,19 +312,19 @@ def insert_industrial_event(event: dict[str, Any]) -> None:
                     """
                     INSERT INTO industrial_events (
                         time, event_id, source_protocol, source_id, asset_id, tag,
-                        value, quality, unit, site, line, schema_version,
+                        value, value_text_raw, value_bool, value_type, quality, unit, site, line, schema_version,
                         fault_type, scenario_id, ground_truth_severity, step
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (time, event_id) DO NOTHING
                     """,
                     (
                         _coalesce_timestamp(event.get("ts_source") or event.get("ts_ingest")),
-                        event.get("event_id"),
-                        event.get("source_protocol"),
-                        event.get("source_id"),
-                        event.get("asset_id"),
-                        event.get("tag"),
-                        float(event.get("value", 0)),
+                        _event_uuid(event.get("event_id")),
+                        protocol,
+                        source_id,
+                        asset_id,
+                        tag,
+                        *_typed_value(event.get("value", 0)),
                         event.get("quality", "good"),
                         event.get("unit"),
                         event.get("site", "demo-site"),
@@ -307,15 +346,16 @@ def insert_industrial_events(events: list[dict[str, Any]]) -> None:
         return
     rows = []
     for event in events:
+        protocol, source_id, asset_id, tag = _industrial_dimensions(event)
         rows.append(
             (
                 _coalesce_timestamp(event.get("ts_ingest")),
-                event.get("event_id"),
-                event.get("source_protocol"),
-                event.get("source_id"),
-                event.get("asset_id"),
-                event.get("tag"),
-                float(event.get("value", 0)),
+                _event_uuid(event.get("event_id")),
+                protocol,
+                source_id,
+                asset_id,
+                tag,
+                *_typed_value(event.get("value", 0)),
                 event.get("quality", "good"),
                 event.get("unit"),
                 event.get("site", "demo-site"),
@@ -332,7 +372,7 @@ def insert_industrial_events(events: list[dict[str, Any]]) -> None:
         """
         INSERT INTO industrial_events (
             time, event_id, source_protocol, source_id, asset_id, tag,
-            value, quality, unit, site, line, schema_version,
+            value, value_text_raw, value_bool, value_type, quality, unit, site, line, schema_version,
             fault_type, scenario_id, ground_truth_severity, step
         ) VALUES %s
         ON CONFLICT (time, event_id) DO NOTHING
@@ -342,6 +382,10 @@ def insert_industrial_events(events: list[dict[str, Any]]) -> None:
 
 
 def insert_processed_event(event: dict[str, Any]) -> None:
+    device_id = str(event.get("device_id") or event.get("asset_id") or event.get("event_id") or "unknown")
+    asset_id = str(event.get("asset_id") or device_id)
+    tag = str(event.get("tag") or "value")
+
     def do_write() -> None:
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -360,15 +404,15 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                     """,
                     (
                         _coalesce_timestamp(event.get("timestamp")),
-                        event.get("event_id"),
-                        event.get("device_id"),
-                        event.get("asset_id", event.get("device_id")),
-                        event.get("tag", ""),
+                        _event_uuid(event.get("event_id")),
+                        device_id,
+                        asset_id,
+                        tag,
                         float(event.get("value", 0) or 0),
                         event.get("unit", ""),
                         event.get("site_id"),
-                        event.get("source_protocol"),
-                        event.get("quality"),
+                        event.get("source_protocol") or "unknown",
+                        event.get("quality") or "unknown",
                         event.get("schema_version", 1),
                         float(event.get("temperature_c", 0)),
                         float(event.get("vibration_mm_s", 0)),
@@ -399,18 +443,21 @@ def insert_processed_events(events: list[dict[str, Any]]) -> None:
         return
     rows = []
     for event in events:
+        device_id = str(event.get("device_id") or event.get("asset_id") or event.get("event_id") or "unknown")
+        asset_id = str(event.get("asset_id") or device_id)
+        tag = str(event.get("tag") or "value")
         rows.append(
             (
                 _coalesce_timestamp(event.get("timestamp")),
-                event.get("event_id"),
-                event.get("device_id"),
-                event.get("asset_id", event.get("device_id")),
-                event.get("tag", ""),
+                _event_uuid(event.get("event_id")),
+                device_id,
+                asset_id,
+                tag,
                 float(event.get("value", 0) or 0),
                 event.get("unit", ""),
                 event.get("site_id"),
-                event.get("source_protocol"),
-                event.get("quality"),
+                event.get("source_protocol") or "unknown",
+                event.get("quality") or "unknown",
                 event.get("schema_version", 1),
                 float(event.get("temperature_c", 0)),
                 float(event.get("vibration_mm_s", 0)),
@@ -490,7 +537,7 @@ def insert_dead_letter(event: dict[str, Any]) -> None:
                     """,
                     (
                         _coalesce_timestamp(event.get("ts_ingest")),
-                        event.get("event_id"),
+                        _event_uuid(event.get("event_id")),
                         event.get("source_protocol"),
                         event.get("source_id"),
                         event.get("error"),
