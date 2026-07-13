@@ -58,6 +58,18 @@ The soak harness treats processor metrics as optional in the Docker profile,
 because the compose stack does not expose a standalone processor metrics
 endpoint in every setup.
 
+Each live generator now writes a delivery report under
+`.datastream/logs/<soak-name>/<site>.report.json`. The report distinguishes
+attempted, acknowledged, failed, queue-full, and effective-rate counts. The
+configured rate is not treated as delivered traffic: acceptance reports must
+use the acknowledged count and the downstream historian/Kafka accounting.
+This prevents a slow local generator or producer queue from being mistaken for
+pipeline capacity.
+
+The accounting helpers in `services/benchmarks/live_soak_accounting.py` are
+pure and unit-tested. They calculate counter deltas, latency percentiles, and
+the consecutive-zero drain condition used by the production soak runner.
+
 Consumer lag is evaluated relative to the campaign's initial snapshot. A reused
 development broker may already contain backlog; that backlog is reported but
 does not fail the campaign unless the soak increases it. A clean release run

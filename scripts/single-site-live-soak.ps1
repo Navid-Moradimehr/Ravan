@@ -11,6 +11,7 @@ $python = "py -3.13"
 $root = (Resolve-Path ".").Path
 $logRoot = Join-Path $root ".datastream\logs\single-site-live-soak"
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
+$runId = "single-{0}" -f ([guid]::NewGuid().ToString("N").Substring(0, 12))
 
 function Start-Generator {
   param(
@@ -26,6 +27,7 @@ function Start-Generator {
   $env:MOCK_DEVICE_COUNT = "$DeviceCount"
   $env:MOCK_MAX_EVENTS = "0"
   $env:IOT_TOPIC = $Topic
+  $env:MOCK_REPORT_PATH = (Join-Path $logRoot "$SiteId.report.json")
 
   Start-Process -WindowStyle Hidden -FilePath "py" -ArgumentList @(
     "-3.13",
@@ -70,6 +72,21 @@ Write-Host ""
 Write-Host "Single-site live soak results"
 Write-Host "----------------------------------------"
 Write-Host ("processes_started={0}" -f 1)
+
+$reportPath = Join-Path $logRoot "site-01.report.json"
+if (Test-Path $reportPath) {
+  $generatorReport = Get-Content $reportPath -Raw | ConvertFrom-Json
+  Write-Host ("run_id={0}" -f $runId)
+  Write-Host ("generator_attempted={0}" -f $generatorReport.attempted)
+  Write-Host ("generator_acknowledged={0}" -f $generatorReport.acknowledged)
+  Write-Host ("generator_failed={0}" -f $generatorReport.failed)
+  Write-Host ("generator_queue_full={0}" -f $generatorReport.queue_full)
+  Write-Host ("generator_effective_attempt_rate={0}" -f $generatorReport.effective_attempt_rate)
+  Write-Host ("generator_effective_ack_rate={0}" -f $generatorReport.effective_ack_rate)
+}
+else {
+  Write-Host "generator_report=missing"
+}
 
 try {
   $processorMetrics = $null
