@@ -379,19 +379,21 @@ export function HistorianDashboard() {
                  </DropdownMenuContent>
                </DropdownMenu>
          </div>
-             <div className="space-y-1.5">
-            <label className="text-xs font-medium text-text-secondary">Scenario</label>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className="inline-flex h-9 w-full max-w-[12rem] items-center justify-between rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm cursor-pointer">{scenariosQuery.data?.find((s) => s.id === selectedScenario)?.name ?? "Normal"}</button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                   {scenariosQuery.data?.map((s) => (
-                    <DropdownMenuItem key={s.id} onClick={() => setSelectedScenario(s.id)}>{s.name}</DropdownMenuItem>
-                   ))}
-                 </DropdownMenuContent>
-               </DropdownMenu>
-         </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-text-secondary">Scenario</label>
+              <SearchableSelect
+                value={selectedScenario}
+                options={(scenariosQuery.data ?? []).map((scenario) => ({
+                  value: scenario.id,
+                  label: scenario.name,
+                  searchText: `${scenario.id} ${scenario.description ?? ""}`,
+                }))}
+                onChange={setSelectedScenario}
+                placeholder="Select a scenario"
+                searchPlaceholder="Search scenarios..."
+                className="w-full max-w-[14rem]"
+              />
+            </div>
              <div className="flex items-end gap-2">
                {replayQuery.data?.running ? (
                  <button onClick={() => stopReplayMutation.mutate()} className="action-danger inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium"><Square className="size-4" />Stop</button>
