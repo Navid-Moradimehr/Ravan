@@ -59,6 +59,24 @@ The fresh deterministic runtime gate measured 9,026.12 events/sec, p50
 132.53 events/sec baseline, the measured throughput improvement is 6,710%.
 This is a local reference result, not an end-to-end Docker capacity promise.
 
+## Capacity boundary: 2026-07-13
+
+Short capacity probes on the same Compose node produced these boundaries:
+
+- 5 sites x 500 events/sec: approximately 2,499 admitted events/sec, zero
+  final normalized-fanout lag.
+- 10 sites x 1,000 events/sec: approximately 9,967 admitted events/sec and
+  29,043 messages of recoverable final lag; the lag drained in about one minute.
+- 20 sites x 1,000 events/sec: approximately 15,969 admitted events/sec,
+  133,231 messages of final normalized-fanout lag, and failure of the zero-lag
+  gate.
+
+The high-rate soaks use `source_protocol=mock` and publish directly to Kafka.
+They validate the common downstream path, not protocol-specific wire behavior.
+MQTT, OPC UA, and Modbus TCP have separate Docker simulators and connector
+smoke coverage. A small connector contract matrix is still required; separate
+15-minute capacity runs for every protocol are not necessary.
+
 ## Interpretation rule
 
 Never compare historian totals to the configured rate alone. First verify the
