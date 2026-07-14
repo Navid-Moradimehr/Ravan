@@ -46,6 +46,8 @@ When several devices qualify at once, each incident creates its own bounded
 evidence set and report job. The queue limits total AI work; Kafka remains the
 durable buffer. Operators should increase partitions and worker capacity only
 after measuring consumer lag, model latency, GPU utilization, and queue depth.
+The gateway exports queue depth, active workers, enqueued jobs, completed jobs,
+and failed jobs to Prometheus for this decision.
 
 ## Recommended external agent flow
 

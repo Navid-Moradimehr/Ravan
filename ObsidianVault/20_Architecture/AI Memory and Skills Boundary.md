@@ -14,6 +14,8 @@ not the threshold engine.
 AI reports now run through a bounded queue and worker outside the Kafka polling
 loop. `AI_REPORT_QUEUE_SIZE` and `AI_REPORT_MAX_IN_FLIGHT` are deployment knobs.
 Kafka remains the durable buffer and the report job remains the audit record.
+Prometheus exposes queue depth, active workers, and job outcome counters so
+concurrent PLC/sensor warnings can be capacity-managed.
 
 Dashboard status: historian live streams, bounded trends, the browser-persisted
 custom dashboard, and Grafana integration exist. A shared server-persisted

@@ -42,6 +42,11 @@ batch_severity_total = Counter(
     ["severity"],
 )
 last_success_epoch = Gauge("ai_gateway_last_success_epoch", "Unix timestamp of last successful enrichment")
+report_queue_depth = Gauge("ai_gateway_report_queue_depth", "AI report jobs waiting for model execution")
+report_workers_active = Gauge("ai_gateway_report_workers_active", "AI report workers currently executing")
+report_jobs_enqueued = Counter("ai_gateway_report_jobs_enqueued_total", "AI report jobs accepted by the bounded queue")
+report_jobs_completed = Counter("ai_gateway_report_jobs_completed_total", "AI report jobs completed")
+report_jobs_failed = Counter("ai_gateway_report_jobs_failed_total", "AI report jobs that failed or were rejected")
 service_state = ServiceHealthState(name="ai-gateway")
 telemetry_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
 _policy_cache: tuple[float, AIReportingPolicy] | None = None
@@ -72,30 +77,39 @@ async def report_worker(
         if item is None:
             queue.task_done()
             return
+        report_workers_active.inc()
         try:
             success = await enrich_batch(item.batch, producer, policy=item.policy, job=item.job)
             if success:
                 if item.job:
                     complete_report_job(str(item.job["job_id"]), {"event_id": "emitted"})
+                report_jobs_completed.inc()
                 consumer.commit(offsets=item.offsets, asynchronous=False)
             elif item.job:
                 fail_report_job(str(item.job["job_id"]), "AI output was not acknowledged")
+                report_jobs_failed.inc()
         except Exception as exc:
             service_state.mark_degraded("AI report worker failed", str(exc))
             if item.job:
                 fail_report_job(str(item.job["job_id"]), str(exc))
+            report_jobs_failed.inc()
         finally:
+            report_workers_active.dec()
             queue.task_done()
+            report_queue_depth.set(queue.qsize())
 
 
 async def enqueue_report(queue: asyncio.Queue[ReportWorkItem | None], item: ReportWorkItem) -> bool:
     """Enqueue without allowing a slow model to grow memory without a bound."""
     try:
         queue.put_nowait(item)
+        report_jobs_enqueued.inc()
+        report_queue_depth.set(queue.qsize())
         return True
     except asyncio.QueueFull:
         if item.job:
             fail_report_job(str(item.job["job_id"]), "AI report queue is full", retry_after_seconds=30)
+        report_jobs_failed.inc()
         service_state.mark_degraded("AI report queue full", "increase capacity or reduce report frequency")
         return False
 
