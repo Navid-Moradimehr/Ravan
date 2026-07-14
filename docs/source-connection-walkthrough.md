@@ -35,6 +35,9 @@ After the save:
 - the platform shows its protocol, endpoint, and configuration version
 - the source still does not publish data until it is enabled
 
+The source list shows five registered sources by default. Select **Show all
+sources** to view up to twenty sources per page and navigate additional pages.
+
 The new source does not automatically create dashboards or historical plots. Those appear only after data starts flowing and the user chooses how to visualize it.
 
 ## 4. What the connection test tells you

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Cable, CircleCheck, CircleX, Pencil, Plus, Power, Radio, Router, Server, TestTube, Trash2 } from "lucide-react";
+import { Cable, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleCheck, CircleX, Pencil, Plus, Power, Radio, Router, Server, TestTube, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -91,6 +91,8 @@ export function SourceConnectionPanel() {
   const [baudrate, setBaudrate] = useState("9600");
   const [slaveId, setSlaveId] = useState("1");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [connectionsExpanded, setConnectionsExpanded] = useState(false);
+  const [connectionPage, setConnectionPage] = useState(1);
   const [previewResult, setPreviewResult] = useState<Record<string, unknown> | null>(null);
   const queryClient = useQueryClient();
   const connections = useQuery({ queryKey: ["connections"], queryFn: getConnections });
@@ -179,6 +181,11 @@ export function SourceConnectionPanel() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["connections"] }); showToast({ title: "Source restored", description: "The source can now be validated and enabled again.", variant: "success" }); },
     onError: (error) => showToast({ title: "Source not restored", description: formatErrorMessage(error), variant: "error" }),
   });
+  const allConnections = connections.data?.connections ?? [];
+  const totalConnectionPages = Math.max(1, Math.ceil(allConnections.length / 20));
+  const visibleConnections = connectionsExpanded
+    ? allConnections.slice((Math.min(connectionPage, totalConnectionPages) - 1) * 20, Math.min(connectionPage, totalConnectionPages) * 20)
+    : allConnections.slice(0, 5);
 
   return (
     <Card className="app-card">
@@ -214,7 +221,8 @@ export function SourceConnectionPanel() {
         {connections.isError ? <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm">{formatErrorMessage(connections.error, "Connections could not be loaded.")}</p> : null}
         {sourceHealth.isError ? <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text-primary">Mapping diagnostics are temporarily unavailable, so live match counts are hidden until the observability endpoint recovers.</p> : null}
         <div className="space-y-2">
-          {(connections.data?.connections ?? []).map((connection) => {
+          {allConnections.length > 0 ? <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-1 px-3 py-2"><p className="text-xs text-text-secondary">{connectionsExpanded ? `Showing ${Math.min(connectionPage, totalConnectionPages)} of ${totalConnectionPages} pages` : `Showing ${Math.min(5, allConnections.length)} of ${allConnections.length} sources`}</p><div className="flex items-center gap-2">{connectionsExpanded && totalConnectionPages > 1 ? <><Button variant="ghost" size="sm" onClick={() => setConnectionPage((page) => Math.max(1, page - 1))} disabled={connectionPage <= 1}><ChevronLeft className="size-4" /> Previous</Button><span className="min-w-16 text-center text-xs text-text-secondary">Page {Math.min(connectionPage, totalConnectionPages)} / {totalConnectionPages}</span><Button variant="ghost" size="sm" onClick={() => setConnectionPage((page) => Math.min(totalConnectionPages, page + 1))} disabled={connectionPage >= totalConnectionPages}>Next <ChevronRight className="size-4" /></Button></> : null}<Button variant="outline" size="sm" onClick={() => { setConnectionsExpanded((expanded) => !expanded); setConnectionPage(1); }}>{connectionsExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />} {connectionsExpanded ? "Show fewer" : "Show all sources"}</Button></div></div> : null}
+          {visibleConnections.map((connection) => {
             const Icon = iconFor(connection.source_protocol);
             const health = sourceHealth.data?.current.find((item) => item.connection_id === connection.connection_id);
             const mappingSummary = health && typeof health.mapping_seen === "number" ? `${health.mapping_matched ?? 0}/${health.mapping_seen} matched` : "";
@@ -239,7 +247,7 @@ export function SourceConnectionPanel() {
               {!runtimeSupported ? <p className="w-full text-xs text-warning">{connection.runtime_note ?? "This source is metadata only and cannot be started by the edge runtime."}</p> : null}
             </div>;
           })}
-          {!connections.isLoading && (connections.data?.connections ?? []).length === 0 ? <p className="text-sm text-text-secondary">No registry connections yet. Existing environment-variable sources remain available to the edge runtime.</p> : null}
+          {!connections.isLoading && allConnections.length === 0 ? <p className="text-sm text-text-secondary">No registry connections yet. Existing environment-variable sources remain available to the edge runtime.</p> : null}
         </div>
         {previewResult ? <div className="rounded-lg border border-border-subtle bg-surface-2 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium">Preview result</p><Button variant="ghost" size="sm" onClick={() => setPreviewResult(null)}>Dismiss</Button></div><pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-text-secondary">{JSON.stringify(previewResult, null, 2)}</pre></div> : null}
       </CardContent>

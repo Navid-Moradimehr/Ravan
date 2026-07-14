@@ -9,6 +9,10 @@ fields, add canonical mappings, and then enable it. A source can be disabled
 without deleting its metadata. The edge supervisor notices registry version
 changes and applies them without a container restart.
 
+The registry list is compact by default: it shows five sources. **Show all
+sources** expands the list to twenty rows per page with pagination for the
+remaining sources.
+
 Existing connections also expose Enable/Disable and Remove actions. Remove is a
 retirement action that preserves the source record for audit and replacement
 history; disabling is the safer operational pause.

@@ -25,6 +25,9 @@ The platform stores that as metadata. The actual secret material stays in the op
 7. Add mappings through the mapping table if the source fields need to become asset or tag names.
 8. Save, validate, test, preview when supported, and press Enable in the source row.
 
+The source list shows five sources by default. Use **Show all sources** to see
+twenty per page and navigate additional pages.
+
 ## 3. What happens after save
 
 - the source appears in the `Integrations` page immediately
