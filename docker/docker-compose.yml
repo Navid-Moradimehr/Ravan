@@ -513,7 +513,7 @@ services:
       - raw-archive
 
   minio-init:
-    image: minio/mc:RELEASE.2025-01-20T14-49-07Z
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       minio:
         condition: service_started
