@@ -12,6 +12,9 @@ migration jobs intentionally exit after success. CPU, memory, and log-retention
 limits remain operator-owned because safe values depend on the target edge
 server or plant host.
 
+Historian deduplication is an explicit maintenance operation rather than a
+startup scan; this prevents a large historian from blocking API readiness.
+
 ## Complete
 
 ### Runtime and data flow

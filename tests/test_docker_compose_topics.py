@@ -91,6 +91,8 @@ def test_timescaledb_migrate_repairs_historian_uniqueness():
     assert "industrial_events_event_id_uniq" in command_blob
     assert "processed_events_event_id_uniq" in command_blob
     assert "dead_letter_events_event_id_uniq" in command_blob
+    assert migrate["environment"]["RUN_HISTORIAN_DEDUPE"] == "${RUN_HISTORIAN_DEDUPE:-false}"
+    assert "RUN_HISTORIAN_DEDUPE" in command_blob
 
 
 def test_fanout_and_ai_services_wait_for_timescale_migration():

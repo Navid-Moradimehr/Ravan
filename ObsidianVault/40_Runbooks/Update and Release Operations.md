@@ -24,3 +24,6 @@ replace, migrate, start, doctor, and release-gate.
 Compose health checks and restart policies are platform-owned defaults. CPU,
 memory, disk quotas, and log retention remain deployment-owned because an edge
 PC and a plant server have materially different safe limits.
+
+Legacy historian deduplication is disabled by default and can be enabled for a
+planned maintenance run with `RUN_HISTORIAN_DEDUPE=true`.

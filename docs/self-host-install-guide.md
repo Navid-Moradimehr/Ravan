@@ -45,6 +45,12 @@ services. Migration and initialization containers intentionally stop after a
 successful run; a stopped `timescaledb-migrate` or `kafka-init` container is
 normal when its exit code is zero.
 
+Legacy historian deduplication is disabled by default so a restart does not
+scan a large production historian. If an operator has evidence of legacy
+duplicates, schedule maintenance, set `RUN_HISTORIAN_DEDUPE=true`, run the
+one-shot migration, and verify the backup/release gate before returning to the
+normal default.
+
 ## Linux example
 
 ```bash

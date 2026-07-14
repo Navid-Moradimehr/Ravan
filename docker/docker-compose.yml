@@ -45,7 +45,7 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
 
   kafka-ui:
-    image: ghcr.io/kafbat/kafka-ui:v1.3.0
+    image: ghcr.io/kafbat/kafka-ui@sha256:7cda86a33344160309fdb65146332e4da65db81a945614f2fe32e210803f6fd1
     restart: unless-stopped
     depends_on:
       kafka:
@@ -596,7 +596,7 @@ services:
 
 
   timescaledb:
-    image: timescale/timescaledb:2.17.2-pg15
+    image: timescale/timescaledb@sha256:d621009854b8519a1bf63f81eebc979c1acc06a16843086f244edd44dcce6eea
     restart: unless-stopped
     environment:
       POSTGRES_DB: stream_engine
@@ -614,13 +614,14 @@ services:
       retries: 10
 
   timescaledb-migrate:
-    image: timescale/timescaledb:2.17.2-pg15
+    image: timescale/timescaledb@sha256:d621009854b8519a1bf63f81eebc979c1acc06a16843086f244edd44dcce6eea
     depends_on:
       timescaledb:
         condition: service_healthy
     restart: "no"
     environment:
       PGPASSWORD: stream
+      RUN_HISTORIAN_DEDUPE: ${RUN_HISTORIAN_DEDUPE:-false}
     entrypoint:
       - /bin/sh
       - -c
@@ -630,10 +631,15 @@ services:
         until psql -h timescaledb -U stream -d stream_engine -c "SELECT 1" >/dev/null 2>&1;
         do sleep 1; done;
         psql -h timescaledb -U stream -d stream_engine -v ON_ERROR_STOP=1
+        -c "CREATE TABLE IF NOT EXISTS metadata_schema_migrations (migration_id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now());";
+        if [ "$${RUN_HISTORIAN_DEDUPE:-false}" = "true" ] && [ "$(psql -h timescaledb -U stream -d stream_engine -tAc "SELECT 1 FROM metadata_schema_migrations WHERE migration_id = '2026-07-historian-dedupe'")" != "1" ]; then
+        psql -h timescaledb -U stream -d stream_engine -v ON_ERROR_STOP=1
         -c "SET timescaledb.max_tuples_decompressed_per_dml_transaction = 0;"
         -c "DELETE FROM industrial_events a USING industrial_events b WHERE a.ctid < b.ctid AND a.event_id = b.event_id;"
         -c "DELETE FROM processed_events a USING processed_events b WHERE a.ctid < b.ctid AND a.event_id = b.event_id;"
         -c "DELETE FROM dead_letter_events a USING dead_letter_events b WHERE a.ctid < b.ctid AND a.event_id = b.event_id;" ;
+        psql -h timescaledb -U stream -d stream_engine -v ON_ERROR_STOP=1 -c "INSERT INTO metadata_schema_migrations (migration_id) VALUES ('2026-07-historian-dedupe') ON CONFLICT (migration_id) DO NOTHING;";
+        fi;
         psql -h timescaledb -U stream -d stream_engine -v ON_ERROR_STOP=1
         -c "CREATE UNIQUE INDEX IF NOT EXISTS industrial_events_event_id_uniq ON industrial_events (time, event_id);"
         -c "CREATE UNIQUE INDEX IF NOT EXISTS processed_events_event_id_uniq ON processed_events (time, event_id);"
@@ -655,8 +661,6 @@ services:
         -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_text_raw TEXT;"
         -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_bool BOOLEAN;"
         -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_type TEXT NOT NULL DEFAULT 'number';"
-        -c "CREATE TABLE IF NOT EXISTS metadata_schema_migrations (migration_id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now());"
-        -c "INSERT INTO metadata_schema_migrations (migration_id) VALUES ('2026-07-deployment-hardening') ON CONFLICT (migration_id) DO NOTHING;"
 
 
   redis:

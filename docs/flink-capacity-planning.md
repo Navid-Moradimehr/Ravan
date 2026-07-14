@@ -93,3 +93,7 @@ queries the JobManager and cancels existing active jobs named
 `iot-anomaly-processor` before submitting the replacement. This prevents a
 container restart or image update from leaving two Flink consumers attached to
 the same Kafka topic.
+The Flink job image includes the PostgreSQL client dependency used by threshold
+policy synchronization. This keeps the production Flink runtime aligned with
+the shared metadata-plane contract; after rebuilding, verify that the job
+reaches `RUNNING` in the JobManager before enabling production traffic.
