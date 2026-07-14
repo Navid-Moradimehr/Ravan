@@ -14,9 +14,18 @@ services:
         exec /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties
     ports:
       - "19092:29092"
+      - "19097:9997"
     volumes:
       - kafka-data:/var/lib/kafka/data
       - ./kafka/server.properties:/opt/kafka/config/server.properties:ro
+    environment:
+      KAFKA_JMX_PORT: 9997
+      KAFKA_JMX_OPTS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Djava.rmi.server.hostname=kafka
+        -Dcom.sun.management.jmxremote.rmi.port=9997
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
       interval: 10s
@@ -54,6 +63,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       KAFKA_CLUSTERS_0_READONLY: "true"
+      KAFKA_CLUSTERS_0_METRICS_TYPE: JMX
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
     ports:
       - "18080:8080"
 

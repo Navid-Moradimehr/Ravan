@@ -81,6 +81,21 @@ def test_long_running_compose_services_have_restart_and_health_contracts():
         assert "healthcheck" in services[name]
 
 
+def test_kafka_ui_broker_metrics_are_wired_to_jmx():
+    services = _compose()["services"]
+    kafka = services["kafka"]
+    ui = services["kafka-ui"]
+
+    assert "19097:9997" in kafka["ports"]
+    assert kafka["environment"]["KAFKA_JMX_PORT"] == 9997
+    jmx_opts = kafka["environment"]["KAFKA_JMX_OPTS"]
+    assert "java.rmi.server.hostname=kafka" in jmx_opts
+    assert "com.sun.management.jmxremote.rmi.port=9997" in jmx_opts
+
+    assert ui["environment"]["KAFKA_CLUSTERS_0_METRICS_TYPE"] == "JMX"
+    assert ui["environment"]["KAFKA_CLUSTERS_0_METRICS_PORT"] == 9997
+
+
 def test_timescaledb_migrate_repairs_historian_uniqueness():
     migrate = _compose()["services"]["timescaledb-migrate"]
     command_blob = " ".join(migrate.get("command", [])) if isinstance(migrate.get("command"), list) else str(migrate.get("command"))
