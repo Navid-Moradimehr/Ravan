@@ -67,6 +67,7 @@ Packaging and installer work is intentionally excluded from the current scope.
 
 - Health checks and runtime diagnostics exist.
 - Backup and restore tooling exists.
+- TimescaleDB restore drills exclude extension-owned `public` schema entries and pass against the local Compose database.
 - Backup-drill matrix tooling exists so restore/rollback drills can be measured per site profile.
 - Site profile backups now carry explicit backup-owner and restore-drill-owner fields.
 - Metrics and observability paths exist.
@@ -96,6 +97,15 @@ Packaging and installer work is intentionally excluded from the current scope.
 - Read-only agent tooling is infrastructure, not a finished agent product.
 - Prompt/model registries are infrastructure, not a governance workflow yet.
 - Spark support is intentionally optional and should remain a user-managed integration for batch/lakehouse workloads, not a core streaming dependency.
+
+### Deployment-owned configuration boundary
+
+Development Compose defaults are intentionally retained so a new user can start
+the local stack without first creating a secret system. They are not production
+credentials. Before deployment, operators must provide their own database,
+object-storage, broker, model, TLS, retention, and identity configuration and
+run the production preflight. The platform should warn or fail the preflight on
+known demo defaults rather than silently changing them for every developer.
 
 ## Necessary Changes
 

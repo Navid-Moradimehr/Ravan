@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import tempfile
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,6 +74,21 @@ def _docker_exec_env(conn: dict[str, str]) -> list[str]:
         "-e", "PGPORT=5432",
         "-e", f"PGDATABASE={conn['database']}",
     ]
+
+
+def _without_public_schema_entries(toc: str) -> str:
+    """Keep TimescaleDB's extension-owned public schema out of clean restores."""
+    return "\n".join(
+        line
+        for line in toc.splitlines()
+        if "SCHEMA - public" not in line and "ACL - public" not in line
+    ) + "\n"
+
+
+def _temporary_toc_path() -> Path:
+    fd, name = tempfile.mkstemp(prefix="datastream-restore-", suffix=".toc")
+    os.close(fd)
+    return Path(name)
 
 
 def _create_backup_via_docker(filepath: Path, conn: dict[str, str], tables: list[str] | None) -> dict[str, Any]:
@@ -173,6 +189,17 @@ def _restore_backup_via_docker(filepath: Path, conn: dict[str, str]) -> dict[str
                 check=True,
                 cwd=str(PROJECT_ROOT),
             )
+        toc = subprocess.run(
+            _compose_base_cmd() + ["exec", "-T", service, "pg_restore", "--list", container_path],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=str(PROJECT_ROOT),
+        ).stdout
+        toc_path = _temporary_toc_path()
+        toc_path.write_text(_without_public_schema_entries(toc), encoding="utf-8")
+        toc_container_path = f"/tmp/{toc_path.name}"
+        subprocess.run(["docker", "cp", str(toc_path), f"{container_id}:{toc_container_path}"], check=True, cwd=str(PROJECT_ROOT))
         result = subprocess.run(
             _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [
                 service,
@@ -182,6 +209,8 @@ def _restore_backup_via_docker(filepath: Path, conn: dict[str, str]) -> dict[str
                 "--if-exists",
                 "--no-owner",
                 "--no-privileges",
+                "--use-list",
+                toc_container_path,
                 "--dbname",
                 conn["database"],
                 container_path,
@@ -193,6 +222,14 @@ def _restore_backup_via_docker(filepath: Path, conn: dict[str, str]) -> dict[str
         )
         subprocess.run(
             _compose_base_cmd() + ["exec", "-T", service, "rm", "-f", container_path],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(PROJECT_ROOT),
+        )
+        toc_path.unlink(missing_ok=True)
+        subprocess.run(
+            _compose_base_cmd() + ["exec", "-T", service, "rm", "-f", toc_container_path],
             capture_output=True,
             text=True,
             check=False,
@@ -313,24 +350,28 @@ def restore_backup(backup_path: str, target_database: str | None = None) -> dict
     if target_database:
         conn["database"] = target_database
 
-    cmd = [
-        "pg_restore",
-        f"--host={conn['host']}",
-        f"--port={conn['port']}",
-        f"--username={conn['user']}",
-        "--dbname", conn["database"],
-        "--verbose",
-        "--clean",
-        "--if-exists",
-        "--no-owner",
-        "--no-privileges",
-        str(filepath),
-    ]
-
     env = os.environ.copy()
     env["PGPASSWORD"] = conn["password"]
+    toc_path: Path | None = None
 
     try:
+        toc = subprocess.run(["pg_restore", "--list", str(filepath)], env=env, capture_output=True, text=True, check=True).stdout
+        toc_path = _temporary_toc_path()
+        toc_path.write_text(_without_public_schema_entries(toc), encoding="utf-8")
+        cmd = [
+            "pg_restore",
+            f"--host={conn['host']}",
+            f"--port={conn['port']}",
+            f"--username={conn['user']}",
+            "--dbname", conn["database"],
+            "--verbose",
+            "--clean",
+            "--if-exists",
+            "--no-owner",
+            "--no-privileges",
+            "--use-list", str(toc_path),
+            str(filepath),
+        ]
         result = subprocess.run(
             cmd,
             env=env,
@@ -354,6 +395,9 @@ def restore_backup(backup_path: str, target_database: str | None = None) -> dict
     except FileNotFoundError:
         logger.warning("pg_restore not found on host; attempting docker-based restore fallback.")
         return _restore_backup_via_docker(filepath, conn)
+    finally:
+        if toc_path:
+            toc_path.unlink(missing_ok=True)
 
 
 def list_backups(backup_dir: str | None = None) -> list[dict[str, Any]]:

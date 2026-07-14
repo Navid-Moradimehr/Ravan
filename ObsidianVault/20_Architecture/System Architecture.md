@@ -24,6 +24,7 @@ Postgres --> Debezium --> CDC topics   keyed state + rules            LLM summar
 - The governance snapshot stays read-only and summarizes lifecycle readiness without creating a workflow engine.
 - Release-gate and rollout-acceptance can archive metadata artifacts and benchmark them without altering the runtime topology.
 - Operational memory is read-only for now and exposes alerts, annotations, shifts, reports, and backup readiness without turning the platform into a MES. The underlying stores for alerts, annotations, and report templates can be file-backed in single-node deployments without changing that API boundary, and recurring report schedules can be rehydrated from persisted templates when scheduling support is installed.
+- Development Compose defaults remain for first-run usability; production operators own credentials, TLS, identity, retention, endpoints, and storage. The release gate now validates TimescaleDB restore without attempting to remove the extension-owned public schema.
 - Site observability is a separate rollout-facing snapshot that reports broker,
   historian, AI gateway, backup readiness, and API health with SLO targets.
 

@@ -75,6 +75,12 @@ Do not require WSL2 for the production install. If a team wants WSL2 for develop
 5. Restart `datastreamd`.
 6. Re-run `datastreamctl doctor` and the site-profile benchmark report.
 
+For a production deployment, do not reuse the Compose demo credentials or
+floating demo endpoints. Supply operator-owned secrets and TLS/authentication
+through the site's secret mechanism, then run the release gate and backup drill.
+The development defaults remain available for local evaluation so upgrades do
+not break existing users.
+
 ## What operators own
 
 - broker endpoints
