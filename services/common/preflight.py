@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+import os
+import re
 
 from services.common.project_manifest import load_project_manifest, validate_project_manifest
 from services.common.site_profiles import load_site_profile, validate_site_profile
@@ -40,9 +42,34 @@ def run_preflight(
     project_manifest: Path | str | None = None,
     soak_scenario: Path | str | None = None,
     compose_file: Path | str = "docker/docker-compose.yml",
+    strict: bool = False,
 ) -> PreflightReport:
     checks: list[PreflightCheck] = []
-    checks.append(_path_check("compose file", Path(compose_file)))
+    compose_path = Path(compose_file)
+    checks.append(_path_check("compose file", compose_path))
+    if compose_path.exists():
+        compose_text = compose_path.read_text(encoding="utf-8")
+        floating = sorted(set(re.findall(r"image:\s*[^\n]*:(latest|latest-[^\s]+)", compose_text)))
+        checks.append(PreflightCheck(
+            "image tags pinned",
+            not floating if strict else True,
+            "no floating tags found" if not floating else f"WARNING: floating tags: {', '.join(floating)}",
+        ))
+
+    demo_defaults = {
+        "POSTGRES_PASSWORD": "stream",
+        "TIMESCALE_PASSWORD": "stream",
+        "MINIO_ROOT_PASSWORD": "minio12345",
+        "GF_SECURITY_ADMIN_PASSWORD": "admin",
+    }
+    for name, demo_value in demo_defaults.items():
+        value = os.getenv(name)
+        is_demo = value is None or value == demo_value
+        checks.append(PreflightCheck(
+            f"{name} configured",
+            not is_demo if strict else True,
+            "WARNING: development default or unset" if is_demo else "configured",
+        ))
 
     if site_profile:
         path = Path(site_profile)

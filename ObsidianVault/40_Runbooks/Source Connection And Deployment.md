@@ -99,3 +99,15 @@ The historian sink is the default. Kafka and lakehouse are already integrated
 in the codebase, but they are optional fan-out targets enabled by route
 metadata or `SINKS`, not hard requirements. Operators still own the endpoint
 credentials and deployment-time settings for those sinks.
+
+## Release update boundary
+
+The platform includes an opt-in, read-only update check. When enabled, the API
+and dashboard compare the running version with a JSON manifest published on
+GitHub or an internal mirror and show a toast with the release version. It
+never downloads, executes, replaces, or migrates the running deployment.
+
+This is intentional for industrial installations: update approval, artifact
+verification, backup, drain, migration, restart, and rollback belong to the
+future installer/update agent and the site's change-control process. Air-gapped
+deployments leave `DATASTREAM_UPDATE_CHECK_ENABLED=false`.

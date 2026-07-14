@@ -44,6 +44,9 @@ Error handling is intentionally platform-neutral: the UI uses in-app banners, in
 
 1. Copy `.env.example` to `.env` and adjust ports/model settings.
 2. Start infrastructure: `docker compose -f docker/docker-compose.yml up -d`.
+   Start the API and dashboard profiles explicitly when using the UI:
+   `docker compose --profile ui -f docker/docker-compose.yml up -d`. Add
+   `--profile edge` for the hardware-free protocol simulators and edge ingest.
 3. Topics are auto-created by the `kafka-init` service on first `up`. To create them manually (non-compose broker), run `powershell -ExecutionPolicy Bypass -File scripts/create-topics.ps1`.
 4. Run the generator: `python services/ingestion/mock_generator.py`.
 5. Run the AI gateway locally or through Docker Compose.
@@ -59,6 +62,8 @@ pip install -e .
 datastreamctl status
 datastreamctl datasets --category synthetic
 datastreamctl doctor
+datastreamctl preflight
+datastreamctl update check --manifest-url https://github.com/OWNER/REPO/releases/latest/download/release-manifest.json
 datastreamctl site-profile validate config/site-profiles/single-site.yaml
 datastreamctl release-gate config/site-profiles/single-site.yaml --skip-network
 ```
@@ -83,6 +88,8 @@ datastreamd down
 `datastreamd` manages the Python service surface only; run `docker compose` first for Kafka, Postgres/TimescaleDB, and Grafana. The distributed Flink processor is available through the compose `flink-job` service.
 
 See `docs/phase8-distribution.md` for the full distribution plan.
+See `docs/update-and-release-operations.md` for the opt-in release check and
+the operator-controlled upgrade procedure.
 
 ## Industrial Simulation
 

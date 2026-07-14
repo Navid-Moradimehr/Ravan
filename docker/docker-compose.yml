@@ -44,7 +44,7 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
 
   kafka-ui:
-    image: ghcr.io/kafbat/kafka-ui:latest
+    image: ghcr.io/kafbat/kafka-ui:v1.3.0
     depends_on:
       kafka:
         condition: service_healthy
@@ -489,7 +489,7 @@ services:
       - raw-archive
 
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2025-01-20T14-49-07Z
     depends_on:
       minio:
         condition: service_started
@@ -572,7 +572,7 @@ services:
 
 
   timescaledb:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb:2.17.2-pg15
     environment:
       POSTGRES_DB: stream_engine
       POSTGRES_USER: stream
@@ -589,7 +589,7 @@ services:
       retries: 10
 
   timescaledb-migrate:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb:2.17.2-pg15
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -630,6 +630,8 @@ services:
         -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_text_raw TEXT;"
         -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_bool BOOLEAN;"
         -c "ALTER TABLE industrial_events ADD COLUMN IF NOT EXISTS value_type TEXT NOT NULL DEFAULT 'number';"
+        -c "CREATE TABLE IF NOT EXISTS metadata_schema_migrations (migration_id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now());"
+        -c "INSERT INTO metadata_schema_migrations (migration_id) VALUES ('2026-07-deployment-hardening') ON CONFLICT (migration_id) DO NOTHING;"
 
 
   redis:
@@ -667,6 +669,10 @@ services:
       DATASTREAM_WEBHOOK_REGISTRY_PATH: /data/webhooks.json
       DATASTREAM_NOTIFICATION_REGISTRY_PATH: /data/notifications.json
       DATASTREAM_DELIVERY_LEDGER_PATH: /data/delivery-ledger.json
+      MODEL_REGISTRY_PATH: /data/model-registry.json
+      PROMPT_REGISTRY_PATH: /data/prompt-registry.json
+      SCHEMA_REGISTRY_PATH: /data/schema-registry.json
+      DATASET_CATALOG_PATH: /data/dataset-catalog.json
       EDGE_SOURCE_HEALTH_HISTORY_PATH: /var/lib/datastream/source-health.json
     ports:
       - "8020:8020"

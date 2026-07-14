@@ -77,6 +77,7 @@ from services.historian.backup import (
 from services.common.metadata_artifacts import build_metadata_artifact_bundle, write_metadata_artifact_bundle
 from services.common.preflight import run_preflight
 from services.common.flink_capacity import decide_scaling, plan_capacity
+from services.common.update_check import check_for_update
 
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
 DEFAULT_AI_BASE = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080")
@@ -998,6 +999,7 @@ def cmd_preflight(args: argparse.Namespace) -> int:
         project_manifest=args.project_manifest,
         soak_scenario=args.soak_scenario,
         compose_file=args.compose_file,
+        strict=args.strict,
     )
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
@@ -1008,6 +1010,28 @@ def cmd_preflight(args: argparse.Namespace) -> int:
             print(f"{'OK' if check.passed else 'FAIL':<6}{check.name:<28}{check.detail}")
         _print_row("passed", str(report.passed).lower())
     return 0 if report.passed else 2
+
+
+def cmd_update(args: argparse.Namespace) -> int:
+    result = check_for_update(
+        enabled=True,
+        manifest_url=args.manifest_url,
+        timeout_seconds=args.timeout,
+    )
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        print("datastream update check")
+        print("=" * 40)
+        print(f"Current version: {result.current_version}")
+        print(f"Latest version:  {result.latest_version or 'unavailable'}")
+        print(f"Available:      {'yes' if result.available else 'no'}")
+        if result.release_url:
+            print(f"Release:        {result.release_url}")
+        if result.error:
+            print(f"Notice:         {result.error}")
+        print("No files were downloaded or installed.")
+    return 0 if not result.error else 2
 
 
 def _kafka_partition_count(brokers: str, topic: str) -> int:
@@ -2580,7 +2604,16 @@ def build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--soak-scenario", default="config/benchmarks/industrial-soak.yaml")
     preflight.add_argument("--compose-file", default="docker/docker-compose.yml")
     preflight.add_argument("--json", action="store_true")
+    preflight.add_argument("--strict", action="store_true", help="Fail on demo secrets and floating image tags")
     preflight.set_defaults(func=cmd_preflight)
+
+    update = sub.add_parser("update", help="Check a release manifest; never downloads or installs")
+    update_sub = update.add_subparsers(dest="action", required=True)
+    update_check = update_sub.add_parser("check", help="Check for a newer GitHub release")
+    update_check.add_argument("--manifest-url", default=os.getenv("DATASTREAM_UPDATE_MANIFEST_URL"))
+    update_check.add_argument("--timeout", type=float, default=3.0)
+    update_check.add_argument("--json", action="store_true")
+    update_check.set_defaults(func=cmd_update)
 
     flink = sub.add_parser("flink", help="Inspect and plan bounded Flink capacity")
     flink_sub = flink.add_subparsers(dest="action", required=True)

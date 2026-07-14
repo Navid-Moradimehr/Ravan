@@ -263,6 +263,7 @@ from services.api_service.routers.external import router as external_router
 from services.api_service.routers.operational_events import router as operational_events_router
 from services.api_service.routers.support import router as support_router
 from services.api_service.routers.admin import router as admin_router
+from services.api_service.routers.updates import router as updates_router
 from services.api_service.routers.historian import ingest_batch, ingest_event
 
 app.include_router(historian_router)
@@ -287,6 +288,7 @@ app.include_router(external_router)
 app.include_router(operational_events_router)
 app.include_router(support_router)
 app.include_router(admin_router)
+app.include_router(updates_router)
 app.include_router(realtime_router)
 from services.api_service.ops_runtime import _render_topic
 

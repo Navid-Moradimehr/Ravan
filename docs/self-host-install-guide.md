@@ -36,8 +36,9 @@ On Windows, use a matching `C:\Datastream\<project>\<site>\` layout.
 3. Put operator-owned secrets into the local secret store or environment.
 4. Start `datastreamd`.
 5. Run `datastreamctl doctor`.
-6. Run `datastreamctl status`.
-7. Run a backup drill before connecting the site to federation or cross-site replication.
+6. Run `datastreamctl preflight` and review warnings.
+7. Run `datastreamctl status`.
+8. Run a backup drill before connecting the site to federation or cross-site replication.
 
 ## Linux example
 
@@ -74,6 +75,18 @@ Do not require WSL2 for the production install. If a team wants WSL2 for develop
 4. Install the new version.
 5. Restart `datastreamd`.
 6. Re-run `datastreamctl doctor` and the site-profile benchmark report.
+
+The optional release notification does not install anything:
+
+```bash
+export DATASTREAM_UPDATE_CHECK_ENABLED=true
+export DATASTREAM_UPDATE_MANIFEST_URL=https://github.com/OWNER/REPO/releases/latest/download/release-manifest.json
+datastreamctl update check --manifest-url "$DATASTREAM_UPDATE_MANIFEST_URL"
+```
+
+The dashboard may show the same result as an in-app toast. Automatic download,
+replacement, and rollback are deliberately deferred until the installer/update
+agent exists. See [`docs/update-and-release-operations.md`](update-and-release-operations.md).
 
 For a production deployment, do not reuse the Compose demo credentials or
 floating demo endpoints. Supply operator-owned secrets and TLS/authentication
