@@ -61,12 +61,24 @@ The additive API is available under `/api/v1/ai`:
 - `POST /reports/generate` creates a manual, scheduled, or anomaly job. It does
   not execute an action or bypass the model provider boundary.
 
-The current gateway processes scheduled evidence when the policy interval elapses
-and records the job before acknowledging the Kafka output. A future worker can
-claim pending jobs for retry without changing these public records.
+The gateway records scheduled or sustained-anomaly evidence as a durable job and
+places the work on a bounded in-process queue. Kafka polling is separated from
+model execution, so a slow local model does not block the consumer loop. The
+queue defaults to 16 jobs and one model worker; deployments can set
+`AI_REPORT_QUEUE_SIZE` and `AI_REPORT_MAX_IN_FLIGHT` when the model server and
+GPU memory support more concurrency. A full queue leaves the job retryable and
+does not silently discard evidence.
 
-Sustained anomaly reports are now evaluated in the gateway using a bounded tracker
-keyed by `site_id`, `asset_id`, and `tag`. The tracker requires both the configured
+Sustained anomaly reports are evaluated independently per `site_id`, `asset_id`,
+and `tag`. Three pumps can therefore produce three independent warning incidents
+without one device suppressing another. The tracker requires both the configured
 duration and minimum sample count, emits once per incident, excludes replay by
-default, and rearms after normal recovery. A failed report is returned to
-`pending`, increments `attempts`, and records `next_attempt_at` and `last_error`.
+default, and rearms after normal recovery. The platform does not invent plant
+thresholds: the deterministic processor or a user-owned mapping must assign the
+event severity before the tracker evaluates it.
+
+A failed report remains retryable, increments `attempts`, and records
+`next_attempt_at` and `last_error`. The current worker retries queue delivery
+through the normal Kafka replay path after a restart; a future separate job
+claimer is warranted only when pending-job recovery becomes a measured
+operational requirement.

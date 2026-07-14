@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 8
     llm_allow_fallback: bool = True
     llm_local_only: bool = Field(default=False, validation_alias=AliasChoices("llm_local_only", "LLM_LOCAL_ONLY"))
+    ai_report_queue_size: int = Field(default=16, validation_alias=AliasChoices("ai_report_queue_size", "AI_REPORT_QUEUE_SIZE"))
+    ai_report_max_in_flight: int = Field(default=1, validation_alias=AliasChoices("ai_report_max_in_flight", "AI_REPORT_MAX_IN_FLIGHT"))
 
     @property
     def openai_base_url(self) -> str:

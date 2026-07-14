@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from typing import Any
@@ -44,6 +45,59 @@ last_success_epoch = Gauge("ai_gateway_last_success_epoch", "Unix timestamp of l
 service_state = ServiceHealthState(name="ai-gateway")
 telemetry_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
 _policy_cache: tuple[float, AIReportingPolicy] | None = None
+
+
+@dataclass(slots=True)
+class ReportWorkItem:
+    batch: list[tuple[str, int, int, dict[str, Any]]]
+    policy: AIReportingPolicy
+    job: dict[str, Any] | None
+    offsets: list[TopicPartition]
+
+
+async def report_worker(
+    queue: asyncio.Queue[ReportWorkItem | None],
+    producer: Producer,
+    consumer: Consumer,
+) -> None:
+    """Execute model calls outside the Kafka poll loop.
+
+    Queue capacity and worker count are deployment controls. The default is one
+    worker because local GPU servers commonly run one model request at a time;
+    increasing it is safe only when the model server and memory budget support
+    concurrent requests.
+    """
+    while service_state.running:
+        item = await queue.get()
+        if item is None:
+            queue.task_done()
+            return
+        try:
+            success = await enrich_batch(item.batch, producer, policy=item.policy, job=item.job)
+            if success:
+                if item.job:
+                    complete_report_job(str(item.job["job_id"]), {"event_id": "emitted"})
+                consumer.commit(offsets=item.offsets, asynchronous=False)
+            elif item.job:
+                fail_report_job(str(item.job["job_id"]), "AI output was not acknowledged")
+        except Exception as exc:
+            service_state.mark_degraded("AI report worker failed", str(exc))
+            if item.job:
+                fail_report_job(str(item.job["job_id"]), str(exc))
+        finally:
+            queue.task_done()
+
+
+async def enqueue_report(queue: asyncio.Queue[ReportWorkItem | None], item: ReportWorkItem) -> bool:
+    """Enqueue without allowing a slow model to grow memory without a bound."""
+    try:
+        queue.put_nowait(item)
+        return True
+    except asyncio.QueueFull:
+        if item.job:
+            fail_report_job(str(item.job["job_id"]), "AI report queue is full", retry_after_seconds=30)
+        service_state.mark_degraded("AI report queue full", "increase capacity or reduce report frequency")
+        return False
 
 
 def reporting_policy() -> AIReportingPolicy:
@@ -254,6 +308,12 @@ async def consume_loop() -> None:
     producer = Producer({"bootstrap.servers": settings.kafka_brokers, "client.id": "ai-gateway"})
     consumer.subscribe([settings.processed_topic])
 
+    report_queue: asyncio.Queue[ReportWorkItem | None] = asyncio.Queue(maxsize=max(1, settings.ai_report_queue_size))
+    worker_tasks = [
+        asyncio.create_task(report_worker(report_queue, producer, consumer))
+        for _ in range(max(1, settings.ai_report_max_in_flight))
+    ]
+
     batch: list[tuple[str, int, int, dict[str, Any]]] = []
     anomaly_tracker = SustainedAnomalyTracker()
     deadline = time.monotonic() + reporting_policy().scheduled_interval_seconds
@@ -279,13 +339,18 @@ async def consume_loop() -> None:
                             policy=policy,
                             evidence=anomaly_evidence,
                         )
-                        anomaly_success = await enrich_batch(anomaly_batch, producer, policy=policy, job=anomaly_job)
-                        if anomaly_success:
-                            complete_report_job(str(anomaly_job["job_id"]), {"event_id": "emitted"})
-                        else:
-                            fail_report_job(str(anomaly_job["job_id"]), "AI output was not acknowledged")
                     except Exception as exc:
                         service_state.mark_degraded("anomaly report failed", str(exc))
+                    else:
+                        await enqueue_report(
+                            report_queue,
+                            ReportWorkItem(
+                                batch=anomaly_batch,
+                                policy=policy,
+                                job=anomaly_job,
+                                offsets=[TopicPartition(message.topic(), message.partition(), message.offset() + 1)],
+                            ),
+                        )
                 try:
                     low, high = consumer.get_watermark_offsets(TopicPartition(message.topic(), message.partition()), cached=True)
                     if high >= 0:
@@ -314,23 +379,23 @@ async def consume_loop() -> None:
                     )
                 except Exception as exc:
                     service_state.mark_degraded("AI report job could not be recorded", str(exc))
-                success = await enrich_batch(batch[: policy.max_evidence_events], producer, policy=policy, job=job)
-                if success:
-                    if job:
-                        complete_report_job(str(job["job_id"]), {"event_id": "emitted"})
-                    try:
-                        consumer.commit(
-                            offsets=[TopicPartition(topic, partition, offset + 1) for topic, partition, offset, _ in batch],
-                            asynchronous=False,
-                        )
-                    except Exception as exc:
-                        service_state.mark_degraded("offset commit failed", f"offset commit failed: {exc}")
-                        asyncio.create_task(_broadcast_telemetry())
+                await enqueue_report(
+                    report_queue,
+                    ReportWorkItem(
+                        batch=batch[: policy.max_evidence_events],
+                        policy=policy,
+                        job=job,
+                        offsets=[TopicPartition(topic, partition, offset + 1) for topic, partition, offset, _ in batch],
+                    ),
+                )
                 batch = []
                 deadline = time.monotonic() + policy.scheduled_interval_seconds
 
             await asyncio.sleep(0)
     finally:
+        for _ in worker_tasks:
+            await report_queue.put(None)
+        await asyncio.gather(*worker_tasks, return_exceptions=True)
         consumer.close()
         producer.flush(5)
 
