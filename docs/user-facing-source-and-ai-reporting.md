@@ -12,6 +12,27 @@ changes and applies them without a container restart.
 Existing connections also expose Enable/Disable and Remove actions. Remove is a
 destructive metadata operation; disabling is the safer operational pause.
 
+Existing connections can also be edited and structurally validated in the same
+panel. `Protocol configuration JSON` contains non-secret protocol settings such
+as an MQTT topic, payload mode, or Modbus register map. `Field mappings JSON`
+maps source fields to canonical asset/tag fields. **Validate** checks the
+definition without making a network call; **Test** is the separate network
+diagnostic, and **Preview** shows protocol metadata when discovery is supported.
+Preview output is displayed in the panel rather than being discarded in a
+toast. Secret values remain outside the platform and are referenced through
+`credential_ref`.
+
+### Landing-page source management recommendation
+
+The Command Center should not contain a second source editor. The recommended
+landing-page addition is a compact **Source operations** card showing the
+number of registered sources, enabled/error counts, and the latest health
+summary, with a **Manage sources** link to
+`/integrations#source-connections`. Integrations remains the canonical editor;
+this avoids conflicting state and works both before and after an operator adds
+AuthN/AuthZ. A protocol-specific wizard can be added inside Integrations later
+if JSON configuration becomes too advanced for a particular user group.
+
 The UI intentionally does not ask for secret values. Users provide credential
 references backed by their environment, mounted secret file, or their own secret
 manager. Protocol-specific discovery and mapping remain explicit so a
@@ -30,3 +51,16 @@ The job history shows durable status, attempts, timestamps, and the latest error
 when a request cannot be completed. Model endpoint, credentials, retention, and
 deployment authentication remain user-owned. AI outputs continue to flow through
 `iot.ai_enriched` and the historian.
+
+The site selector is not an asset selector. It combines site IDs known by source
+registry and asset/tag metadata, and falls back to the shared `*` scope when a
+deployment has not registered site metadata yet.
+
+## Pipeline page data contract
+
+The Pipeline page reads source health from
+`GET /api/v1/observability/source-health` and recent records from the
+`industrial_events` historian table. It no longer displays invented simulator
+rates, endpoints, or example events. Static stage cards describe architecture;
+the ingress and event-preview panels are live when their services are available
+and show an explicit empty/error state otherwise.

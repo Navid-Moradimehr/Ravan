@@ -74,6 +74,14 @@ policy source/bounds, and durable job errors/attempts. The old `/sources` route
 redirects to `/integrations#source-connections`; Integrations is the single
 canonical source-management screen.
 
+### Site scope
+
+`site_id` is a deployment boundary, not an asset ID or tag. The AI Reporting
+scope selector is populated from registered source connections and the observed
+asset/tag catalog. `*` means the shared default policy. A site-specific policy
+is useful when one installation hosts more than one site or report jobs must be
+isolated by site.
+
 The gateway records scheduled or sustained-anomaly evidence as a durable job and
 places the work on a bounded in-process queue. Kafka polling is separated from
 model execution, so a slow local model does not block the consumer loop. The

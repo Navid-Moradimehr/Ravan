@@ -137,6 +137,23 @@ export async function getAssetTagCatalog(): Promise<{ items: AssetTagCatalogItem
   return requestJson("/api/metadata/asset-tags");
 }
 
+export type SourceHealth = {
+  connection_id: string;
+  protocol: string;
+  site: string;
+  state?: string;
+  error?: string;
+  mapping_seen?: number;
+  mapping_matched?: number;
+  mapping_missed?: number;
+  last_mapping_match?: string;
+  last_mapping_miss?: string;
+};
+
+export async function getSourceHealth(): Promise<{ current: SourceHealth[]; history: SourceHealth[] }> {
+  return requestJson("/api/observability/source-health");
+}
+
 export async function getThresholdPolicies(siteId?: string): Promise<{ policies: ThresholdPolicy[] }> {
   const query = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
   return requestJson(`/api/threshold-policies${query}`);

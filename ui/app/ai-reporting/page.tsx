@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { BrainCircuit, Clock3, FileText, ShieldCheck, Activity } from "lucide-react";
 import { DashboardFrame } from "@/components/dashboard-frame";
 import { SectionHeader } from "@/components/section-header";
@@ -11,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { formatErrorMessage, requestJson } from "@/lib/http";
 import { showToast } from "@/components/toaster";
+import { getAssetTagCatalog } from "@/lib/api";
 
 type Policy = {
   enabled: boolean;
@@ -77,6 +79,19 @@ export default function AIReportingPage() {
   const [status, setStatus] = useState<ReportingStatus | null>(null);
   const [siteId, setSiteId] = useState("*");
   const [loaded, setLoaded] = useState(false);
+  const siteCatalog = useQuery({
+    queryKey: ["ai-reporting", "sites"],
+    queryFn: async () => {
+      const [assetTags, connections] = await Promise.all([
+        getAssetTagCatalog(),
+        requestJson<{ connections: Array<{ site_id: string }> }>("/api/connections"),
+      ]);
+      return Array.from(new Set([
+        ...assetTags.items.map((item) => item.site_id),
+        ...connections.connections.map((item) => item.site_id),
+      ])).filter(Boolean).sort();
+    },
+  });
   const update = <K extends keyof Policy>(key: K, value: Policy[K]) => setPolicy((current) => ({ ...current, [key]: value }));
 
   async function load() {
@@ -135,11 +150,11 @@ export default function AIReportingPage() {
 
       <Card className="app-card">
         <CardHeader className="app-card-header">
-          <CardTitle className="flex items-center gap-2"><Activity className="size-4 text-accent" /> Reporting scope <HelpTip label="Reporting scope help" content="Policies and manual reports are stored per site. Use * for the shared default policy, or enter a site ID to manage a site-specific policy and job view." /></CardTitle>
-          <CardDescription>Load the persisted policy before editing it. The default policy is only a local form fallback.</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Activity className="size-4 text-accent" /> Reporting scope <HelpTip label="Reporting scope help" content="Site ID is the deployment boundary used by events, source connections, historian data, and reporting policies. It is not an asset ID. Select a known site or use the shared * policy." /></CardTitle>
+          <CardDescription>Site IDs come from the asset/tag catalog and registered source connections. Load the persisted policy before editing it.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3 p-4">
-          <label className="min-w-56 space-y-1 text-sm">Site ID<Input value={siteId} onChange={(event) => setSiteId(event.target.value || "*")} placeholder="* or site-a" /></label>
+          <label className="min-w-56 space-y-1 text-sm">Site ID<select aria-label="Site ID" className="app-select w-full" value={siteId} onChange={(event) => setSiteId(event.target.value)}><option value="*">All sites (shared policy)</option>{siteCatalog.data?.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           {status ? <div className="rounded-lg border border-border-subtle bg-surface-2 px-3 py-2 text-xs text-text-secondary">Source: <span className="font-medium text-text-primary">{status.source}</span><br />Allowed interval: {status.min_interval_seconds / 60} min to {status.max_interval_seconds / 3600} hr</div> : null}
         </CardContent>
       </Card>

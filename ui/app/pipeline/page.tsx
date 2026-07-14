@@ -1,6 +1,7 @@
 "use client";
 
 import { Activity, AlertTriangle, BrainCircuit, Cable, Gauge, RadioTower, Workflow } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardFrame } from "@/components/dashboard-frame";
 import { HelpTip } from "@/components/help-tip";
 import { SectionHeader } from "@/components/section-header";
@@ -9,19 +10,8 @@ import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-const sourceHealth = [
-  { protocol: "OPC UA", endpoint: "opc.tcp://opcua-sim:4840", status: "active", rate: "3 tags/s", latency: "410 ms" },
-  { protocol: "MQTT", endpoint: "factory/+/+/+", status: "active", rate: "25 msg/s", latency: "74 ms" },
-  { protocol: "Modbus TCP", endpoint: "modbus-sim:5020", status: "active", rate: "3 regs/s", latency: "190 ms" },
-];
-
-const events = [
-  { asset: "Pump-01", tag: "Temperature", value: "51.2 C", protocol: "OPC UA", quality: "good" },
-  { asset: "Pump-04", tag: "Vibration", value: "8.8 mm/s", protocol: "MQTT", quality: "good" },
-  { asset: "Pump-03", tag: "Pressure", value: "6.4 bar", protocol: "Modbus", quality: "good" },
-  { asset: "Pump-07", tag: "Temperature", value: "72.1 C", protocol: "MQTT", quality: "warning" },
-];
+import { getHistorianEvents, getSourceHealth } from "@/lib/api";
+import { formatErrorMessage } from "@/lib/http";
 
 function statusTone(status: string) {
   if (status === "active" || status === "online") return "border-success/30 bg-success/10 text-success";
@@ -31,8 +21,10 @@ function statusTone(status: string) {
 
 export default function PipelinePage() {
   const telemetry = useTelemetryEvents();
+  const sourceQuery = useQuery({ queryKey: ["pipeline", "source-health"], queryFn: getSourceHealth, refetchInterval: 10000 });
+  const eventsQuery = useQuery({ queryKey: ["pipeline", "events"], queryFn: () => getHistorianEvents("industrial_events", 10), refetchInterval: 10000 });
   const runtimeMode = telemetry.data?.pipeline?.[2]?.status ?? "starting";
-  const systemStatus = telemetry.error ? "degraded" : "online";
+  const systemStatus = telemetry.error || sourceQuery.isError || eventsQuery.isError ? "degraded" : "online";
 
   return (
     <DashboardFrame systemStatus={systemStatus} rightRail={<PipelineRail runtimeMode={runtimeMode} />}>
@@ -52,7 +44,7 @@ export default function PipelinePage() {
           <SectionHeader
             title="Ingress lanes"
             eyebrow="Edge ingest"
-            description="Protocol adapters and their current simulated endpoints."
+            description="Registered source adapters and their current runtime diagnostics."
             icon={Cable}
             actions={
               <HelpTip
@@ -63,32 +55,35 @@ export default function PipelinePage() {
             }
           />
           <div className="grid gap-4 md:grid-cols-3">
-            {sourceHealth.map((source) => (
+            {(sourceQuery.data?.current ?? []).map((source) => (
               <Card key={source.protocol} className="app-card overflow-hidden">
                 <CardHeader className="app-card-header rounded-none border-b px-4 py-3">
                   <CardTitle className="flex items-center justify-between gap-2 text-base font-semibold">
                     <span className="flex items-center gap-2">
                       <Cable aria-hidden="true" className="size-4 text-accent" />
-                      {source.protocol}
+                      {source.protocol} <span className="text-xs font-normal text-text-muted">{source.site}</span>
                     </span>
-                    <Badge variant="outline" className={statusTone(source.status)}>
-                      <span className="capitalize">{source.status}</span>
+                    <Badge variant="outline" className={statusTone(source.state ?? "offline")}>
+                      <span className="capitalize">{source.state ?? "unknown"}</span>
                     </Badge>
                   </CardTitle>
-                  <CardDescription className="font-mono text-xs text-text-muted">{source.endpoint}</CardDescription>
+                  <CardDescription className="font-mono text-xs text-text-muted">{source.connection_id}</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-3 p-4 text-sm">
                   <div>
-                    <div className="label-overline">Rate</div>
-                    <div className="mt-1 font-mono text-xs text-text-primary">{source.rate}</div>
+                    <div className="label-overline">Mappings</div>
+                    <div className="mt-1 font-mono text-xs text-text-primary">{source.mapping_matched ?? 0}/{source.mapping_seen ?? 0} matched</div>
                   </div>
                   <div>
-                    <div className="label-overline">Latency</div>
-                    <div className="mt-1 font-mono text-xs text-text-primary">{source.latency}</div>
+                    <div className="label-overline">Diagnostics</div>
+                    <div className="mt-1 text-xs text-text-primary">{source.error ?? (source.mapping_missed ? `${source.mapping_missed} missed` : "No active error")}</div>
                   </div>
                 </CardContent>
               </Card>
             ))}
+            {sourceQuery.isLoading ? <Card className="border-border bg-surface-2 p-4 text-sm text-text-secondary">Loading source health...</Card> : null}
+            {!sourceQuery.isLoading && !sourceQuery.isError && (sourceQuery.data?.current ?? []).length === 0 ? <Card className="border-dashed border-border bg-surface-2 p-4 text-sm text-text-secondary md:col-span-3">No registry source-health records are available. Environment-managed connectors may still be running; add a source in Integrations to make its health visible here.</Card> : null}
+            {sourceQuery.isError ? <Card className="border-error/30 bg-error/10 p-4 text-sm text-error md:col-span-3">Source health unavailable: {formatErrorMessage(sourceQuery.error)}</Card> : null}
           </div>
         </section>
 
@@ -128,13 +123,13 @@ export default function PipelinePage() {
           <SectionHeader
             title="Event preview"
             eyebrow="Preview"
-            description="Representative records after extraction and normalization."
+            description="Recent records read from the historian after extraction and normalization."
             icon={RadioTower}
             actions={
               <HelpTip
                 label="Event preview help"
                 side="left"
-                content="This panel shows example records in the shape the platform expects after normalization. Use it to understand the asset, tag, value, protocol, and quality fields before data is written to durable storage."
+                content="This panel reads recent records from the industrial_events historian table. It is not generated example data. A blank result means the historian has no records for this deployment or the table name is user-configured differently."
               />
             }
           />
@@ -150,12 +145,12 @@ export default function PipelinePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((event) => (
-                  <TableRow key={`${event.asset}-${event.tag}`}>
-                    <TableCell className="font-mono">{event.asset}</TableCell>
+                {(eventsQuery.data ?? []).map((event) => (
+                  <TableRow key={event.event_id}>
+                    <TableCell className="font-mono">{event.asset_id}</TableCell>
                     <TableCell>{event.tag}</TableCell>
-                    <TableCell>{event.value}</TableCell>
-                    <TableCell>{event.protocol}</TableCell>
+                    <TableCell>{event.value} {event.unit}</TableCell>
+                    <TableCell>{event.source_protocol}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={statusTone(event.quality === "good" ? "active" : "warning")}>
                         {event.quality}
@@ -163,6 +158,9 @@ export default function PipelinePage() {
                     </TableCell>
                   </TableRow>
                 ))}
+                {eventsQuery.isLoading ? <TableRow><TableCell colSpan={5}>Loading historian events...</TableCell></TableRow> : null}
+                {!eventsQuery.isLoading && !eventsQuery.isError && !(eventsQuery.data ?? []).length ? <TableRow><TableCell colSpan={5} className="text-text-secondary">No historian events are available yet.</TableCell></TableRow> : null}
+                {eventsQuery.isError ? <TableRow><TableCell colSpan={5} className="text-error">Historian preview unavailable: {formatErrorMessage(eventsQuery.error)}</TableCell></TableRow> : null}
               </TableBody>
             </Table>
           </Card>
