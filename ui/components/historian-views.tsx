@@ -147,7 +147,7 @@ function TrendChart({ data, tag, unit }: { data: { time: string; value: number }
             <Label value={unit ? `${tag} (${unit})` : tag} angle={-90} position="insideLeft" offset={-2} fill="var(--color-text-secondary)" fontSize={11} />
           </YAxis>
           <Tooltip content={<ChartTooltipContent indicator="line" labelFormatter={(value) => formatEventTime(value)} />} />
-          <Line type="monotone" dataKey="value" name={unit ? `${tag} (${unit})` : tag} stroke="var(--chart-1)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+          <Line type="monotone" dataKey="value" name={unit ? `${tag} (${unit})` : tag} stroke="var(--chart-1)" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} connectNulls={false} />
         </LineChart>
       </ResponsiveContainer>
     </ChartContainer>

@@ -7,7 +7,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any, Callable
 
@@ -585,18 +585,48 @@ def query_tables() -> list[str]:
             return [row[0] for row in cur.fetchall()]
 
 
-def query_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]:
+def query_trend(
+    asset_id: str,
+    tag: str,
+    hours: int = 1,
+    *,
+    start: Any | None = None,
+    end: Any | None = None,
+    max_points: int = 2000,
+    aggregation: str = "auto",
+) -> list[dict[str, Any]]:
+    """Read a bounded trend, using Timescale buckets for dense ranges.
+
+    ``hours`` remains the compatibility default. ``max_points`` prevents a
+    long historian interval from returning an unbounded response to the UI.
+    """
+    max_points = max(1, min(int(max_points or 2000), 2000))
+    aggregation = aggregation.lower().strip()
+    if aggregation not in {"auto", "raw", "avg", "min", "max"}:
+        raise ValueError("aggregation must be auto, raw, avg, min, or max")
+    if start is None:
+        start = datetime.now(timezone.utc) - timedelta(hours=max(1, int(hours)))
+    if end is None:
+        end = datetime.now(timezone.utc)
+    if aggregation == "raw":
+        return _fetch_rows(
+            "industrial_events", "trend",
+            """SELECT time, value, quality, fault_type, ground_truth_severity
+               FROM industrial_events WHERE asset_id = %s AND tag = %s
+                 AND time >= %s AND time <= %s ORDER BY time ASC LIMIT %s""",
+            (asset_id, tag, start, end, max_points),
+        )
+    seconds = max(1.0, (end - start).total_seconds() / max_points)
+    bucket = f"{seconds} seconds"
+    aggregate = {"min": "MIN(value)", "max": "MAX(value)"}.get(aggregation, "AVG(value)")
     return _fetch_rows(
-        "industrial_events",
-        "trend",
-        """
-        SELECT time, value, quality, fault_type, ground_truth_severity
-        FROM industrial_events
-        WHERE asset_id = %s AND tag = %s
-          AND time > NOW() - INTERVAL '%s hours'
-        ORDER BY time ASC
-        """,
-        (asset_id, tag, hours),
+        "industrial_events", "trend",
+        f"""SELECT time_bucket(%s::interval, time) AS time, {aggregate} AS value,
+                  'good' AS quality, NULL AS fault_type, NULL AS ground_truth_severity
+               FROM industrial_events WHERE asset_id = %s AND tag = %s
+                 AND time >= %s AND time <= %s
+               GROUP BY 1 ORDER BY 1 ASC LIMIT %s""",
+        (bucket, asset_id, tag, start, end, max_points),
     )
 def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
     rows = _fetch_rows(

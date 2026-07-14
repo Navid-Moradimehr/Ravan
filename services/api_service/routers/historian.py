@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -72,9 +73,17 @@ async def get_alarms(limit: int = 50) -> list[dict[str, Any]]:
 
 
 @router.get("/api/v1/historian/trend")
-async def get_trend(asset_id: str, tag: str, hours: int = 1) -> list[dict[str, Any]]:
+async def get_trend(
+    asset_id: str,
+    tag: str,
+    hours: int = 1,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    max_points: int = 2000,
+    aggregation: str = "auto",
+) -> list[dict[str, Any]]:
     try:
-        return query_trend(asset_id, tag, hours)
+        return query_trend(asset_id, tag, hours, start=start, end=end, max_points=max_points, aggregation=aggregation)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
