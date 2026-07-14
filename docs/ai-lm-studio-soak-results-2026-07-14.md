@@ -11,10 +11,18 @@
 
 ## Results
 
-The five-minute stream sent 900 events from three source identities and completed
-without producer errors. The first exact 20-second run produced no report because
-the simulator emitted warning samples at elapsed seconds 0 through 19. The
-simulator was corrected to include the boundary sample.
+The definitive five-minute stream sent 900 events from three source identities
+and completed without producer errors. The sources represented OPC UA, MQTT,
+and Modbus input paths. The simulator includes the boundary sample at elapsed
+second 20, so a configured 20-second warning interval is testable rather than
+being shortened to 19 seconds.
+
+The run created a completed sustained-anomaly report job. The latest
+`iot.ai_enriched` Kafka record contained 22 warning evidence events for
+`plant-a/Pump-01/Vibration`, `report_type=anomaly`,
+`trigger_reason=sustained_anomaly`, `model_id=openai/gpt-oss-20b`, and
+`used_fallback=false`. The AI-enriched historian row was persisted in
+`ai_enriched`.
 
 A controlled 40-second run with a 30-second warning condition then produced one
 completed anomaly job. The output contained 22 warning evidence events for
@@ -35,9 +43,15 @@ Kafka retains the events and reports consumer lag. For production deployments,
 the next high-value improvement is separating Kafka consumption/job claiming from
 model execution with a bounded worker queue and explicit max in-flight reports.
 
-The report is visible in Kafka UI under `iot.ai_enriched`, in the AI gateway
-metrics (`ai_gateway_llm_request_seconds` and
-`ai_gateway_enriched_events_total`), in the durable `ai_report_jobs` table/API,
-and through the AI Reporting page. AI fan-out can persist the summary into the
-historian `ai_enriched` table.
+The report is visible in Kafka UI under `iot.ai_enriched`, in the durable
+`ai_report_jobs` table/API, and through the AI Reporting page. AI fan-out can
+persist the summary into the historian `ai_enriched` table. Gateway metrics
+expose the request latency and enrichment counters while the gateway process is
+running; after a restart, the database and Kafka records remain the durable
+verification sources.
 
+The first controlled run with the default eight-second timeout used the
+deterministic fallback after a model timeout. With the LM Studio deployment
+timeout raised to 60 seconds, the accepted model response measured 19.93
+seconds and did not use fallback. The policy was restored after the soak, so
+the test did not leave anomaly-triggered reporting enabled by default.
