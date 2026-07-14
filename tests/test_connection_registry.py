@@ -50,3 +50,13 @@ def test_registry_filters_by_site_and_enabled(tmp_path):
 
     assert [item.connection_id for item in registry.list(site_id="plant-b", enabled=True)] == ["conn-mqtt"]
     assert registry.list(site_id="plant-a", enabled=True) == []
+
+
+def test_registry_labels_metadata_only_protocols(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    connection = _connection(connection_id="conn-rest", source_protocol="rest", endpoint="https://example.test/api", config={"url": "https://example.test/api"})
+    saved = registry.put(connection)
+
+    assert saved.runtime_supported is False
+    assert "metadata-only" in saved.runtime_note
+    assert registry.get("conn-rest").to_dict()["runtime_supported"] is False

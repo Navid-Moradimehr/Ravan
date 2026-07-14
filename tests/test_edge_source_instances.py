@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 
 from services.common.connection_registry import ConnectionRegistry, SourceConnection, SourceMapping
@@ -38,3 +39,38 @@ def test_settings_keeps_legacy_environment_fallback(monkeypatch):
     settings = replace(Settings(), enabled_protocols=("mqtt", "opcua"))
 
     assert {source.connection_id for source in settings.source_connections()} == {"legacy-mqtt", "legacy-opcua"}
+
+
+def test_sparkplug_b_sources_are_dispatched_via_mqtt_runner(tmp_path, monkeypatch):
+    import services.edge_ingest.connectors as connectors
+    from services.edge_ingest.settings import SourceRuntime
+
+    async def fake_run_mqtt(settings, publisher, stop_event, source=None):
+        return None
+
+    monkeypatch.setattr(connectors, "run_mqtt", fake_run_mqtt)
+    monkeypatch.setattr(
+        Settings,
+        "source_connections",
+        lambda self: (
+            SourceRuntime(
+                connection_id="conn-spb",
+                source_protocol="sparkplug_b",
+                site_id="plant-a",
+                endpoint="mqtt://broker:1883",
+                source_id="node-a",
+                config={"topic": "spBv1.0/group/DDATA/node-a"},
+                mappings=(),
+            ),
+        ),
+    )
+
+    async def run() -> None:
+        settings = replace(Settings(), enabled_protocols=("mqtt",))
+        publisher = object()
+        stop_event = asyncio.Event()
+        tasks = connectors.build_connector_tasks(settings, publisher, stop_event)  # type: ignore[arg-type]
+        assert len(tasks) == 1
+        await asyncio.gather(*tasks)
+
+    asyncio.run(run())

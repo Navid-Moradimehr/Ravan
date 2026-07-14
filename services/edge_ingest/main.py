@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import signal
 from pathlib import Path
@@ -8,6 +9,9 @@ from typing import Any
 from prometheus_client import start_http_server
 
 from services.common.normalize import to_legacy_iot_event
+
+
+logger = logging.getLogger(__name__)
 
 async def main() -> None:
     from services.edge_ingest.connectors import build_connector_tasks
@@ -42,6 +46,7 @@ async def main() -> None:
                     for item in configured
                 )
                 if signature != last_signature:
+                    logger.info("connection registry changed, rebuilding %s connector tasks", len(configured))
                     for task in tasks:
                         task.cancel()
                     if tasks:
@@ -50,7 +55,7 @@ async def main() -> None:
                     last_signature = signature
             except Exception:
                 # A malformed edit must not terminate the edge process.
-                pass
+                logger.exception("connector reconciliation failed")
             await asyncio.sleep(2.0 if registry_path.exists() else 5.0)
 
     supervisor_task = asyncio.create_task(reconcile_connectors())

@@ -14,3 +14,9 @@ def test_diagnostics_reports_unreachable_tcp_source():
     result = run_connection_test(SourceConnection("mqtt-1", "MQTT", "mqtt", "demo-site", "mqtt://127.0.0.1:1"), timeout_seconds=0.1)
     assert result["valid"] is True
     assert result["network_test"] in {"unreachable", "timeout"}
+
+
+def test_diagnostics_labels_metadata_only_sources():
+    result = run_connection_test(SourceConnection("rest-1", "REST", "rest", "demo-site", "https://example.test/api"))
+    assert result["valid"] is True
+    assert result["network_test"] == "not_required"

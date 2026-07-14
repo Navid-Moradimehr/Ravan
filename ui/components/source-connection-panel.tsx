@@ -23,6 +23,8 @@ type Connection = {
   mappings?: Array<Record<string, unknown>>;
   state: string;
   config_version: number;
+  runtime_supported?: boolean;
+  runtime_note?: string;
 };
 
 type SourceHealth = {
@@ -83,8 +85,22 @@ export function SourceConnectionPanel() {
     onError: (error) => showToast({ title: "Connection not updated", description: formatErrorMessage(error, "The source definition could not be updated."), variant: "error" }),
   });
   const validate = useMutation({
-    mutationFn: (id: string) => requestJson<{ valid: boolean; errors: string[] }>(`/api/connections/${encodeURIComponent(id)}/validate`, { method: "POST" }),
-    onSuccess: (result) => showToast({ title: result.valid ? "Connection definition is valid" : "Connection definition has errors", description: result.valid ? "Network connectivity was not tested." : result.errors.join(" "), variant: result.valid ? "success" : "error" }),
+    mutationFn: (id: string) => requestJson<{ valid: boolean; errors: string[]; runtime_supported?: boolean; runtime_note?: string }>(`/api/connections/${encodeURIComponent(id)}/validate`, { method: "POST" }),
+    onSuccess: (result) => {
+      if (!result.valid) {
+        showToast({ title: "Connection definition has errors", description: result.errors.join(" "), variant: "error" });
+        return;
+      }
+      if (result.runtime_supported === false) {
+        showToast({
+          title: "Connection is metadata only",
+          description: result.runtime_note ?? "This protocol is not started by the edge runtime.",
+          variant: "warning",
+        });
+        return;
+      }
+      showToast({ title: "Connection definition is valid", description: "Network connectivity was not tested.", variant: "success" });
+    },
     onError: (error) => showToast({ title: "Validation failed", description: formatErrorMessage(error, "The source definition could not be validated."), variant: "error" }),
   });
   const test = useMutation({
@@ -141,7 +157,7 @@ export function SourceConnectionPanel() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <label className="space-y-1 text-xs text-text-secondary">Connection name<Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Connection name" /></label>
           <label className="space-y-1 text-xs text-text-secondary">Protocol<select aria-label="Source protocol" value={protocol} onChange={(event) => setProtocol(event.target.value)} className="app-select w-full">
-            <option value="opcua">OPC UA</option><option value="mqtt">MQTT</option><option value="modbus">Modbus TCP</option><option value="modbus_rtu">Modbus RTU</option><option value="rest">REST</option>
+            <option value="opcua">OPC UA</option><option value="mqtt">MQTT</option><option value="sparkplug_b">Sparkplug B over MQTT</option><option value="modbus">Modbus TCP</option><option value="modbus_rtu">Modbus RTU</option><option value="opcua_discovery">OPC UA Discovery</option><option value="rest">REST (metadata-only)</option><option value="file">File (metadata-only)</option><option value="dataset">Dataset replay (metadata-only)</option><option value="mock">Mock generator (metadata-only)</option>
           </select></label>
           <label className="space-y-1 text-xs text-text-secondary">Site ID<Input value={siteId} onChange={(event) => setSiteId(event.target.value)} placeholder="Site ID" /></label>
           <label className="space-y-1 text-xs text-text-secondary">Endpoint<Input value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="opc.tcp://host:4840" /></label>
@@ -149,7 +165,7 @@ export function SourceConnectionPanel() {
         </div>
         <div className="grid gap-3 md:grid-cols-3"><label className="space-y-1 text-xs text-text-secondary">Credential reference<Input value={credentialRef} onChange={(event) => setCredentialRef(event.target.value)} placeholder="secret://plant-a/opcua/pump" /></label><label className="space-y-1 text-xs text-text-secondary">Source ID<Input value={sourceId} onChange={(event) => setSourceId(event.target.value)} placeholder="Optional source identifier" /></label><div className="text-xs leading-5 text-text-secondary">Credentials remain user-owned references. The editor never accepts or stores passwords, keys, or certificates.</div></div>
         <div className="grid gap-3 lg:grid-cols-2"><label className="space-y-1 text-xs text-text-secondary">Protocol configuration JSON<textarea aria-label="Protocol configuration JSON" className="app-textarea min-h-24 w-full font-mono text-xs" value={configJson} onChange={(event) => setConfigJson(event.target.value)} /></label><label className="space-y-1 text-xs text-text-secondary">Field mappings JSON<textarea aria-label="Field mappings JSON" className="app-textarea min-h-24 w-full font-mono text-xs" value={mappingsJson} onChange={(event) => setMappingsJson(event.target.value)} /></label></div>
-        <p className="text-xs leading-5 text-text-secondary">Save creates metadata only. It does not connect, publish, or store secrets. Test with the button, then activate with <code>POST /api/v1/connections/&lt;id&gt;/enable</code> through the operator&apos;s configured API security boundary.</p>
+        <p className="text-xs leading-5 text-text-secondary">Save creates metadata only. It does not connect, publish, or store secrets. Test with the button, then activate with <code>POST /api/v1/connections/&lt;id&gt;/enable</code> through the operator&apos;s configured API security boundary. REST, file, dataset, and mock are metadata-only workflows and are intentionally handled outside this source editor.</p>
         {connections.isError ? <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm">{formatErrorMessage(connections.error, "Connections could not be loaded.")}</p> : null}
         {sourceHealth.isError ? <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text-primary">Mapping diagnostics are temporarily unavailable, so live match counts are hidden until the observability endpoint recovers.</p> : null}
         <div className="space-y-2">
@@ -158,13 +174,15 @@ export function SourceConnectionPanel() {
             const health = sourceHealth.data?.current.find((item) => item.connection_id === connection.connection_id);
             const mappingSummary = health && typeof health.mapping_seen === "number" ? `${health.mapping_matched ?? 0}/${health.mapping_seen} matched` : "";
             const mappingWarning = health && typeof health.mapping_missed === "number" && health.mapping_missed > 0;
+            const runtimeSupported = connection.runtime_supported !== false;
             return <div key={connection.connection_id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-surface-0 p-3">
               <div className="flex min-w-0 items-center gap-3"><Icon className="size-4 shrink-0 text-accent" /><div className="min-w-0"><p className="truncate text-sm font-medium">{connection.name}</p><p className="truncate font-mono text-xs text-text-secondary">{connection.endpoint}</p></div></div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{connection.source_protocol}</Badge><Badge variant="outline">v{connection.config_version}</Badge><Badge variant="outline">{connection.state}</Badge>
+                <Badge variant="outline">{connection.source_protocol}</Badge><Badge variant="outline">v{connection.config_version}</Badge><Badge variant="outline">{connection.state}</Badge>{runtimeSupported ? <Badge variant="outline" className="border-success/30 bg-success/10 text-success">runtime-ready</Badge> : <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">metadata-only</Badge>}
                 {mappingSummary ? <Badge variant={mappingWarning ? "destructive" : "outline"}>{mappingSummary}</Badge> : null}
-                <Button variant="ghost" size="sm" onClick={() => edit(connection)}><Pencil className="size-4" /> Edit</Button><Button variant="ghost" size="sm" onClick={() => validate.mutate(connection.connection_id)} disabled={validate.isPending}>Validate</Button><Button variant="ghost" size="sm" onClick={() => test.mutate(connection.connection_id)} disabled={test.isPending}><TestTube className="size-4" /> Test</Button><Button variant="ghost" size="sm" onClick={() => preview.mutate(connection.connection_id)} disabled={preview.isPending}>Preview</Button><Button variant="ghost" size="sm" onClick={() => lifecycle.mutate({ id: connection.connection_id, action: connection.state === "enabled" ? "disable" : "enable" })} disabled={lifecycle.isPending}><Power className="size-4" /> {connection.state === "enabled" ? "Disable" : "Enable"}</Button><Button variant="ghost" size="sm" onClick={() => { if (window.confirm(`Remove ${connection.name}?`)) remove.mutate(connection.connection_id); }} disabled={remove.isPending}><Trash2 className="size-4" /> Remove</Button>{connection.state === "enabled" ? <CircleCheck className="size-4 text-success" /> : <CircleX className="size-4 text-text-muted" />}</div>
+                <Button variant="ghost" size="sm" onClick={() => edit(connection)}><Pencil className="size-4" /> Edit</Button><Button variant="ghost" size="sm" onClick={() => validate.mutate(connection.connection_id)} disabled={validate.isPending}>Validate</Button><Button variant="ghost" size="sm" onClick={() => test.mutate(connection.connection_id)} disabled={test.isPending}><TestTube className="size-4" /> Test</Button><Button variant="ghost" size="sm" onClick={() => preview.mutate(connection.connection_id)} disabled={preview.isPending}>Preview</Button><Button variant="ghost" size="sm" onClick={() => lifecycle.mutate({ id: connection.connection_id, action: connection.state === "enabled" ? "disable" : "enable" })} disabled={lifecycle.isPending || !runtimeSupported}><Power className="size-4" /> {connection.state === "enabled" ? "Disable" : "Enable"}</Button><Button variant="ghost" size="sm" onClick={() => { if (window.confirm(`Remove ${connection.name}?`)) remove.mutate(connection.connection_id); }} disabled={remove.isPending}><Trash2 className="size-4" /> Remove</Button>{connection.state === "enabled" ? <CircleCheck className="size-4 text-success" /> : <CircleX className="size-4 text-text-muted" />}</div>
               {mappingWarning ? <p className="w-full text-xs text-warning">Configured mappings are enabled, but live traffic has produced mapping misses. Check source_field, source_id, and tag alignment.</p> : null}
+              {!runtimeSupported ? <p className="w-full text-xs text-warning">{connection.runtime_note ?? "This source is metadata only and cannot be started by the edge runtime."}</p> : null}
             </div>;
           })}
           {!connections.isLoading && (connections.data?.connections ?? []).length === 0 ? <p className="text-sm text-text-secondary">No registry connections yet. Existing environment-variable sources remain available to the edge runtime.</p> : null}

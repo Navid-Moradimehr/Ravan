@@ -100,6 +100,14 @@ async def delete_connection(connection_id: str) -> dict[str, str]:
 @router.post("/api/v1/connections/{connection_id}/enable")
 async def enable_connection(connection_id: str) -> dict[str, Any]:
     try:
+        connection = connection_registry.get(connection_id)
+        if connection is None:
+            raise HTTPException(status_code=404, detail="Connection not found")
+        if not connection.runtime_supported:
+            raise HTTPException(
+                status_code=422,
+                detail=f"source_protocol {connection.source_protocol} is metadata-only and cannot be enabled by the edge runtime",
+            )
         return connection_registry.set_enabled(connection_id, True).to_dict()
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Connection not found") from exc
@@ -119,7 +127,14 @@ async def validate_connection(connection_id: str) -> dict[str, Any]:
     if connection is None:
         raise HTTPException(status_code=404, detail="Connection not found")
     errors = connection.validate()
-    return {"connection_id": connection_id, "valid": not errors, "errors": errors, "network_test": "not_run"}
+    return {
+        "connection_id": connection_id,
+        "valid": not errors,
+        "errors": errors,
+        "network_test": "not_run",
+        "runtime_supported": connection.runtime_supported,
+        "runtime_note": connection.runtime_note,
+    }
 
 
 @router.post("/api/v1/connections/{connection_id}/test")

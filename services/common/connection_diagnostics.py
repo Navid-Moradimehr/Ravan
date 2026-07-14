@@ -4,7 +4,7 @@ from __future__ import annotations
 import socket
 from urllib.parse import urlparse
 
-from services.common.connection_registry import SourceConnection
+from services.common.connection_registry import METADATA_ONLY_PROTOCOLS, RUNTIME_PROTOCOLS, SourceConnection
 
 
 def _host_port(connection: SourceConnection) -> tuple[str, int] | None:
@@ -29,8 +29,12 @@ def run_connection_test(connection: SourceConnection, timeout_seconds: float = 3
     }
     if errors:
         return result
-    if connection.source_protocol in {"file", "dataset", "mock"}:
+    if connection.source_protocol in METADATA_ONLY_PROTOCOLS:
         result["network_test"] = "not_required"
+        return result
+    if connection.source_protocol not in RUNTIME_PROTOCOLS:
+        result["network_test"] = "unsupported_protocol"
+        result["network_error"] = f"{connection.source_protocol} is not started by the edge runtime"
         return result
     host_port = _host_port(connection)
     if host_port is None:

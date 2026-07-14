@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any
 
 SUPPORTED_PROTOCOLS = {"opcua", "mqtt", "modbus", "modbus_rtu", "sparkplug_b", "rest", "file", "dataset", "mock"}
+RUNTIME_PROTOCOLS = {"opcua", "mqtt", "modbus", "modbus_rtu", "opcua_discovery", "sparkplug_b"}
+METADATA_ONLY_PROTOCOLS = {"rest", "file", "dataset", "mock"}
 CONNECTION_STATES = {"disabled", "configured", "enabled", "error"}
 SECRET_KEY_PATTERN = re.compile(r"(password|passwd|token|secret|private[_-]?key|api[_-]?key)", re.I)
 
@@ -92,6 +94,8 @@ class SourceConnection:
             errors.append(f"state must be one of {sorted(CONNECTION_STATES)}")
         if self.enabled and self.state == "disabled":
             errors.append("enabled connections cannot have disabled state")
+        if self.source_protocol not in RUNTIME_PROTOCOLS and self.source_protocol not in METADATA_ONLY_PROTOCOLS:
+            errors.append(f"source_protocol must be one of {sorted(SUPPORTED_PROTOCOLS)}")
         try:
             _reject_secret_fields(self.config)
         except ConnectionValidationError as exc:
@@ -105,9 +109,23 @@ class SourceConnection:
                 errors.append(f"mappings[{index}].tag is required")
         return errors
 
+    @property
+    def runtime_supported(self) -> bool:
+        return self.source_protocol in RUNTIME_PROTOCOLS
+
+    @property
+    def runtime_note(self) -> str:
+        if self.runtime_supported:
+            return "runtime-capable"
+        if self.source_protocol in METADATA_ONLY_PROTOCOLS:
+            return "metadata-only; configure it through the relevant dataset or integration workflow"
+        return "unknown protocol"
+
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["mappings"] = [mapping.to_dict() for mapping in self.mappings]
+        payload["runtime_supported"] = self.runtime_supported
+        payload["runtime_note"] = self.runtime_note
         return payload
 
 

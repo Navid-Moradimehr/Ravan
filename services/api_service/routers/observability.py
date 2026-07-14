@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from services.common.site_observability import build_site_observability_snapshot
 
@@ -20,9 +20,12 @@ async def site_observability(site_profile: str | None = None) -> dict[str, Any]:
 
 @router.get("/api/v1/observability/source-health")
 async def source_health(limit: int = 100) -> dict[str, Any]:
-    from services.edge_ingest.source_health import history, snapshot
+    try:
+        from services.edge_ingest.source_health import history, snapshot
 
-    return {"current": snapshot(), "history": history(limit)}
+        return {"current": snapshot(), "history": history(limit)}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"source health unavailable: {exc}") from exc
 
 
 @router.get("/api/v1/observability/federation")
