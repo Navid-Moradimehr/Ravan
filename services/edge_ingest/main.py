@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import signal
+from pathlib import Path
+from typing import Any
 from prometheus_client import start_http_server
 
 from services.common.normalize import to_legacy_iot_event
@@ -24,11 +27,39 @@ async def main() -> None:
             # Windows event loops do not support signal handlers here.
             pass
 
-    tasks = build_connector_tasks(settings, publisher, stop_event)
+    tasks: list[asyncio.Task[None]] = []
+
+    async def reconcile_connectors() -> None:
+        """Reload registry desired state without restarting the edge service."""
+        nonlocal tasks
+        registry_path = Path(os.getenv("DATASTREAM_CONNECTION_REGISTRY_PATH", ".datastream/connection-registry.json"))
+        last_signature: tuple[Any, ...] | None = None
+        while not stop_event.is_set():
+            try:
+                configured = settings.source_connections()
+                signature = tuple(
+                    (item.connection_id, item.config_version, item.enabled, item.source_protocol)
+                    for item in configured
+                )
+                if signature != last_signature:
+                    for task in tasks:
+                        task.cancel()
+                    if tasks:
+                        await asyncio.gather(*tasks, return_exceptions=True)
+                    tasks = build_connector_tasks(settings, publisher, stop_event)
+                    last_signature = signature
+            except Exception:
+                # A malformed edit must not terminate the edge process.
+                pass
+            await asyncio.sleep(2.0 if registry_path.exists() else 5.0)
+
+    supervisor_task = asyncio.create_task(reconcile_connectors())
 
     try:
         await stop_event.wait()
     finally:
+        supervisor_task.cancel()
+        await asyncio.gather(supervisor_task, return_exceptions=True)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)

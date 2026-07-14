@@ -316,6 +316,7 @@ services:
       EDGE_PROTOCOLS: ${EDGE_PROTOCOLS:-mqtt,opcua,modbus}
       EDGE_STORE_FORWARD_DIR: /var/lib/datastream/edge-buffer
       EDGE_SOURCE_HEALTH_HISTORY_PATH: /var/lib/datastream/source-health.json
+      DATASTREAM_CONNECTION_REGISTRY_PATH: /data/connection-registry.json
       MQTT_HOST: mqtt-broker
       MQTT_PORT: 1883
       OPCUA_ENDPOINT: opc.tcp://opcua-sim:4840/freeopcua/server/
