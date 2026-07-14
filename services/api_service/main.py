@@ -169,6 +169,11 @@ def _parse_cors_origins(raw: str | None) -> list[str]:
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
     return origins
 
+
+def _auth_required() -> bool:
+    """Return whether the operator enabled the built-in JWT boundary."""
+    return os.getenv("DATASTREAM_AUTH_REQUIRED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
 class HealthResponse(BaseModel):
     status: str
     version: str = "1.0.0"
@@ -314,7 +319,7 @@ async def _security_middleware(request: Request, call_next):
         "/api/v1/auth/login",
         "/api/v1/historian/replay",
     }
-    if method in {"POST", "PUT", "PATCH", "DELETE"} and path not in exempt_mutations and not path.startswith(("/docs", "/redoc", "/openapi.json", "/health", "/metrics", "/.well-known")):
+    if _auth_required() and method in {"POST", "PUT", "PATCH", "DELETE"} and path not in exempt_mutations and not path.startswith(("/docs", "/redoc", "/openapi.json", "/health", "/metrics", "/.well-known")):
         auth_header = request.headers.get("authorization", "")
         if not auth_header.lower().startswith("bearer "):
             return JSONResponse(status_code=401, content={"detail": "Missing bearer token"})
@@ -392,6 +397,7 @@ async def health() -> HealthResponse:
         kafka_ok = historian_ok = ai_ok = False
 
     auth_status = auth_security_status()
+    auth_status["required"] = _auth_required()
     dep_down = not (kafka_ok and historian_ok and ai_ok)
     status = "degraded" if (service_state.degraded or dep_down) else "ok"
     return HealthResponse(
@@ -404,6 +410,7 @@ async def health() -> HealthResponse:
             "ai_gateway": ai_ok,
             "auth": auth_status["jwt_secret_configured"],
             "auth_strong": auth_status["jwt_secret_strong_enough"],
+            "auth_required": auth_status["required"],
             "degraded": service_state.degraded,
             "degraded_reason": service_state.degraded_reason or "",
         },

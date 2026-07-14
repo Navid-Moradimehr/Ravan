@@ -20,7 +20,7 @@ This checklist turns the current roadmap into a concrete execution track for a s
 
 ## 2. Self-Hosted Security
 
-- [x] Keep mutating API requests protected by bearer-token middleware by default.
+- [x] Keep the built-in bearer-token middleware available as an explicit operator opt-in (`DATASTREAM_AUTH_REQUIRED=true`).
 - [x] Keep auth and RBAC as local/self-hosted infrastructure rather than cloud-managed dependencies.
 - [x] Keep secrets out of exported manifests.
 - [x] Keep TLS support available for MQTT, OPC UA, and Modbus TCP.

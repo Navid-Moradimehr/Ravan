@@ -31,8 +31,12 @@ accepts legacy path aliases such as `/api/historian/assets`,
 the same backend historian contracts.
 
 Authorization headers are forwarded on mutation proxies. No identity provider,
-token issuer, RBAC model, or reverse proxy is imposed by the project; operators
-may place their chosen authentication system in front of the dashboard and API.
+token issuer, RBAC model, or reverse proxy is imposed by the project. The built-in
+JWT middleware is opt-in: set `DATASTREAM_AUTH_REQUIRED=true` when the operator
+wants the API to reject unauthenticated mutations. The default is `false` so a
+self-hosted installation can rely on its own network boundary, reverse proxy, or
+SSO layer without a second login. Operators may place their chosen authentication
+system in front of the dashboard and API.
 
 For a Docker dashboard deployment, use:
 

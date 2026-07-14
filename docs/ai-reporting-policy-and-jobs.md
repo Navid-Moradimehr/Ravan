@@ -62,9 +62,17 @@ The additive API is available under `/api/v1/ai`:
   not execute an action or bypass the model provider boundary.
 
 The dashboard exposes same-origin proxies at `/api/ai/reporting-policy`,
-`/api/ai/reporting-status`, and `/api/ai/reports`. The proxies forward the
-browser bearer token for protected mutations; they do not bypass the API
-security middleware.
+`/api/ai/reporting-status`, and `/api/ai/reports`. The proxies forward a browser
+bearer token when one is present. For the default self-hosted mode, mutations
+work without a token; set `DATASTREAM_AUTH_REQUIRED=true` to enable the built-in
+JWT boundary. This keeps the feature usable before an operator configures
+AuthN/AuthZ while preserving a clean integration point for a future gateway.
+
+The AI Reporting page also exposes the global enable flag, site scope, minimum
+sample count, rearm and cooldown controls, evidence bound, replay policy, live
+policy source/bounds, and durable job errors/attempts. The old `/sources` route
+redirects to `/integrations#source-connections`; Integrations is the single
+canonical source-management screen.
 
 The gateway records scheduled or sustained-anomaly evidence as a durable job and
 places the work on a bounded in-process queue. Kafka polling is separated from

@@ -5,10 +5,27 @@ from fastapi.testclient import TestClient
 from services.api_service.main import app
 
 
-def test_mutating_route_requires_bearer_token(monkeypatch):
+def test_mutating_route_is_available_without_bearer_when_auth_is_operator_owned(monkeypatch):
     import services.api_service.main as api_main
 
     monkeypatch.setattr(api_main, "_persist_webhooks", lambda: None)
+    monkeypatch.delenv("DATASTREAM_AUTH_REQUIRED", raising=False)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/webhooks",
+        json={"url": "http://example.com/hook"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "registered"
+
+
+def test_mutating_route_requires_bearer_when_auth_is_enabled(monkeypatch):
+    import services.api_service.main as api_main
+
+    monkeypatch.setattr(api_main, "_persist_webhooks", lambda: None)
+    monkeypatch.setenv("DATASTREAM_AUTH_REQUIRED", "true")
     client = TestClient(app)
 
     response = client.post(

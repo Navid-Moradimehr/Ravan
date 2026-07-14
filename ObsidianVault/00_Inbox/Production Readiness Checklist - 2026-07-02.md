@@ -35,7 +35,7 @@ Packaging and installer work is intentionally not part of this phase.
 - synthetic and replay datasets for regression tests
 - expanded observability for historian query latency, broker lag, and WebSocket delivery lag
 - every manifest source is explicitly attached to a site boundary
-- mutating API requests require a bearer token by default and the API emits baseline security headers
+- the built-in bearer-token boundary is available through `DATASTREAM_AUTH_REQUIRED=true`; default self-hosted mode remains usable without a duplicate login, and the API emits baseline security headers
 
 ## Incomplete
 
