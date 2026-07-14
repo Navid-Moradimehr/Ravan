@@ -4,7 +4,7 @@ import asyncio
 import os
 import ssl
 
-from pymodbus.client import ModbusTcpClient
+from pymodbus.client import ModbusTcpClient, ModbusTlsClient
 
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors, adapter_reconnects
@@ -33,11 +33,13 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
         sslctx: ssl.SSLContext | None = None
         if modbus_tls and modbus_ca:
             sslctx = ssl.create_default_context(cafile=modbus_ca)
-        client = ModbusTcpClient(
-            host,
-            port=port,
-            sslctx=sslctx,
-        )
+        if sslctx is not None:
+            client = ModbusTlsClient(host, port=port, sslctx=sslctx)
+        else:
+            # ModbusTcpClient does not accept an sslctx keyword. Keep the
+            # plain TCP path separate from the TLS client so default sources
+            # work with current pymodbus releases.
+            client = ModbusTcpClient(host, port=port)
         try:
             if not client.connect():
                 raise ConnectionError("modbus connect failed")

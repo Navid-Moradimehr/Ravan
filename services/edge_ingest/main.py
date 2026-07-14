@@ -42,7 +42,10 @@ async def main() -> None:
             try:
                 configured = settings.source_connections()
                 signature = tuple(
-                    (item.connection_id, item.config_version, item.enabled, item.source_protocol)
+                    # Settings returns enabled runtime definitions only. The
+                    # enabled flag belongs to the registry model, not the
+                    # connector runtime projection.
+                    (item.connection_id, item.config_version, item.source_protocol)
                     for item in configured
                 )
                 if signature != last_signature:

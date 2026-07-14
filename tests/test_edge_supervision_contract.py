@@ -12,5 +12,6 @@ def test_edge_compose_uses_shared_connection_registry_path():
 def test_edge_supervisor_reconciles_versions_without_new_service():
     source = Path("services/edge_ingest/main.py").read_text(encoding="utf-8")
     assert "config_version" in source
+    assert "item.enabled" not in source
     assert "build_connector_tasks(settings, publisher, stop_event)" in source
     assert "reconcile_connectors" in source

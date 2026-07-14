@@ -1,0 +1,86 @@
+{
+  "title": "Connected Sources",
+  "uid": "connected-sources",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "site",
+        "label": "Site",
+        "type": "query",
+        "query": "label_values(edge_source_state, site)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": ["$__all"] }
+      },
+      {
+        "name": "connection_id",
+        "label": "Source",
+        "type": "query",
+        "query": "label_values(edge_source_state{site=~\"$site\"}, connection_id)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": ["$__all"] }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Connected sources",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "count(edge_source_state{site=~\"$site\",connection_id=~\"$connection_id\"} == 1)", "legendFormat": "sources" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "value_and_name" }
+    },
+    {
+      "type": "timeseries",
+      "title": "Source ingest throughput",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "targets": [
+        { "expr": "sum by (connection_id, protocol, site) (rate(edge_ingest_source_events_total{site=~\"$site\",connection_id=~\"$connection_id\"}[$__rate_interval]))", "legendFormat": "{{site}} / {{connection_id}} ({{protocol}})" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "type": "table",
+      "title": "Source state",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "edge_source_state{site=~\"$site\",connection_id=~\"$connection_id\"}", "legendFormat": "{{site}} / {{connection_id}} ({{protocol}})", "instant": true, "format": "table" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": { "showHeader": true }
+    },
+    {
+      "type": "timeseries",
+      "title": "Mapping misses by source",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "sum by (connection_id, protocol, site) (rate(edge_source_mapping_miss_total{site=~\"$site\",connection_id=~\"$connection_id\"}[$__rate_interval]))", "legendFormat": "{{site}} / {{connection_id}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Edge store-and-forward backlog",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "edge_store_forward_pending", "legendFormat": "pending events" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "hidden" }, "tooltip": { "mode": "single" } }
+    }
+  ]
+}

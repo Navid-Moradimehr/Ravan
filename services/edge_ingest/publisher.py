@@ -18,6 +18,11 @@ from services.edge_ingest.disk_spool import DiskEventSpool
 
 
 events_total = Counter("edge_ingest_events_total", "Validated industrial events", ["protocol"])
+source_events_total = Counter(
+    "edge_ingest_source_events_total",
+    "Validated industrial events by configured source connection",
+    ["connection_id", "protocol", "site"],
+)
 dlq_total = Counter("edge_ingest_dlq_total", "Invalid industrial events", ["protocol"])
 adapter_errors = Counter("edge_ingest_adapter_errors_total", "Adapter errors", ["protocol"])
 adapter_reconnects = Counter("edge_ingest_reconnects_total", "Adapter reconnect attempts", ["protocol"])
@@ -230,6 +235,11 @@ class EdgePublisher:
             self._buffer.append((self.settings.normalized_topic, key, normalized_bytes))
             self._buffer.append((self.settings.legacy_topic, key, legacy_bytes))
             events_total.labels(protocol=event.source_protocol).inc()
+            source_events_total.labels(
+                connection_id=event.source_connection_id or event.source_id,
+                protocol=event.source_protocol,
+                site=event.site,
+            ).inc()
             last_success_epoch.labels(protocol=event.source_protocol).set(time.time())
             observe_latency(event)
 
