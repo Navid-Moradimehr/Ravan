@@ -29,5 +29,12 @@ evidence. Replay is excluded unless explicitly requested.
 Prompt authoring, model promotion, and human approval workflows remain separate
 future capabilities. This change only establishes the stable reporting boundary.
 
+## API
+
+The first implementation exposes policy, status, job listing, and manual job
+creation under `/api/v1/ai`. The interval is validated at 10 minutes through one
+day. A job is recorded before gateway output is acknowledged, while model access
+and credentials remain deployment-owned.
+
 [[System Architecture]]
 [[Postponed Features Matrix]]

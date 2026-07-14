@@ -133,6 +133,34 @@ CREATE TABLE IF NOT EXISTS ai_enriched (
 SELECT create_hypertable('ai_enriched', 'time', if_not_exists => TRUE, migrate_data => TRUE);
 CREATE INDEX IF NOT EXISTS ai_enriched_source_ts_idx ON ai_enriched (source, time DESC);
 
+CREATE TABLE IF NOT EXISTS metadata_ai_reporting_policy (
+    policy_id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL UNIQUE,
+    policy JSONB NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS ai_report_jobs (
+    job_id UUID PRIMARY KEY,
+    site_id TEXT NOT NULL,
+    report_type TEXT NOT NULL,
+    trigger_reason TEXT NOT NULL,
+    window_start TIMESTAMPTZ,
+    window_end TIMESTAMPTZ,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    policy_snapshot JSONB NOT NULL,
+    evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
+    result JSONB,
+    last_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ai_report_jobs_status_idx ON ai_report_jobs (status, next_attempt_at);
+CREATE UNIQUE INDEX IF NOT EXISTS ai_report_jobs_window_uniq ON ai_report_jobs (site_id, report_type, trigger_reason, window_start, window_end);
+
 CREATE TABLE IF NOT EXISTS dead_letter_events (
     time TIMESTAMPTZ NOT NULL,
     event_id UUID NOT NULL,

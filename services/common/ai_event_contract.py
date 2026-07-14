@@ -122,6 +122,12 @@ def build_ai_summary_event(
     prompt_version: str = "1.0.0",
     used_fallback: bool = False,
     latency_seconds: float | None = None,
+    report_id: str | None = None,
+    report_type: str = "scheduled",
+    trigger_reason: str = "interval",
+    policy_snapshot: dict[str, Any] | None = None,
+    window_start: str | None = None,
+    window_end: str | None = None,
 ) -> dict[str, Any]:
     source_event_ids = _collect_source_event_ids(batch)
     source_sites = sorted({str(event.get("site_id", "")) for event in batch if event.get("site_id")})
@@ -158,6 +164,11 @@ def build_ai_summary_event(
         "latency_seconds": round(latency_seconds, 3) if latency_seconds is not None else None,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "used_fallback": used_fallback,
+        "report_id": report_id,
+        "report_type": report_type,
+        "trigger_reason": trigger_reason,
+        "policy_snapshot": policy_snapshot,
+        "window_start": window_start,
+        "window_end": window_end,
     }
     return event
-

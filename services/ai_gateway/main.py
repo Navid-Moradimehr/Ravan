@@ -26,6 +26,7 @@ from services.common.prompt_registry import prompt_registry
 from services.common.structured_output import validate_industrial_summary
 from services.common.service_health import ServiceHealthState
 from services.common.runtime_metrics import set_consumer_lag
+from services.common.ai_reporting import AIReportingPolicy, create_report_job, get_policy
 
 
 settings = Settings()
@@ -42,6 +43,20 @@ batch_severity_total = Counter(
 last_success_epoch = Gauge("ai_gateway_last_success_epoch", "Unix timestamp of last successful enrichment")
 service_state = ServiceHealthState(name="ai-gateway")
 telemetry_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+_policy_cache: tuple[float, AIReportingPolicy] | None = None
+
+
+def reporting_policy() -> AIReportingPolicy:
+    """Reload policy periodically while retaining the pre-migration fallback."""
+    global _policy_cache
+    now = time.monotonic()
+    if _policy_cache is None or now - _policy_cache[0] >= 10:
+        try:
+            _policy_cache = (now, get_policy("*"))
+        except Exception as exc:  # pragma: no cover - deployment failure path
+            service_state.mark_degraded("AI reporting policy unavailable", str(exc))
+            _policy_cache = (now, AIReportingPolicy())
+    return _policy_cache[1]
 
 
 @asynccontextmanager
@@ -240,7 +255,7 @@ async def consume_loop() -> None:
     consumer.subscribe([settings.processed_topic])
 
     batch: list[tuple[str, int, int, dict[str, Any]]] = []
-    deadline = time.monotonic() + settings.llm_batch_seconds
+    deadline = time.monotonic() + reporting_policy().scheduled_interval_seconds
 
     try:
         while service_state.running:
@@ -255,10 +270,28 @@ async def consume_loop() -> None:
                 except Exception:
                     service_state.mark_degraded("consumer lag probe failed")
 
-            ready_by_size = len(batch) >= settings.llm_max_batch_size
+            policy = reporting_policy()
+            # The legacy batch-size trigger is retained only as a compatibility
+            # setting when no governed policy has been persisted yet. A durable
+            # policy prevents accidental high-frequency LLM calls.
+            ready_by_size = False
             ready_by_time = batch and time.monotonic() >= deadline
-            if ready_by_size or ready_by_time:
-                success = await enrich_batch(batch, producer)
+            if policy.scheduled_enabled and ready_by_time:
+                job = None
+                try:
+                    payloads = [_batch_payload(item) for item in batch[: policy.max_evidence_events]]
+                    job = create_report_job(
+                        site_id=_batch_site(payloads),
+                        report_type="scheduled",
+                        trigger_reason="interval",
+                        window_start=None,
+                        window_end=None,
+                        policy=policy,
+                        evidence=payloads,
+                    )
+                except Exception as exc:
+                    service_state.mark_degraded("AI report job could not be recorded", str(exc))
+                success = await enrich_batch(batch[: policy.max_evidence_events], producer, policy=policy, job=job)
                 if success:
                     try:
                         consumer.commit(
@@ -269,7 +302,7 @@ async def consume_loop() -> None:
                         service_state.mark_degraded("offset commit failed", f"offset commit failed: {exc}")
                         asyncio.create_task(_broadcast_telemetry())
                 batch = []
-                deadline = time.monotonic() + settings.llm_batch_seconds
+                deadline = time.monotonic() + policy.scheduled_interval_seconds
 
             await asyncio.sleep(0)
     finally:
@@ -277,7 +310,13 @@ async def consume_loop() -> None:
         producer.flush(5)
 
 
-async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], producer: Producer) -> bool:
+async def enrich_batch(
+    batch: list[tuple[str, int, int, dict[str, Any]]],
+    producer: Producer,
+    *,
+    policy: AIReportingPolicy | None = None,
+    job: dict[str, Any] | None = None,
+) -> bool:
     batch_size_gauge.set(len(batch))
     payloads = [_batch_payload(item) for item in batch]
     for severity in ("normal", "warning", "critical"):
@@ -330,6 +369,10 @@ async def enrich_batch(batch: list[tuple[str, int, int, dict[str, Any]]], produc
         prompt_version=prompt_version,
         used_fallback=used_fallback,
         latency_seconds=time.monotonic() - started,
+        report_id=str(job["job_id"]) if job else None,
+        report_type=str(job["report_type"]) if job else "scheduled",
+        trigger_reason=str(job["trigger_reason"]) if job else "interval",
+        policy_snapshot=policy.model_dump(mode="json") if policy else None,
     )
     producer.produce(settings.ai_enriched_topic, value=json.dumps(enriched_payload).encode("utf-8"))
     # Do not let the input consumer commit before the AI event has reached the
@@ -367,6 +410,11 @@ def _batch_payload(item: Any) -> dict[str, Any]:
     if hasattr(item, "model_dump"):
         return item.model_dump(mode="json")
     return dict(item)
+
+
+def _batch_site(payloads: list[dict[str, Any]]) -> str:
+    sites = sorted({str(event.get("site_id") or event.get("site") or "*") for event in payloads})
+    return sites[0] if len(sites) == 1 else "*"
 
 if __name__ == "__main__":
     import uvicorn

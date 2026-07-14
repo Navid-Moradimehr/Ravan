@@ -50,3 +50,17 @@ they no longer define governed report scheduling when a reporting policy is acti
 6. Unit and contract tests cover policy validation and job lifecycle without a
    running Kafka or LLM service.
 
+## API
+
+The additive API is available under `/api/v1/ai`:
+
+- `GET /reporting-policy?site_id=*` reads the effective policy.
+- `PUT /reporting-policy?site_id=<site>` replaces the validated policy.
+- `GET /reporting-status?site_id=<site>` exposes bounds and effective defaults.
+- `GET /reports?site_id=<site>&limit=50` lists durable report jobs.
+- `POST /reports/generate` creates a manual, scheduled, or anomaly job. It does
+  not execute an action or bypass the model provider boundary.
+
+The current gateway processes scheduled evidence when the policy interval elapses
+and records the job before acknowledging the Kafka output. A future worker can
+claim pending jobs for retry without changing these public records.

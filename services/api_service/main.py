@@ -247,6 +247,7 @@ from services.api_service.routers.design import router as design_router
 from services.api_service.routers.connections import router as connections_router
 from services.api_service.routers.sinks import router as sinks_router
 from services.api_service.routers.modeling import router as modeling_router
+from services.api_service.routers.ai_reporting import router as ai_reporting_router
 from services.api_service.routers.search import router as search_router
 from services.api_service.routers.retrieval import router as retrieval_router
 from services.api_service.routers.metadata import router as metadata_router
@@ -270,6 +271,7 @@ app.include_router(design_router)
 app.include_router(connections_router)
 app.include_router(sinks_router)
 app.include_router(modeling_router)
+app.include_router(ai_reporting_router)
 app.include_router(search_router)
 app.include_router(retrieval_router)
 app.include_router(metadata_router)
