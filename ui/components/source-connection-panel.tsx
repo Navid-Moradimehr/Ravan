@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Cable, CircleCheck, CircleX, Plus, Radio, Router, Server, TestTube } from "lucide-react";
+import { Cable, CircleCheck, CircleX, Plus, Power, Radio, Router, Server, TestTube, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,16 @@ export function SourceConnectionPanel() {
     onSuccess: (result: any) => showToast({ title: "Source preview ready", description: result.tags ? `${result.tags.length} OPC UA tags discovered.` : `Preview mode: ${result.preview}.`, variant: "success" }),
     onError: (error) => showToast({ title: "Source preview failed", description: formatErrorMessage(error, "The source preview could not run."), variant: "error" }),
   });
+  const lifecycle = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "enable" | "disable" }) => requestJson(`/api/connections/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["connections"] }); queryClient.invalidateQueries({ queryKey: ["source-health"] }); showToast({ title: "Source state updated", description: "The edge runtime will reconcile the new desired state.", variant: "success" }); },
+    onError: (error) => showToast({ title: "Source state not updated", description: formatErrorMessage(error), variant: "error" }),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => requestJson(`/api/connections/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["connections"] }); showToast({ title: "Source removed", description: "The edge runtime will stop it on the next reconciliation.", variant: "success" }); },
+    onError: (error) => showToast({ title: "Source not removed", description: formatErrorMessage(error), variant: "error" }),
+  });
 
   return (
     <Card className="app-card">
@@ -113,7 +123,7 @@ export function SourceConnectionPanel() {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{connection.source_protocol}</Badge><Badge variant="outline">v{connection.config_version}</Badge><Badge variant="outline">{connection.state}</Badge>
                 {mappingSummary ? <Badge variant={mappingWarning ? "destructive" : "outline"}>{mappingSummary}</Badge> : null}
-                <Button variant="ghost" size="sm" onClick={() => test.mutate(connection.connection_id)} disabled={test.isPending}><TestTube className="size-4" /> Test</Button><Button variant="ghost" size="sm" onClick={() => preview.mutate(connection.connection_id)} disabled={preview.isPending}>Preview</Button>{connection.state === "enabled" ? <CircleCheck className="size-4 text-success" /> : <CircleX className="size-4 text-text-muted" />}</div>
+                <Button variant="ghost" size="sm" onClick={() => test.mutate(connection.connection_id)} disabled={test.isPending}><TestTube className="size-4" /> Test</Button><Button variant="ghost" size="sm" onClick={() => preview.mutate(connection.connection_id)} disabled={preview.isPending}>Preview</Button><Button variant="ghost" size="sm" onClick={() => lifecycle.mutate({ id: connection.connection_id, action: connection.state === "enabled" ? "disable" : "enable" })} disabled={lifecycle.isPending}><Power className="size-4" /> {connection.state === "enabled" ? "Disable" : "Enable"}</Button><Button variant="ghost" size="sm" onClick={() => { if (window.confirm(`Remove ${connection.name}?`)) remove.mutate(connection.connection_id); }} disabled={remove.isPending}><Trash2 className="size-4" /> Remove</Button>{connection.state === "enabled" ? <CircleCheck className="size-4 text-success" /> : <CircleX className="size-4 text-text-muted" />}</div>
               {mappingWarning ? <p className="w-full text-xs text-warning">Configured mappings are enabled, but live traffic has produced mapping misses. Check source_field, source_id, and tag alignment.</p> : null}
             </div>;
           })}

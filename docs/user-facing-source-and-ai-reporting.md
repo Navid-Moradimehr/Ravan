@@ -9,6 +9,9 @@ canonical mappings, and then enable it. A source can be disabled without deletin
 its metadata. The edge supervisor notices registry version changes and applies
 them without a container restart.
 
+Existing connections also expose Enable/Disable and Remove actions. Remove is a
+destructive metadata operation; disabling is the safer operational pause.
+
 The first UI surface intentionally does not ask for secret values. Users provide
 credential references backed by their environment, mounted secret file, or their
 own secret manager. Protocol-specific discovery and mapping remain explicit so a
@@ -25,4 +28,3 @@ manual report, which creates a durable job; it does not perform a plant action.
 The job history is the first operational view of report requests. Model endpoint,
 credentials, retention, and deployment authentication remain user-owned. AI
 outputs continue to flow through `iot.ai_enriched` and the historian.
-
