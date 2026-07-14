@@ -61,6 +61,11 @@ The additive API is available under `/api/v1/ai`:
 - `POST /reports/generate` creates a manual, scheduled, or anomaly job. It does
   not execute an action or bypass the model provider boundary.
 
+The dashboard exposes same-origin proxies at `/api/ai/reporting-policy`,
+`/api/ai/reporting-status`, and `/api/ai/reports`. The proxies forward the
+browser bearer token for protected mutations; they do not bypass the API
+security middleware.
+
 The gateway records scheduled or sustained-anomaly evidence as a durable job and
 places the work on a bounded in-process queue. Kafka polling is separated from
 model execution, so a slow local model does not block the consumer loop. The
