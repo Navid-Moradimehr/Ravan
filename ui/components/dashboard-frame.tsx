@@ -17,10 +17,12 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/", label: "Command center", icon: LayoutDashboard, description: "Overview and quick actions" },
+  { href: "/", label: "Operations overview", icon: LayoutDashboard, description: "Live health and quick actions" },
+  { href: "/sources", label: "Sources", icon: Cable, description: "Connect and activate inputs" },
   { href: "/historian", label: "Historian", icon: DatabaseZap, description: "Storage, queries, backup" },
   { href: "/observability", label: "Observability", icon: Gauge, description: "Health, metrics, latency" },
   { href: "/integrations", label: "Integrations", icon: BarChart3, description: "CDC, webhooks, models" },
+  { href: "/ai-reporting", label: "AI reporting", icon: Workflow, description: "Governed summaries and jobs" },
   { href: "/pipeline", label: "Pipeline", icon: Cable, description: "Ingress, normalization, DLQ" },
 ];
 
