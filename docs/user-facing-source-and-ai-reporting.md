@@ -10,17 +10,24 @@ without deleting its metadata. The edge supervisor notices registry version
 changes and applies them without a container restart.
 
 Existing connections also expose Enable/Disable and Remove actions. Remove is a
-destructive metadata operation; disabling is the safer operational pause.
+retirement action that preserves the source record for audit and replacement
+history; disabling is the safer operational pause.
 
 Existing connections can also be edited and structurally validated in the same
-panel. `Protocol configuration JSON` contains non-secret protocol settings such
-as an MQTT topic, payload mode, or Modbus register map. `Field mappings JSON`
-maps source fields to canonical asset/tag fields. **Validate** checks the
-definition without making a network call; **Test** is the separate network
-diagnostic, and **Preview** shows protocol metadata when discovery is supported.
+panel. Runtime protocols expose normal fields for MQTT topics, OPC UA nodes,
+Modbus registers, and RTU settings. Advanced JSON remains available for
+metadata-only workflows. The mapping table maps source fields to canonical
+asset/tag fields. **Validate** checks the definition without making a network
+call; **Test** is the separate network diagnostic; **Preview** shows protocol
+metadata when discovery is supported; and **Enable** activates the source.
 Preview output is displayed in the panel rather than being discarded in a
 toast. Secret values remain outside the platform and are referenced through
-`credential_ref`.
+`credential_refs`, using `env://`, `file://`, `path://`, or an operator-provided
+`secret://` integration.
+
+When a source is retired, the UI keeps the record visible with an archived
+state badge. You can restore it later if the same logical connection should
+return to service.
 
 ### Landing-page source management recommendation
 

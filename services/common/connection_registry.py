@@ -18,7 +18,7 @@ from typing import Any
 SUPPORTED_PROTOCOLS = {"opcua", "mqtt", "modbus", "modbus_rtu", "sparkplug_b", "rest", "file", "dataset", "mock"}
 RUNTIME_PROTOCOLS = {"opcua", "mqtt", "modbus", "modbus_rtu", "opcua_discovery", "sparkplug_b"}
 METADATA_ONLY_PROTOCOLS = {"rest", "file", "dataset", "mock"}
-CONNECTION_STATES = {"disabled", "configured", "enabled", "error"}
+CONNECTION_STATES = {"disabled", "configured", "enabled", "error", "retired"}
 SECRET_KEY_PATTERN = re.compile(r"(password|passwd|token|secret|private[_-]?key|api[_-]?key)", re.I)
 
 
@@ -68,6 +68,7 @@ class SourceConnection:
     endpoint: str = ""
     source_id: str = ""
     credential_ref: str = ""
+    credential_refs: dict[str, str] = field(default_factory=dict)
     config: dict[str, Any] = field(default_factory=dict)
     mappings: list[SourceMapping] = field(default_factory=list)
     enabled: bool = False
@@ -75,6 +76,8 @@ class SourceConnection:
     config_version: int = 1
     last_error: str = ""
     last_success_at: str | None = None
+    retired_at: str | None = None
+    retired_reason: str = ""
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)
 
@@ -92,14 +95,25 @@ class SourceConnection:
             errors.append("endpoint is required for network sources")
         if self.state not in CONNECTION_STATES:
             errors.append(f"state must be one of {sorted(CONNECTION_STATES)}")
-        if self.enabled and self.state == "disabled":
-            errors.append("enabled connections cannot have disabled state")
+        if self.enabled and self.state != "enabled":
+            errors.append("enabled connections must have enabled state")
+        if self.state == "enabled" and not self.enabled:
+            errors.append("state enabled requires enabled=true")
+        if self.state == "retired" and self.enabled:
+            errors.append("retired connections cannot be enabled")
         if self.source_protocol not in RUNTIME_PROTOCOLS and self.source_protocol not in METADATA_ONLY_PROTOCOLS:
             errors.append(f"source_protocol must be one of {sorted(SUPPORTED_PROTOCOLS)}")
         try:
             _reject_secret_fields(self.config)
         except ConnectionValidationError as exc:
             errors.append(str(exc))
+        for key, reference in self.credential_refs.items():
+            if not str(key).strip():
+                errors.append("credential_refs keys must not be empty")
+            if not str(reference).strip():
+                errors.append(f"credential_refs.{key} must be a non-empty reference")
+            elif not str(reference).startswith(("env://", "file://", "path://", "secret://")):
+                errors.append(f"credential_refs.{key} must use env://, file://, path://, or secret://")
         for index, mapping in enumerate(self.mappings):
             if not mapping.source_field.strip():
                 errors.append(f"mappings[{index}].source_field is required")
@@ -111,10 +125,12 @@ class SourceConnection:
 
     @property
     def runtime_supported(self) -> bool:
-        return self.source_protocol in RUNTIME_PROTOCOLS
+        return self.source_protocol in RUNTIME_PROTOCOLS and self.state != "retired"
 
     @property
     def runtime_note(self) -> str:
+        if self.state == "retired":
+            return "retired; preserved for audit and replacement history"
         if self.runtime_supported:
             return "runtime-capable"
         if self.source_protocol in METADATA_ONLY_PROTOCOLS:
@@ -159,8 +175,10 @@ class ConnectionRegistry:
         if self._state_path.exists():
             self._load()
 
-    def list(self, *, site_id: str | None = None, enabled: bool | None = None) -> list[SourceConnection]:
+    def list(self, *, site_id: str | None = None, enabled: bool | None = None, include_retired: bool = True) -> list[SourceConnection]:
         values = list(self._connections.values())
+        if not include_retired:
+            values = [item for item in values if item.state != "retired"]
         if site_id:
             values = [item for item in values if item.site_id == site_id]
         if enabled is not None:
@@ -179,21 +197,58 @@ class ConnectionRegistry:
         connection.updated_at = _now()
         if existing:
             connection.created_at = existing.created_at
+            connection.last_error = existing.last_error
+            connection.last_success_at = existing.last_success_at
+            if existing.state == "retired":
+                connection.state = "retired"
+                connection.enabled = False
+                connection.retired_at = existing.retired_at or _now()
+                connection.retired_reason = existing.retired_reason
+            else:
+                connection.enabled = existing.enabled
+                connection.state = existing.state
+                connection.retired_at = existing.retired_at
+                connection.retired_reason = existing.retired_reason
         self._connections[connection.connection_id] = connection
+        self._persist()
+        return connection
+
+    def retire(self, connection_id: str, reason: str = "retired by operator") -> SourceConnection:
+        connection = self._connections.get(connection_id)
+        if connection is None:
+            raise KeyError(connection_id)
+        connection.enabled = False
+        connection.state = "retired"
+        connection.retired_at = _now()
+        connection.retired_reason = reason
+        connection.updated_at = _now()
+        self._persist()
+        return connection
+
+    def restore(self, connection_id: str) -> SourceConnection:
+        connection = self._connections.get(connection_id)
+        if connection is None:
+            raise KeyError(connection_id)
+        connection.state = "configured"
+        connection.enabled = False
+        connection.retired_at = None
+        connection.retired_reason = ""
+        connection.updated_at = _now()
         self._persist()
         return connection
 
     def delete(self, connection_id: str) -> bool:
         if connection_id not in self._connections:
             return False
-        del self._connections[connection_id]
-        self._persist()
+        self.retire(connection_id)
         return True
 
     def set_enabled(self, connection_id: str, enabled: bool) -> SourceConnection:
         connection = self._connections.get(connection_id)
         if connection is None:
             raise KeyError(connection_id)
+        if connection.state == "retired":
+            raise ConnectionValidationError("retired connections must be restored before they can be enabled")
         connection.enabled = enabled
         connection.state = "enabled" if enabled else "disabled"
         connection.updated_at = _now()

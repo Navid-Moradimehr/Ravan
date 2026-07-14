@@ -15,12 +15,13 @@ small in-process supervisor, not a new microservice.
 
 ## User flow
 
-1. Create a source through the Connections API or the source-management UI.
-2. Select the protocol and enter its endpoint, source identifier, and credential
-   reference. Add mappings from source fields to canonical asset and tag IDs.
+1. Create a source through the source-management UI.
+2. Select the protocol and complete its guided fields. Add `env://` or `file://`
+   references for secret values and `path://` references for certificate/key
+   files. Add mappings from source fields to canonical asset and tag IDs.
 3. Run validation, network test, and preview. These are separate checks; a
    successful network test does not mean that a usable sample has been mapped.
-4. Enable the connection. The registry version changes and the edge supervisor
+4. Press Enable in the source row. The registry version changes and the edge supervisor
    starts the supported connector.
 5. Confirm source health, Kafka raw/normalized topics, processed events, and the
    historian. The platform does not silently create dashboard panels for every
@@ -38,4 +39,3 @@ for an active data path.
 The old environment variables remain valid for simple deployments with no
 registry file. A configured enabled registry takes precedence over those legacy
 sources.
-

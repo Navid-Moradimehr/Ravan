@@ -60,3 +60,50 @@ def test_registry_labels_metadata_only_protocols(tmp_path):
     assert saved.runtime_supported is False
     assert "metadata-only" in saved.runtime_note
     assert registry.get("conn-rest").to_dict()["runtime_supported"] is False
+
+
+def test_registry_retire_preserves_history_and_hides_from_active_list(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    registry.put(_connection())
+
+    retired = registry.retire("conn-pump-01", reason="sensor replaced")
+
+    assert retired.state == "retired"
+    assert retired.enabled is False
+    assert retired.retired_reason == "sensor replaced"
+    assert retired.retired_at is not None
+    assert registry.list(enabled=True) == []
+    assert registry.list(include_retired=False) == []
+    assert registry.get("conn-pump-01").state == "retired"
+
+
+def test_registry_edit_preserves_enabled_state(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    registry.put(_connection())
+    registry.set_enabled("conn-pump-01", True)
+
+    updated = registry.put(_connection(name="Pump OPC UA v2"))
+
+    assert updated.enabled is True
+    assert updated.state == "enabled"
+    assert updated.config_version == 2
+
+
+def test_registry_restore_returns_connection_to_configured_state(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    registry.put(_connection())
+    registry.retire("conn-pump-01")
+
+    restored = registry.restore("conn-pump-01")
+
+    assert restored.state == "configured"
+    assert restored.enabled is False
+    assert restored.retired_at is None
+
+
+def test_registry_persists_credential_references_without_secret_values(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    saved = registry.put(SourceConnection("mqtt-auth", "Authenticated MQTT", "mqtt", "plant-a", "mqtt://broker:1883", credential_refs={"username": "env://MQTT_USER", "password": "file://C:/secrets/mqtt-password"}))
+    loaded = ConnectionRegistry(tmp_path / "connections.json").get(saved.connection_id)
+    assert loaded is not None
+    assert loaded.credential_refs == {"username": "env://MQTT_USER", "password": "file://C:/secrets/mqtt-password"}

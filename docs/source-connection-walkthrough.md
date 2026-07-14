@@ -22,12 +22,10 @@ The platform stores that as metadata. The actual secret material stays in the op
 3. Choose the protocol, such as OPC UA, MQTT, Modbus TCP, Modbus RTU, REST, or Sparkplug B.
 4. Enter the endpoint or broker address.
 5. Enter the site ID.
-6. Provide a `credential_ref` that points to a secret the operator already owns.
-7. Save the source definition.
-8. Run the connection test.
-9. Add mappings if the source fields need to become asset or tag names.
-10. Activate the source through the operator API boundary with
-    `POST /api/v1/connections/<connection_id>/enable`.
+6. Complete the protocol-specific fields and add credential references if required. Use `env://NAME` or `file://path` for secret values and `path://path` for certificate/key files.
+7. Add mappings through the mapping table if the source fields need to become canonical asset or tag names.
+8. Save the source definition, run Validate, run Test, and use Preview when the protocol supports discovery.
+9. Press Enable in the same source row. The edge runtime reconciles the desired state automatically.
 
 ## 3. What happens after save
 
@@ -147,6 +145,31 @@ For local development, the Python fallback path remains available.
 If the source is saved, it exists as metadata.
 If it is enabled, the edge can use it.
 If data is flowing, the historian and read side can show it.
+
+## 14. Editing and removing a source
+
+Editing a source updates the saved connection in place and preserves its current runtime state.
+If the source is already retired, editing updates the archived record but does
+not bring it back online.
+
+The usual edit flow is:
+
+1. Open `Integrations`.
+2. Click `Edit` on the source.
+3. Change the endpoint, protocol settings, source ID, credential reference, or mappings.
+4. Save the change.
+5. Re-run `Validate` or `Test` if the protocol settings changed.
+
+Removing a source now means retiring it, not erasing its history.
+
+The retire flow is:
+
+1. Open `Integrations`.
+2. Click `Retire` on the source.
+3. Confirm the action.
+4. The source leaves the active runtime path and remains archived for audit and replacement history.
+
+If you later need the same logical connection again, restore the archived record from the API boundary and then validate and enable it again.
 
 ## 13. What errors you should expect
 

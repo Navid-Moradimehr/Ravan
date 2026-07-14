@@ -19,6 +19,7 @@ class SourceRuntime:
     mapping_version: str = ""
     config: dict[str, Any] | None = None
     mappings: tuple[dict[str, Any], ...] = ()
+    credential_refs: dict[str, str] | None = None
 
     @property
     def options(self) -> dict[str, Any]:
@@ -125,6 +126,7 @@ class Settings:
                     mapping_version=f"{item.connection_id}:v{item.config_version}",
                     config=item.config,
                     mappings=tuple(mapping.to_dict() for mapping in item.mappings),
+                    credential_refs=item.credential_refs,
                 )
                 for item in configured
             )

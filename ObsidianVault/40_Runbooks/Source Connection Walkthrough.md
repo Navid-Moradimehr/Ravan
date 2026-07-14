@@ -21,12 +21,9 @@ The platform stores that as metadata. The actual secret material stays in the op
 3. Choose the protocol, such as OPC UA, MQTT, Modbus TCP, Modbus RTU, REST, or Sparkplug B.
 4. Enter the endpoint or broker address.
 5. Enter the site ID.
-6. Provide a `credential_ref` that points to a secret the operator already owns.
-7. Save the source definition.
-8. Run the connection test.
-9. Add mappings if the source fields need to become asset or tag names.
-10. Activate the source through the operator API boundary with
-    `POST /api/v1/connections/<connection_id>/enable`.
+6. Complete the protocol-specific fields and add credential references where required. Use `env://NAME` or `file://path` for secret values and `path://path` for certificate/key files.
+7. Add mappings through the mapping table if the source fields need to become asset or tag names.
+8. Save, validate, test, preview when supported, and press Enable in the source row.
 
 ## 3. What happens after save
 
@@ -121,3 +118,16 @@ Some mismatches are intentionally softer:
 - a mapping that does not match incoming source fields does not block ingest, it just does not apply
 
 That means the platform catches broken config, and it now exposes mapping misses in source-health state so operators can see when a connection is valid but semantically misaligned.
+
+## Editing and retiring a source
+
+Editing a saved source updates the same registry record and keeps its current
+runtime state. If a source was enabled before the edit, it stays enabled after
+the update unless the operator disables it explicitly.
+If the source is already retired, editing keeps it archived until the operator
+restores it explicitly.
+
+Retiring a source is the preferred removal path. The registry marks the source
+as retired, removes it from the active runtime path, and keeps the metadata for
+audit and replacement history. The source can later be restored from the API
+boundary if the same logical connection needs to come back into service.

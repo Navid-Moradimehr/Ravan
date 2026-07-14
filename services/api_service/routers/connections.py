@@ -34,15 +34,21 @@ class ConnectionRequest(BaseModel):
     endpoint: str = ""
     source_id: str = ""
     credential_ref: str = ""
+    credential_refs: dict[str, str] = Field(default_factory=dict)
     config: dict[str, Any] = Field(default_factory=dict)
     mappings: list[MappingRequest] = Field(default_factory=list)
     enabled: bool = False
 
 
-def _to_connection(request: ConnectionRequest, connection_id: str | None = None) -> SourceConnection:
+def _to_connection(
+    request: ConnectionRequest,
+    connection_id: str | None = None,
+    *,
+    existing: SourceConnection | None = None,
+) -> SourceConnection:
     import uuid
 
-    return SourceConnection(
+    connection = SourceConnection(
         connection_id=connection_id or request.connection_id or f"conn-{uuid.uuid4().hex[:12]}",
         name=request.name,
         source_protocol=request.source_protocol,
@@ -50,16 +56,36 @@ def _to_connection(request: ConnectionRequest, connection_id: str | None = None)
         endpoint=request.endpoint,
         source_id=request.source_id,
         credential_ref=request.credential_ref,
+        credential_refs=request.credential_refs,
         config=request.config,
         mappings=[SourceMapping(**mapping.model_dump()) for mapping in request.mappings],
         enabled=request.enabled,
         state="enabled" if request.enabled else "configured",
     )
+    if existing is not None:
+        connection.created_at = existing.created_at
+        connection.updated_at = existing.updated_at
+        connection.last_error = existing.last_error
+        connection.last_success_at = existing.last_success_at
+        connection.retired_at = existing.retired_at
+        connection.retired_reason = existing.retired_reason
+        if existing.state == "retired":
+            connection.state = "retired"
+            connection.enabled = False
+        else:
+            connection.state = existing.state
+            connection.enabled = existing.enabled
+    return connection
 
 
 @router.get("/api/v1/connections")
-async def list_connections(site_id: str | None = None, enabled: bool | None = None) -> dict[str, Any]:
-    return {"connections": [item.to_dict() for item in connection_registry.list(site_id=site_id, enabled=enabled)]}
+async def list_connections(site_id: str | None = None, enabled: bool | None = None, include_retired: bool = True) -> dict[str, Any]:
+    return {
+        "connections": [
+            item.to_dict()
+            for item in connection_registry.list(site_id=site_id, enabled=enabled, include_retired=include_retired)
+        ]
+    }
 
 
 @router.post("/api/v1/connections")
@@ -81,10 +107,11 @@ async def get_connection(connection_id: str) -> dict[str, Any]:
 
 @router.put("/api/v1/connections/{connection_id}")
 async def update_connection(connection_id: str, request: ConnectionRequest) -> dict[str, Any]:
-    if connection_registry.get(connection_id) is None:
+    existing = connection_registry.get(connection_id)
+    if existing is None:
         raise HTTPException(status_code=404, detail="Connection not found")
     try:
-        connection = connection_registry.put(_to_connection(request, connection_id))
+        connection = connection_registry.put(_to_connection(request, connection_id, existing=existing))
     except ConnectionValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return connection.to_dict()
@@ -94,7 +121,25 @@ async def update_connection(connection_id: str, request: ConnectionRequest) -> d
 async def delete_connection(connection_id: str) -> dict[str, str]:
     if not connection_registry.delete(connection_id):
         raise HTTPException(status_code=404, detail="Connection not found")
-    return {"status": "deleted", "connection_id": connection_id}
+    return {"status": "retired", "connection_id": connection_id}
+
+
+@router.post("/api/v1/connections/{connection_id}/retire")
+async def retire_connection(connection_id: str) -> dict[str, Any]:
+    try:
+        connection = connection_registry.retire(connection_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Connection not found") from exc
+    return connection.to_dict()
+
+
+@router.post("/api/v1/connections/{connection_id}/restore")
+async def restore_connection(connection_id: str) -> dict[str, Any]:
+    try:
+        connection = connection_registry.restore(connection_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Connection not found") from exc
+    return connection.to_dict()
 
 
 @router.post("/api/v1/connections/{connection_id}/enable")
@@ -103,12 +148,16 @@ async def enable_connection(connection_id: str) -> dict[str, Any]:
         connection = connection_registry.get(connection_id)
         if connection is None:
             raise HTTPException(status_code=404, detail="Connection not found")
+        if connection.state == "retired":
+            raise HTTPException(status_code=422, detail="retired connections must be restored before they can be enabled")
         if not connection.runtime_supported:
             raise HTTPException(
                 status_code=422,
                 detail=f"source_protocol {connection.source_protocol} is metadata-only and cannot be enabled by the edge runtime",
             )
         return connection_registry.set_enabled(connection_id, True).to_dict()
+    except ConnectionValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Connection not found") from exc
 
@@ -117,6 +166,8 @@ async def enable_connection(connection_id: str) -> dict[str, Any]:
 async def disable_connection(connection_id: str) -> dict[str, Any]:
     try:
         return connection_registry.set_enabled(connection_id, False).to_dict()
+    except ConnectionValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Connection not found") from exc
 

@@ -18,6 +18,7 @@ from services.edge_ingest.publisher import (
 from services.edge_ingest.source_health import mark_mapping_result
 from services.edge_ingest.settings import Settings, SourceRuntime
 from services.edge_ingest.source_health import mark_source, mark_source_success
+from services.edge_ingest.credentials import CredentialResolutionError, resolve_credentials
 
 
 def enqueue_mqtt_message(
@@ -149,6 +150,18 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"edge-ingest-{source.connection_id}")
     client.on_connect = on_connect
     client.on_message = on_message
+    try:
+        credentials = resolve_credentials(source.credential_refs)
+        username = credentials.get("username", "")
+        password = credentials.get("password", "")
+        if username or password:
+            client.username_pw_set(username, password)
+    except CredentialResolutionError as exc:
+        mark_source(source.connection_id, source.source_protocol, source.site_id, "error", str(exc))
+        adapter_errors.labels(protocol="mqtt").inc()
+        await queue.put(None)
+        await drainer
+        return
 
     # Last Will and Testament: if the adapter disconnects ungracefully the
     # broker publishes the will so downstream consumers learn the adapter is
@@ -161,9 +174,17 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
             qos=settings.mqtt_will_qos,
             retain=settings.mqtt_will_retain,
         )
-    mqtt_ca_cert = os.getenv("MQTT_CA_CERT", "")
-    mqtt_certfile = os.getenv("MQTT_CERTFILE", "")
-    mqtt_keyfile = os.getenv("MQTT_KEYFILE", "")
+    try:
+        credentials = resolve_credentials(source.credential_refs)
+    except CredentialResolutionError as exc:
+        mark_source(source.connection_id, source.source_protocol, source.site_id, "error", str(exc))
+        adapter_errors.labels(protocol="mqtt").inc()
+        await queue.put(None)
+        await drainer
+        return
+    mqtt_ca_cert = credentials.get("ca_cert", os.getenv("MQTT_CA_CERT", ""))
+    mqtt_certfile = credentials.get("client_cert", os.getenv("MQTT_CERTFILE", ""))
+    mqtt_keyfile = credentials.get("client_key", os.getenv("MQTT_KEYFILE", ""))
     if mqtt_ca_cert:
         client.tls_set(
             ca_certs=mqtt_ca_cert,

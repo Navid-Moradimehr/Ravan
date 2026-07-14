@@ -12,16 +12,13 @@ The platform does not own plant credentials, certificates, firewall rules, PLC p
 2. Open Integrations and create a source connection.
 3. Select OPC UA, MQTT, Modbus TCP, Modbus RTU, REST, or another supported source type.
 4. Enter the endpoint and site ID.
-5. Enter a credential reference such as `secret://plant-a/opcua/pump`; never enter a password in the connection config.
-6. Save the source definition.
-7. Run the connection test. This performs configuration validation and a bounded TCP reachability check. It does not publish data.
-8. Add source-to-asset mappings in the connection definition or deployment manifest.
-9. Enable the connection through the protected API or deployment workflow.
+5. Complete the protocol settings shown by the editor. OPC UA node IDs, MQTT topic/QoS, Modbus register rows, and RTU serial settings are collected through normal fields; advanced JSON remains available only for metadata-only workflows.
+6. Add credential references where required. Use `env://NAME` or `file://path` for secret values and `path://path` for certificate/key file paths. The registry stores references only.
+7. Add source-to-asset mappings in the mapping table.
+8. Save, run Validate, run Test, optionally Preview discovered fields, then press Enable in the same UI. No manual API call is required for supported runtime protocols.
 10. Verify `industrial.raw`, `industrial.normalized`, the historian, and the edge metrics before adding dashboards or alerts.
 
-The current UI provides the connection definition and test surface. Full protocol-specific browse and register-map editing are the next extension points; existing environment variables remain supported.
-
-The source-connection panel is intentionally metadata-only. It records where a source lives, which protocol it uses, what site it belongs to, and which deployment-managed credential reference it should use. It does not browse the operator's filesystem, it does not import a whole `.env` file, and it does not store passwords or certificates in the app database.
+The source-connection panel is a desired-state editor backed by internal metadata. Users do not edit backend code, Compose files, or raw registry JSON. The edge runtime consumes the saved definition and reconciles connector tasks without a container restart. It does not browse or import a whole `.env` file and does not store passwords or certificates in the registry.
 
 If an operator keeps credentials in a secret manager, each connection should point at a separate named secret reference such as `secret://site-a/opcua/pump-01` or `secret://site-a/mqtt/broker-02`. If multiple credentials happen to live in the same file, the file is still the operator's secret store boundary; the platform should reference the specific entry name or key, not the file contents. That keeps the registry portable and avoids ambiguity when two sources share one file.
 
@@ -33,11 +30,15 @@ The persisted registry is stored at `DATASTREAM_CONNECTION_REGISTRY_PATH`. Docke
 
 If no enabled registry connections exist, the edge runtime creates the legacy sources from `EDGE_PROTOCOLS`, `OPCUA_ENDPOINT`, `OPCUA_NODES`, `MQTT_HOST`, `MQTT_TOPIC`, `MODBUS_HOST`, and related variables. Existing deployments therefore continue to work while registry-managed sources are introduced.
 
-Each registry source has a stable `connection_id`, site boundary, source protocol, endpoint, configuration version, mappings, and runtime state. Secrets are represented only by references. The registry rejects password, token, secret, private-key, and API-key fields.
+Editing a source preserves its current runtime state. If the connection was enabled, the update keeps it enabled. If the source was retired, the update keeps it archived until an operator restores it explicitly.
+
+Each registry source has a stable `connection_id`, site boundary, source protocol, endpoint, configuration version, mappings, and runtime state. Secrets are represented only by references. The registry rejects password, token, secret, private-key, and API-key fields. `credential_refs` provides separate references for username, password, OPC UA certificates, and MQTT TLS files.
 
 When an enabled source has mappings, the edge runtime applies the first matching mapping to the emitted event before canonical validation. Mapping can set asset, tag, site, line, unit, scale, and offset. The raw topic still receives the source payload, so mapping changes do not erase the original source record.
 
 Mapping health is also tracked at runtime. If mappings are configured but do not match live traffic, the source-health snapshot records mapping-match and mapping-miss counts so operators can distinguish a valid connection from a semantically misaligned one.
+
+Retiring a source does not erase it. The registry keeps the record, marks it as retired, and removes it from the active runtime path. This is the preferred way to decommission a sensor, PLC, gateway, or API endpoint while preserving audit and replacement history.
 
 ## Protocol notes
 
