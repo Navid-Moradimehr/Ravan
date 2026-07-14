@@ -3,6 +3,7 @@ name: local-stream-engine
 services:
   kafka:
     image: apache/kafka:4.1.2
+    restart: unless-stopped
     command:
       - bash
       - -lc
@@ -45,6 +46,7 @@ services:
 
   kafka-ui:
     image: ghcr.io/kafbat/kafka-ui:v1.3.0
+    restart: unless-stopped
     depends_on:
       kafka:
         condition: service_healthy
@@ -77,6 +79,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
+    restart: unless-stopped
     command: ["postgres", "-c", "wal_level=logical"]
     environment:
       POSTGRES_DB: stream_engine
@@ -95,6 +98,7 @@ services:
 
   connect:
     image: debezium/connect:3.0.0.Final
+    restart: unless-stopped
     depends_on:
       kafka:
         condition: service_healthy
@@ -118,6 +122,7 @@ services:
       context: ..
       dockerfile: services/ai_gateway/Dockerfile
     init: true
+    restart: unless-stopped
     depends_on:
       kafka:
         condition: service_healthy
@@ -140,6 +145,11 @@ services:
       LLM_ALLOW_FALLBACK: ${LLM_ALLOW_FALLBACK:-true}
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=3)\" >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
   processor:
     build:
@@ -166,6 +176,7 @@ services:
       context: ..
       dockerfile: services/processor/Dockerfile
     command: ["python", "-m", "services.processor.normalized_fanout"]
+    restart: unless-stopped
     depends_on:
       kafka:
         condition: service_healthy
@@ -205,6 +216,7 @@ services:
       context: ..
       dockerfile: services/processor/Dockerfile
     command: ["python", "-m", "services.processor.processed_fanout"]
+    restart: unless-stopped
     depends_on:
       kafka:
         condition: service_healthy
@@ -227,6 +239,7 @@ services:
       context: ..
       dockerfile: services/processor/Dockerfile
     command: ["python", "-m", "services.processor.ai_enriched_fanout"]
+    restart: unless-stopped
     depends_on:
       kafka:
         condition: service_healthy
@@ -347,11 +360,12 @@ services:
       context: ..
       dockerfile: ui/Dockerfile
     init: true
+    restart: unless-stopped
     depends_on:
       ai-gateway:
-        condition: service_started
+        condition: service_healthy
       api-service:
-        condition: service_started
+        condition: service_healthy
     environment:
       API_SERVICE_BASE: http://api-service:8020
       NEXT_PUBLIC_API_WS_BASE_URL: ws://localhost:8020
@@ -360,6 +374,11 @@ services:
       GRAFANA_BASE_URL: http://grafana:3000
     ports:
       - "3006:3006"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3006/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
     profiles:
       - ui
 
@@ -377,6 +396,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.flink-runtime
     command: jobmanager
+    restart: unless-stopped
     depends_on:
       flink-checkpoint-init:
         condition: service_completed_successfully
@@ -397,6 +417,7 @@ services:
       - jobmanager
       - flink-checkpoint-init
     command: taskmanager
+    restart: unless-stopped
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: jobmanager
@@ -413,6 +434,7 @@ services:
       - jobmanager
       - taskmanager
       - kafka
+    restart: unless-stopped
     environment:
       KAFKA_BROKERS: kafka:9092
       IOT_TOPIC: ${IOT_TOPIC:-industrial.normalized}
@@ -429,6 +451,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.0.1
+    restart: unless-stopped
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -466,6 +489,7 @@ services:
 
   grafana-proxy:
     image: nginx:1.27-alpine
+    restart: unless-stopped
     depends_on:
       - grafana
     ports:
@@ -573,6 +597,7 @@ services:
 
   timescaledb:
     image: timescale/timescaledb:2.17.2-pg15
+    restart: unless-stopped
     environment:
       POSTGRES_DB: stream_engine
       POSTGRES_USER: stream
@@ -676,6 +701,11 @@ services:
       EDGE_SOURCE_HEALTH_HISTORY_PATH: /var/lib/datastream/source-health.json
     ports:
       - "8020:8020"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8020/health', timeout=3)\" >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
     volumes:
       - api-data:/data
       - edge-data:/var/lib/datastream:ro

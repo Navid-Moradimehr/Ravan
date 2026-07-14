@@ -40,6 +40,11 @@ On Windows, use a matching `C:\Datastream\<project>\<site>\` layout.
 7. Run `datastreamctl status`.
 8. Run a backup drill before connecting the site to federation or cross-site replication.
 
+The Compose deployment uses restart policies and health checks for long-running
+services. Migration and initialization containers intentionally stop after a
+successful run; a stopped `timescaledb-migrate` or `kafka-init` container is
+normal when its exit code is zero.
+
 ## Linux example
 
 ```bash

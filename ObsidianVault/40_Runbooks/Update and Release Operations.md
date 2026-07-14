@@ -20,3 +20,7 @@ Automatic replacement is intentionally deferred until an installer/update
 agent can verify signatures, create backups, drain ingestion, apply migrations,
 run health checks, and roll back. The current manual sequence is stop, backup,
 replace, migrate, start, doctor, and release-gate.
+
+Compose health checks and restart policies are platform-owned defaults. CPU,
+memory, disk quotas, and log retention remain deployment-owned because an edge
+PC and a plant server have materially different safe limits.

@@ -6,6 +6,12 @@ This document tracks what is already complete, what is still incomplete, and wha
 
 Packaging and installer work is intentionally excluded from the current scope.
 
+Compose deployment hardening is in scope: long-running services use explicit
+restart policies and health checks, while one-shot initialization and
+migration jobs intentionally exit after success. CPU, memory, and log-retention
+limits remain operator-owned because safe values depend on the target edge
+server or plant host.
+
 ## Complete
 
 ### Runtime and data flow

@@ -73,6 +73,14 @@ def test_timescaledb_migrate_service_exists_and_is_one_shot():
     assert migrate.get("depends_on", {}).get("timescaledb") == {"condition": "service_healthy"}
 
 
+def test_long_running_compose_services_have_restart_and_health_contracts():
+    services = _compose()["services"]
+    for name in ("kafka", "postgres", "ai-gateway", "api-service", "dashboard", "prometheus"):
+        assert services[name].get("restart") == "unless-stopped"
+    for name in ("ai-gateway", "api-service", "dashboard"):
+        assert "healthcheck" in services[name]
+
+
 def test_timescaledb_migrate_repairs_historian_uniqueness():
     migrate = _compose()["services"]["timescaledb-migrate"]
     command_blob = " ".join(migrate.get("command", [])) if isinstance(migrate.get("command"), list) else str(migrate.get("command"))
@@ -115,7 +123,7 @@ def test_dashboard_profile_starts_api_service_for_same_origin_proxies():
     services = _compose()["services"]
     assert "ui" in services["api-service"].get("profiles", [])
     depends = services["dashboard"].get("depends_on", {})
-    assert depends.get("api-service") == {"condition": "service_started"}
+    assert depends.get("api-service") == {"condition": "service_healthy"}
 
 
 def test_soak_metrics_are_exposed_by_processing_workers():
