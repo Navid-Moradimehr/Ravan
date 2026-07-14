@@ -7,6 +7,7 @@ running historian.
 from __future__ import annotations
 
 import uuid
+import time
 from datetime import datetime
 from typing import Any
 
@@ -41,6 +42,48 @@ class AIReportingPolicy(BaseModel):
 
 def default_policy() -> AIReportingPolicy:
     return AIReportingPolicy()
+
+
+class SustainedAnomalyTracker:
+    """Bounded per-stream tracker for one report per sustained incident."""
+
+    def __init__(self, max_streams: int = 10000) -> None:
+        self._states: dict[str, dict[str, Any]] = {}
+        self._max_streams = max_streams
+
+    def update(self, event: dict[str, Any], policy: AIReportingPolicy, *, now: float | None = None) -> list[dict[str, Any]] | None:
+        if not policy.anomaly_enabled or (policy.exclude_replay and _is_replay(event)):
+            return None
+        severity = str(event.get("severity") or "normal").lower()
+        qualifies = policy.anomaly_severity == "any" or severity == policy.anomaly_severity or (policy.anomaly_severity == "warning" and severity == "critical")
+        key = ":".join(str(event.get(field) or "unknown") for field in ("site_id", "asset_id", "tag"))
+        now = time.monotonic() if now is None else now
+        state = self._states.get(key)
+        if not qualifies:
+            if state and state.get("reported") and severity == "normal" and now - float(state["last_seen"]) >= policy.anomaly_rearm_seconds:
+                self._states.pop(key, None)
+            elif state and not state.get("reported"):
+                self._states.pop(key, None)
+            return None
+        if state is None:
+            if len(self._states) >= self._max_streams:
+                self._states.pop(next(iter(self._states)))
+            state = {"started": now, "last_seen": now, "count": 0, "reported": False, "evidence": [], "last_report": 0.0}
+            self._states[key] = state
+        state["last_seen"] = now
+        state["count"] += 1
+        state["evidence"] = (state["evidence"] + [event])[-policy.max_evidence_events :]
+        if state["reported"] or state["count"] < policy.anomaly_min_samples or now - float(state["started"]) < policy.anomaly_duration_seconds:
+            return None
+        if state["last_report"] and now - float(state["last_report"]) < policy.anomaly_cooldown_seconds:
+            return None
+        state["reported"] = True
+        state["last_report"] = now
+        return list(state["evidence"])
+
+
+def _is_replay(event: dict[str, Any]) -> bool:
+    return bool(event.get("replay") or event.get("is_replay") or event.get("replay_source") or str(event.get("source_protocol", "")).lower() == "dataset")
 
 
 def _db():
@@ -159,6 +202,25 @@ def create_report_job(
         conn.commit()
     columns = ["job_id", "site_id", "report_type", "trigger_reason", "window_start", "window_end", "status", "attempts", "policy_snapshot", "evidence", "created_at", "updated_at"]
     return dict(zip(columns, row))
+
+
+def complete_report_job(job_id: str, result: dict[str, Any] | None = None) -> None:
+    ensure_ai_reporting_tables()
+    from psycopg2.extras import Json
+    with _db()() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE ai_report_jobs SET status = 'completed', result = %s, updated_at = now() WHERE job_id = %s", (Json(result or {}), job_id))
+        conn.commit()
+
+
+def fail_report_job(job_id: str, error: str, retry_after_seconds: int = 60) -> None:
+    ensure_ai_reporting_tables()
+    with _db()() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE ai_report_jobs SET status = 'pending', attempts = attempts + 1,
+                         last_error = %s, next_attempt_at = now() + (%s * interval '1 second'), updated_at = now()
+                         WHERE job_id = %s""", (error[:2000], max(1, retry_after_seconds), job_id))
+        conn.commit()
 
 
 def list_report_jobs(*, site_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:

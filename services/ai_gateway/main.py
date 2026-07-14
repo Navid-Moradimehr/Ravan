@@ -26,7 +26,7 @@ from services.common.prompt_registry import prompt_registry
 from services.common.structured_output import validate_industrial_summary
 from services.common.service_health import ServiceHealthState
 from services.common.runtime_metrics import set_consumer_lag
-from services.common.ai_reporting import AIReportingPolicy, create_report_job, get_policy
+from services.common.ai_reporting import AIReportingPolicy, SustainedAnomalyTracker, complete_report_job, create_report_job, fail_report_job, get_policy
 
 
 settings = Settings()
@@ -255,6 +255,7 @@ async def consume_loop() -> None:
     consumer.subscribe([settings.processed_topic])
 
     batch: list[tuple[str, int, int, dict[str, Any]]] = []
+    anomaly_tracker = SustainedAnomalyTracker()
     deadline = time.monotonic() + reporting_policy().scheduled_interval_seconds
 
     try:
@@ -262,7 +263,29 @@ async def consume_loop() -> None:
             message = consumer.poll(0.25)
             if message and not message.error():
                 consumed_events.inc()
-                batch.append((message.topic(), message.partition(), message.offset(), json.loads(message.value().decode("utf-8"))))
+                event = json.loads(message.value().decode("utf-8"))
+                batch.append((message.topic(), message.partition(), message.offset(), event))
+                policy = reporting_policy()
+                anomaly_evidence = anomaly_tracker.update(event, policy)
+                if anomaly_evidence:
+                    anomaly_batch = [(message.topic(), message.partition(), message.offset(), evidence) for evidence in anomaly_evidence]
+                    try:
+                        anomaly_job = create_report_job(
+                            site_id=_batch_site(anomaly_evidence),
+                            report_type="anomaly",
+                            trigger_reason="sustained_anomaly",
+                            window_start=None,
+                            window_end=None,
+                            policy=policy,
+                            evidence=anomaly_evidence,
+                        )
+                        anomaly_success = await enrich_batch(anomaly_batch, producer, policy=policy, job=anomaly_job)
+                        if anomaly_success:
+                            complete_report_job(str(anomaly_job["job_id"]), {"event_id": "emitted"})
+                        else:
+                            fail_report_job(str(anomaly_job["job_id"]), "AI output was not acknowledged")
+                    except Exception as exc:
+                        service_state.mark_degraded("anomaly report failed", str(exc))
                 try:
                     low, high = consumer.get_watermark_offsets(TopicPartition(message.topic(), message.partition()), cached=True)
                     if high >= 0:
@@ -293,6 +316,8 @@ async def consume_loop() -> None:
                     service_state.mark_degraded("AI report job could not be recorded", str(exc))
                 success = await enrich_batch(batch[: policy.max_evidence_events], producer, policy=policy, job=job)
                 if success:
+                    if job:
+                        complete_report_job(str(job["job_id"]), {"event_id": "emitted"})
                     try:
                         consumer.commit(
                             offsets=[TopicPartition(topic, partition, offset + 1) for topic, partition, offset, _ in batch],

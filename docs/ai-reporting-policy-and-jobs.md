@@ -64,3 +64,9 @@ The additive API is available under `/api/v1/ai`:
 The current gateway processes scheduled evidence when the policy interval elapses
 and records the job before acknowledging the Kafka output. A future worker can
 claim pending jobs for retry without changing these public records.
+
+Sustained anomaly reports are now evaluated in the gateway using a bounded tracker
+keyed by `site_id`, `asset_id`, and `tag`. The tracker requires both the configured
+duration and minimum sample count, emits once per incident, excludes replay by
+default, and rearms after normal recovery. A failed report is returned to
+`pending`, increments `attempts`, and records `next_attempt_at` and `last_error`.

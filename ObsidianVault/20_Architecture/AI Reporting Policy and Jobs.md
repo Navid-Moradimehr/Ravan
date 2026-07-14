@@ -36,5 +36,10 @@ creation under `/api/v1/ai`. The interval is validated at 10 minutes through one
 day. A job is recorded before gateway output is acknowledged, while model access
 and credentials remain deployment-owned.
 
+The gateway now has a bounded sustained-anomaly tracker and durable failure
+transitions. Warning or critical evidence must remain active for the configured
+duration and sample count; replay is excluded by default and a report is emitted
+once per incident.
+
 [[System Architecture]]
 [[Postponed Features Matrix]]
