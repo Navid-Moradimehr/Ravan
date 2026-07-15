@@ -1,0 +1,32 @@
+# Deterministic Model Dataset Builder
+
+## Boundary
+
+The builder is an intelligence-plane preparation tool. It consumes platform
+exports and produces a portable bundle for user-owned training code. It does
+not become a model runtime and does not decide what a reward means.
+
+## Contract
+
+Manifest v2 identifies sites, time range, purpose, source records, alignment,
+episode boundaries, provenance, and semantic context. Actions, outcomes, and
+large artifacts remain separate from observations.
+
+## Alignment
+
+The compiler uses a fixed interval and explicit maximum timestamp skew. It
+uses nearest records only within that bound and emits a boolean mask when no
+valid observation exists. There is no silent interpolation, forward filling,
+or cross-site merge.
+
+## Outputs
+
+`steps.parquet`, `actions.parquet`, `outcomes.parquet`, `artifacts.parquet`,
+`channels.json`, `semantic-context.json`, `manifest.yaml`, `lineage.json`,
+`quality-report.json`, and `_SUCCESS`.
+
+## Future extension
+
+The current compiler is local and deterministic. A durable Postgres-backed
+build queue and optional worker are the next phase. External Iceberg/S3
+scanning and multi-site federation must remain bounded and deployment-owned.

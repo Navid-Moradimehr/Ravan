@@ -1,5 +1,18 @@
 # Implementation Log
 
+## 2026-07-16 - Deterministic Model Dataset Builder
+
+Added manifest-v2 validation and a trajectory compiler for downstream model
+training. The builder aligns scalar observations on a fixed interval with a
+bounded nearest-neighbor skew, emits explicit missing-value masks, preserves
+actions/outcomes/artifact references as separate datasets, and writes
+manifest, lineage, semantic context, quality, and `_SUCCESS` artifacts. The
+existing v1 compiler and CLI remain backward compatible; no model training or
+reward inference was added.
+
+Validation: 21 focused tests passed after correcting support for a single
+source path in addition to an explicit source list.
+
 ## 2026-07-16 - Model Evidence Lakehouse Routing
 
 Added optional, family-specific lakehouse schemas for the model-data

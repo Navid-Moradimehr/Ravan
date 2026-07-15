@@ -959,9 +959,12 @@ def cmd_datasets(args: argparse.Namespace) -> int:
 
 def cmd_training_dataset(args: argparse.Namespace) -> int:
     from services.common.training_dataset import compile_bundle, load_manifest, validate_manifest
+    from services.common.model_dataset import compile_trajectory_bundle, validate_model_manifest
 
     if args.action == "validate":
-        result = validate_manifest(load_manifest(args.manifest)).to_dict()
+        result = validate_model_manifest(load_manifest(args.manifest)).to_dict()
+    elif args.action == "build":
+        result = compile_trajectory_bundle(args.manifest, args.output_dir)
     else:
         result = compile_bundle(
             args.manifest,
@@ -2611,6 +2614,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     training_compile.add_argument("--json", action="store_true")
     training_compile.set_defaults(func=cmd_training_dataset)
+    training_build = training_dataset_sub.add_parser("build", help="Build a deterministic model-data trajectory bundle")
+    training_build.add_argument("manifest")
+    training_build.add_argument("output_dir")
+    training_build.add_argument("--json", action="store_true")
+    training_build.set_defaults(func=cmd_training_dataset)
 
     sub.add_parser("doctor", help="Run health/diagnostic checks").set_defaults(func=cmd_doctor)
     sub.add_parser("config", help="Show effective control configuration").set_defaults(func=cmd_config)
