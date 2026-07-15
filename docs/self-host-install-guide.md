@@ -45,6 +45,19 @@ services. Migration and initialization containers intentionally stop after a
 successful run; a stopped `timescaledb-migrate` or `kafka-init` container is
 normal when its exit code is zero.
 
+## Downtime handling
+
+Do not configure a periodic reconnect timer in the UI or deployment package.
+Connectors should retry automatically with protocol-appropriate backoff, and
+operators should use the source enable/disable controls for planned outages.
+If a maintenance window should be visible in health reporting, mark the source
+or site as planned downtime in the operator-owned deployment state rather than
+teaching the platform a company production calendar.
+
+This keeps the platform portable across factories and utilities. The runtime
+owns reconnect behavior; the operator owns maintenance schedules, outage
+policy, and any external alert suppression rules.
+
 Legacy historian deduplication is disabled by default so a restart does not
 scan a large production historian. If an operator has evidence of legacy
 duplicates, schedule maintenance, set `RUN_HISTORIAN_DEDUPE=true`, run the
