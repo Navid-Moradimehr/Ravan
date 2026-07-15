@@ -9,6 +9,22 @@ credentials, source exports, rewards, GPUs, or plant safety policy.
 
 Validation: `npm run build` passed and emitted the new page and API routes.
 
+## 2026-07-16 - Full Validation Results
+
+The complete Python suite passed: `649 passed` with four existing warnings.
+The UI `npm run build` passed, and `docker compose -f
+docker/docker-compose.yml config --quiet` passed. The model-data compiler
+benchmark processed 1,000 records into 1,000 aligned steps in 0.9512 seconds
+(1,051.28 records/sec) on the local development machine. This benchmark does
+not represent Kafka, S3, GPU, or multi-node capacity.
+
+## 2026-07-16 - Model Data Validation Gate
+
+Added a repeatable local trajectory-builder benchmark and contract test. The
+benchmark measures manifest read, bounded alignment, Parquet output, and
+quality-artifact generation only; it intentionally does not claim plant,
+Kafka, object-store, GPU, or Kubernetes capacity.
+
 ## 2026-07-16 - Deterministic Model Dataset Builder
 
 Added manifest-v2 validation and a trajectory compiler for downstream model

@@ -39,3 +39,11 @@ unchanged.
 The `/datasets` web page provides a lightweight validation view. It is not a
 training UI and does not upload data or handle secrets. CLI and worker paths
 remain the authoritative build interfaces.
+
+The local benchmark covers compiler work only. It must not be presented as a
+substitute for site-level ingestion, Kafka, S3, GPU, or Kubernetes validation.
+
+Reference result on 2026-07-16: 1,000 records compiled into 1,000 steps in
+0.9512 seconds, or 1,051.28 records/sec. The full Python suite passed with
+649 tests, the UI production build passed, and the Compose file rendered
+successfully.

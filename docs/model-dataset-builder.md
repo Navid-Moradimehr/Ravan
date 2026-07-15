@@ -76,3 +76,12 @@ The web UI is available at `/datasets`. It validates a JSON representation of
 the manifest and explains the platform/user ownership boundary. The CLI
 remains the complete offline build interface; the UI intentionally does not
 accept credentials or upload source data.
+
+The compiler benchmark is available as a Python library through
+`services.benchmarks.model_dataset.run_benchmark`. It measures local manifest
+read, bounded alignment, Parquet output, and quality artifact generation; it
+does not represent Kafka, S3, GPU, or multi-node performance.
+
+Current local reference: `1,000` records -> `1,000` aligned steps in `0.9512 s`
+(`1,051.28 records/sec`) on the development machine. This is a compiler
+reference only, not an end-to-end platform capacity claim.
