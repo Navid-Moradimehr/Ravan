@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from services.common.brokers import resolve_kafka_brokers
 from services.edge_ingest.model import to_json_bytes
+from services.common.model_data_contract import validate_standard_operational_payload
 
 
 OperationalKind = Literal[
@@ -36,7 +37,11 @@ class OperationalEvent(BaseModel):
     correlation_id: str = ""
     causation_id: str = ""
     schema_version: int = Field(default=1, ge=1)
+    schema_ref: str = ""
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    def model_post_init(self, __context: Any) -> None:
+        self.payload = validate_standard_operational_payload(self.event_kind, self.payload, self.schema_ref)
 
 
 def publish_operational_event(event: OperationalEvent) -> dict[str, Any]:

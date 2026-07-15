@@ -2833,3 +2833,11 @@ guessing where the Flink operator example lives.
 Verification: `627 passed`; protocol matrix `46 passed`; Compose config valid;
 Flink REST job RUNNING with 2 tasks and 0 failed tasks; Prometheus/Kafka
 UI/Grafana/API/AI HTTP probes returned 200 at final inspection.
+# 2026-07-16: Model-data collection contracts
+
+Added backward-compatible synchronization/provenance fields to industrial
+events, a checksummed object-reference contract for rich observations, typed
+optional action/outcome/episode-boundary payloads, and the
+`industrial.observation-artifacts` event catalog entry. Existing schema-v1
+events and custom operational payloads remain supported. This phase does not
+add model training or control execution.

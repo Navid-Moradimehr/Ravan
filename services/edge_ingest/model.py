@@ -42,6 +42,13 @@ class IndustrialEvent(BaseModel):
     source_config_version: int = 0
     mapping_version: str = ""
     lineage_id: str = ""
+    sequence_number: int | None = Field(default=None, ge=0)
+    clock_id: str = ""
+    clock_sync_status: str = ""
+    timestamp_uncertainty_ms: float | None = Field(default=None, ge=0)
+    calibration_version: str = ""
+    topology_version: str = ""
+    context_id: str = ""
 
     @field_validator("tag", "asset_id", "source_id")
     @classmethod

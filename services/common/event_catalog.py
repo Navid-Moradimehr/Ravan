@@ -57,6 +57,16 @@ CANONICAL_EVENT_TOPICS: tuple[EventCatalogEntry, ...] = (
         retained=True,
     ),
     EventCatalogEntry(
+        topic="industrial.observation-artifacts",
+        stage="artifact-reference",
+        description="Checksummed references to large image, video, waveform, audio, tensor, and document observations.",
+        category="industrial",
+        producers=("edge.artifact-adapter", "user.adapters"),
+        consumers=("lakehouse.artifact-sink", "dataset.builder", "replay"),
+        site_scoped=True,
+        retained=True,
+    ),
+    EventCatalogEntry(
         topic="industrial.dlq",
         stage="dlq",
         description="Rejected or oversized industrial events requiring operator review.",
