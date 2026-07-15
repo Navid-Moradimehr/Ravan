@@ -43,7 +43,7 @@ services:
       - -lc
       - |
         set -e
-        for topic in industrial.raw industrial.normalized industrial.operational industrial.dlq iot.raw iot.processed iot.ai_enriched platform.metadata.threshold-policies; do
+        for topic in industrial.raw industrial.normalized industrial.operational industrial.observation-artifacts industrial.dlq iot.raw iot.processed iot.ai_enriched platform.metadata.threshold-policies; do
           /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
             --topic "$$topic" \
             --bootstrap-server kafka:9092 \

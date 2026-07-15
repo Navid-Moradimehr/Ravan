@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from confluent_kafka import Producer
+from confluent_kafka import AdminClient, NewTopic, Producer
 
 from services.common.model_dataset import compile_trajectory_bundle
 
@@ -41,6 +41,18 @@ def _upload_artifact(client: Any, bucket: str, key: str, body: bytes) -> str:
         client.create_bucket(Bucket=bucket)
     client.put_object(Bucket=bucket, Key=key, Body=body, ContentType="application/octet-stream")
     return hashlib.sha256(body).hexdigest()
+
+
+def _ensure_topics(brokers: str) -> None:
+    admin = AdminClient({"bootstrap.servers": brokers})
+    topics = ["industrial.normalized", "industrial.operational", "industrial.observation-artifacts"]
+    futures = admin.create_topics([NewTopic(topic, num_partitions=3, replication_factor=1) for topic in topics])
+    for topic, future in futures.items():
+        try:
+            future.result()
+        except Exception as exc:
+            if "already exists" not in str(exc).lower():
+                raise RuntimeError(f"could not create Kafka topic {topic}: {exc}") from exc
 
 
 def main() -> int:
@@ -79,6 +91,7 @@ def main() -> int:
         raise SystemExit(f"MinIO client unavailable: {exc}") from exc
 
     counters = {"attempted": 0, "acknowledged": 0, "failed": 0}
+    _ensure_topics(args.brokers)
     producer = Producer({"bootstrap.servers": args.brokers, "client.id": "world-model-soak", "enable.idempotence": True, "acks": "all"})
     sites = [f"world-site-{index + 1}" for index in range(args.sites)]
     channels = (("pump-01", "pressure", "bar"), ("pump-01", "temperature", "c"), ("pump-01", "vibration", "mm/s"))
