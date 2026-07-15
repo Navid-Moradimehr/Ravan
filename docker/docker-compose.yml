@@ -605,6 +605,21 @@ services:
     profiles:
       - extended
 
+  dataset-worker:
+    build:
+      context: ..
+      dockerfile: services/processor/Dockerfile
+    command: ["python", "-m", "services.datasets.dataset_worker"]
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://stream:stream@timescaledb:5432/stream_engine
+      DATASET_WORKER_ID: ${DATASET_WORKER_ID:-dataset-worker-1}
+      DATASET_WORKER_POLL_SECONDS: ${DATASET_WORKER_POLL_SECONDS:-5}
+    profiles:
+      - world-model
+
   raw-lakehouse-archive:
     build:
       context: ..

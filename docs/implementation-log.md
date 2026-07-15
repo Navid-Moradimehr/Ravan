@@ -13,6 +13,13 @@ reward inference was added.
 Validation: 21 focused tests passed after correcting support for a single
 source path in addition to an explicit source list.
 
+## 2026-07-16 - Optional Durable Dataset Build Queue
+
+Added Postgres-backed manifest and build-job metadata plus an optional
+`world-model` dataset worker. The worker uses row locking to claim jobs and
+records output artifact metadata; direct CLI compilation remains the simpler
+offline path. The worker is not part of the default Compose deployment.
+
 ## 2026-07-16 - Model Evidence Lakehouse Routing
 
 Added optional, family-specific lakehouse schemas for the model-data

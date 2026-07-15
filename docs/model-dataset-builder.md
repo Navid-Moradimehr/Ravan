@@ -54,3 +54,20 @@ and deterministic local compiler. Users own source exports, episode truth,
 reward/objective definitions, train/test policy, model code, GPU execution,
 and any external lakehouse credentials. A v1 manifest remains supported by
 the original training-dataset compiler.
+
+## Optional durable worker
+
+Register manifests and queue builds through the API only when Postgres is
+available. The `world-model` Compose profile runs a worker using
+`FOR UPDATE SKIP LOCKED`, so multiple workers can claim different jobs without
+introducing duplicate builds:
+
+```powershell
+docker compose -f docker/docker-compose.yml --profile world-model up -d dataset-worker
+```
+
+The worker writes to a temporary/output directory selected by the operator and
+marks a job successful only after the bundle contains `_SUCCESS`. Postgres
+stores manifest versions, job state, heartbeats, errors, and output artifact
+metadata. The worker is optional; direct CLI builds remain available for
+offline or single-user deployments.

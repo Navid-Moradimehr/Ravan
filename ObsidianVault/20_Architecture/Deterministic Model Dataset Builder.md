@@ -30,3 +30,8 @@ or cross-site merge.
 The current compiler is local and deterministic. A durable Postgres-backed
 build queue and optional worker are the next phase. External Iceberg/S3
 scanning and multi-site federation must remain bounded and deployment-owned.
+
+The optional `world-model` Compose profile now provides that queue worker.
+Postgres claims jobs with `FOR UPDATE SKIP LOCKED`, and the worker records
+success/failure plus emitted artifact files. The default deployment is
+unchanged.
