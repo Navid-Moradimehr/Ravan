@@ -1,5 +1,13 @@
 # Implementation Log
 
+## 2026-07-16 - World-Model Evidence Soak Harness
+
+Added `scripts/world-model-soak.py`, a dedicated 15-minute campaign for
+telemetry, operational actions/outcomes, episode boundaries, MinIO artifacts,
+Kafka references, and manifest-v2 compilation. It is intentionally separate
+from the existing telemetry capacity soak so a passing throughput result
+cannot be mistaken for evidence completeness.
+
 ## 2026-07-16 - Data Readiness UI
 
 Added `/datasets` with a styled manifest validation surface and Next.js API
