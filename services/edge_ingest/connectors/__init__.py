@@ -38,6 +38,12 @@ async def _supervise_connector(
                 mark_source(source.connection_id, source.source_protocol, source.site_id, "error", str(exc))
             except Exception:
                 logger.warning("failed to record connector crash state for %s", getattr(source, "connection_id", "unknown"))
+    finally:
+        if stop_event.is_set() and source is not None:
+            try:
+                mark_source(source.connection_id, source.source_protocol, source.site_id, "stopped", "edge runtime stopped")
+            except Exception:
+                logger.debug("failed to record connector stop state for %s", getattr(source, "connection_id", "unknown"))
 
 
 def build_connector_tasks(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event) -> list[asyncio.Task[None]]:

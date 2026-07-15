@@ -19,11 +19,23 @@ async def site_observability(site_profile: str | None = None) -> dict[str, Any]:
 
 
 @router.get("/api/v1/observability/source-health")
-async def source_health(limit: int = 100) -> dict[str, Any]:
+async def source_health(limit: int = 100, expected_interval_seconds: float = 10.0) -> dict[str, Any]:
     try:
+        from services.common.runtime_lifecycle import enrich_source_health
         from services.edge_ingest.source_health import history, snapshot
 
-        return {"current": snapshot(), "history": history(limit)}
+        interval = max(expected_interval_seconds, 0.1)
+        current = snapshot(expected_interval_seconds=interval)
+        records = history(limit)
+        # In Compose, edge-ingest and api-service are separate processes. The
+        # API cannot see the edge module's in-memory map, so use the shared
+        # bounded transition history to expose the latest known state.
+        known = {str(item.get("connection_id")): item for item in current}
+        for record in records:
+            connection_id = str(record.get("connection_id", ""))
+            if connection_id and connection_id not in known:
+                known[connection_id] = enrich_source_health(record, expected_interval_seconds=interval)
+        return {"current": list(known.values()), "history": records}
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"source health unavailable: {exc}") from exc
 

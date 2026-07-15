@@ -9,6 +9,7 @@ from threading import Lock
 from typing import Any
 
 from prometheus_client import Counter, Gauge
+from services.common.runtime_lifecycle import enrich_source_health
 
 source_state = Gauge("edge_source_state", "Current edge source state: 1 connected, 0 disconnected, -1 error", ["connection_id", "protocol", "site"])
 source_last_success = Gauge("edge_source_last_success_epoch", "Last successful event epoch per edge source", ["connection_id", "protocol", "site"])
@@ -43,7 +44,7 @@ def _record_transition(value: dict[str, Any]) -> None:
 
 
 def mark_source(connection_id: str, protocol: str, site: str, state: str, error: str = "") -> None:
-    source_state.labels(connection_id=connection_id, protocol=protocol, site=site).set({"connected": 1.0, "disconnected": 0.0, "error": -1.0, "reconnecting": 0.0}.get(state, 0.0))
+    source_state.labels(connection_id=connection_id, protocol=protocol, site=site).set({"connected": 1.0, "disconnected": 0.0, "error": -1.0, "reconnecting": 0.0, "recovering": 0.0, "planned_downtime": 0.0, "stopped": 0.0}.get(state, 0.0))
     value = {"connection_id": connection_id, "protocol": protocol, "site": site, "state": state, "error": error, "updated_at": datetime.now(timezone.utc).isoformat()}
     with _lock:
         previous = _states.get(connection_id)
@@ -58,8 +59,12 @@ def mark_source(connection_id: str, protocol: str, site: str, state: str, error:
 
 
 def mark_source_success(connection_id: str, protocol: str, site: str) -> None:
-    source_last_success.labels(connection_id=connection_id, protocol=protocol, site=site).set(datetime.now(timezone.utc).timestamp())
+    success_at = datetime.now(timezone.utc)
+    source_last_success.labels(connection_id=connection_id, protocol=protocol, site=site).set(success_at.timestamp())
     mark_source(connection_id, protocol, site, "connected")
+    with _lock:
+        if connection_id in _states:
+            _states[connection_id]["last_success_at"] = success_at.isoformat()
 
 
 def mark_mapping_result(
@@ -98,9 +103,9 @@ def mark_mapping_result(
         _states[connection_id] = state
 
 
-def snapshot() -> list[dict[str, Any]]:
+def snapshot(*, expected_interval_seconds: float = 10.0) -> list[dict[str, Any]]:
     with _lock:
-        return [dict(value) for value in _states.values()]
+        return [enrich_source_health(dict(value), expected_interval_seconds=expected_interval_seconds) for value in _states.values()]
 
 
 def history(limit: int = 100) -> list[dict[str, Any]]:
