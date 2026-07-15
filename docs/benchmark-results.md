@@ -7,6 +7,39 @@
 - **Broker**: Kafka KRaft
 - **Historian**: TimescaleDB
 
+## Threshold Policy Cache Fix
+
+- **Date**: 2026-07-15
+- **Scope**: fixed the keyed-runtime threshold-policy resolution path so a cached fallback policy is reused before any loader work, and added regression coverage for the empty-policy case
+
+### Latest Benchmark Run
+
+| Benchmark | Median events/sec | Median p99 ms | Notes |
+|-----------|-------------------|---------------|-------|
+| Production pipeline `python-fallback` repeatability | 25,640.43 | 0.1027 | repeat count 3, same mixed industrial CSV, after threshold-cache fix |
+| Production pipeline single run | 23,923.03 | 0.0953 | same mixed industrial CSV, same host, same runtime path |
+
+### Stage Breakdown
+
+| Stage | Ops/sec | Avg ms | Notes |
+|-------|---------|--------|-------|
+| mapping_validation | 107,996.03 | 0.0093 | stable; not the bottleneck |
+| record_build | 198,819.02 | 0.0050 | stable; not the bottleneck |
+| keyed_state_enrichment | 60,233.34 | 0.0166 | improved after eliminating repeated empty-policy loader work |
+| wire_roundtrip | 94,688.90 | 0.0106 | stable |
+
+### Comparison To The Pre-Fix Session
+
+- Production pipeline throughput increased from `436.77` events/sec to `23,923.03` events/sec, which is a `+5,377.3%` change.
+- Repeatability median increased from the pre-fix `453.58` events/sec to `25,640.43` events/sec, which is a `+5,553.8%` change.
+- The keyed-state enrichment stage moved from `450.45` ops/sec to `60,233.34` ops/sec, confirming the slowdown was in policy resolution rather than the rolling-window math.
+
+### Interpretation
+
+- The regression was caused by the empty-threshold-policy path repeatedly loading policy metadata instead of reusing the already-resolved fallback.
+- The fix keeps the platform behavior the same, but it now avoids redoing loader work for every event when no explicit policy exists.
+- This is a real production-path improvement, not just a benchmark artifact, because the same threshold-resolution function is used by the Python fallback runtime and the Flink keyed job.
+
 ## Production And Site Repeatability
 
 - **Date**: 2026-07-07

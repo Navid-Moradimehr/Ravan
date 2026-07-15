@@ -160,6 +160,9 @@ def _manifest_policy(site_id: str, asset_id: str, tag: str, asset_config: str) -
 
 def _load_explicit_policies() -> dict[tuple[str, str, str], dict[str, Any]]:
     global _POLICY_CACHE
+    with _CACHE_LOCK:
+        if _POLICY_CACHE is not None:
+            return dict(_POLICY_CACHE[1])
     cached = list_cached_policies()
     if cached:
         policies: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -207,6 +210,12 @@ def invalidate_policy_cache() -> None:
         _RESOLVED_POLICY_CACHE.clear()
 
 
+def invalidate_explicit_policy_cache() -> None:
+    global _POLICY_CACHE
+    with _CACHE_LOCK:
+        _POLICY_CACHE = None
+
+
 def resolve_threshold_policy(
     site_id: str,
     asset_id: str,
@@ -218,13 +227,13 @@ def resolve_threshold_policy(
     explicit = get_cached_policy(site_id, asset_id, tag)
     if explicit:
         return explicit
-    explicit = _load_explicit_policies().get(lookup_key)
-    if explicit:
-        return explicit
     with _CACHE_LOCK:
         cached = _RESOLVED_POLICY_CACHE.get(lookup_key)
     if cached:
         return cached
+    explicit = _load_explicit_policies().get(lookup_key)
+    if explicit:
+        return explicit
     manifest = _manifest_policy(site_id, asset_id, tag, asset_config)
     if manifest:
         with _CACHE_LOCK:
@@ -350,6 +359,7 @@ def upsert_threshold_policy(policy: dict[str, Any]) -> dict[str, Any]:
             )
         conn.commit()
     cache_threshold_policy(payload)
+    invalidate_explicit_policy_cache()
     with _CACHE_LOCK:
         _RESOLVED_POLICY_CACHE[(policy["site_id"], policy["asset_id"], policy["tag"])] = payload
     return {

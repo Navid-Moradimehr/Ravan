@@ -355,6 +355,9 @@ def consume_policy_topic(
                 incoming_version = int(policy.get("version", 0) or 0)
                 if incoming_version < current_version:
                     continue
+                from services.common.threshold_policy import invalidate_explicit_policy_cache
+
+                invalidate_explicit_policy_cache()
                 cache_policy(policy)
                 with _CACHE_LOCK:
                     _SYNC_STATE["status"] = "synced"

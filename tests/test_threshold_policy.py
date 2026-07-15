@@ -173,3 +173,20 @@ def test_resolved_fallback_policy_is_cached(monkeypatch, tmp_path) -> None:
     assert second["warning_high"] == 80
     assert calls["load"] == 1
     assert calls["stat"] == 1
+
+
+def test_empty_explicit_policy_loader_does_not_repeat_after_fallback_cache(monkeypatch) -> None:
+    invalidate_policy_cache()
+    calls = {"load": 0}
+
+    def load_explicit_policies():
+        calls["load"] += 1
+        return {}
+
+    monkeypatch.setattr(threshold_policy, "_load_explicit_policies", load_explicit_policies)
+    first = resolve_threshold_policy("site-02", "Pump-02", "temperature")
+    second = resolve_threshold_policy("site-02", "Pump-02", "temperature")
+
+    assert first["source"] == "unconfigured"
+    assert second["source"] == "unconfigured"
+    assert calls["load"] == 1

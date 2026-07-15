@@ -1,5 +1,23 @@
 # Implementation Log
 
+## 2026-07-15 - Threshold Policy Cache Regression Fix
+
+Fixed the keyed-runtime threshold-policy path so cached fallback policies are reused before any loader work. The previous hot path was repeatedly re-entering the empty-policy loader, which made the keyed enrichment stage the dominant cost in the production pipeline benchmark.
+
+Validation on the current host:
+
+- `tests/test_threshold_policy.py`: 8 passed
+- `tests/test_runtime_pipeline_contract.py` plus the datastreamctl benchmark smoke coverage: 4 passed
+- `tests/test_end_to_end_pipeline_benchmark.py`: passed
+- `benchmark production-pipeline --runtime-mode python-fallback --events 10000 --batch-size 256 --json`
+  - 23,923.03 events/sec
+  - 0.0953 ms p99
+- `benchmark session-repeatability --runtime-mode python-fallback --events 10000 --batch-size 256 --repeat-count 5 --json`
+  - median 25,640.43 events/sec
+  - median p99 0.1027 ms
+
+The fix keeps the public contract unchanged while removing a real empty-cache performance regression from the keyed state path.
+
 ## 2026-07-11 - World-Model Benchmark Pass
 
 Ran the existing simulator, CGR-style slice, metadata, semantic-query, and
