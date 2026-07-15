@@ -1,5 +1,14 @@
 # Implementation Log
 
+## 2026-07-16 - Data Readiness UI
+
+Added `/datasets` with a styled manifest validation surface and Next.js API
+proxies for dataset manifests/builds. The page exposes contract readiness
+without pretending to be a model-training console or taking ownership of
+credentials, source exports, rewards, GPUs, or plant safety policy.
+
+Validation: `npm run build` passed and emitted the new page and API routes.
+
 ## 2026-07-16 - Deterministic Model Dataset Builder
 
 Added manifest-v2 validation and a trajectory compiler for downstream model

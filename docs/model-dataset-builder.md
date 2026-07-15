@@ -71,3 +71,8 @@ marks a job successful only after the bundle contains `_SUCCESS`. Postgres
 stores manifest versions, job state, heartbeats, errors, and output artifact
 metadata. The worker is optional; direct CLI builds remain available for
 offline or single-user deployments.
+
+The web UI is available at `/datasets`. It validates a JSON representation of
+the manifest and explains the platform/user ownership boundary. The CLI
+remains the complete offline build interface; the UI intentionally does not
+accept credentials or upload source data.

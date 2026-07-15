@@ -35,3 +35,7 @@ The optional `world-model` Compose profile now provides that queue worker.
 Postgres claims jobs with `FOR UPDATE SKIP LOCKED`, and the worker records
 success/failure plus emitted artifact files. The default deployment is
 unchanged.
+
+The `/datasets` web page provides a lightweight validation view. It is not a
+training UI and does not upload data or handle secrets. CLI and worker paths
+remain the authoritative build interfaces.

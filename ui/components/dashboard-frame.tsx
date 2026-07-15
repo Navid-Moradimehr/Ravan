@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowRight, BarChart3, Cable, DatabaseZap, Gauge, LayoutDashboard, Workflow } from "lucide-react";
+import { ArrowRight, BarChart3, Cable, Database, DatabaseZap, Gauge, LayoutDashboard, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ const navItems: NavItem[] = [
   { href: "/observability", label: "Observability", icon: Gauge, description: "Health, metrics, latency" },
   { href: "/integrations", label: "Integrations", icon: BarChart3, description: "CDC, webhooks, models" },
   { href: "/ai-reporting", label: "AI reporting", icon: Workflow, description: "Governed summaries and jobs" },
+  { href: "/datasets", label: "Data readiness", icon: Database, description: "Manifests and trajectories" },
   { href: "/pipeline", label: "Pipeline", icon: Cable, description: "Ingress, normalization, DLQ" },
 ];
 
