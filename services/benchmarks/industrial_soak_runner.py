@@ -35,6 +35,13 @@ class RuntimeSnapshot:
     container_memory_mb: float | None
     consumer_lag: float | None
     consumer_lag_by_service: dict[str, float | None] | None = None
+    flink_job_ok: bool | None = None
+    prometheus_ok: bool | None = None
+    kafka_ui_ok: bool | None = None
+    grafana_ok: bool | None = None
+    prometheus_latency_ms: float | None = None
+    kafka_ui_latency_ms: float | None = None
+    grafana_latency_ms: float | None = None
 
 
 @dataclass(frozen=True)
@@ -80,6 +87,16 @@ def _read_json(url: str, timeout: float = 3.0) -> dict[str, Any] | None:
         return value if isinstance(value, dict) else None
     except json.JSONDecodeError:
         return None
+
+
+def _probe_http(url: str, timeout: float = 3.0) -> tuple[bool, float | None]:
+    started = time.perf_counter()
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            response.read(256)
+            return 200 <= response.status < 400, round((time.perf_counter() - started) * 1000, 2)
+    except Exception:
+        return False, None
 
 
 def _metric_total(text: str | None, metric_name: str, labels: dict[str, str] | None = None) -> int | None:
@@ -158,6 +175,10 @@ def collect_snapshot(
     fanout_url: str = "http://localhost:18095",
     processed_fanout_url: str = "http://localhost:18097",
     ai_fanout_url: str = "http://localhost:18096",
+    flink_url: str = "http://localhost:18088",
+    prometheus_health_url: str = "http://localhost:19090/-/healthy",
+    kafka_ui_url: str = "http://localhost:18080",
+    grafana_url: str = "http://localhost:13000",
     include_ai: bool = False,
 ) -> RuntimeSnapshot:
     edge_metrics = _read_text(edge_url)
@@ -168,6 +189,18 @@ def collect_snapshot(
     available = [value for value in simulator_values if value is not None]
     api_health = _read_json(f"{api_url}/health")
     ai_health = _read_json(f"{ai_url}/health")
+    flink_overview = _read_json(f"{flink_url}/jobs/overview")
+    flink_job_ok = bool(
+        flink_overview
+        and any(
+            job.get("name") == "iot-anomaly-processor" and job.get("state") == "RUNNING"
+            for job in flink_overview.get("jobs", [])
+            if isinstance(job, dict)
+        )
+    )
+    prometheus_ok, prometheus_latency_ms = _probe_http(prometheus_health_url)
+    kafka_ui_ok, kafka_ui_latency_ms = _probe_http(kafka_ui_url)
+    grafana_ok, grafana_latency_ms = _probe_http(grafana_url)
     cpu, memory = _docker_resources(compose_file)
     return RuntimeSnapshot(
         captured_at=datetime.now(timezone.utc).isoformat(),
@@ -195,6 +228,13 @@ def collect_snapshot(
             )
             for service in ("processor", "fanout", "processed_fanout", "ai_gateway", "ai_enriched_fanout")
         },
+        flink_job_ok=flink_job_ok,
+        prometheus_ok=prometheus_ok,
+        kafka_ui_ok=kafka_ui_ok,
+        grafana_ok=grafana_ok,
+        prometheus_latency_ms=prometheus_latency_ms,
+        kafka_ui_latency_ms=kafka_ui_latency_ms,
+        grafana_latency_ms=grafana_latency_ms,
     )
 
 
@@ -330,6 +370,11 @@ def run_live(
         failures.append("API service was not healthy at the end of the campaign")
     if final.ai_ok is False:
         failures.append("AI gateway was not healthy at the end of the campaign")
+    if final.flink_job_ok is False:
+        failures.append("Flink iot-anomaly-processor was not RUNNING at the end of the campaign")
+    for name, ok in (("Prometheus", final.prometheus_ok), ("Kafka UI", final.kafka_ui_ok), ("Grafana", final.grafana_ok)):
+        if ok is False:
+            failures.append(f"{name} observability endpoint was not reachable at the end of the campaign")
     if (
         final.consumer_lag is not None
         and initial.consumer_lag is not None
@@ -352,10 +397,10 @@ def _write_report(report: IndustrialSoakReport, report_dir: Path | str | None) -
     path = Path(report_dir)
     path.mkdir(parents=True, exist_ok=True)
     (path / "industrial-soak.json").write_text(json.dumps(asdict(report), indent=2), encoding="utf-8")
-    lines = [f"# Industrial Soak: {report.scenario_id}", "", f"- Passed: `{str(report.passed).lower()}`", f"- Generated events: `{report.generated_events}`", f"- Edge events: `{report.edge_events}`", f"- DLQ events: `{report.dlq_events}`", f"- Unaccounted events: `{report.unaccounted_events}`", "", "## Phases", "", "| Phase | Seconds | Configured events/sec | Aggregate lag | Processor lag | Fanout lag | AI lag | Memory MB |", "|---|---:|---:|---:|---:|---:|---:|---:|"]
+    lines = [f"# Industrial Soak: {report.scenario_id}", "", f"- Passed: `{str(report.passed).lower()}`", f"- Generated events: `{report.generated_events}`", f"- Edge events: `{report.edge_events}`", f"- DLQ events: `{report.dlq_events}`", f"- Unaccounted events: `{report.unaccounted_events}`", "", "## Phases", "", "| Phase | Seconds | Configured events/sec | Aggregate lag | Processor lag | Fanout lag | AI lag | Flink | Prometheus | Kafka UI | Grafana | Memory MB |", "|---|---:|---:|---:|---:|---:|---:|---|---|---|---|---:|"]
     for phase in report.phases:
         lag = phase.snapshot.consumer_lag_by_service or {}
-        lines.append(f"| {phase.name} | {phase.duration_seconds} | {phase.configured_rate_per_second} | {phase.snapshot.consumer_lag} | {lag.get('processor')} | {lag.get('fanout')} | {lag.get('ai_gateway')} | {phase.snapshot.container_memory_mb} |")
+        lines.append(f"| {phase.name} | {phase.duration_seconds} | {phase.configured_rate_per_second} | {phase.snapshot.consumer_lag} | {lag.get('processor')} | {lag.get('fanout')} | {lag.get('ai_gateway')} | {phase.snapshot.flink_job_ok} | {phase.snapshot.prometheus_ok} | {phase.snapshot.kafka_ui_ok} | {phase.snapshot.grafana_ok} | {phase.snapshot.container_memory_mb} |")
     if report.failures:
         lines.extend(["", "## Failures", "", *[f"- {failure}" for failure in report.failures]])
     (path / "industrial-soak.md").write_text("\n".join(lines) + "\n", encoding="utf-8")

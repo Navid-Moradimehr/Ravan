@@ -11,6 +11,8 @@ runtime.
 - keep checkpoint and savepoint storage operator-owned
 
 This is a deployment-owned path. It does not replace the Docker Compose path.
+For a disposable local rehearsal cluster, see `docs/local-kubernetes-rehearsal.md`
+and `scripts/kind-rehearsal.ps1`.
 
 ## Prerequisites
 
@@ -38,6 +40,10 @@ helm install flink-kubernetes-operator flink-operator-repo/flink-kubernetes-oper
 
 If your cluster uses a site-approved values file, pass it with `-f` and keep the
 operator defaults under review before production rollout.
+
+For local validation, the kind rehearsal script can create a disposable
+cluster, validate the generated bundles, and optionally load the platform Flink
+image before applying `k8s/flink-operator/flinkdeployment.yaml`.
 
 ## 2. Prepare the platform deployment
 

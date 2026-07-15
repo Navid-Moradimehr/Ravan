@@ -40,5 +40,36 @@ def test_restore_backup_uses_docker_fallback_when_pg_restore_missing(monkeypatch
     assert result["transport"] == "docker:timescaledb"
 
 
+def test_snapshot_uses_docker_fallback_when_psql_missing(monkeypatch):
+    from services.historian import backup
+
+    monkeypatch.setattr(backup, "_detect_docker_db_service", lambda: "timescaledb")
+    monkeypatch.setattr(
+        backup.subprocess,
+        "run",
+        lambda *args, **kwargs: type("Result", (), {"stdout": "industrial_events|3\nprocessed_events|2\n", "stderr": "", "returncode": 0})(),
+    )
+    monkeypatch.setattr(backup, "_connection_params", lambda: {"host": "localhost", "port": "5432", "database": "stream_engine", "user": "stream", "password": "stream"})
+    result = backup._collect_historian_snapshot_via_docker(("industrial_events", "processed_events"), backup._connection_params())
+    assert result["status"] == "success"
+    assert result["transport"] == "docker:timescaledb"
+    assert result["row_count_total"] == 5
+
+
+def test_snapshot_can_target_restored_database(monkeypatch):
+    from services.historian import backup
+
+    captured = {}
+    monkeypatch.setattr(backup, "_connection_params", lambda: {"host": "localhost", "port": "5432", "database": "stream_engine", "user": "stream", "password": "stream"})
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        return type("Result", (), {"stdout": "industrial_events|4\n", "stderr": "", "returncode": 0})()
+
+    monkeypatch.setattr(backup.subprocess, "run", fake_run)
+    result = backup.collect_historian_snapshot(("industrial_events",), database="restore_db")
+    assert result["database"] == "restore_db"
+    assert "restore_db" in captured["command"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

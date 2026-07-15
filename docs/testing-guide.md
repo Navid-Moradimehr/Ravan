@@ -75,6 +75,15 @@
 9. AI gateway mock benchmark: run `python scripts/benchmark_ai_gateway_mock.py --provider openai_compat --events 100000 --batch-size 64` and the same command with `--provider ollama`, then confirm the provider abstraction stays above 140K events/sec on the local mock transport.
 10. Site-profile soak: run `powershell -ExecutionPolicy Bypass -File scripts/site-profile-soak.ps1 -SiteProfile config/site-profiles/single-site.yaml -Seconds 60 -MqttRatePerSecond 100 -RecoveryService processor` and repeat it for `plant-local.yaml`; confirm release-gate, backup, restore, and restart recovery all pass.
 
+## Local Kubernetes Rehearsal
+
+- Install `kind`, `kubectl`, and `helm` on the local machine.
+- Run `scripts\kind-rehearsal.ps1` to create a disposable cluster and validate the generated site bundles.
+- If you want to test the operator-managed job, pass `-ApplyFlinkDeployment` and a reachable `-PlatformImage`.
+- If you also want the helper to install the Flink Kubernetes Operator, pass `-OperatorRepoUrl` and optionally `-OperatorChartVersion`.
+- Confirm the rehearsal produces a valid local export and, when applied, a runnable operator-managed deployment.
+- Delete the cluster afterward so the local Docker environment returns to its normal Compose shape.
+
 ## Industrial Readiness
 
 The app includes a hardware-free edge adapter and simulators for OPC UA, MQTT, and Modbus TCP. This validates the same data acquisition pattern used in real deployments without requiring physical PLCs or sensors.

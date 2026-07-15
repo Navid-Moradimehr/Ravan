@@ -2767,3 +2767,51 @@ documented separately from user-owned secrets, registry, and storage setup.
 10. Added a Kubernetes install/apply runbook and linked it from the self-host
 install guide so operators can follow the Helm + `kubectl` path without
 guessing where the Flink operator example lives.
+
+## 2026-07-15 - Kind-Based Kubernetes Rehearsal Path
+
+1. Added `scripts/kind-rehearsal.ps1` as a disposable local-cluster helper for
+   the Kubernetes deployment contract. It creates or reuses a `kind` cluster,
+   optionally installs the Flink Kubernetes Operator, validates generated site
+   bundles through `datastreamctl local-kubernetes-rehearsal`, and can
+   optionally apply the platform FlinkDeployment for a single-node rehearsal.
+2. Added `docs/local-kubernetes-rehearsal.md` so the local rehearsal path is
+   documented as a validation tool, not a production deployment guide.
+3. Linked the new rehearsal guide from the Flink operator runbook and the
+   testing guide so the local Docker/Kubernetes path is discoverable without
+   guessing the command sequence.
+4. Mirrored the rehearsal guidance in Obsidian so the vault tracks the same
+   platform-owned versus user-owned Kubernetes boundary.
+5. Verified the helper on this host: it created a disposable `kind` cluster,
+   ran the bundled `datastreamctl local-kubernetes-rehearsal` checks against
+   the project venv, and then deleted the cluster cleanly.
+
+## 2026-07-15 - Full-Stack Soak, Flink Runtime, and Backup Validation
+
+1. The first 15-minute live run exposed a real Flink image defect: the PyFlink
+   worker imported historian threshold code but `Dockerfile.flink-runtime`
+   omitted `psycopg2-binary`. The runtime image now installs the pinned
+   dependency and the owned `iot-anomaly-processor` job remains RUNNING with
+   two tasks.
+2. The resilience benchmark now creates an isolated temporary spool for each
+   implicit campaign. Concurrent benchmark runs no longer share or delete one
+   another's queue state.
+3. The industrial soak runner now probes Flink, Prometheus, Kafka UI, and
+   Grafana during every phase and fails the campaign when an owned dependency
+   is unreachable. UI services are measured as observability dependencies, not
+   counted as processing throughput.
+4. Three 900-second Docker campaigns were completed: single-site normal load,
+   three-site normal load, and staged burst/recovery. All accepted producers
+   reported zero failures and zero queue saturation; final downstream lag was
+   zero; Flink stayed RUNNING; the observability probes remained reachable.
+5. Historian snapshot collection now falls back to Docker-hosted PostgreSQL
+   tools when the Windows host lacks client binaries. Full dumps include
+   `_timescaledb_*` schemas and restore invokes Timescale pre/post hooks.
+6. Validation found that generic logical restore into a blank target still
+   does not recreate hypertable metadata. This is intentionally recorded as a
+   failed backup acceptance gate instead of being hidden by a live-source row
+   count comparison. A production-safe restore procedure remains required.
+
+Verification: `627 passed`; protocol matrix `46 passed`; Compose config valid;
+Flink REST job RUNNING with 2 tasks and 0 failed tasks; Prometheus/Kafka
+UI/Grafana/API/AI HTTP probes returned 200 at final inspection.

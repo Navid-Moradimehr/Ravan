@@ -104,7 +104,10 @@ def _create_backup_via_docker(filepath: Path, conn: dict[str, str], tables: list
         for table in tables:
             cmd.extend(["--table", table])
     else:
-        cmd.append("--schema=public")
+        # Timescale hypertables store rows in chunk tables under
+        # _timescaledb_internal. Dumping only public omits the telemetry
+        # payload while retaining the parent table definitions.
+        cmd.extend(["--schema=public", "--schema=_timescaledb_*"])
     cmd.append(conn["database"])
 
     try:
@@ -189,6 +192,19 @@ def _restore_backup_via_docker(filepath: Path, conn: dict[str, str]) -> dict[str
                 check=True,
                 cwd=str(PROJECT_ROOT),
             )
+        # Timescale requires its restore hooks around logical restores. The
+        # target database is otherwise restored as ordinary PostgreSQL tables
+        # and loses hypertable/chunk metadata even when row data is present.
+        timescale_sql = _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [
+            service,
+            "psql",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-c",
+            "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE; SELECT timescaledb_pre_restore();",
+            conn["database"],
+        ]
+        subprocess.run(timescale_sql, capture_output=True, text=True, check=True, cwd=str(PROJECT_ROOT))
         toc = subprocess.run(
             _compose_base_cmd() + ["exec", "-T", service, "pg_restore", "--list", container_path],
             capture_output=True,
@@ -220,6 +236,16 @@ def _restore_backup_via_docker(filepath: Path, conn: dict[str, str]) -> dict[str
             check=True,
             cwd=str(PROJECT_ROOT),
         )
+        timescale_post_sql = _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [
+            service,
+            "psql",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-c",
+            "SELECT timescaledb_post_restore();",
+            conn["database"],
+        ]
+        subprocess.run(timescale_post_sql, capture_output=True, text=True, check=True, cwd=str(PROJECT_ROOT))
         subprocess.run(
             _compose_base_cmd() + ["exec", "-T", service, "rm", "-f", container_path],
             capture_output=True,
@@ -293,7 +319,7 @@ def create_backup(backup_dir: str | None = None, tables: list[str] | None = None
         for table in tables:
             cmd.extend(["--table", table])
     else:
-        cmd.append("--schema=public")
+        cmd.extend(["--schema=public", "--schema=_timescaledb_*"])
 
     cmd.append(conn["database"])
 
@@ -440,7 +466,10 @@ def get_walg_status() -> dict[str, Any]:
     }
 
 
-def collect_historian_snapshot(table_names: Iterable[str] | None = None) -> dict[str, Any]:
+def collect_historian_snapshot(
+    table_names: Iterable[str] | None = None,
+    database: str | None = None,
+) -> dict[str, Any]:
     """Collect simple row-count snapshots for historian tables.
 
     The snapshot is intentionally small so backup/restore drills can compare
@@ -448,6 +477,8 @@ def collect_historian_snapshot(table_names: Iterable[str] | None = None) -> dict
     """
     tables = tuple(table_names or DEFAULT_SNAPSHOT_TABLES)
     conn = _connection_params()
+    if database:
+        conn["database"] = database
     query = "; ".join(
         f"SELECT '{table}' AS table_name, COUNT(*)::bigint AS row_count FROM {table}"
         for table in tables
@@ -488,16 +519,53 @@ def collect_historian_snapshot(table_names: Iterable[str] | None = None) -> dict
             "transport": "psql",
         }
     except FileNotFoundError:
-        return {
-            "status": "error",
-            "error": "psql not found on host; install PostgreSQL client tools to collect historian snapshots.",
-        }
+        return _collect_historian_snapshot_via_docker(tables, conn)
     except subprocess.CalledProcessError as e:
         return {
             "status": "error",
             "error": e.stderr,
             "command": " ".join(cmd),
         }
+
+
+def _collect_historian_snapshot_via_docker(tables: Iterable[str], conn: dict[str, str]) -> dict[str, Any]:
+    """Collect the same row-count snapshot through the Compose DB container."""
+    service = _detect_docker_db_service()
+    if not service:
+        return {
+            "status": "error",
+            "error": "psql not found on host and no running Docker database service detected.",
+        }
+    query = "; ".join(
+        f"SELECT '{table}' AS table_name, COUNT(*)::bigint AS row_count FROM {table}"
+        for table in tables
+    )
+    cmd = _compose_base_cmd() + ["exec", "-T", service, "psql", "-U", conn["user"], "-d", conn["database"],
+                                 "--no-align", "--tuples-only", "--field-separator=|", "--command", query]
+    env = os.environ.copy()
+    env["PGPASSWORD"] = conn["password"]
+    try:
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True, check=True, cwd=str(PROJECT_ROOT))
+        counts: dict[str, int] = {}
+        for line in result.stdout.splitlines():
+            parts = [part.strip() for part in line.split("|")]
+            if len(parts) != 2 or not parts[0]:
+                continue
+            try:
+                counts[parts[0]] = int(parts[1])
+            except ValueError:
+                counts[parts[0]] = 0
+        return {
+            "status": "success",
+            "database": conn["database"],
+            "tables": counts,
+            "table_count": len(counts),
+            "row_count_total": sum(counts.values()),
+            "transport": f"docker:{service}",
+        }
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        error = getattr(exc, "stderr", None) or str(exc)
+        return {"status": "error", "error": error, "transport": f"docker:{service}"}
 
 
 def compare_historian_snapshots(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:

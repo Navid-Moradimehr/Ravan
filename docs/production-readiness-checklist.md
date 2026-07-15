@@ -62,6 +62,7 @@ startup scan; this prevents a large historian from blocking API readiness.
 - Flink keyed-window state now uses the shared rolling-window contract instead of the slower list-and-pop benchmark shape.
 - Optional MsgPack wire-format support now exists for the industrial event contract.
 - Optional Rust fastpath module now exists for JSON bytes and partition-key handling, but it is opt-in and not the default runtime path.
+- A kind-based local Kubernetes rehearsal wrapper now exists so operators can validate generated bundles and the Flink operator flow on a disposable cluster.
 - Dataset conversion workflow exists for AI4I, C-MAPSS, and generic industrial CSV slices.
 - Historian batch/query plumbing is now consolidated behind shared helpers.
 - API and AI gateway health surfaces report degraded mode instead of swallowing repeated runtime failures.
@@ -76,7 +77,7 @@ startup scan; this prevents a large historian from blocking API readiness.
 
 - Health checks and runtime diagnostics exist.
 - Backup and restore tooling exists.
-- TimescaleDB restore drills exclude extension-owned `public` schema entries and pass against the local Compose database.
+- TimescaleDB backup tooling uses Docker-hosted PostgreSQL tools, includes internal chunk schemas, and invokes Timescale restore hooks; final restore acceptance remains blocked until hypertable metadata is reconstructed and verified.
 - Backup-drill matrix tooling exists so restore/rollback drills can be measured per site profile.
 - Site profile backups now carry explicit backup-owner and restore-drill-owner fields.
 - Metrics and observability paths exist.
@@ -90,6 +91,7 @@ startup scan; this prevents a large historian from blocking API readiness.
 - Per-site production benchmarking on the actual target broker and historian topology.
 - Live benchmark calibration using the target industrial network.
 - Production-pipeline validation against the real Flink/Kafka/Timescale deployment topology.
+- TimescaleDB restore validation that preserves hypertable/chunk metadata in a clean target database.
 - Repeatability checks over several benchmark sessions to separate regression noise from actual performance loss.
 - Model evaluation lifecycle and promotion workflow.
 - Diagnostic-agent productization beyond the scaffold.
@@ -130,6 +132,7 @@ These are the changes that matter most before calling the platform production-re
 8. Treat the wire format as a lever, not a cure-all. If JSON remains faster in Python on the target host, move the hot path into a compiled runtime before forcing binary serialization everywhere.
 9. Use the explicit runtime mode contract to keep `python-fallback` for local development and `flink-production` for real rollout targets.
 10. Keep the supervisor and deployment templates aligned so runtime mode changes both the active processor and the benchmark baseline.
+11. Do not mark backup/restore production-ready until a clean target reports both matching row counts and the expected Timescale hypertables after restore.
 
 ## Session Delta Guidance
 

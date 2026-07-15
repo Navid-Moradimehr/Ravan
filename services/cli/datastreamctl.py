@@ -194,7 +194,9 @@ def _run_backup_drill(
         result["restore"] = restore_backup(result["backup"]["path"], restore_db)
         result["restore_elapsed_seconds"] = round(time.perf_counter() - restore_started_at, 4)
         if result["restore"].get("status") == "success":
-            after_snapshot = collect_historian_snapshot()
+            # Compare against the restored target, not the live source. The
+            # source may continue ingesting while a backup drill runs.
+            after_snapshot = collect_historian_snapshot(database=restore_db)
             result["after_snapshot"] = after_snapshot
             result["snapshot_comparison"] = compare_historian_snapshots(before_snapshot, after_snapshot)
     result["total_elapsed_seconds"] = round(time.perf_counter() - started_at, 4)

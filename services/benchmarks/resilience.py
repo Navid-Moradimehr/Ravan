@@ -9,6 +9,8 @@ successful producer call as proof of end-to-end delivery.
 from __future__ import annotations
 
 import json
+import shutil
+import tempfile
 import tracemalloc
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
@@ -83,7 +85,9 @@ def run_campaign(
     outage_events = min(max(outage_events, 0), events)
     started = perf_counter()
     temporary_spool = spool_dir is None
-    spool_path = Path(spool_dir) if spool_dir is not None else Path(".datastream") / "resilience-spool"
+    # A fixed default spool makes concurrent CI or matrix runs consume each
+    # other's records. Each implicit campaign gets an isolated spool instead.
+    spool_path = Path(spool_dir) if spool_dir is not None else Path(tempfile.mkdtemp(prefix="datastream-resilience-"))
     spool = DiskEventSpool(spool_path)
     spool.replace([])
     accepted = unique_accepted = rejected = malformed = duplicates = out_of_order = queued = replayed = historian_written = 0
@@ -148,8 +152,7 @@ def run_campaign(
         failures.append(f"pending spool records remain after recovery: {pending_after_recovery}")
 
     if temporary_spool:
-        spool_path.mkdir(parents=True, exist_ok=True)
-        spool.replace([])
+        shutil.rmtree(spool_path, ignore_errors=True)
 
     return ResilienceReport(
         scenario_id="local-resilience-fault-campaign",

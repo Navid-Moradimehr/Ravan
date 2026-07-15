@@ -16,3 +16,8 @@ def test_flink_job_compose_uses_lifecycle_entrypoint() -> None:
     dockerfile = (ROOT / "docker" / "Dockerfile.flink-job").read_text(encoding="utf-8")
     assert "flink-job-entrypoint.sh" in dockerfile
     assert "CMD [\"bash\", \"/opt/stream/flink-job-entrypoint.sh\"]" in dockerfile
+
+
+def test_flink_runtime_includes_historian_policy_dependency() -> None:
+    dockerfile = (ROOT / "docker" / "Dockerfile.flink-runtime").read_text(encoding="utf-8")
+    assert "psycopg2-binary" in dockerfile

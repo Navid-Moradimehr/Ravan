@@ -1,11 +1,15 @@
 # Flink Operator Runbook
 
 The platform now has a concrete Kubernetes operator path for its Flink runtime.
+There is also a disposable `kind` rehearsal path in the repo for validating
+generated manifests before touching a real cluster.
 
 ## Operator install
 
 Use the Apache Flink Kubernetes Operator Helm chart in the target cluster. Keep
 the install values site-owned and do not move secrets or storage into the repo.
+For local validation, use `scripts/kind-rehearsal.ps1` and the companion guide
+in `docs/local-kubernetes-rehearsal.md`.
 
 ## Deployment artifact
 

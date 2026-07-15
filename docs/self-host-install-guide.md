@@ -70,7 +70,10 @@ Then install the generated `systemd/install.sh` on the target host.
 
 For Kubernetes deployments, use the Flink operator runbook at
 [`docs/flink-operator-runbook.md`](docs/flink-operator-runbook.md) and the
-example deployment in `k8s/flink-operator/flinkdeployment.yaml`.
+local rehearsal guide at [`docs/local-kubernetes-rehearsal.md`](docs/local-kubernetes-rehearsal.md)
+and the example deployment in `k8s/flink-operator/flinkdeployment.yaml`.
+The `scripts/kind-rehearsal.ps1` helper can validate generated bundles before
+you apply them to a real cluster.
 
 ## Windows example
 

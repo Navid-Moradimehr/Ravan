@@ -96,6 +96,22 @@ was 29 messages during the burst and returned to 0 after recovery/drain.
 Peak aggregate container memory was 6,463.1 MB; historian writes increased
 from 3 to 459. This is a local Docker benchmark, not a production capacity
 claim. DLQ/delivery-failure counters remain a release-hardening gap.
+
+## 2026-07-15 Validation Update
+
+The current local Docker evidence includes three 15-minute campaigns: one
+single-site normal-load run at 100 events/sec, one three-site run at 100
+events/sec per site, and one staged burst/recovery run. Acknowledged delivery
+was 89,990 for the single site and 269,986 across three sites; final downstream
+lag was zero; Flink was RUNNING with two tasks. Prometheus, Kafka UI, and
+Grafana were sampled throughout the staged campaign and remained reachable.
+
+The first live run also found and fixed a missing `psycopg2-binary` dependency
+in the Flink runtime image. The backup drill found a separate limitation:
+generic restore brings back rows but not Timescale hypertable metadata in a
+blank target. Backup acceptance remains open until the restore procedure
+reconstructs and verifies hypertables. Missing edge-DLQ and processor metrics
+remain measurement gaps, not zero values.
 # Local Resilience Campaign
 
 The repository now has a deterministic broker-free resilience campaign at

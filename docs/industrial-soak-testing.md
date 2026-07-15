@@ -171,3 +171,46 @@ the mtime-aware cache removed that work from the keyed hot path.
 AI enrichment is reported separately from the deterministic gate. Local AI
 gateway runs may be `degraded` when the configured model endpoint is busy or
 unavailable; that does not invalidate the Kafka-to-Flink-to-historian result.
+
+## 2026-07-15 Full-Stack Validation Evidence
+
+Three wall-clock campaigns were completed against the Docker Compose stack:
+
+| Campaign | Duration | Input | Acknowledged | Final downstream lag | Flink | Prometheus/Kafka UI/Grafana |
+|---|---:|---:|---:|---:|---|---|
+| single-site normal | 900 s | 100 events/s | 89,990 | 0 | RUNNING, 2 tasks | healthy throughout |
+| three-site normal | 900 s | 3 x 100 events/s | 269,986 | 0 | RUNNING, 2 tasks | healthy throughout |
+| burst/recovery | 900 s staged | industrial-soak scenario | report passed | 0 after drain | RUNNING | healthy throughout |
+
+The single-site producer reported zero failures and zero queue saturation. Each
+of the three multisite producers also reported zero failures and zero queue
+saturation. The staged burst/recovery runner recorded Flink state, Prometheus,
+Kafka UI, Grafana, API health, fan-out lag, and UI probe latency at every phase.
+Its peak aggregate container CPU was approximately 414.8% and peak memory was
+approximately 8.43 GB. AI health degraded during the burst and recovered; the
+deterministic Flink and historian path drained to zero lag.
+
+Kafka UI and Grafana are not data-plane processors. They were tested as
+operator-facing observability dependencies: HTTP reachability and response
+latency were sampled during the soak. Final standalone probes returned HTTP
+200 for Flink (`317.8 ms`), Prometheus (`28 ms`), Kafka UI (`77 ms`), Grafana
+proxy (`373.6 ms`), API (`729.3 ms`), and AI gateway (`824.2 ms`).
+
+The runner still cannot attribute all raw edge delivery and processor lag in
+every Compose profile because those counters are not exposed by all services;
+missing counters are reported as unavailable, not as zero. This is a
+measurement gap, not evidence of lossless delivery.
+
+## Backup Validation Finding
+
+The backup harness was hardened to use Docker-hosted `psql`, include
+TimescaleDB internal chunk schemas, and execute Timescale restore hooks. A
+large local dump completed successfully (`~553 MB`, `88.9 s` backup and
+`269.8 s` restore), and restored row data was present. However, a generic
+`pg_restore` into a blank database did not reconstruct the source hypertable
+metadata; `timescaledb_information.hypertables` remained empty. The backup
+drill therefore remains a failed acceptance gate rather than a false pass.
+Before production release, the restore path must initialize the target with a
+compatible Timescale schema or use a Timescale-native backup/restore procedure
+and verify row counts plus hypertable metadata. Do not interpret the current
+local backup result as production-grade disaster-recovery evidence.

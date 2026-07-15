@@ -141,7 +141,7 @@ class TestDatastreamctl:
         assert "python-fallback" in out
 
     def test_backup_drill_uses_backup_helpers(self, monkeypatch):
-        monkeypatch.setattr(ctl, "collect_historian_snapshot", lambda table_names=None: {"status": "success", "tables": {"industrial_events": 3}})
+        monkeypatch.setattr(ctl, "collect_historian_snapshot", lambda table_names=None, database=None: {"status": "success", "tables": {"industrial_events": 3}})
         monkeypatch.setattr(ctl, "compare_historian_snapshots", lambda before, after: {"matched": True, "diffs": {}, "before": before, "after": after})
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
@@ -154,7 +154,7 @@ class TestDatastreamctl:
 
     def test_backup_drill_writes_report_dir(self, monkeypatch, tmp_path):
         report_dir = tmp_path / "backup-report"
-        monkeypatch.setattr(ctl, "collect_historian_snapshot", lambda table_names=None: {"status": "success", "tables": {"industrial_events": 3}})
+        monkeypatch.setattr(ctl, "collect_historian_snapshot", lambda table_names=None, database=None: {"status": "success", "tables": {"industrial_events": 3}})
         monkeypatch.setattr(ctl, "compare_historian_snapshots", lambda before, after: {"matched": True, "diffs": {}, "before": before, "after": after})
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})

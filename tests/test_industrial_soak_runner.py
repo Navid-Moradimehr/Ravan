@@ -44,6 +44,28 @@ def test_snapshot_exposes_per_service_lag(monkeypatch, tmp_path: Path):
     assert snapshot.consumer_lag_by_service["fanout"] == 0.0
 
 
+def test_snapshot_marks_flink_and_observability_endpoints(monkeypatch, tmp_path: Path):
+    import services.benchmarks.industrial_soak_runner as runner
+
+    def fake_json(url):
+        if url.endswith("/jobs/overview"):
+            return {"jobs": [{"name": "iot-anomaly-processor", "state": "RUNNING"}]}
+        return {"status": "ok"}
+
+    monkeypatch.setattr(runner, "_read_text", lambda url: "")
+    monkeypatch.setattr(runner, "_read_json", fake_json)
+    monkeypatch.setattr(runner, "_probe_http", lambda url: (True, 12.5))
+    monkeypatch.setattr(runner, "_docker_resources", lambda compose_file: (1.0, 100.0))
+    monkeypatch.setattr(runner, "_prometheus_scalar", lambda base_url, query: 0.0)
+
+    snapshot = runner.collect_snapshot(compose_file=tmp_path / "compose.yml")
+    assert snapshot.flink_job_ok is True
+    assert snapshot.prometheus_ok is True
+    assert snapshot.kafka_ui_ok is True
+    assert snapshot.grafana_ok is True
+    assert snapshot.kafka_ui_latency_ms == 12.5
+
+
 def test_individual_consumer_backlog_is_a_failure():
     import services.benchmarks.industrial_soak_runner as runner
 

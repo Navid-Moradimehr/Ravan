@@ -110,6 +110,9 @@ The edge path publishes raw protocol payloads to `industrial.raw`, validated env
 
 When you want the distributed stream processor instead of the host-run Python fallback, start the Flink cluster services plus the `flink-job` compose service. The job uses keyed state, checkpointing, and the same runtime enrichment contract as the Python processor.
 
+For Kubernetes validation, use `scripts/kind-rehearsal.ps1` together with
+`docs/local-kubernetes-rehearsal.md` before moving to a real cluster.
+
 Run the mixed replay benchmark pack:
 
 ```powershell
