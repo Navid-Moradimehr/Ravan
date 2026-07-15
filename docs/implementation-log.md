@@ -9,6 +9,10 @@ credentials, source exports, rewards, GPUs, or plant safety policy.
 
 Validation: `npm run build` passed and emitted the new page and API routes.
 
+Completed the dataset API contract with manifest-version lookup, per-job
+status, queued-job cancellation, and output-artifact listing. Focused route,
+compiler, and benchmark tests passed.
+
 ## 2026-07-16 - Full Validation Results
 
 The complete Python suite passed: `649 passed` with four existing warnings.

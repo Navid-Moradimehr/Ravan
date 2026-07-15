@@ -40,6 +40,10 @@ The `/datasets` web page provides a lightweight validation view. It is not a
 training UI and does not upload data or handle secrets. CLI and worker paths
 remain the authoritative build interfaces.
 
+The API also supports manifest validation/version lookup and durable build
+status, cancellation of queued jobs, and emitted artifact listing. These are
+control-plane operations; they do not execute model training.
+
 The local benchmark covers compiler work only. It must not be presented as a
 substitute for site-level ingestion, Kafka, S3, GPU, or Kubernetes validation.
 

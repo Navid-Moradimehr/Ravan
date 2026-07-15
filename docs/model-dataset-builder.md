@@ -77,6 +77,13 @@ the manifest and explains the platform/user ownership boundary. The CLI
 remains the complete offline build interface; the UI intentionally does not
 accept credentials or upload source data.
 
+The durable API surface includes `GET/POST /api/v1/datasets/manifests`,
+`GET /api/v1/datasets/manifests/{dataset_id}/versions`,
+`POST /api/v1/datasets/manifests/validate`, `GET/POST
+/api/v1/datasets/builds`, `GET /api/v1/datasets/builds/{job_id}`, `POST
+/api/v1/datasets/builds/{job_id}/cancel`, and `GET
+/api/v1/datasets/builds/{job_id}/artifacts`.
+
 The compiler benchmark is available as a Python library through
 `services.benchmarks.model_dataset.run_benchmark`. It measures local manifest
 read, bounded alignment, Parquet output, and quality artifact generation; it
