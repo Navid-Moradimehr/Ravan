@@ -144,7 +144,17 @@ class TestDatastreamctl:
         monkeypatch.setattr(ctl, "collect_historian_snapshot", lambda table_names=None, database=None: {"status": "success", "tables": {"industrial_events": 3}})
         monkeypatch.setattr(ctl, "compare_historian_snapshots", lambda before, after: {"matched": True, "diffs": {}, "before": before, "after": after})
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
-        monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
+        monkeypatch.setattr(ctl, "reset_database", lambda database, conn: {"status": "success", "database": database})
+        monkeypatch.setattr(
+            ctl,
+            "restore_backup",
+            lambda backup_path, target_database=None: {
+                "status": "success",
+                "database": target_database,
+                "hypertables_verified": True,
+                "hypertables": {"matched": True},
+            },
+        )
         monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
         monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": False})
         rc, out = self._run(["backup-drill", "--restore-db", "restore_db"])
@@ -157,7 +167,17 @@ class TestDatastreamctl:
         monkeypatch.setattr(ctl, "collect_historian_snapshot", lambda table_names=None, database=None: {"status": "success", "tables": {"industrial_events": 3}})
         monkeypatch.setattr(ctl, "compare_historian_snapshots", lambda before, after: {"matched": True, "diffs": {}, "before": before, "after": after})
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
-        monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
+        monkeypatch.setattr(ctl, "reset_database", lambda database, conn: {"status": "success", "database": database})
+        monkeypatch.setattr(
+            ctl,
+            "restore_backup",
+            lambda backup_path, target_database=None: {
+                "status": "success",
+                "database": target_database,
+                "hypertables_verified": True,
+                "hypertables": {"matched": True},
+            },
+        )
         monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
         monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": True})
         rc, out = self._run(["backup-drill", "--restore-db", "restore_db", "--report-dir", str(report_dir)])
@@ -165,6 +185,7 @@ class TestDatastreamctl:
         assert (report_dir / "backup-drill-summary.json").exists()
         assert (report_dir / "before_snapshot.json").exists()
         assert (report_dir / "backup.json").exists()
+        assert (report_dir / "restore_reset.json").exists()
         assert (report_dir / "restore.json").exists()
         assert (report_dir / "after_snapshot.json").exists()
         assert (report_dir / "snapshot_comparison.json").exists()
@@ -181,7 +202,7 @@ class TestDatastreamctl:
                 "before_snapshot": {"status": "success"},
                 "backup": {"status": "success", "path": f"{backup_dir}/backup.sql"},
                 "backup_elapsed_seconds": 0.1234,
-                "restore": {"status": "success", "database": restore_db},
+                "restore": {"status": "success", "database": restore_db, "hypertables_verified": True, "hypertables": {"matched": True}},
                 "backups": [{"path": f"{backup_dir}/backup.sql"}],
                 "wal_g": {"installed": True},
                 "after_snapshot": {"status": "success"},
@@ -230,7 +251,8 @@ class TestDatastreamctl:
                         "restore_elapsed_seconds": 0.23,
                         "total_elapsed_seconds": 0.45,
                         "snapshot_match": True,
-                        "details": {"backup": {"status": "success"}, "restore": {"status": "success"}},
+                        "hypertable_match": True,
+                        "details": {"backup": {"status": "success"}, "restore": {"status": "success", "hypertables_verified": True}},
                     }
                 ],
                 "passed": True,
@@ -307,7 +329,8 @@ class TestDatastreamctl:
                         "restore_elapsed_seconds": 0.23,
                         "total_elapsed_seconds": 0.45,
                         "snapshot_match": True,
-                        "details": {"backup": {"status": "success"}, "restore": {"status": "success"}},
+                        "hypertable_match": True,
+                        "details": {"backup": {"status": "success"}, "restore": {"status": "success", "hypertables_verified": True}},
                         "backup_rto_threshold_seconds": 30.0,
                         "restore_rto_threshold_seconds": 30.0,
                         "rpo_threshold_seconds": 0.0,
@@ -330,7 +353,8 @@ class TestDatastreamctl:
                         "restore_elapsed_seconds": 0.34,
                         "total_elapsed_seconds": 0.61,
                         "snapshot_match": True,
-                        "details": {"backup": {"status": "success"}, "restore": {"status": "success"}},
+                        "hypertable_match": True,
+                        "details": {"backup": {"status": "success"}, "restore": {"status": "success", "hypertables_verified": True}},
                         "backup_rto_threshold_seconds": 60.0,
                         "restore_rto_threshold_seconds": 60.0,
                         "rpo_threshold_seconds": 0.0,

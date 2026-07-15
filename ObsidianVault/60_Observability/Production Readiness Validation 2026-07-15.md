@@ -25,12 +25,13 @@ They do not process or persist the industrial stream themselves.
 
 ## Open Gate
 
-The Timescale backup dump now includes internal schemas and uses Timescale
-restore hooks. A clean logical restore still reconstructs rows without
-reconstructing hypertable metadata. This is a real release blocker for backup
-acceptance. The next implementation must initialize or restore Timescale
-hypertables correctly and verify both row identity and
-`timescaledb_information.hypertables`.
+The Timescale backup drill now passes end-to-end on a disposable clean target.
+The backup path switched to a full-database logical dump, the drill resets the
+restore target before running, and the restore verification now checks both
+row identity and `timescaledb_information.hypertables`.
+
+The remaining release gates are the non-local items: real-site sizing,
+real PLC/sensor validation, and repeatability on target hardware.
 
 Raw edge delivery and standalone processor lag are unavailable in some Compose
 profiles because the corresponding counters are not exposed. The validation

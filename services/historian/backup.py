@@ -28,6 +28,12 @@ DEFAULT_SNAPSHOT_TABLES: tuple[str, ...] = (
     "ai_enriched",
     "dead_letter_events",
 )
+TIMESCALE_HYPERTABLE_TIME_COLUMNS: dict[str, str] = {
+    "industrial_events": "time",
+    "processed_events": "time",
+    "ai_enriched": "time",
+    "dead_letter_events": "time",
+}
 
 
 def _connection_params() -> dict[str, str]:
@@ -91,6 +97,332 @@ def _temporary_toc_path() -> Path:
     return Path(name)
 
 
+def _timescale_restore_sql(tables: Iterable[str] | None = None) -> str:
+    """Return the SQL bootstrap used to restore Timescale metadata.
+
+    Logical dumps can preserve row data without reattaching the hypertable
+    catalog state in a blank target. Re-running create_hypertable with
+    if_not_exists and migrate_data makes the restore idempotent: already
+    restored hypertables are left untouched, and ordinary tables are promoted
+    back into hypertables after the data has been restored.
+    """
+    selected_tables = list(DEFAULT_SNAPSHOT_TABLES if tables is None else tables)
+    statements = [
+        "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE",
+        "SELECT timescaledb_post_restore()",
+    ]
+    for table in selected_tables:
+        time_column = TIMESCALE_HYPERTABLE_TIME_COLUMNS.get(table)
+        if not time_column:
+            continue
+        statements.append(
+            f"SELECT create_hypertable('{table}', '{time_column}', if_not_exists => TRUE, migrate_data => TRUE)"
+        )
+    return "; ".join(statements)
+
+
+def _list_hypertables(database: str, conn: dict[str, str]) -> dict[str, Any]:
+    query = (
+        "SELECT hypertable_name FROM timescaledb_information.hypertables "
+        "WHERE hypertable_schema = 'public' "
+        "AND hypertable_name = ANY(ARRAY['industrial_events','processed_events','ai_enriched','dead_letter_events']) "
+        "ORDER BY hypertable_name"
+    )
+    cmd = [
+        "psql",
+        f"--host={conn['host']}",
+        f"--port={conn['port']}",
+        f"--username={conn['user']}",
+        "--dbname",
+        database,
+        "--no-align",
+        "--tuples-only",
+        "--command",
+        query,
+    ]
+    env = os.environ.copy()
+    env["PGPASSWORD"] = conn["password"]
+
+    try:
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True, check=True)
+        hypertables = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        expected = list(TIMESCALE_HYPERTABLE_TIME_COLUMNS)
+        missing = [table for table in expected if table not in hypertables]
+        return {
+            "status": "success",
+            "database": database,
+            "hypertables": hypertables,
+            "expected_hypertables": expected,
+            "missing_hypertables": missing,
+            "hypertable_count": len(hypertables),
+            "matched": not missing and len(hypertables) == len(expected),
+            "transport": "psql",
+        }
+    except FileNotFoundError:
+        service = _detect_docker_db_service()
+        if not service:
+            return {
+                "status": "error",
+                "error": "psql not found on host and no running Docker database service detected.",
+            }
+        docker_cmd = _compose_base_cmd() + ["exec", "-T", service, "psql", "-U", conn["user"], "-d", database,
+                                            "--no-align", "--tuples-only", "--command", query]
+        env = os.environ.copy()
+        env["PGPASSWORD"] = conn["password"]
+        try:
+            result = subprocess.run(docker_cmd, env=env, capture_output=True, text=True, check=True, cwd=str(PROJECT_ROOT))
+            hypertables = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            expected = list(TIMESCALE_HYPERTABLE_TIME_COLUMNS)
+            missing = [table for table in expected if table not in hypertables]
+            return {
+                "status": "success",
+                "database": database,
+                "hypertables": hypertables,
+                "expected_hypertables": expected,
+                "missing_hypertables": missing,
+                "hypertable_count": len(hypertables),
+                "matched": not missing and len(hypertables) == len(expected),
+                "transport": f"docker:{service}",
+            }
+        except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+            error = getattr(exc, "stderr", None) or str(exc)
+            return {"status": "error", "error": error, "transport": f"docker:{service}"}
+    except subprocess.CalledProcessError as exc:
+        return {
+            "status": "error",
+            "error": exc.stderr,
+            "command": " ".join(cmd),
+        }
+
+
+def _run_timescale_restore_bootstrap(database: str, conn: dict[str, str]) -> dict[str, Any]:
+    bootstrap_sql = _timescale_restore_sql([])
+    cmd = [
+        "psql",
+        f"--host={conn['host']}",
+        f"--port={conn['port']}",
+        f"--username={conn['user']}",
+        "--dbname",
+        database,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "--command",
+        bootstrap_sql,
+    ]
+    env = os.environ.copy()
+    env["PGPASSWORD"] = conn["password"]
+    try:
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True, check=True)
+        hypertable_snapshot = _list_hypertables(database, conn)
+        if hypertable_snapshot.get("status") != "success":
+            return {
+                "status": "error",
+                "error": hypertable_snapshot.get("error", "hypertable verification failed"),
+                "bootstrap_output": result.stdout,
+                "transport": "psql",
+            }
+        missing = hypertable_snapshot.get("missing_hypertables", [])
+        repair_result: dict[str, Any] = {"status": "skipped", "missing_hypertables": missing}
+        if missing:
+            repair_sql = "; ".join(
+                f"SELECT create_hypertable('{table}', '{TIMESCALE_HYPERTABLE_TIME_COLUMNS[table]}', if_not_exists => TRUE, migrate_data => TRUE)"
+                for table in missing
+                if table in TIMESCALE_HYPERTABLE_TIME_COLUMNS
+            )
+            if repair_sql:
+                repair_cmd = [
+                    "psql",
+                    f"--host={conn['host']}",
+                    f"--port={conn['port']}",
+                    f"--username={conn['user']}",
+                    "--dbname",
+                    database,
+                    "-v",
+                    "ON_ERROR_STOP=1",
+                    "--command",
+                    repair_sql,
+                ]
+                repair_result_run = subprocess.run(repair_cmd, env=env, capture_output=True, text=True, check=True)
+                repair_result = {
+                    "status": "success",
+                    "database": database,
+                    "output": repair_result_run.stdout,
+                    "missing_hypertables": missing,
+                    "transport": "psql",
+                }
+                hypertable_snapshot = _list_hypertables(database, conn)
+                if hypertable_snapshot.get("status") != "success":
+                    return {
+                        "status": "error",
+                        "error": hypertable_snapshot.get("error", "hypertable verification failed"),
+                        "bootstrap_output": result.stdout,
+                        "repair": repair_result,
+                        "transport": "psql",
+                    }
+        return {
+            "status": "success",
+            "database": database,
+            "bootstrap_output": result.stdout,
+            "repair": repair_result,
+            "hypertables": hypertable_snapshot,
+            "hypertables_verified": bool(hypertable_snapshot.get("matched")),
+            "transport": "psql",
+        }
+    except FileNotFoundError:
+        service = _detect_docker_db_service()
+        if not service:
+            return {
+                "status": "error",
+                "error": "psql not found on host and no running Docker database service detected.",
+            }
+        docker_cmd = _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [
+            service,
+            "psql",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "--command",
+            bootstrap_sql,
+            database,
+        ]
+        try:
+            result = subprocess.run(docker_cmd, capture_output=True, text=True, check=True, cwd=str(PROJECT_ROOT))
+            hypertable_snapshot = _list_hypertables(database, conn)
+            if hypertable_snapshot.get("status") != "success":
+                return {
+                    "status": "error",
+                    "error": hypertable_snapshot.get("error", "hypertable verification failed"),
+                    "bootstrap_output": result.stdout,
+                    "transport": f"docker:{service}",
+                }
+            missing = hypertable_snapshot.get("missing_hypertables", [])
+            repair_result: dict[str, Any] = {"status": "skipped", "missing_hypertables": missing}
+            if missing:
+                repair_sql = "; ".join(
+                    f"SELECT create_hypertable('{table}', '{TIMESCALE_HYPERTABLE_TIME_COLUMNS[table]}', if_not_exists => TRUE, migrate_data => TRUE)"
+                    for table in missing
+                    if table in TIMESCALE_HYPERTABLE_TIME_COLUMNS
+                )
+                if repair_sql:
+                    repair_cmd = _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [
+                        service,
+                        "psql",
+                        "-v",
+                        "ON_ERROR_STOP=1",
+                        "--command",
+                        repair_sql,
+                        database,
+                    ]
+                    repair_result_run = subprocess.run(repair_cmd, capture_output=True, text=True, check=True, cwd=str(PROJECT_ROOT))
+                    repair_result = {
+                        "status": "success",
+                        "database": database,
+                        "output": repair_result_run.stdout,
+                        "missing_hypertables": missing,
+                        "transport": f"docker:{service}",
+                    }
+                    hypertable_snapshot = _list_hypertables(database, conn)
+                    if hypertable_snapshot.get("status") != "success":
+                        return {
+                            "status": "error",
+                            "error": hypertable_snapshot.get("error", "hypertable verification failed"),
+                            "bootstrap_output": result.stdout,
+                            "repair": repair_result,
+                            "transport": f"docker:{service}",
+                        }
+            return {
+                "status": "success",
+                "database": database,
+                "bootstrap_output": result.stdout,
+                "repair": repair_result,
+                "hypertables": hypertable_snapshot,
+                "hypertables_verified": bool(hypertable_snapshot.get("matched")),
+                "transport": f"docker:{service}",
+            }
+        except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+            error = getattr(exc, "stderr", None) or str(exc)
+            return {"status": "error", "error": error, "transport": f"docker:{service}"}
+
+
+def reset_database(database: str, conn: dict[str, str]) -> dict[str, Any]:
+    """Drop and recreate a disposable restore target.
+
+    This is used by backup drills and other validation routines that need a
+    clean target database. It intentionally refuses to touch the live source
+    database.
+    """
+    source_database = _connection_params()["database"]
+    if database == source_database:
+        return {
+            "status": "error",
+            "error": f"refusing to reset live source database '{database}'",
+        }
+
+    commands = [
+        [
+            "dropdb",
+            f"--host={conn['host']}",
+            f"--port={conn['port']}",
+            f"--username={conn['user']}",
+            "--if-exists",
+            "--force",
+            database,
+        ],
+        [
+            "createdb",
+            f"--host={conn['host']}",
+            f"--port={conn['port']}",
+            f"--username={conn['user']}",
+            "-O",
+            conn["user"],
+            database,
+        ],
+    ]
+    env = os.environ.copy()
+    env["PGPASSWORD"] = conn["password"]
+    try:
+        for cmd in commands:
+            subprocess.run(cmd, env=env, capture_output=True, text=True, check=True)
+        return {
+            "status": "success",
+            "database": database,
+            "transport": "psql",
+        }
+    except FileNotFoundError:
+        service = _detect_docker_db_service()
+        if not service:
+            return {
+                "status": "error",
+                "error": "dropdb/createdb not found on host and no running Docker database service detected.",
+            }
+        try:
+            docker_commands = [
+                _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [service, "dropdb", "--if-exists", "--force", database],
+                _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [service, "createdb", "-O", conn["user"], database],
+            ]
+            for cmd in docker_commands:
+                subprocess.run(cmd, env=env, capture_output=True, text=True, check=True, cwd=str(PROJECT_ROOT))
+            return {
+                "status": "success",
+                "database": database,
+                "transport": f"docker:{service}",
+            }
+        except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+            error = getattr(exc, "stderr", None) or str(exc)
+            return {"status": "error", "error": error, "transport": f"docker:{service}"}
+    except subprocess.CalledProcessError as exc:
+        return {
+            "status": "error",
+            "error": exc.stderr,
+            "command": " ".join(commands[0]),
+        }
+    except subprocess.CalledProcessError as exc:
+        return {
+            "status": "error",
+            "error": exc.stderr,
+            "command": " ".join(cmd),
+        }
+
+
 def _create_backup_via_docker(filepath: Path, conn: dict[str, str], tables: list[str] | None) -> dict[str, Any]:
     service = _detect_docker_db_service()
     if not service:
@@ -103,11 +435,6 @@ def _create_backup_via_docker(filepath: Path, conn: dict[str, str], tables: list
     if tables:
         for table in tables:
             cmd.extend(["--table", table])
-    else:
-        # Timescale hypertables store rows in chunk tables under
-        # _timescaledb_internal. Dumping only public omits the telemetry
-        # payload while retaining the parent table definitions.
-        cmd.extend(["--schema=public", "--schema=_timescaledb_*"])
     cmd.append(conn["database"])
 
     try:
@@ -236,16 +563,20 @@ def _restore_backup_via_docker(filepath: Path, conn: dict[str, str]) -> dict[str
             check=True,
             cwd=str(PROJECT_ROOT),
         )
-        timescale_post_sql = _compose_base_cmd() + ["exec", "-T"] + _docker_exec_env(conn) + [
-            service,
-            "psql",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-c",
-            "SELECT timescaledb_post_restore();",
-            conn["database"],
-        ]
-        subprocess.run(timescale_post_sql, capture_output=True, text=True, check=True, cwd=str(PROJECT_ROOT))
+        bootstrap_result = _run_timescale_restore_bootstrap(conn["database"], conn)
+        if bootstrap_result.get("status") != "success":
+            return {
+                "status": "error",
+                "error": bootstrap_result.get("error", "timescale restore bootstrap failed"),
+                "transport": f"docker:{service}",
+            }
+        hypertable_snapshot = _list_hypertables(conn["database"], conn)
+        if hypertable_snapshot.get("status") != "success":
+            return {
+                "status": "error",
+                "error": hypertable_snapshot.get("error", "hypertable verification failed"),
+                "transport": f"docker:{service}",
+            }
         subprocess.run(
             _compose_base_cmd() + ["exec", "-T", service, "rm", "-f", container_path],
             capture_output=True,
@@ -267,6 +598,9 @@ def _restore_backup_via_docker(filepath: Path, conn: dict[str, str]) -> dict[str
             "database": conn["database"],
             "backup_path": str(filepath),
             "output": result.stdout,
+            "bootstrap": bootstrap_result,
+            "hypertables": hypertable_snapshot,
+            "hypertables_verified": bool(hypertable_snapshot.get("matched")),
             "transport": f"docker:{service}",
         }
     except subprocess.CalledProcessError as e:
@@ -318,8 +652,6 @@ def create_backup(backup_dir: str | None = None, tables: list[str] | None = None
     if tables:
         for table in tables:
             cmd.extend(["--table", table])
-    else:
-        cmd.extend(["--schema=public", "--schema=_timescaledb_*"])
 
     cmd.append(conn["database"])
 
@@ -405,12 +737,32 @@ def restore_backup(backup_path: str, target_database: str | None = None) -> dict
             text=True,
             check=True,
         )
+        bootstrap_result = _run_timescale_restore_bootstrap(conn["database"], conn)
+        if bootstrap_result.get("status") != "success":
+            return {
+                "status": "error",
+                "error": bootstrap_result.get("error", "timescale restore bootstrap failed"),
+                "restore_output": result.stdout,
+                "bootstrap": bootstrap_result,
+            }
+        hypertable_snapshot = _list_hypertables(conn["database"], conn)
+        if hypertable_snapshot.get("status") != "success":
+            return {
+                "status": "error",
+                "error": hypertable_snapshot.get("error", "hypertable verification failed"),
+                "restore_output": result.stdout,
+                "bootstrap": bootstrap_result,
+                "hypertables": hypertable_snapshot,
+            }
         logger.info(f"Backup restored to {conn['database']}")
         return {
             "status": "success",
             "database": conn["database"],
             "backup_path": str(filepath),
             "output": result.stdout,
+            "bootstrap": bootstrap_result,
+            "hypertables": hypertable_snapshot,
+            "hypertables_verified": bool(hypertable_snapshot.get("matched")),
         }
     except subprocess.CalledProcessError as e:
         logger.error(f"Restore failed: {e.stderr}")

@@ -77,7 +77,7 @@ startup scan; this prevents a large historian from blocking API readiness.
 
 - Health checks and runtime diagnostics exist.
 - Backup and restore tooling exists.
-- TimescaleDB backup tooling uses Docker-hosted PostgreSQL tools, includes internal chunk schemas, and invokes Timescale restore hooks; final restore acceptance remains blocked until hypertable metadata is reconstructed and verified.
+- TimescaleDB backup tooling now uses a full-database logical dump, resets disposable drill targets before restore, invokes Timescale restore hooks, and verifies both row counts and `timescaledb_information.hypertables` on the restored target.
 - Backup-drill matrix tooling exists so restore/rollback drills can be measured per site profile.
 - Site profile backups now carry explicit backup-owner and restore-drill-owner fields.
 - Metrics and observability paths exist.
@@ -91,7 +91,6 @@ startup scan; this prevents a large historian from blocking API readiness.
 - Per-site production benchmarking on the actual target broker and historian topology.
 - Live benchmark calibration using the target industrial network.
 - Production-pipeline validation against the real Flink/Kafka/Timescale deployment topology.
-- TimescaleDB restore validation that preserves hypertable/chunk metadata in a clean target database.
 - Repeatability checks over several benchmark sessions to separate regression noise from actual performance loss.
 - Model evaluation lifecycle and promotion workflow.
 - Diagnostic-agent productization beyond the scaffold.
@@ -132,7 +131,7 @@ These are the changes that matter most before calling the platform production-re
 8. Treat the wire format as a lever, not a cure-all. If JSON remains faster in Python on the target host, move the hot path into a compiled runtime before forcing binary serialization everywhere.
 9. Use the explicit runtime mode contract to keep `python-fallback` for local development and `flink-production` for real rollout targets.
 10. Keep the supervisor and deployment templates aligned so runtime mode changes both the active processor and the benchmark baseline.
-11. Do not mark backup/restore production-ready until a clean target reports both matching row counts and the expected Timescale hypertables after restore.
+11. Keep the backup/restore drill on a disposable target and re-run it after any Timescale or dump-format change to confirm row counts and hypertable metadata still match.
 
 ## Session Delta Guidance
 

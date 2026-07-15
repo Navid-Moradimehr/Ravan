@@ -70,8 +70,10 @@ from services.historian.backup import (
     collect_historian_snapshot,
     compare_historian_snapshots,
     create_backup,
+    _connection_params as historian_connection_params,
     get_walg_status,
     list_backups,
+    reset_database,
     restore_backup,
 )
 from services.common.metadata_artifacts import build_metadata_artifact_bundle, write_metadata_artifact_bundle
@@ -177,6 +179,7 @@ def _run_backup_drill(
         "before_snapshot": before_snapshot,
         "backup": backup_result,
         "backup_elapsed_seconds": backup_elapsed_seconds,
+        "restore_reset": None,
         "restore": None,
         "backups": list_backups(backup_dir=backup_dir),
         "wal_g": get_walg_status(),
@@ -190,10 +193,18 @@ def _run_backup_drill(
         result["total_elapsed_seconds"] = round(time.perf_counter() - started_at, 4)
         return result
     if restore_db:
+        reset_result = reset_database(restore_db, historian_connection_params())
+        result["restore_reset"] = reset_result
+        if reset_result.get("status") != "success":
+            result["restore"] = reset_result
+            result["restore_elapsed_seconds"] = 0.0
+            result["total_elapsed_seconds"] = round(time.perf_counter() - started_at, 4)
+            return result
         restore_started_at = time.perf_counter()
         result["restore"] = restore_backup(result["backup"]["path"], restore_db)
         result["restore_elapsed_seconds"] = round(time.perf_counter() - restore_started_at, 4)
         if result["restore"].get("status") == "success":
+            result["hypertable_comparison"] = result["restore"].get("hypertables")
             # Compare against the restored target, not the live source. The
             # source may continue ingesting while a backup drill runs.
             after_snapshot = collect_historian_snapshot(database=restore_db)
@@ -232,6 +243,7 @@ def _run_backup_drill_matrix(
         backup_elapsed_seconds = float(drill.get("backup_elapsed_seconds") or 0.0)
         restore_elapsed_seconds = float(drill.get("restore_elapsed_seconds") or 0.0)
         snapshot_match = bool(drill.get("snapshot_comparison") and drill["snapshot_comparison"].get("matched"))
+        hypertable_match = bool(drill.get("restore") and drill["restore"].get("hypertables_verified"))
         backup_rto_passed = backup_elapsed_seconds <= backup_threshold_seconds
         restore_rto_passed = restore_elapsed_seconds <= restore_threshold_seconds if drill["restore"] else False
         rpo_seconds = 0.0 if snapshot_match else 1.0
@@ -241,6 +253,7 @@ def _run_backup_drill_matrix(
             drill["backup"].get("status") == "success"
             and (drill["restore"] is None or drill["restore"].get("status") == "success")
             and snapshot_match
+            and hypertable_match
             and backup_rto_passed
             and (drill["restore"] is None or restore_rto_passed)
             and rpo_passed
@@ -263,6 +276,7 @@ def _run_backup_drill_matrix(
                 "restore_elapsed_seconds": restore_elapsed_seconds,
                 "total_elapsed_seconds": drill.get("total_elapsed_seconds", 0.0),
                 "snapshot_match": snapshot_match,
+                "hypertable_match": hypertable_match,
                 "backup_rto_threshold_seconds": backup_threshold_seconds,
                 "restore_rto_threshold_seconds": restore_threshold_seconds,
                 "rpo_threshold_seconds": rpo_threshold_seconds,
@@ -292,7 +306,7 @@ def _write_backup_drill_report(report_dir: str, payload: dict[str, Any]) -> list
     summary_path = output_dir / "backup-drill-summary.json"
     summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     written.append(summary_path)
-    for key in ("before_snapshot", "backup", "restore", "after_snapshot", "snapshot_comparison", "wal_g"):
+    for key in ("before_snapshot", "backup", "restore_reset", "restore", "after_snapshot", "snapshot_comparison", "wal_g"):
         if payload.get(key) is None:
             continue
         item_path = output_dir / f"{key}.json"
