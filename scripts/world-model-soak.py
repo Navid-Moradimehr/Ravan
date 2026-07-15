@@ -19,7 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from confluent_kafka import AdminClient, NewTopic, Producer
+from confluent_kafka import Producer
+from confluent_kafka.admin import AdminClient, NewTopic
 
 from services.common.model_dataset import compile_trajectory_bundle
 
