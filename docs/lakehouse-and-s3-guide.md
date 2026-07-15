@@ -117,3 +117,30 @@ The platform does not enable concurrent direct writes from every plant by
 itself. Operators should prefer a central controlled writer or a catalog with
 documented multi-writer commit guarantees. Partitioning, compaction, catalog
 availability, and S3 lifecycle policy remain deployment responsibilities.
+
+## Operational events and multimodal references
+
+Operational events are not telemetry. When the optional `operational-fanout`
+service is enabled, `industrial.operational` is written to an
+`operational_events` Iceberg table with its envelope and `payload_json`. The
+fan-out no longer invents a numeric value or asset/tag pair for actions,
+outcomes, maintenance records, or episode boundaries.
+
+Large observations are represented by `ObservationArtifactReference` records.
+The API endpoint `POST /api/v1/observation-artifacts` publishes a reference to
+`industrial.observation-artifacts`; it does not upload bytes. The optional
+`artifact-fanout` service writes these references to an `observation_artifacts`
+Iceberg table. Supported references use `s3://` or `file://` URIs and include
+the modality, checksum, timing, clock, calibration, and topology versions
+when available. The deployment owns object-store upload, access policy,
+retention, and checksum verification.
+
+Start both optional archive consumers with:
+
+```powershell
+docker compose -f docker/docker-compose.yml --profile extended up -d operational-fanout artifact-fanout
+```
+
+These consumers are additive. The historian and normalized telemetry path are
+unchanged, and disabling the profile does not prevent scalar ingestion or
+Kafka replay.

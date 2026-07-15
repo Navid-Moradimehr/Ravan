@@ -565,6 +565,38 @@ services:
       LAKEHOUSE_LAYOUT: ${LAKEHOUSE_LAYOUT:-single-table}
       LAKEHOUSE_NAMESPACE_TEMPLATE: ${LAKEHOUSE_NAMESPACE_TEMPLATE:-industrial}
       LAKEHOUSE_TABLE_TEMPLATE: ${LAKEHOUSE_OPERATIONAL_TABLE_TEMPLATE:-operational_events}
+      LAKEHOUSE_EVENT_FAMILY: operational
+      LAKEHOUSE_WAREHOUSE: ${LAKEHOUSE_WAREHOUSE:-s3://lakehouse/}
+      LAKEHOUSE_S3_ENDPOINT: ${LAKEHOUSE_S3_ENDPOINT:-http://minio:9000}
+      LAKEHOUSE_S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:-minio}
+      LAKEHOUSE_S3_SECRET_KEY: ${LAKEHOUSE_S3_SECRET_KEY:-minio12345}
+      LAKEHOUSE_S3_REGION: ${LAKEHOUSE_S3_REGION:-us-east-1}
+    profiles:
+      - extended
+
+  artifact-fanout:
+    build:
+      context: ..
+      dockerfile: services/processor/Dockerfile
+    command: ["python", "-m", "services.processor.artifact_fanout"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      timescaledb:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      INDUSTRIAL_ARTIFACT_TOPIC: industrial.observation-artifacts
+      ARTIFACT_SINKS: ${ARTIFACT_SINKS:-lakehouse}
+      LAKEHOUSE_CATALOG: ${LAKEHOUSE_CATALOG:-sql}
+      LAKEHOUSE_CATALOG_URI: ${LAKEHOUSE_CATALOG_URI:-postgresql+psycopg2://stream:stream@timescaledb:5432/stream_engine}
+      LAKEHOUSE_NAMESPACE: ${LAKEHOUSE_NAMESPACE:-industrial}
+      LAKEHOUSE_TABLE: ${LAKEHOUSE_ARTIFACT_TABLE:-observation_artifacts}
+      LAKEHOUSE_TABLE_TEMPLATE: ${LAKEHOUSE_ARTIFACT_TABLE_TEMPLATE:-observation_artifacts}
+      LAKEHOUSE_LAYOUT: ${LAKEHOUSE_LAYOUT:-single-table}
+      LAKEHOUSE_EVENT_FAMILY: artifact
       LAKEHOUSE_WAREHOUSE: ${LAKEHOUSE_WAREHOUSE:-s3://lakehouse/}
       LAKEHOUSE_S3_ENDPOINT: ${LAKEHOUSE_S3_ENDPOINT:-http://minio:9000}
       LAKEHOUSE_S3_ACCESS_KEY: ${LAKEHOUSE_S3_ACCESS_KEY:-minio}

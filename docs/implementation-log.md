@@ -1,5 +1,19 @@
 # Implementation Log
 
+## 2026-07-16 - Model Evidence Lakehouse Routing
+
+Added optional, family-specific lakehouse schemas for the model-data
+foundation. Telemetry keeps its normalized scalar schema; operational events
+now retain their envelope and payload without fake telemetry values; and
+immutable image, audio, waveform, tensor, document, lidar, and thermal
+references can be published through `POST /api/v1/observation-artifacts` and
+archived by the optional `artifact-fanout` service. The existing historian,
+Kafka contracts, and default Compose profile remain unchanged.
+
+Validation: 21 focused tests passed and the new API/fan-out modules compile.
+The artifact bytes remain user-owned in S3/MinIO or a local file store; the
+platform owns the reference contract and routing only.
+
 ## 2026-07-15 - Threshold Policy Cache Regression Fix
 
 Fixed the keyed-runtime threshold-policy path so cached fallback policies are reused before any loader work. The previous hot path was repeatedly re-entering the empty-policy loader, which made the keyed enrichment stage the dominant cost in the production pipeline benchmark.

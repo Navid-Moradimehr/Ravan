@@ -41,6 +41,7 @@ class LakehouseSink:
         layout: str = "single-table",
         namespace_template: str = "industrial",
         table_template: str = "events",
+        event_family: str = "telemetry",
     ) -> None:
         self._catalog_name = catalog_name
         self._catalog_uri = catalog_uri or "postgresql+psycopg2://stream:stream@timescaledb:5432/stream_engine"
@@ -55,6 +56,7 @@ class LakehouseSink:
         self._layout = layout
         self._namespace_template = namespace_template
         self._table_template = table_template
+        self._event_family = event_family
         self._buffer: list[dict[str, Any]] = []
         self._table = None
         self._tables: dict[tuple[str, str], Any] = {}
@@ -79,6 +81,85 @@ class LakehouseSink:
             layout=env.get("LAKEHOUSE_LAYOUT", "single-table"),
             namespace_template=env.get("LAKEHOUSE_NAMESPACE_TEMPLATE", env.get("LAKEHOUSE_NAMESPACE", "industrial")),
             table_template=env.get("LAKEHOUSE_TABLE_TEMPLATE", env.get("LAKEHOUSE_TABLE", "events")),
+            event_family=env.get("LAKEHOUSE_EVENT_FAMILY", "telemetry"),
+        )
+
+    def _schema_fields(self, pa: Any) -> Any:
+        if self._event_family == "operational":
+            return pa.schema(
+                [
+                    pa.field("event_id", pa.string()),
+                    pa.field("event_type", pa.string()),
+                    pa.field("event_kind", pa.string()),
+                    pa.field("source_id", pa.string()),
+                    pa.field("site_id", pa.string()),
+                    pa.field("entity_id", pa.string()),
+                    pa.field("occurred_at", pa.string()),
+                    pa.field("correlation_id", pa.string()),
+                    pa.field("causation_id", pa.string()),
+                    pa.field("schema_version", pa.int32()),
+                    pa.field("schema_ref", pa.string()),
+                    pa.field("event_stage", pa.string()),
+                    pa.field("lineage_id", pa.string()),
+                    pa.field("payload_json", pa.string()),
+                ]
+            )
+        if self._event_family == "artifact":
+            return pa.schema(
+                [
+                    pa.field("artifact_id", pa.string()),
+                    pa.field("event_id", pa.string()),
+                    pa.field("site_id", pa.string()),
+                    pa.field("source_id", pa.string()),
+                    pa.field("entity_id", pa.string()),
+                    pa.field("modality", pa.string()),
+                    pa.field("uri", pa.string()),
+                    pa.field("sha256", pa.string()),
+                    pa.field("size_bytes", pa.int64()),
+                    pa.field("content_type", pa.string()),
+                    pa.field("encoding", pa.string()),
+                    pa.field("shape", pa.list_(pa.int64())),
+                    pa.field("sample_rate_hz", pa.float64()),
+                    pa.field("frame_rate_hz", pa.float64()),
+                    pa.field("started_at", pa.string()),
+                    pa.field("ended_at", pa.string()),
+                    pa.field("clock_id", pa.string()),
+                    pa.field("calibration_version", pa.string()),
+                    pa.field("topology_version", pa.string()),
+                    pa.field("schema_version", pa.int32()),
+                    pa.field("lineage_id", pa.string()),
+                ]
+            )
+        return pa.schema(
+            [
+                pa.field("event_id", pa.string()),
+                pa.field("ts_source", pa.string()),
+                pa.field("source_protocol", pa.string()),
+                pa.field("source_id", pa.string()),
+                pa.field("asset_id", pa.string()),
+                pa.field("tag", pa.string()),
+                pa.field("value", pa.float64()),
+                pa.field("quality", pa.string()),
+                pa.field("unit", pa.string()),
+                pa.field("site", pa.string()),
+                pa.field("line", pa.string()),
+                pa.field("schema_version", pa.int32()),
+                pa.field("event_stage", pa.string()),
+                pa.field("ts_ingest", pa.string()),
+                pa.field("project_id", pa.string()),
+                pa.field("mapping_version", pa.string()),
+                pa.field("source_config_version", pa.int32()),
+                pa.field("source_connection_id", pa.string()),
+                pa.field("lineage_id", pa.string()),
+                pa.field("sequence_number", pa.int64()),
+                pa.field("clock_id", pa.string()),
+                pa.field("clock_sync_status", pa.string()),
+                pa.field("timestamp_uncertainty_ms", pa.float64()),
+                pa.field("calibration_version", pa.string()),
+                pa.field("topology_version", pa.string()),
+                pa.field("context_id", pa.string()),
+                pa.field("payload_json", pa.string()),
+            ]
         )
 
     def _table_target(self, site: str) -> tuple[str, str]:
@@ -127,30 +208,7 @@ class LakehouseSink:
         try:
             table = self._catalog.load_table((namespace, table_name))
         except Exception:
-            schema = pa.schema(
-                [
-                    pa.field("event_id", pa.string()),
-                    pa.field("ts_source", pa.string()),
-                    pa.field("source_protocol", pa.string()),
-                    pa.field("source_id", pa.string()),
-                    pa.field("asset_id", pa.string()),
-                    pa.field("tag", pa.string()),
-                    pa.field("value", pa.float64()),
-                    pa.field("quality", pa.string()),
-                    pa.field("unit", pa.string()),
-                    pa.field("site", pa.string()),
-                    pa.field("line", pa.string()),
-                    pa.field("schema_version", pa.int32()),
-                    pa.field("event_stage", pa.string()),
-                    pa.field("ts_ingest", pa.string()),
-                    pa.field("project_id", pa.string()),
-                    pa.field("mapping_version", pa.string()),
-                    pa.field("source_config_version", pa.int32()),
-                    pa.field("source_connection_id", pa.string()),
-                    pa.field("lineage_id", pa.string()),
-                    pa.field("payload_json", pa.string()),
-                ]
-            )
+            schema = self._schema_fields(pa)
             table = self._catalog.create_table(
                 (namespace, table_name),
                 schema=schema,
@@ -216,7 +274,12 @@ class LakehouseSink:
             row.setdefault("project_id", row.get("site", ""))
             row.setdefault("mapping_version", row.get("mapping_version", ""))
             row.setdefault("source_config_version", row.get("source_config_version", 0))
-            row.setdefault("payload_json", json.dumps(row, sort_keys=True, default=str))
+            if self._event_family == "operational":
+                row.setdefault("payload_json", json.dumps(row.get("payload", {}), sort_keys=True, default=str))
+            elif self._event_family == "telemetry":
+                row.setdefault("payload_json", json.dumps(row, sort_keys=True, default=str))
+            if self._event_family == "artifact":
+                row.setdefault("shape", [])
             rows.append({name: row.get(name) for name in columns})
         return pa.Table.from_pylist(rows, schema=table.schema().as_arrow())
 

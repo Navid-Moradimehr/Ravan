@@ -1,9 +1,4 @@
-"""Optional operational-event archive consumer.
-
-Operational events stay separate from the telemetry historian schema. When the
-lakehouse sink is enabled, this consumer archives them as event-stage records;
-Kafka remains the durable contract even when the optional archive is offline.
-"""
+"""Optional Kafka-to-lakehouse archive for immutable artifact references."""
 
 from __future__ import annotations
 
@@ -22,18 +17,20 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
-    topic = os.getenv("INDUSTRIAL_OPERATIONAL_TOPIC", "industrial.operational")
-    group_id = os.getenv("OPERATIONAL_FANOUT_GROUP_ID", "operational-fanout")
-    sink = SinkRegistry.from_env({
-        **os.environ,
-        "SINKS": os.getenv("OPERATIONAL_SINKS", ""),
-        "LAKEHOUSE_EVENT_FAMILY": "operational",
-    })
+    topic = os.getenv("INDUSTRIAL_ARTIFACT_TOPIC", "industrial.observation-artifacts")
+    group_id = os.getenv("ARTIFACT_FANOUT_GROUP_ID", "artifact-fanout")
+    sink = SinkRegistry.from_env(
+        {
+            **os.environ,
+            "SINKS": os.getenv("ARTIFACT_SINKS", "lakehouse"),
+            "LAKEHOUSE_EVENT_FAMILY": "artifact",
+        }
+    )
     consumer = Consumer(
         {
             "bootstrap.servers": resolve_kafka_brokers("localhost:19092"),
             "group.id": group_id,
-            "auto.offset.reset": os.getenv("OPERATIONAL_AUTO_OFFSET_RESET", "earliest"),
+            "auto.offset.reset": os.getenv("ARTIFACT_AUTO_OFFSET_RESET", "earliest"),
             "enable.auto.commit": False,
         }
     )
@@ -47,22 +44,18 @@ def main() -> None:
     signal.signal(signal.SIGTERM, stop)
     consumer.subscribe([topic])
     buffer: list[dict[str, object]] = []
-    offsets: list[tuple[str, int, int]] = []
+    batch_size = max(1, int(os.getenv("ARTIFACT_FANOUT_BATCH_SIZE", "256")))
     last_flush = time.monotonic()
-    batch_size = max(1, int(os.getenv("OPERATIONAL_FANOUT_BATCH_SIZE", "512")))
 
     def flush(force: bool = False) -> None:
         nonlocal last_flush
         if not buffer or (not force and len(buffer) < batch_size and time.monotonic() - last_flush < 1):
             return
         batch = buffer[:]
-        pending = offsets[:]
         buffer.clear()
-        offsets.clear()
         sink.write_batch_strict(batch)
         sink.flush_strict()
-        if pending:
-            consumer.commit(asynchronous=False)
+        consumer.commit(asynchronous=False)
         last_flush = time.monotonic()
 
     try:
@@ -72,16 +65,17 @@ def main() -> None:
                 flush()
                 continue
             if message.error():
-                logger.warning("operational fanout consumer error: %s", message.error())
+                logger.warning("artifact fanout consumer error: %s", message.error())
                 continue
             try:
                 event = json.loads(message.value().decode("utf-8"))
-                event["event_stage"] = "operational"
+                if not isinstance(event, dict):
+                    raise ValueError("artifact record must be a JSON object")
+                event["event_stage"] = "artifact-reference"
                 buffer.append(event)
-                offsets.append((message.topic(), message.partition(), message.offset()))
                 flush()
             except Exception as exc:
-                logger.warning("operational event archive failed: %s", exc)
+                logger.warning("artifact archive failed: %s", exc)
     finally:
         flush(force=True)
         sink.close()
@@ -89,4 +83,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main()

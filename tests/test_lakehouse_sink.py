@@ -35,6 +35,43 @@ def test_from_env_uses_defaults():
     assert sink._table_name == "events"
     assert sink._warehouse == "s3://lakehouse/"
     assert sink._batch_size == 1024
+    assert sink._event_family == "telemetry"
+
+
+def test_operational_schema_preserves_payload_without_telemetry_columns():
+    sink = LakehouseSink.from_env({"LAKEHOUSE_EVENT_FAMILY": "operational"})
+    schema = sink._schema_fields(pa)
+    names = [field.name for field in schema]
+    assert "payload_json" in names
+    assert "value" not in names
+
+    class _FakeSchema:
+        fields = [SimpleNamespace(name=name) for name in names]
+
+        @staticmethod
+        def as_arrow():
+            return schema
+
+    class _FakeTable:
+        @staticmethod
+        def schema():
+            return _FakeSchema()
+
+    arrow_table = sink._build_arrow_table(
+        pa,
+        _FakeTable(),
+        [{"event_id": "evt-1", "event_type": "action.requested", "payload": {"action_id": "a-1"}}],
+    )
+    row = arrow_table.to_pylist()[0]
+    assert row["payload_json"] == '{"action_id": "a-1"}'
+
+
+def test_artifact_schema_contains_reference_fields():
+    sink = LakehouseSink.from_env({"LAKEHOUSE_EVENT_FAMILY": "artifact"})
+    names = [field.name for field in sink._schema_fields(pa)]
+    assert names[:6] == ["artifact_id", "event_id", "site_id", "source_id", "entity_id", "modality"]
+    assert "uri" in names
+    assert "shape" in names
 
 
 def test_per_site_layout_routes_events_to_site_namespaces():

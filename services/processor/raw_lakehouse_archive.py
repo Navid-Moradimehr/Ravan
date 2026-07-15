@@ -30,6 +30,7 @@ def main() -> None:
         **os.environ,
         "LAKEHOUSE_TABLE": os.getenv("LAKEHOUSE_RAW_TABLE", "raw_events"),
         "LAKEHOUSE_TABLE_TEMPLATE": os.getenv("LAKEHOUSE_RAW_TABLE_TEMPLATE", "raw_events"),
+        "LAKEHOUSE_EVENT_FAMILY": "telemetry",
     }
     sink = LakehouseSink.from_env(env)
     max_bytes = max(1, int(os.getenv("RAW_ARCHIVE_MAX_BYTES", "1048576")))
