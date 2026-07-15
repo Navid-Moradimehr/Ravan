@@ -143,6 +143,27 @@ def list_build_jobs() -> list[dict[str, Any]]:
             return [{"job_id": r[0], "dataset_id": r[1], "manifest_version": r[2], "status": r[3], "error": r[4], "output_dir": r[5], "created_at": r[6], "finished_at": r[7]} for r in cur.fetchall()]
 
 
+def get_build_job(job_id: str) -> dict[str, Any] | None:
+    ensure_dataset_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT job_id, dataset_id, manifest_version, status, error, output_dir, created_at::text, finished_at::text FROM dataset_build_jobs WHERE job_id=%s", (job_id,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {"job_id": row[0], "dataset_id": row[1], "manifest_version": row[2], "status": row[3], "error": row[4], "output_dir": row[5], "created_at": row[6], "finished_at": row[7]}
+
+
+def cancel_build_job(job_id: str) -> bool:
+    ensure_dataset_tables()
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE dataset_build_jobs SET status='cancelled', finished_at=now() WHERE job_id=%s AND status='queued'", (job_id,))
+            changed = cur.rowcount > 0
+        conn.commit()
+    return changed
+
+
 def get_build_artifacts(job_id: str) -> list[dict[str, Any]]:
     ensure_dataset_tables()
     with get_connection() as conn:
