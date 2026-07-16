@@ -1,7 +1,7 @@
 schema_version: 1
 scenario_id: industrial-soak-default
 duration_seconds: 900
-processor_mode: python-fallback
+processor_mode: flink-production
 ai_enabled: false
 
 sources:
@@ -41,8 +41,8 @@ phases:
   - name: restart
     duration_seconds: 60
     rate_multiplier: 1
-    fault: processor_restart
-    restart_service: processor
+    fault: flink_restart
+    restart_service: flink-job
   - name: recovery
     duration_seconds: 60
     rate_multiplier: 1
