@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createObservabilityFallback, getObservability } from "@/lib/api";
 import { useTelemetryEvents } from "@/lib/useTelemetryEvents";
+import { LatestAIBriefing } from "@/components/latest-ai-briefing";
 
 const quickRoutes = [
   {
@@ -191,6 +192,8 @@ export default function Home() {
             </Link>
           </div>
         </header>
+
+        <LatestAIBriefing />
 
         <section className="space-y-4">
           <SectionHeader

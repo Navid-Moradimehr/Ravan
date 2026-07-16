@@ -9,6 +9,7 @@ import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createObservabilityFallback, getObservability } from "@/lib/api";
 import { AlertTriangle } from "lucide-react";
+import { LatestAIBriefing } from "@/components/latest-ai-briefing";
 
 export default function ObservabilityPage() {
   const observability = useQuery({
@@ -59,6 +60,8 @@ export default function ObservabilityPage() {
             </CardContent>
           </Card>
         ) : null}
+
+        <LatestAIBriefing reportType="anomaly" title="Latest anomaly briefing" />
 
         <SectionHeader
           title="Observability panels"
