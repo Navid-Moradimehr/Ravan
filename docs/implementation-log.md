@@ -1,5 +1,16 @@
 # Implementation Log
 
+## 2026-07-16 - World-model lakehouse schema compatibility
+
+Fixed `LakehouseSink` so an existing Iceberg table is validated against the
+active event-family schema before append. A telemetry-shaped table can no
+longer accept operational or artifact rows while silently discarding their
+envelope fields. The default operational archive target is now
+`industrial.operational_events_v2`; deployments with an older development
+table must migrate or choose a new table name explicitly. Added a regression
+test and documented the upgrade behavior in the lakehouse guide and Obsidian
+architecture note.
+
 ## 2026-07-16 - World-Model Evidence Soak Harness
 
 Added `scripts/world-model-soak.py`, a dedicated 15-minute campaign for

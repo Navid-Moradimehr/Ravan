@@ -14,7 +14,7 @@ The platform keeps three evidence families distinct:
 
 `industrial.normalized` -> historian and optional telemetry lakehouse
 
-`industrial.operational` -> optional operational-fanout -> `operational_events`
+`industrial.operational` -> optional operational-fanout -> `operational_events_v2`
 
 `POST /api/v1/observation-artifacts` ->
 `industrial.observation-artifacts` -> optional artifact-fanout ->
@@ -36,4 +36,7 @@ control actions.
 Both archive consumers are optional `extended` Compose services. The default
 historian and normalized telemetry path remains usable without MinIO or a
 lakehouse. Use the same Iceberg catalog and warehouse settings for S3 or
-MinIO, and use a separate table name for each event family.
+MinIO, and use a separate table name for each event family. The operational
+default is versioned because the sink rejects an existing table whose schema
+belongs to another event family; this prevents silent loss of action and
+outcome envelope fields during upgrades.

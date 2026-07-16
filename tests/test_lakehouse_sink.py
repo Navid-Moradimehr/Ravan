@@ -116,6 +116,31 @@ def test_shared_partitioned_layout_uses_site_partition(monkeypatch):
     assert table.spec().fields[0].name == "site"
 
 
+def test_existing_table_with_wrong_event_family_schema_is_rejected(monkeypatch):
+    from pyiceberg.catalog import load_in_memory
+
+    catalog = load_in_memory("schema-mismatch", {})
+    catalog.create_namespace("industrial")
+    telemetry = LakehouseSink.from_env({"LAKEHOUSE_EVENT_FAMILY": "telemetry"})
+    catalog.create_table(
+        ("industrial", "shared_events"),
+        schema=telemetry._schema_fields(pa),
+    )
+
+    sink = LakehouseSink.from_env(
+        {
+            "LAKEHOUSE_EVENT_FAMILY": "operational",
+            "LAKEHOUSE_TABLE": "shared_events",
+        }
+    )
+    monkeypatch.setattr("pyiceberg.catalog.load_catalog", lambda *args, **kwargs: catalog)
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="schema mismatch"):
+        sink._ensure_table("world-site-1")
+
+
 def test_write_batch_buffers_until_threshold():
     sink = LakehouseSink(
         catalog_name="rest",

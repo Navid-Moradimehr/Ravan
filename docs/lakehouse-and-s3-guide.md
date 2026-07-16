@@ -122,7 +122,7 @@ availability, and S3 lifecycle policy remain deployment responsibilities.
 
 Operational events are not telemetry. When the optional `operational-fanout`
 service is enabled, `industrial.operational` is written to an
-`operational_events` Iceberg table with its envelope and `payload_json`. The
+`operational_events_v2` Iceberg table with its envelope and `payload_json`. The
 fan-out no longer invents a numeric value or asset/tag pair for actions,
 outcomes, maintenance records, or episode boundaries.
 
@@ -144,3 +144,9 @@ docker compose -f docker/docker-compose.yml --profile extended up -d operational
 These consumers are additive. The historian and normalized telemetry path are
 unchanged, and disabling the profile does not prevent scalar ingestion or
 Kafka replay.
+
+The `v2` suffix is intentional. Earlier development builds could create
+`operational_events` with the telemetry schema. The sink now rejects a table
+whose columns do not match its event family instead of silently dropping
+operational fields. Existing deployments should either keep the new default
+or explicitly migrate and rename the old table before reusing its name.

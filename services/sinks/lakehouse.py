@@ -214,6 +214,14 @@ class LakehouseSink:
                 schema=schema,
             )
             logger.info("created iceberg table %s.%s", namespace, table_name)
+        else:
+            expected_names = [field.name for field in self._schema_fields(pa)]
+            actual_names = [field.name for field in table.schema().fields]
+            if actual_names != expected_names:
+                raise RuntimeError(
+                    f"lakehouse table {namespace}.{table_name} schema mismatch for event_family={self._event_family}; "
+                    "use a new table name or migrate the existing Iceberg table"
+                )
         if self._layout == "shared-partitioned" and table.spec().is_unpartitioned():
             try:
                 table.update_spec().add_identity("site").commit()
