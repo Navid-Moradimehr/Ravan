@@ -177,14 +177,22 @@ async def validate_connection(connection_id: str) -> dict[str, Any]:
     connection = connection_registry.get(connection_id)
     if connection is None:
         raise HTTPException(status_code=404, detail="Connection not found")
-    errors = connection.validate()
+    draft_errors = connection.validate_draft()
+    activation_errors = connection.activation_errors()
     return {
         "connection_id": connection_id,
-        "valid": not errors,
-        "errors": errors,
+        "valid": not draft_errors,
+        "activation_ready": not activation_errors,
+        "errors": draft_errors,
+        "missing_fields": [error for error in activation_errors if error not in draft_errors],
+        "warnings": [
+            "Credentials are references only; the deployment must provide the referenced values."
+            if connection.credential_refs else "No credentials configured; anonymous access must be accepted by the source."
+        ],
         "network_test": "not_run",
         "runtime_supported": connection.runtime_supported,
         "runtime_note": connection.runtime_note,
+        "capabilities": list(connection.capabilities),
     }
 
 
@@ -205,7 +213,7 @@ async def preview_connection(connection_id: str, node_id: str | None = None, max
     if connection.source_protocol == "opcua":
         from services.edge_ingest.opcua_discovery import OPCUADiscoveryClient
 
-        client = OPCUADiscoveryClient(connection.endpoint)
+        client = OPCUADiscoveryClient(connection.endpoint, credential_refs=connection.credential_refs)
         connected = await asyncio.wait_for(client.connect(), timeout=5.0)
         if not connected:
             return {"connection_id": connection_id, "preview": "unavailable", "error": "OPC UA connection failed"}
@@ -218,7 +226,7 @@ async def preview_connection(connection_id: str, node_id: str | None = None, max
         finally:
             await client.disconnect()
     if connection.source_protocol in {"modbus", "modbus_rtu"}:
-        return {"connection_id": connection_id, "preview": "modbus", "registers": connection.config.get("registers", []), "config": connection.config}
+        return {"connection_id": connection_id, "preview": "modbus", "registers": connection.config.get("registers", []), "config": connection.config, "activation_ready": connection.activation_ready}
     if connection.source_protocol in {"mqtt", "sparkplug_b"}:
         return {"connection_id": connection_id, "preview": "mqtt", "topic": connection.config.get("topic", ""), "payload_mode": connection.config.get("payload_mode", "json")}
-    return {"connection_id": connection_id, "preview": "configuration", "config": connection.config}
+    return {"connection_id": connection_id, "preview": "configuration", "config": connection.config, "activation_ready": connection.activation_ready}

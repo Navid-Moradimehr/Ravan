@@ -20,6 +20,7 @@ class SourceRuntime:
     config: dict[str, Any] | None = None
     mappings: tuple[dict[str, Any], ...] = ()
     credential_refs: dict[str, str] | None = None
+    registry_managed: bool = False
 
     @property
     def options(self) -> dict[str, Any]:
@@ -127,6 +128,7 @@ class Settings:
                     config=item.config,
                     mappings=tuple(mapping.to_dict() for mapping in item.mappings),
                     credential_refs=item.credential_refs,
+                    registry_managed=True,
                 )
                 for item in configured
             )
@@ -135,13 +137,13 @@ class Settings:
     def _legacy_sources(self) -> tuple[SourceRuntime, ...]:
         sources: list[SourceRuntime] = []
         if "mqtt" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-mqtt", "mqtt", os.getenv("SITE_ID", "demo-site"), f"mqtt://{self.mqtt_host}:{self.mqtt_port}", "legacy-mqtt", 1, "legacy-mqtt:v1", {"topic": self.mqtt_topic}))
+            sources.append(SourceRuntime("legacy-mqtt", "mqtt", os.getenv("SITE_ID", "demo-site"), f"mqtt://{self.mqtt_host}:{self.mqtt_port}", "legacy-mqtt", 1, "legacy-mqtt:v1", {"topic": self.mqtt_topic}, registry_managed=False))
         if "opcua" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-opcua", "opcua", os.getenv("SITE_ID", "demo-site"), self.opcua_endpoint, "legacy-opcua", 1, "legacy-opcua:v1", {"nodes": list(self.opcua_nodes)}))
+            sources.append(SourceRuntime("legacy-opcua", "opcua", os.getenv("SITE_ID", "demo-site"), self.opcua_endpoint, "legacy-opcua", 1, "legacy-opcua:v1", {"nodes": list(self.opcua_nodes)}, registry_managed=False))
         if "modbus" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-modbus", "modbus", os.getenv("SITE_ID", "demo-site"), f"modbus://{self.modbus_host}:{self.modbus_port}", "legacy-modbus", 1, "legacy-modbus:v1", {}))
+            sources.append(SourceRuntime("legacy-modbus", "modbus", os.getenv("SITE_ID", "demo-site"), f"modbus://{self.modbus_host}:{self.modbus_port}", "legacy-modbus", 1, "legacy-modbus:v1", {}, registry_managed=False))
         if "modbus_rtu" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-modbus-rtu", "modbus_rtu", os.getenv("SITE_ID", "demo-site"), "", "legacy-modbus-rtu", 1, "legacy-modbus-rtu:v1", {}))
+            sources.append(SourceRuntime("legacy-modbus-rtu", "modbus_rtu", os.getenv("SITE_ID", "demo-site"), "", "legacy-modbus-rtu", 1, "legacy-modbus-rtu:v1", {}, registry_managed=False))
         if "opcua_discovery" in self.enabled_protocols:
-            sources.append(SourceRuntime("legacy-opcua-discovery", "opcua_discovery", os.getenv("SITE_ID", "demo-site"), "", "legacy-opcua-discovery", 1, "legacy-opcua-discovery:v1", {}))
+            sources.append(SourceRuntime("legacy-opcua-discovery", "opcua_discovery", os.getenv("SITE_ID", "demo-site"), "", "legacy-opcua-discovery", 1, "legacy-opcua-discovery:v1", {}, registry_managed=False))
         return tuple(sources)

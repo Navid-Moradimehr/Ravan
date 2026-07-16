@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from services.api_service.runtime import _do_ingest_event, build_asset_hierarchy, list_scenarios
@@ -25,8 +25,35 @@ from services.historian.client import (
     setup_retention_policies,
     manual_compress_chunk,
 )
+from services.common.connection_registry import connection_registry
 
 router = APIRouter(tags=["historian"])
+
+_HTTP_PUSH_CACHE: dict[str, tuple[float, dict[str, str]]] = {}
+_HTTP_PUSH_CACHE_MAX = 10000
+_HTTP_PUSH_CACHE_TTL_SECONDS = 86400.0
+
+
+def _push_cache_get(key: str) -> dict[str, str] | None:
+    import time
+
+    item = _HTTP_PUSH_CACHE.get(key)
+    if item is None:
+        return None
+    if time.monotonic() - item[0] > _HTTP_PUSH_CACHE_TTL_SECONDS:
+        _HTTP_PUSH_CACHE.pop(key, None)
+        return None
+    return {**item[1], "status": "duplicate"}
+
+
+def _push_cache_put(key: str, result: dict[str, str]) -> None:
+    import time
+
+    if len(_HTTP_PUSH_CACHE) >= _HTTP_PUSH_CACHE_MAX:
+        oldest = next(iter(_HTTP_PUSH_CACHE), None)
+        if oldest:
+            _HTTP_PUSH_CACHE.pop(oldest, None)
+    _HTTP_PUSH_CACHE[key] = (time.monotonic(), result)
 
 
 class SqlQueryRequest(BaseModel):
@@ -130,6 +157,50 @@ async def stop_replay_job() -> dict[str, Any]:
 @router.post("/api/v1/events/ingest")
 async def ingest_event(event: dict[str, Any]) -> dict[str, str]:
     return _do_ingest_event(event)
+
+
+@router.post("/api/v1/connections/{connection_id}/events")
+async def push_connection_event(connection_id: str, event: dict[str, Any], idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")) -> dict[str, str]:
+    """Receive a JSON event from an enabled HTTP Push source.
+
+    Authentication remains an operator/deployment boundary. The route still
+    requires a registered, enabled connection so arbitrary callers cannot
+    create an untracked source definition by posting to the generic endpoint.
+    """
+    connection = connection_registry.get(connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    if connection.source_protocol != "http_push":
+        raise HTTPException(status_code=422, detail="connection is not configured for http_push")
+    if not connection.enabled:
+        raise HTTPException(status_code=409, detail="connection must be enabled before it accepts events")
+    key = idempotency_key or str(event.get("event_id", ""))
+    if key:
+        duplicate = _push_cache_get(f"{connection_id}:{key}")
+        if duplicate:
+            return duplicate
+    payload = {
+        **event,
+        "source_protocol": "http_push",
+        "source_connection_id": connection_id,
+        "site": event.get("site") or connection.site_id,
+        "source_id": event.get("source_id") or connection.source_id or connection_id,
+    }
+    result = _do_ingest_event(payload)
+    if result.get("status") == "publish_failed":
+        raise HTTPException(status_code=503, detail=result)
+    result = {**result, "connection_id": connection_id}
+    if key:
+        _push_cache_put(f"{connection_id}:{key}", result)
+    return result
+
+
+@router.post("/api/v1/connections/{connection_id}/events/batch")
+async def push_connection_events(connection_id: str, body: list[dict[str, Any]], idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")) -> dict[str, Any]:
+    if len(body) > 1000:
+        raise HTTPException(status_code=413, detail="batch contains more than 1000 events")
+    results = [await push_connection_event(connection_id, event, idempotency_key=f"{idempotency_key}:{index}" if idempotency_key else None) for index, event in enumerate(body)]
+    return {"status": "accepted", "connection_id": connection_id, "accepted": sum(item.get("status") in {"ingested", "duplicate"} for item in results), "results": results}
 
 
 @router.post("/api/v1/events/ingest/batch")

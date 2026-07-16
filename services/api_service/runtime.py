@@ -48,7 +48,7 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
     dlq_topic = os.getenv("INDUSTRIAL_DLQ_TOPIC", "industrial.dlq")
 
     payload = {
-        "event_id": str(_uuid.uuid4()),
+        "event_id": str(event.get("event_id") or _uuid.uuid4()),
         "source_protocol": event.get("source_protocol", "api"),
         "source_id": event.get("source_id", ""),
         "asset_id": event.get("asset_id", ""),
@@ -59,6 +59,10 @@ def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:
         "site": event.get("site", "demo-site"),
         "line": event.get("line", "line-01"),
         "ts_source": event.get("ts_source") or utc_now(),
+        "source_connection_id": event.get("source_connection_id", ""),
+        "source_config_version": event.get("source_config_version", 0),
+        "mapping_version": event.get("mapping_version", ""),
+        "lineage_id": event.get("lineage_id", ""),
     }
 
     event_model, dlq = validate_event(payload)

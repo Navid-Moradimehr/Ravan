@@ -16,7 +16,8 @@ def test_diagnostics_reports_unreachable_tcp_source():
     assert result["network_test"] in {"unreachable", "timeout"}
 
 
-def test_diagnostics_labels_metadata_only_sources():
+def test_diagnostics_reports_rest_activation_and_network_state():
     result = run_connection_test(SourceConnection("rest-1", "REST", "rest", "demo-site", "https://example.test/api"))
     assert result["valid"] is True
-    assert result["network_test"] == "not_required"
+    assert result["activation_ready"] is False
+    assert result["network_test"] in {"reachable", "unreachable", "timeout", "unhealthy"}

@@ -13,6 +13,7 @@ from .modbus import run_modbus
 from .modbus_rtu import run_modbus_rtu
 from .opcua import run_opcua
 from .opcua_discovery import run_opcua_discovery
+from .rest import run_rest
 from services.common.connection_registry import RUNTIME_PROTOCOLS
 
 
@@ -71,4 +72,6 @@ def build_connector_tasks(settings: Settings, publisher: EdgePublisher, stop_eve
             tasks.append(asyncio.create_task(_supervise_connector(source.connection_id, run_modbus_rtu, settings, publisher, stop_event, source)))
         elif source.source_protocol == "opcua_discovery":
             tasks.append(asyncio.create_task(_supervise_connector(source.connection_id, run_opcua_discovery, settings, publisher, stop_event, source)))
+        elif source.source_protocol == "rest":
+            tasks.append(asyncio.create_task(_supervise_connector(source.connection_id, run_rest, settings, publisher, stop_event, source)))
     return tasks

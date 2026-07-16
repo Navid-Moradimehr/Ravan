@@ -15,11 +15,27 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SUPPORTED_PROTOCOLS = {"opcua", "mqtt", "modbus", "modbus_rtu", "sparkplug_b", "rest", "file", "dataset", "mock"}
-RUNTIME_PROTOCOLS = {"opcua", "mqtt", "modbus", "modbus_rtu", "opcua_discovery", "sparkplug_b"}
-METADATA_ONLY_PROTOCOLS = {"rest", "file", "dataset", "mock"}
-CONNECTION_STATES = {"disabled", "configured", "enabled", "error", "retired"}
+SUPPORTED_PROTOCOLS = {
+    "opcua", "mqtt", "modbus", "modbus_rtu", "sparkplug_b", "rest", "http_push",
+    "file", "dataset", "mock",
+}
+RUNTIME_PROTOCOLS = {"opcua", "mqtt", "modbus", "modbus_rtu", "sparkplug_b", "rest", "http_push"}
+METADATA_ONLY_PROTOCOLS = {"file", "dataset", "mock"}
+CONNECTION_STATES = {"draft", "disabled", "configured", "validated", "enabled", "error", "retired"}
 SECRET_KEY_PATTERN = re.compile(r"(password|passwd|token|secret|private[_-]?key|api[_-]?key)", re.I)
+
+PROTOCOL_CAPABILITIES: dict[str, tuple[str, ...]] = {
+    "opcua": ("browse", "read", "subscribe", "credentials", "reconnect"),
+    "mqtt": ("subscribe", "qos", "retained_messages", "credentials", "reconnect"),
+    "sparkplug_b": ("subscribe", "birth_death", "metrics", "credentials", "reconnect"),
+    "modbus": ("read_holding_registers", "scaling", "byte_word_order", "reconnect"),
+    "modbus_rtu": ("serial_read", "scaling", "byte_word_order", "reconnect"),
+    "rest": ("poll", "json_mapping", "pagination", "conditional_requests", "retries"),
+    "http_push": ("push", "batch", "idempotency", "canonical_ingest"),
+    "file": ("metadata_reference",),
+    "dataset": ("metadata_reference",),
+    "mock": ("metadata_reference",),
+}
 
 
 class ConnectionValidationError(ValueError):
@@ -33,12 +49,49 @@ def _now() -> str:
 def _reject_secret_fields(value: Any, path: str = "config") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
-            if SECRET_KEY_PATTERN.search(str(key)):
+            key_text = str(key)
+            # A configuration may contain a pointer such as ``token_ref`` or
+            # ``api_key_ref``. The value is still checked as a reference below;
+            # only secret material itself is prohibited in the registry.
+            is_reference_key = key_text.endswith(("_ref", "_refs")) or key_text in {"credential_ref", "credential_refs"}
+            if SECRET_KEY_PATTERN.search(key_text) and not is_reference_key:
                 raise ConnectionValidationError(f"{path}.{key} must be a credential reference, not secret material")
             _reject_secret_fields(child, f"{path}.{key}")
     elif isinstance(value, list):
         for index, child in enumerate(value):
             _reject_secret_fields(child, f"{path}[{index}]")
+
+
+def _validate_reference(value: Any, path: str) -> list[str]:
+    if not str(value or "").strip():
+        return [f"{path} must be a non-empty credential reference"]
+    if not str(value).startswith(("env://", "file://", "path://", "secret://")):
+        return [f"{path} must use env://, file://, path://, or secret://"]
+    return []
+
+
+def _validate_config_references(config: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    auth = config.get("auth", {}) if isinstance(config, dict) else {}
+    if not isinstance(auth, dict):
+        return ["config.auth must be an object"]
+    auth_type = str(auth.get("type", "none")).lower()
+    if auth_type not in {"none", "basic", "bearer", "api_key", "oauth2_client_credentials", "mtls"}:
+        errors.append("config.auth.type is unsupported")
+        return errors
+    required = {
+        "basic": ("username_ref", "password_ref"),
+        "bearer": ("token_ref",),
+        "api_key": ("key_ref",),
+        "oauth2_client_credentials": ("client_id_ref", "client_secret_ref"),
+        "mtls": ("client_cert_ref", "client_key_ref"),
+    }.get(auth_type, ())
+    for key in required:
+        errors.extend(_validate_reference(auth.get(key), f"config.auth.{key}"))
+    if auth_type == "oauth2_client_credentials":
+        if not str(auth.get("token_url", "")).startswith(("http://", "https://")):
+            errors.append("config.auth.token_url is required for OAuth2 client credentials")
+    return errors
 
 
 @dataclass(frozen=True)
@@ -81,7 +134,8 @@ class SourceConnection:
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)
 
-    def validate(self) -> list[str]:
+    def validate_draft(self) -> list[str]:
+        """Validate a persistable draft without requiring activation fields."""
         errors: list[str] = []
         if not self.connection_id.strip():
             errors.append("connection_id is required")
@@ -91,8 +145,6 @@ class SourceConnection:
             errors.append(f"source_protocol must be one of {sorted(SUPPORTED_PROTOCOLS)}")
         if not self.site_id.strip():
             errors.append("site_id is required")
-        if self.source_protocol not in {"dataset", "mock", "file"} and not self.endpoint.strip():
-            errors.append("endpoint is required for network sources")
         if self.state not in CONNECTION_STATES:
             errors.append(f"state must be one of {sorted(CONNECTION_STATES)}")
         if self.enabled and self.state != "enabled":
@@ -101,8 +153,6 @@ class SourceConnection:
             errors.append("state enabled requires enabled=true")
         if self.state == "retired" and self.enabled:
             errors.append("retired connections cannot be enabled")
-        if self.source_protocol not in RUNTIME_PROTOCOLS and self.source_protocol not in METADATA_ONLY_PROTOCOLS:
-            errors.append(f"source_protocol must be one of {sorted(SUPPORTED_PROTOCOLS)}")
         try:
             _reject_secret_fields(self.config)
         except ConnectionValidationError as exc:
@@ -123,6 +173,68 @@ class SourceConnection:
                 errors.append(f"mappings[{index}].tag is required")
         return errors
 
+    def activation_errors(self) -> list[str]:
+        """Return errors that would make an enabled connector unsafe or inert."""
+        errors = self.validate_draft()
+        if errors:
+            return errors
+        protocol = self.source_protocol
+        if protocol in {"opcua", "mqtt", "sparkplug_b", "modbus", "rest"} and not self.endpoint.strip():
+            errors.append("endpoint is required for this protocol")
+        if protocol == "http_push":
+            # The listener is owned by the platform; an endpoint is generated
+            # after activation and therefore is intentionally not required.
+            pass
+        if protocol == "opcua":
+            nodes = self.config.get("nodes") if isinstance(self.config, dict) else None
+            if not nodes and not self.mappings:
+                errors.append("OPC UA requires config.nodes or at least one mapping after discovery")
+        if protocol in {"mqtt", "sparkplug_b"}:
+            if not str(self.config.get("topic", "")).strip():
+                errors.append("MQTT requires config.topic before activation")
+        if protocol == "modbus":
+            registers = self.config.get("registers") if isinstance(self.config, dict) else None
+            if not isinstance(registers, list) or not registers:
+                errors.append("Modbus TCP requires an explicit config.registers map; demo registers are not used for registry sources")
+        if protocol == "modbus_rtu":
+            if not str(self.config.get("port", "")).strip():
+                errors.append("Modbus RTU requires config.port")
+            registers = self.config.get("registers")
+            if not registers:
+                errors.append("Modbus RTU requires an explicit config.registers map")
+        if protocol == "rest":
+            url = str(self.config.get("url") or self.endpoint).strip()
+            if not url.startswith(("http://", "https://")):
+                errors.append("REST requires an http:// or https:// endpoint")
+            method = str(self.config.get("method", "GET")).upper()
+            if method not in {"GET", "POST"}:
+                errors.append("REST config.method must be GET or POST")
+            interval = self.config.get("poll_interval_seconds", 60)
+            try:
+                if not 1 <= float(interval) <= 86400:
+                    errors.append("REST poll_interval_seconds must be between 1 and 86400")
+            except (TypeError, ValueError):
+                errors.append("REST poll_interval_seconds must be numeric")
+            field_paths = self.config.get("response", {}).get("field_paths", {}) if isinstance(self.config.get("response", {}), dict) else {}
+            for field in ("value", "asset_id", "tag"):
+                if not str(field_paths.get(field, "")).strip():
+                    errors.append(f"REST response.field_paths.{field} is required")
+        if protocol in {"rest", "http_push"}:
+            errors.extend(_validate_config_references(self.config))
+        return errors
+
+    def validate(self) -> list[str]:
+        """Backward-compatible strict validation used by activation/tests."""
+        return self.activation_errors()
+
+    @property
+    def activation_ready(self) -> bool:
+        return not self.activation_errors()
+
+    @property
+    def capabilities(self) -> tuple[str, ...]:
+        return PROTOCOL_CAPABILITIES.get(self.source_protocol, ())
+
     @property
     def runtime_supported(self) -> bool:
         return self.source_protocol in RUNTIME_PROTOCOLS and self.state != "retired"
@@ -142,6 +254,9 @@ class SourceConnection:
         payload["mappings"] = [mapping.to_dict() for mapping in self.mappings]
         payload["runtime_supported"] = self.runtime_supported
         payload["runtime_note"] = self.runtime_note
+        payload["activation_ready"] = self.activation_ready
+        payload["activation_errors"] = self.activation_errors()
+        payload["capabilities"] = list(self.capabilities)
         return payload
 
 
@@ -159,7 +274,9 @@ def connection_from_dict(payload: dict[str, Any]) -> SourceConnection:
     data["mappings"] = [_mapping_from_dict(item) for item in data.get("mappings", [])]
     allowed = {field.name for field in SourceConnection.__dataclass_fields__.values()}
     connection = SourceConnection(**{key: data[key] for key in allowed if key in data})
-    errors = connection.validate()
+    errors = connection.validate_draft()
+    if connection.enabled or connection.state == "enabled":
+        errors.extend(connection.activation_errors())
     if errors:
         raise ConnectionValidationError("; ".join(errors))
     return connection
@@ -189,7 +306,9 @@ class ConnectionRegistry:
         return self._connections.get(connection_id)
 
     def put(self, connection: SourceConnection) -> SourceConnection:
-        errors = connection.validate()
+        errors = connection.validate_draft()
+        if connection.enabled or connection.state == "enabled":
+            errors.extend(connection.activation_errors())
         if errors:
             raise ConnectionValidationError("; ".join(errors))
         existing = self._connections.get(connection.connection_id)
@@ -249,6 +368,10 @@ class ConnectionRegistry:
             raise KeyError(connection_id)
         if connection.state == "retired":
             raise ConnectionValidationError("retired connections must be restored before they can be enabled")
+        if enabled:
+            errors = connection.activation_errors()
+            if errors:
+                raise ConnectionValidationError("; ".join(errors))
         connection.enabled = enabled
         connection.state = "enabled" if enabled else "disabled"
         connection.updated_at = _now()

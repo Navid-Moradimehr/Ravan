@@ -22,8 +22,9 @@ logger = logging.getLogger(__name__)
 class OPCUADiscoveryClient:
     """OPC UA client for device discovery and tag browsing."""
 
-    def __init__(self, endpoint_url: str = "opc.tcp://localhost:4840"):
+    def __init__(self, endpoint_url: str = "opc.tcp://localhost:4840", credential_refs: dict[str, str] | None = None):
         self.endpoint_url = endpoint_url
+        self.credential_refs = credential_refs or {}
         self._client: Client | None = None
 
     async def connect(self) -> bool:
@@ -34,6 +35,16 @@ class OPCUADiscoveryClient:
 
         try:
             self._client = Client(url=self.endpoint_url)
+            from services.edge_ingest.credentials import resolve_credentials
+
+            credentials = resolve_credentials(self.credential_refs)
+            if credentials.get("username"):
+                self._client.set_user(credentials["username"])
+            if credentials.get("password"):
+                self._client.set_password(credentials["password"])
+            if credentials.get("certificate") and credentials.get("private_key"):
+                self._client.certificate = credentials["certificate"]
+                self._client.private_key = credentials["private_key"]
             await self._client.connect()
             return True
         except Exception as e:

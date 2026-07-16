@@ -45,21 +45,36 @@ def test_registry_rejects_secret_material(tmp_path):
 def test_registry_filters_by_site_and_enabled(tmp_path):
     registry = ConnectionRegistry(tmp_path / "connections.json")
     registry.put(_connection())
-    registry.put(_connection(connection_id="conn-mqtt", source_protocol="mqtt", endpoint="mqtt://broker", site_id="plant-b"))
+    registry.put(_connection(connection_id="conn-mqtt", source_protocol="mqtt", endpoint="mqtt://broker", site_id="plant-b", config={"topic": "plant/a/#"}))
     registry.set_enabled("conn-mqtt", True)
 
     assert [item.connection_id for item in registry.list(site_id="plant-b", enabled=True)] == ["conn-mqtt"]
     assert registry.list(site_id="plant-a", enabled=True) == []
 
 
-def test_registry_labels_metadata_only_protocols(tmp_path):
+def test_registry_labels_rest_as_runtime_protocol(tmp_path):
     registry = ConnectionRegistry(tmp_path / "connections.json")
     connection = _connection(connection_id="conn-rest", source_protocol="rest", endpoint="https://example.test/api", config={"url": "https://example.test/api"})
     saved = registry.put(connection)
 
-    assert saved.runtime_supported is False
-    assert "metadata-only" in saved.runtime_note
-    assert registry.get("conn-rest").to_dict()["runtime_supported"] is False
+    assert saved.runtime_supported is True
+    assert "runtime" in saved.runtime_note
+    assert registry.get("conn-rest").to_dict()["runtime_supported"] is True
+
+
+def test_incomplete_sources_are_saved_as_drafts_but_not_activation_ready(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    saved = registry.put(SourceConnection("rest-draft", "External API", "rest", "plant-a"))
+    assert saved.state == "configured"
+    assert saved.activation_ready is False
+    assert "endpoint" in " ".join(saved.activation_errors())
+
+
+def test_http_push_has_generated_activation_contract(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    saved = registry.put(SourceConnection("push-1", "Gateway", "http_push", "plant-a"))
+    registry.set_enabled("push-1", True)
+    assert saved.capabilities == ("push", "batch", "idempotency", "canonical_ingest")
 
 
 def test_registry_retire_preserves_history_and_hides_from_active_list(tmp_path):

@@ -17,6 +17,8 @@ Protocol = Literal[
     "modbus",
     "modbus_rtu",
     "sparkplug_b",
+    "rest",
+    "http_push",
     "dataset",
     "mock",
     "api",

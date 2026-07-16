@@ -25,8 +25,11 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
             (int(item["address"]), str(item.get("tag", f"register_{item['address']}")), str(item.get("unit", "")), float(item.get("scale", 1.0)), float(item.get("offset", 0.0)), int(item.get("unit_id", item.get("slave_id", 1))))
             for item in configured_registers
         ]
-    else:
+    elif not source.registry_managed:
         register_map = [(0, "Temperature", "c", 0.1, 0.0, 1), (1, "Vibration", "mm/s", 0.01, 0.0, 1), (2, "Pressure", "bar", 0.1, 0.0, 1)]
+    else:
+        mark_source(source.connection_id, source.source_protocol, source.site_id, "error", "registry source has no explicit register map")
+        return
     while not stop_event.is_set():
         modbus_tls = os.getenv("MODBUS_TLS", "false").lower() == "true"
         modbus_ca = os.getenv("MODBUS_CA_CERT", "")
