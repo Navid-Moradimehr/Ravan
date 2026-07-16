@@ -3046,3 +3046,21 @@ Verification: the regression test retains 100 events after 10,000 appends. The
 interrupted live run is not a performance result; it reached approximately
 8.1 GB in the AI-gateway container before being stopped to avoid another WSL
 lockup.
+## 2026-07-16 - Guided Source Onboarding And REST Runtime
+
+- Added a draft-safe connection lifecycle. Definitions can be saved while
+  incomplete; protocol-specific activation errors are reported before Enable.
+- REST is now a bounded runtime pull connector with JSON field paths, polling,
+  retries, pagination, conditional ETag requests, deterministic event IDs, and
+  canonical Kafka/DLQ/historian fan-out.
+- Added HTTP Push single and batch routes tied to an enabled registered source,
+  with source/site lineage and bounded idempotency handling.
+- Removed OPC UA discovery as a fake source protocol; browsing is an OPC UA
+  preview operation. Registry Modbus sources no longer fall back to demo
+  registers, and RTU no longer requires a TCP endpoint.
+- Replaced the compact source form with a five-step Integrations flow while
+  preserving the existing source list, edit, test, preview, enable, disable,
+  retire, and restore actions.
+- Updated source onboarding runbooks and the Obsidian vault. AuthN/AuthZ,
+  endpoint credentials, certificates, network policy, and external secret
+  ownership remain deployment-owned.

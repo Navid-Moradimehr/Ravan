@@ -18,12 +18,14 @@ retirement action that preserves the source record for audit and replacement
 history; disabling is the safer operational pause.
 
 Existing connections can also be edited and structurally validated in the same
-panel. Runtime protocols expose normal fields for MQTT topics, OPC UA nodes,
-Modbus registers, and RTU settings. Advanced JSON remains available for
-metadata-only workflows. The mapping table maps source fields to canonical
-asset/tag fields. **Validate** checks the definition without making a network
-call; **Test** is the separate network diagnostic; **Preview** shows protocol
-metadata when discovery is supported; and **Enable** activates the source.
+panel. The editor guides users through Identity, Connectivity, Discover/sample,
+Map data, and Review/enable. Runtime protocols expose normal fields for MQTT
+topics, OPC UA nodes, Modbus registers, RTU settings, and REST JSON paths.
+Advanced JSON remains only for reference-only workflows. The mapping table maps
+source fields to canonical asset/tag fields. **Validate** checks the definition
+and activation readiness; **Test** is the separate network diagnostic;
+**Preview** shows protocol metadata when discovery is supported; and **Enable**
+activates the source.
 Preview output is displayed in the panel rather than being discarded in a
 toast. Secret values remain outside the platform and are referenced through
 `credential_refs`, using `env://`, `file://`, `path://`, or an operator-provided

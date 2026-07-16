@@ -17,7 +17,8 @@ For the operator-facing source registry and deployment boundary, see `docs/sourc
 
 The platform already knows how to:
 
-- read OPC UA, MQTT, Modbus TCP, and Modbus RTU sources
+- read OPC UA, MQTT, Modbus TCP, Modbus RTU, and REST Pull sources
+- accept tracked HTTP Push events from gateways and applications
 - normalize different payload shapes into one internal industrial event format
 - publish those events to Kafka topics
 - send invalid messages to the dead-letter path
@@ -94,10 +95,11 @@ OPC UA is the best starting point for modern PLCs because it can expose a richer
 
 ### How to set it up
 
-1. Set `OPCUA_ENDPOINT` to the PLC, gateway, or OPC UA server address.
-2. Set `OPCUA_NODES` to the specific node IDs you want to ingest.
-3. If the server uses certificates, provide `OPCUA_CERTIFICATE` and `OPCUA_PRIVATE_KEY`.
-4. Map each node to an asset and tag in the platform.
+1. Open **Integrations** and select **OPC UA**.
+2. Complete the Identity and Connectivity steps with the site and endpoint.
+3. Use the read-only Preview workflow to browse the server, then copy selected node IDs into the source definition.
+4. If the server uses certificates, provide credential references for the deployment-managed certificate and key.
+5. Map each node to an asset and tag, save the draft, test it, and enable it.
 
 ### What happens in the platform
 
@@ -200,7 +202,25 @@ The platform can still normalize it into the same event model.
 
 MQTT is the best fit when the plant already has a broker or edge gateway.
 
-## 8. Multiple PLCs And Sensors On One Line
+## 8. REST Pull And HTTP Push
+
+Choose **REST Pull** when an API exposes telemetry and the platform should poll
+it. Enter the URL, GET or POST method, poll interval, timeout, optional auth
+reference, response records path, and dotted field paths for source, asset, tag,
+and value. Pagination and retries are bounded by the source configuration. The
+connector creates deterministic canonical events and sends them through the
+same Kafka, processor/Flink, historian, DLQ, and optional sink path as PLC
+events.
+
+Choose **HTTP Push** when a gateway or application already polls the source and
+can send JSON to the platform. Save and enable the connection, then post to
+`/api/v1/connections/<connection_id>/events` or the bounded `/events/batch`
+endpoint. The endpoint accepts a single object or up to 1,000 objects, stamps
+the connection and site identity, and deduplicates repeated event IDs or
+`Idempotency-Key` values in the local process. Put authentication, rate limits,
+and network exposure at the operator's reverse proxy or API security boundary.
+
+## 9. Multiple PLCs And Sensors On One Line
 
 This is the most common real plant setup.
 
@@ -232,7 +252,7 @@ They need to define:
 
 Without that mapping, the platform cannot know whether two readings belong to the same machine, the same line, or two unrelated devices.
 
-## 9. Dashboard And Historian Behavior
+## 10. Dashboard And Historian Behavior
 
 When multiple sources are connected:
 
@@ -247,7 +267,7 @@ The important rule is:
 
 That is how you avoid mixing devices together too early.
 
-## 10. What Apache Flink Does Here
+## 11. What Apache Flink Does Here
 
 Apache Flink is the high-throughput, stateful stream-processing option.
 
@@ -271,7 +291,7 @@ It sits between Kafka and the historian or AI outputs and is useful for:
 - event transformations
 - replay-safe stateful processing
 
-## 11. Practical First Install Flow
+## 12. Practical First Install Flow
 
 1. Start the platform runtime.
 2. Bring up Kafka, the historian, and the API.
@@ -282,7 +302,7 @@ It sits between Kafka and the historian or AI outputs and is useful for:
 7. Confirm the platform keeps the sources separate.
 8. Add dashboards and alerts after the data is stable.
 
-## 12. What To Do If You Do Not Have Real PLCs Yet
+## 13. What To Do If You Do Not Have Real PLCs Yet
 
 Use the built-in simulators and replay packs first.
 
@@ -302,7 +322,7 @@ That lets you validate:
 - error handling
 - reconnect behavior
 
-## 13. Final Rule
+## 14. Final Rule
 
 Do not try to force every PLC or sensor into one universal configuration shape.
 

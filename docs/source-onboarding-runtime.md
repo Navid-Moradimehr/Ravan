@@ -16,7 +16,7 @@ small in-process supervisor, not a new microservice.
 ## User flow
 
 1. Create a source through the source-management UI.
-2. Select the protocol and complete its guided fields. Add `env://` or `file://`
+2. Select the protocol and complete its five guided steps. Add `env://` or `file://`
    references for secret values and `path://` references for certificate/key
    files. Add mappings from source fields to canonical asset and tag IDs.
 3. Run validation, network test, and preview. These are separate checks; a
@@ -31,10 +31,11 @@ small in-process supervisor, not a new microservice.
 
 The existing edge runtime directly activates MQTT, OPC UA, Modbus TCP/RTU, and
 OPC UA discovery connectors. Sparkplug B can use the MQTT adapter's payload mode.
-REST/file/dataset/mock are registry-compatible integration definitions, but their
-runtime behavior remains an explicit integration concern rather than an implied
-live connector. This distinction prevents a metadata record from being mistaken
-for an active data path.
+REST Pull and HTTP Push are runtime paths. File, dataset, and mock remain
+reference-only definitions until their dedicated workflows are used. REST Pull
+polls JSON and maps records into canonical events; HTTP Push accepts canonical
+or source-shaped JSON through the enabled connection endpoint. Both reuse the
+same Kafka/DLQ/historian fan-out contract as the native edge protocols.
 
 The old environment variables remain valid for simple deployments with no
 registry file. A configured enabled registry takes precedence over those legacy

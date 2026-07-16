@@ -12,6 +12,9 @@ This note tracks the deployment boundary for plant sources.
 - Multiple registry-backed source descriptors
 - Legacy environment-variable fallback
 - Canonical event and Kafka contracts
+- Draft versus activation readiness validation
+- REST Pull JSON polling and HTTP Push canonical ingress
+- Bounded retry, pagination, deterministic event identity, and idempotency contracts
 
 ## User-owned
 
@@ -41,7 +44,7 @@ User-owned device/network
 
 ## Current implementation state
 
-The Integrations page can create source metadata and run a non-ingesting connection test. The edge runtime loads enabled registry records when present and otherwise preserves the legacy environment-variable deployment.
+The Integrations page is a five-step source editor: Identity, Connectivity, Discover/sample, Map data, and Review/enable. It can save incomplete drafts, then reports strict protocol-specific activation requirements. The edge runtime loads enabled registry records when present and otherwise preserves the legacy environment-variable deployment.
 
 The source-connection panel is metadata-only by design. It stores the connection contract, not the secret contents. The app should not browse arbitrary secret files or import a whole `.env` file. Operators should provide named credential references from their own secret store, and each source should point at a specific named entry even if several credentials live in one file.
 
@@ -51,7 +54,7 @@ Enabled mappings are applied to the emitted canonical event before validation. R
 
 Mapping health is also tracked at runtime. If mappings are configured but do not match live traffic, the source-health snapshot records mapping-match and mapping-miss counts so operators can distinguish a valid connection from a semantically misaligned one.
 
-The connection API now offers a bounded read-only OPC UA preview and accepts declarative Modbus register entries. Full Sparkplug B binary activation, richer register-map editing, durable health history, and end-to-end connector task orchestration remain future work.
+The connection API offers a bounded read-only OPC UA preview, declarative Modbus register entries, REST Pull polling, and HTTP Push single/batch endpoints. REST records reuse canonical validation and Kafka/fan-out; HTTP Push requires an enabled registered connection and bounded idempotency. Full Sparkplug B binary activation, richer register-map editing, durable health history, OAuth2/mTLS diagnostics beyond connector execution, and end-to-end connector task orchestration remain future work.
 
 The edge runtime exposes `edge_source_state`, `edge_source_last_success_epoch`, and mapping-match/mapping-miss counters labeled by connection ID, protocol, and site. With `EDGE_SOURCE_HEALTH_HISTORY_PATH`, state transitions are retained in a bounded local file and exposed through `/api/v1/observability/source-health`; repeated successful reads are not recorded individually.
 

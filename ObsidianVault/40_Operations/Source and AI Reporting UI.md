@@ -16,9 +16,11 @@ without AuthN/AuthZ. The API built-in JWT boundary is opt-in with
 forwarded when an operator adds an external or built-in auth boundary.
 
 Source connections can be edited and structurally validated in Integrations.
-Protocol-specific configuration and canonical field mappings are entered as
-JSON; secret values remain outside the platform behind `credential_ref`. Test is
-the network diagnostic and Preview displays discovered metadata.
+The editor uses five steps: Identity, Connectivity, Discover/sample, Map data,
+and Review/enable. Native protocol fields and REST JSON-path mapping are
+provided without requiring backend code changes; secret values remain outside
+the platform behind credential references. Test is the bounded connectivity
+diagnostic and Preview displays discovered metadata without publishing data.
 
 The AI Reporting Site ID selector represents deployment scope, not an asset or
 tag. It combines IDs from the source registry and asset/tag catalog, with `*`

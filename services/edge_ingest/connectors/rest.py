@@ -18,6 +18,7 @@ import httpx
 from services.edge_ingest.model import utc_now
 from services.edge_ingest.publisher import EdgePublisher, adapter_errors, adapter_reconnects
 from services.edge_ingest.rest_support import deep_get, event_from_record, records_from_response, resolved_auth
+from services.edge_ingest.credentials import resolve_credentials
 from services.edge_ingest.settings import Settings, SourceRuntime
 from services.edge_ingest.source_health import mark_mapping_result, mark_source, mark_source_success
 
@@ -34,6 +35,29 @@ def _bounded_int(value: Any, default: int, low: int, high: int) -> int:
         return max(low, min(high, int(value)))
     except (TypeError, ValueError):
         return default
+
+
+async def _apply_oauth2(client: httpx.AsyncClient, options: dict[str, Any], headers: dict[str, str], refs: dict[str, str] | None) -> None:
+    auth = options.get("auth", {}) if isinstance(options.get("auth", {}), dict) else {}
+    if str(auth.get("type", "none")).lower() != "oauth2_client_credentials":
+        return
+    references = {
+        "client_id": str(auth.get("client_id_ref", "")),
+        "client_secret": str(auth.get("client_secret_ref", "")),
+    }
+    references.update({key: value for key, value in (refs or {}).items() if key in {"client_id", "client_secret"}})
+    credentials = resolve_credentials({key: value for key, value in references.items() if value})
+    token_url = str(auth.get("token_url", ""))
+    data = {"grant_type": "client_credentials", "client_id": credentials.get("client_id", ""), "client_secret": credentials.get("client_secret", "")}
+    scopes = auth.get("scopes", [])
+    if scopes:
+        data["scope"] = " ".join(str(item) for item in scopes)
+    response = await client.post(token_url, data=data)
+    response.raise_for_status()
+    token = response.json().get("access_token")
+    if not token:
+        raise RuntimeError("OAuth2 token response did not contain access_token")
+    headers["Authorization"] = f"Bearer {token}"
 
 
 async def _request_with_retries(client: httpx.AsyncClient, method: str, url: str, *, headers: dict[str, str], params: dict[str, str], auth: tuple[str, str] | None, json_body: Any, retries: int) -> httpx.Response:
@@ -82,6 +106,12 @@ async def run_rest(settings: Settings, publisher: EdgePublisher, stop_event: asy
     if cert:
         client_kwargs["cert"] = cert
     async with httpx.AsyncClient(**client_kwargs) as client:
+        try:
+            await _apply_oauth2(client, options, headers, source.credential_refs)
+        except Exception as exc:
+            mark_source(source.connection_id, source.source_protocol, source.site_id, "error", f"OAuth2 authentication failed: {exc}")
+            adapter_errors.labels(protocol="rest").inc()
+            return
         while not stop_event.is_set():
             started = time.monotonic()
             try:

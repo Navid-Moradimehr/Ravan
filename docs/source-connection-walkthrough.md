@@ -19,12 +19,12 @@ The platform stores that as metadata. The actual secret material stays in the op
 
 1. Open `Integrations`.
 2. Create a source connection.
-3. Choose the protocol, such as OPC UA, MQTT, Modbus TCP, Modbus RTU, REST, or Sparkplug B.
-4. Enter the endpoint or broker address.
-5. Enter the site ID.
-6. Complete the protocol-specific fields and add credential references if required. Use `env://NAME` or `file://path` for secret values and `path://path` for certificate/key files.
+3. Choose the protocol, such as OPC UA, MQTT, Modbus TCP, Modbus RTU, REST Pull, HTTP Push, or Sparkplug B.
+4. Complete Identity, Connectivity, Discover/sample, Map data, and Review/enable. REST exposes method, poll interval, auth mode, pagination, and dotted JSON field paths as fields rather than requiring a connector code change.
+5. Enter the endpoint or broker address when the platform polls or connects outward. HTTP Push receives a generated endpoint after activation.
+6. Enter the site ID and credential references if required. Use `env://NAME` or `file://path` for secret values and `path://path` for certificate/key files.
 7. Add mappings through the mapping table if the source fields need to become canonical asset or tag names.
-8. Save the source definition, run Validate, run Test, and use Preview when the protocol supports discovery.
+8. Save the source definition as a draft, run Validate, run Test, and use Preview when the protocol supports discovery.
 9. Press Enable in the same source row. The edge runtime reconciles the desired state automatically.
 
 ## 3. What happens after save
@@ -49,7 +49,7 @@ The connection test checks two things:
 
 For OPC UA, the platform can also provide a read-only preview of tags or a node read.
 For Modbus, it can validate the declared register-style configuration.
-For file, dataset, or mock sources, the test is configuration-only because there is no live network endpoint.
+For REST Pull, the test performs a bounded HTTP request without publishing data. For HTTP Push, the test returns the generated ingest endpoint. For file, dataset, or mock sources, the test is configuration-only because there is no live runtime endpoint.
 
 ## 5. What happens after enablement
 

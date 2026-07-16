@@ -10,15 +10,15 @@ The platform does not own plant credentials, certificates, firewall rules, PLC p
 
 1. Install the platform on an edge or plant server that can reach the OT network.
 2. Open Integrations and create a source connection.
-3. Select OPC UA, MQTT, Modbus TCP, Modbus RTU, REST, or another supported source type.
-4. Enter the endpoint and site ID.
-5. Complete the protocol settings shown by the editor. OPC UA node IDs, MQTT topic/QoS, Modbus register rows, and RTU serial settings are collected through normal fields; advanced JSON remains available only for metadata-only workflows.
+3. Select OPC UA, MQTT, Modbus TCP, Modbus RTU, REST Pull, HTTP Push, or a reference-only source type.
+4. Enter the site ID. Enter an endpoint when the source reaches out to a device/API; HTTP Push receives a generated platform endpoint.
+5. Follow the five steps in the editor: Identity, Connectivity, Discover/sample, Map data, and Review/enable. OPC UA node IDs, MQTT topic/QoS, Modbus register rows, RTU serial settings, and REST request/JSON paths are collected through normal fields.
 6. Add credential references where required. Use `env://NAME` or `file://path` for secret values and `path://path` for certificate/key file paths. The registry stores references only.
 7. Add source-to-asset mappings in the mapping table.
 8. Save, run Validate, run Test, optionally Preview discovered fields, then press Enable in the same UI. No manual API call is required for supported runtime protocols.
-10. Verify `industrial.raw`, `industrial.normalized`, the historian, and the edge metrics before adding dashboards or alerts.
+9. Verify `industrial.raw`, `industrial.normalized`, the historian, and the edge metrics before adding dashboards or alerts.
 
-The source-connection panel is a desired-state editor backed by internal metadata. Users do not edit backend code, Compose files, or raw registry JSON. The edge runtime consumes the saved definition and reconciles connector tasks without a container restart. It does not browse or import a whole `.env` file and does not store passwords or certificates in the registry.
+The source-connection panel is a desired-state editor backed by internal metadata. Users do not edit backend code, Compose files, or raw registry JSON. The edge runtime consumes the saved definition and reconciles connector tasks without a container restart. It does not browse or import a whole `.env` file and does not store passwords or certificates in the registry. A saved draft may be incomplete; Enable is the strict boundary and reports missing protocol fields.
 
 If an operator keeps credentials in a secret manager, each connection should point at a separate named secret reference such as `secret://site-a/opcua/pump-01` or `secret://site-a/mqtt/broker-02`. If multiple credentials happen to live in the same file, the file is still the operator's secret store boundary; the platform should reference the specific entry name or key, not the file contents. That keeps the registry portable and avoids ambiguity when two sources share one file.
 
@@ -42,11 +42,15 @@ Retiring a source does not erase it. The registry keeps the record, marks it as 
 
 ## Protocol notes
 
-OPC UA sources use the configured endpoint and node list. The connection workflow now provides a bounded read-only preview endpoint that browses tags or reads a selected node without enabling ingestion. Subscription management, certificate trust configuration, and persistent browse selection remain future work.
+OPC UA sources use the configured endpoint and node list. The connection workflow provides a bounded read-only preview endpoint that browses tags or reads a selected node without enabling ingestion. Discovery is an operation in the OPC UA workflow, not a separate source protocol. Subscription management, certificate trust configuration, and persistent browse selection remain future work.
 
 MQTT sources subscribe to configured topic filters with the existing QoS, TLS, reconnect, bounded queue, and dead-letter behavior. Sparkplug B sources use the optional pinned TahUtils/Eclipse Tahu protobuf decoder when `source_protocol` is `sparkplug_b` or `config.payload_mode` is `sparkplug_b`. Ordinary JSON MQTT is not automatically equivalent to binary Sparkplug B.
 
-Modbus sources accept declarative register entries with address, tag, unit, scale, offset, and unit ID. Datatype, byte order, word order, input/holding register selection, and richer register-map editing remain user-owned configuration or future UI work. The platform cannot safely infer those from a TCP endpoint.
+Modbus sources accept declarative register entries with address, tag, unit, scale, offset, and unit ID. A registry-managed source must provide an explicit register map; it never silently uses demo registers. Datatype, byte order, word order, input/holding register selection, and richer register-map editing remain user-owned configuration or future UI work. The platform cannot safely infer those from a device endpoint.
+
+REST Pull is a runtime source. Configure an HTTP(S) endpoint, GET or POST, bounded poll interval and timeout, optional deployment-owned authentication reference, response records path, canonical field paths, and bounded pagination. Each record becomes a deterministic canonical event and uses the same Kafka, DLQ, lineage, processor, historian, and optional sink path as PLC telemetry. REST retries, page counts, records per poll, and request timeouts are bounded.
+
+HTTP Push is a runtime ingress for gateways and applications that already own the outbound connection. After an `http_push` connection is enabled, post one event to `/api/v1/connections/<connection_id>/events` or up to 1,000 events to `/events/batch`. The route requires a registered enabled connection, stamps source/site lineage, uses the canonical ingest path, and deduplicates repeated `Idempotency-Key` or `event_id` values in a bounded local cache. Authentication is deliberately left to the operator's reverse proxy or API boundary.
 
 ## Multi-site deployment options
 
@@ -105,9 +109,11 @@ supplied.
 
 - Implemented: versioned connection contract, persisted registry, secret-reference validation, list/create/update/delete/enable/disable APIs, bounded TCP diagnostics, Docker persistence, multiple registry-backed edge source descriptors, and legacy environment fallback.
 - Implemented: per-source Prometheus health metrics labeled by connection, protocol, and site, plus runtime mapping-match and mapping-miss diagnostics.
-- Partially implemented: MQTT Sparkplug B activation, richer Modbus register maps, durable health history, and deeper source-to-asset mapping UI.
+- Implemented: draft lifecycle, protocol-specific activation readiness, REST Pull polling, HTTP Push single/batch ingress, bounded retries/pagination, deterministic REST event IDs, and the guided source editor.
+- Partially implemented: MQTT Sparkplug B activation, richer Modbus datatype/byte-order editing, durable health history, OAuth2/mTLS diagnostics beyond connector execution, and deeper source-to-asset mapping UI.
 - User-owned: credentials, certificates, network access, firewall rules, asset topology, register-map correctness, external storage, external brokers, SMTP, and authentication/authorization.
 - Future: durable connector task orchestration, richer protocol diagnostics,
-  and per-route delivery history. Source-health transition history and sink
-  route refresh are implemented; a durable asynchronous notification queue
-  remains intentionally deployment-owned.
+  durable HTTP Push idempotency across process restarts, and per-route delivery
+  history. Source-health transition history and sink route refresh are
+  implemented; a durable asynchronous notification queue remains intentionally
+  deployment-owned.
