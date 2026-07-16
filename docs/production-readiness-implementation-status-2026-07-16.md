@@ -25,8 +25,16 @@ ownership. Operator mode renders a PyFlink `FlinkDeployment` using
 ## Evidence in this environment
 
 - Focused platform, model, agent, SLO, Helm, and Flink tests: **39 passed**.
+- Extended protocol and pipeline suites: **177 passed**.
+- Remaining non-Docker suite: **596 passed**, with 4 non-blocking warnings.
 - Repository preflight: **passed**.
 - Helm render: single-site fallback and federated Operator profiles rendered.
+- Local Kubernetes bundle rehearsal: **passed**.
+- Industrial soak dry-run: **passed**.
+- Three-site outage/recovery simulation: **6,000 central events, 0 duplicates,
+  0 isolation errors, recovery complete**.
+- Fault-injection resilience campaign: **5,000 requested, 0 unaccounted,
+  0 pending after recovery, passed**.
 - Full test collection: **660 tests collected**; collection is import-heavy and
   took about 108 seconds.
 - Docker live checks: **not available during this pass** because Docker/WSL
@@ -39,4 +47,5 @@ The remaining gates are environmental or deliberately user-owned: Docker and
 Kubernetes live soak after rebuilding images, Operator installation and
 site-owned object storage/network policy, real PLC and sensor commissioning,
 target broker/historian sizing, and multi-site network-failure validation.
-Packaging remains postponed.
+The local multi-site failure simulation is complete, but it is not a substitute
+for a real network-partition rehearsal. Packaging remains postponed.

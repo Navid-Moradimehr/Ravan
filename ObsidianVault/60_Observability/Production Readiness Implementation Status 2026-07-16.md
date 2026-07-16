@@ -15,9 +15,14 @@
 
 ## Local evidence
 
-Focused tests passed: 39. Repository preflight passed. Helm rendered both
-fallback and Operator profiles. Docker/WSL was unavailable for live verification
-in this pass because host Docker commands timed out.
+Focused tests passed: 39; extended protocol and pipeline suites passed 177;
+the remaining non-Docker suite passed 596 with four non-blocking warnings.
+Repository preflight passed. Helm rendered both fallback and Operator profiles,
+and the local Kubernetes bundle rehearsal passed. The three-site outage/recovery
+simulation wrote 6,000 central events with zero duplicates or isolation errors;
+the fault-injection campaign reported zero unaccounted and zero pending events.
+Docker/WSL was unavailable for live verification in this pass because host
+Docker commands timed out.
 
 ## Still outside local evidence
 
