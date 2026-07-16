@@ -36,6 +36,60 @@ using nearest-neighbor matching within `max_skew_ms`. Missing values are
 represented by masks; values are never silently forward-filled or
 interpolated.
 
+## Manifest v3: multi-site training evidence
+
+Manifest v3 is the platform-owned contract for new multi-site model-data
+bundles. It keeps v2 available for existing exports, but adds site-qualified
+channel identity, explicit episode identity, deterministic whole-episode
+splits, and a transition table.
+
+```yaml
+manifest_version: 3
+dataset_id: company-pilot-v3
+site_ids: [plant-a, plant-b, plant-c]
+purpose: dreamer
+observation_sources: exports/observations.jsonl
+action_sources: exports/actions.jsonl
+outcome_sources: exports/outcomes.jsonl
+episode_definition:
+  boundary: industrial.boundary.v1
+alignment:
+  sample_interval_ms: 1000
+  max_skew_ms: 250
+splits:
+  strategy: episode_hash
+  seed: 17
+  ratios: {train: 0.7, validation: 0.15, test: 0.15}
+provenance:
+  source: historian-and-operational-events
+semantic_context:
+  topology_version: company-topology-v1
+```
+
+Every v3 observation must contain `site_id`, `asset_id` or `entity_id`, a
+`tag` or `channel`, a numeric `value`, a parseable timestamp, and
+`episode_id`, `context_id`, or `lineage_id`. A channel is represented as
+`site_id::entity_id::tag`; two sites cannot accidentally share a feature
+column. The compiler does not invent an episode, reward, interpolation, or
+control action.
+
+The v3 builder emits the existing files plus `transitions.parquet`. Each
+transition contains current and next observations, the split, optional
+action/outcome references, reward/terminal fields, and site/episode identity.
+Splits are assigned to whole episodes, never individual rows. The default is
+a deterministic SHA-256 episode hash with a recorded seed. Use
+`splits.strategy: explicit` for supplied episode assignments, or
+`splits.strategy: temporal` with `train_end` and `validation_end` boundaries
+for chronological evaluation. Hash splits require at least three episodes;
+smaller datasets must use explicit or temporal boundaries.
+
+The v3 quality report includes episode and split counts, missing observation
+masks, unlinked action/outcome counts, and the generated manifest hash. A
+build fails on missing identity, duplicate observation event IDs, invalid
+episode identity, or unit changes within one channel. This is a dataset
+integrity gate, not a claim that the resulting data is suitable for a specific
+model without user review.
+
 ## CLI
 
 ```powershell
@@ -46,6 +100,8 @@ datastreamctl training-dataset build config/datasets/pump-v2.yaml .datastream/da
 The output contains `steps.parquet`, `actions.parquet`, `outcomes.parquet`,
 `artifacts.parquet`, `channels.json`, `semantic-context.json`,
 `quality-report.json`, `lineage.json`, `manifest.yaml`, and `_SUCCESS`.
+Manifest v3 additionally emits `transitions.parquet` and site-qualified
+channel metadata in `channels.json`.
 
 ## Ownership boundary
 

@@ -2939,3 +2939,18 @@ optional action/outcome/episode-boundary payloads, and the
 `industrial.observation-artifacts` event catalog entry. Existing schema-v1
 events and custom operational payloads remain supported. This phase does not
 add model training or control execution.
+
+# 2026-07-16: Site-aware model dataset manifest v3
+
+Added a backward-compatible v3 compiler path for multi-site model-data
+bundles. V3 qualifies channel identity with site, entity, and tag; requires
+explicit episode identity; assigns complete episodes to deterministic train,
+validation, and test partitions; and emits `transitions.parquet` with current
+and next observations plus action/outcome references. Quality gates reject
+missing identity, duplicate observation IDs, and unit changes within a
+channel. V1/v2 compilation behavior is unchanged.
+
+Verification: focused model-dataset and benchmark tests passed (`5 passed`).
+The next phase will update the 15-minute soak harness to generate unique
+campaign/episode IDs and verify v3 output against Kafka, Flink, historian, and
+lakehouse evidence.
