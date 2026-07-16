@@ -486,6 +486,7 @@ class TestDatastreamctl:
 
     def test_release_gate_can_skip_network_and_run_backup(self, monkeypatch):
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
+        monkeypatch.setattr(ctl, "reset_database", lambda database, conn: {"status": "success", "database": database})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
         monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
         monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": True})
@@ -517,6 +518,7 @@ class TestDatastreamctl:
 
     def test_project_manifest_release_gate_runs(self, monkeypatch):
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
+        monkeypatch.setattr(ctl, "reset_database", lambda database, conn: {"status": "success", "database": database})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
         monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
         monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": True})
@@ -527,6 +529,7 @@ class TestDatastreamctl:
     def test_project_manifest_release_gate_writes_report_dir(self, monkeypatch, tmp_path):
         report_dir = tmp_path / "release-gate"
         monkeypatch.setattr(ctl, "create_backup", lambda backup_dir=None, tables=None: {"status": "success", "path": "backups/x.sql"})
+        monkeypatch.setattr(ctl, "reset_database", lambda database, conn: {"status": "success", "database": database})
         monkeypatch.setattr(ctl, "restore_backup", lambda backup_path, target_database=None: {"status": "success", "database": target_database})
         monkeypatch.setattr(ctl, "list_backups", lambda backup_dir=None: [{"path": "backups/x.sql"}])
         monkeypatch.setattr(ctl, "get_walg_status", lambda: {"installed": True})

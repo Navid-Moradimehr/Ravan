@@ -24,6 +24,43 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def parse_lifecycle_topic(topic: str) -> dict[str, str] | None:
+    """Return the Sparkplug lifecycle meaning encoded in a topic."""
+    parts = topic.split("/")
+    if len(parts) < 4 or parts[0] != "spBv1.0":
+        return None
+    packet_type = parts[2].upper()
+    states = {"NBIRTH": "connected", "DBIRTH": "connected", "NDEATH": "disconnected", "DDEATH": "disconnected"}
+    state = states.get(packet_type)
+    if state is None:
+        return None
+    return {
+        "group_id": parts[1],
+        "packet_type": packet_type,
+        "state": state,
+        "edge_node_id": parts[3],
+        "device_id": parts[4] if len(parts) > 4 else "",
+    }
+
+
+def lifecycle_event(topic: str, site: str, source_id: str, lifecycle: dict[str, str]) -> dict[str, Any]:
+    """Build a canonical state event for a Sparkplug birth/death packet."""
+    asset_id = lifecycle.get("device_id") or lifecycle.get("edge_node_id") or source_id or topic
+    return {
+        "source_protocol": "sparkplug_b",
+        "source_id": source_id or topic,
+        "asset_id": asset_id,
+        "tag": "__sparkplug_lifecycle__",
+        "value": lifecycle["state"],
+        "value_kind": "state",
+        "quality": "good",
+        "site": site,
+        "ts_source": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "sparkplug_topic": topic,
+        "sparkplug_packet_type": lifecycle["packet_type"],
+    }
+
+
 def decode_binary_payload(payload: bytes, topic: str, site: str, source_id: str) -> list[dict[str, Any]]:
     """Decode a real Sparkplug B protobuf payload through TahUtils/Eclipse Tahu."""
     try:

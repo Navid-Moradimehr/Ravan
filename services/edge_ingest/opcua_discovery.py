@@ -22,9 +22,10 @@ logger = logging.getLogger(__name__)
 class OPCUADiscoveryClient:
     """OPC UA client for device discovery and tag browsing."""
 
-    def __init__(self, endpoint_url: str = "opc.tcp://localhost:4840", credential_refs: dict[str, str] | None = None):
+    def __init__(self, endpoint_url: str = "opc.tcp://localhost:4840", credential_refs: dict[str, str] | None = None, security: dict[str, Any] | None = None):
         self.endpoint_url = endpoint_url
         self.credential_refs = credential_refs or {}
+        self.security = security or {}
         self._client: Client | None = None
 
     async def connect(self) -> bool:
@@ -45,6 +46,9 @@ class OPCUADiscoveryClient:
             if credentials.get("certificate") and credentials.get("private_key"):
                 self._client.certificate = credentials["certificate"]
                 self._client.private_key = credentials["private_key"]
+            security_string = str(credentials.get("security_string", self.security.get("security_string", ""))).strip()
+            if security_string:
+                await self._client.set_security_string(security_string)
             await self._client.connect()
             return True
         except Exception as e:

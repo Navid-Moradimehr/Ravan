@@ -10,7 +10,7 @@ import json
 import os
 import re
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -407,6 +407,23 @@ class ConnectionRegistry:
         connection.updated_at = _now()
         self._persist()
         return connection
+
+    def save_opcua_browse_selection(self, connection_id: str, node_ids: list[str]) -> SourceConnection:
+        connection = self._connections.get(connection_id)
+        if connection is None:
+            raise KeyError(connection_id)
+        if connection.source_protocol != "opcua":
+            raise ConnectionValidationError("browse selections are supported only for OPC UA connections")
+        selected = list(dict.fromkeys(str(node_id).strip() for node_id in node_ids if str(node_id).strip()))
+        if not selected:
+            raise ConnectionValidationError("at least one OPC UA node ID is required")
+        if len(selected) > 500:
+            raise ConnectionValidationError("at most 500 OPC UA browse selections may be saved")
+        config = dict(connection.config)
+        config["nodes"] = selected
+        config["browse_nodes"] = selected
+        updated = replace(connection, config=config)
+        return self.put(updated)
 
     def export(self) -> dict[str, Any]:
         return {

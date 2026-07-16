@@ -112,7 +112,17 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
     def on_message(_client: mqtt.Client, _userdata: object, message: mqtt.MQTTMessage) -> None:
         if sparkplug_mode:
             try:
-                from services.edge_ingest.mqtt_sparkplug_b import decode_binary_payload
+                from services.edge_ingest.mqtt_sparkplug_b import decode_binary_payload, lifecycle_event, parse_lifecycle_topic
+
+                lifecycle = parse_lifecycle_topic(message.topic)
+                if lifecycle:
+                    mark_source(source.connection_id, source.source_protocol, source.site_id, lifecycle["state"])
+                    if lifecycle["state"] == "disconnected":
+                        event = lifecycle_event(message.topic, source.site_id, source.source_id or message.topic, lifecycle)
+                        mapped, matched, source_field = source.map_event_with_status(event)
+                        enqueue_mqtt_message(queue, mapped, publisher, event["source_id"])
+                        mark_mapping_result(source.connection_id, source.source_protocol, source.site_id, matched=matched, source_field=source_field)
+                        return
 
                 events = decode_binary_payload(message.payload, message.topic, source.site_id, source.source_id or message.topic)
                 for event in events:

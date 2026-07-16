@@ -96,6 +96,17 @@ def test_opcua_security_requires_policy_for_signed_modes(tmp_path):
     assert "security.policy" in " ".join(saved.activation_errors())
 
 
+def test_opcua_browse_selection_is_persisted_and_deduplicated(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    registry.put(_connection())
+
+    updated = registry.save_opcua_browse_selection("conn-pump-01", ["n1", "n1", " n2 "])
+
+    assert updated.config["nodes"] == ["n1", "n2"]
+    assert updated.config["browse_nodes"] == ["n1", "n2"]
+    assert updated.config_version == 2
+
+
 def test_registry_retire_preserves_history_and_hides_from_active_list(tmp_path):
     registry = ConnectionRegistry(tmp_path / "connections.json")
     registry.put(_connection())

@@ -55,6 +55,17 @@ def run_connection_test(connection: SourceConnection, timeout_seconds: float = 3
         "network_test": "not_run",
         "endpoint": connection.endpoint,
     }
+    if connection.source_protocol == "opcua":
+        security = connection.config.get("security", {}) if isinstance(connection.config.get("security", {}), dict) else {}
+        result["opcua_security"] = {
+            "mode": str(security.get("mode", "None")),
+            "policy_configured": bool(str(security.get("policy", "")).strip()),
+            "security_string_reference_configured": bool(connection.credential_refs.get("security_string")),
+            "certificate_reference_configured": bool(connection.credential_refs.get("certificate")),
+            "private_key_reference_configured": bool(connection.credential_refs.get("private_key")),
+            "trust_store_reference_configured": bool(connection.credential_refs.get("ca_cert")),
+            "browse_selection_count": len(connection.config.get("browse_nodes", [])) if isinstance(connection.config.get("browse_nodes", []), list) else 0,
+        }
     if draft_errors:
         return result
     if connection.source_protocol in METADATA_ONLY_PROTOCOLS:

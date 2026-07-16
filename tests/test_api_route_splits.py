@@ -43,6 +43,7 @@ def test_split_domain_routes_registered():
         "/api/v1/observability/site",
         "/api/v1/observability/federation",
         "/api/v1/observability/source-delivery",
+        "/api/v1/connections/{connection_id}/opcua/browse-selection",
         "/api/v1/lineage",
         "/api/v1/operational/events",
         "/api/v1/search/catalog",

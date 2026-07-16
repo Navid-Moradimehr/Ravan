@@ -127,3 +127,5 @@ reconciled; full suite now 419 passed.
 - Source delivery history is bounded and persistent. Compose merges API-origin records from `/data` with edge connector records from the shared edge volume at `/api/v1/observability/source-delivery`.
 - Modbus TCP and RTU use the same typed register contract for datatype, scaling, byte order, and word order; legacy RTU `address:count` maps remain accepted.
 - OPC UA supports security-string execution hooks and bounded browse previews. Certificate/trust-store lifecycle management remains operator-owned and is not claimed as complete.
+- OPC UA selected node IDs can be persisted through a bounded API contract without exposing certificate or key material.
+- Sparkplug B birth/death lifecycle topics now update source health and emit canonical state events; command/rebirth orchestration remains outside the core connector.

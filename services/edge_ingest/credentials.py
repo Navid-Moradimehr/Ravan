@@ -37,7 +37,7 @@ def resolve_reference(reference: str) -> str:
         raise CredentialResolutionError(
             "secret:// references require a deployment secret provider; configure an env://, file://, or path:// reference for this runtime"
         )
-    raise CredentialResolutionError("credential reference must use env://, file://, or secret://")
+    raise CredentialResolutionError("credential reference must use env://, file://, path://, or secret://")
 
 
 def resolve_credentials(references: dict[str, str] | None) -> dict[str, str]:

@@ -13,6 +13,8 @@ from mqtt_sparkplug_b import (
     SparkplugBEncoder,
     SparkplugBDecoder,
     SparkplugTopicBuilder,
+    parse_lifecycle_topic,
+    lifecycle_event,
 )
 
 
@@ -97,6 +99,15 @@ def test_topic_builder():
     assert SparkplugTopicBuilder.device_data("group1", "node1", "device1") == "spBv1.0/group1/DDATA/node1/device1"
     assert SparkplugTopicBuilder.node_command("group1", "node1") == "spBv1.0/group1/NCMD/node1"
     assert SparkplugTopicBuilder.state("group1") == "spBv1.0/group1/STATE/group1"
+
+
+def test_sparkplug_lifecycle_topics_become_state_events():
+    lifecycle = parse_lifecycle_topic("spBv1.0/group1/NDEATH/node1/device1")
+    assert lifecycle == {"group_id": "group1", "packet_type": "NDEATH", "state": "disconnected", "edge_node_id": "node1", "device_id": "device1"}
+    event = lifecycle_event("spBv1.0/group1/NDEATH/node1/device1", "plant-a", "edge-1", lifecycle)
+    assert event["tag"] == "__sparkplug_lifecycle__"
+    assert event["value"] == "disconnected"
+    assert event["value_kind"] == "state"
 
 
 def test_infer_datatype():

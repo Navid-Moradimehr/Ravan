@@ -40,6 +40,10 @@ class ConnectionRequest(BaseModel):
     enabled: bool = False
 
 
+class OPCUABrowseSelectionRequest(BaseModel):
+    node_ids: list[str] = Field(..., min_length=1, max_length=500)
+
+
 def _to_connection(
     request: ConnectionRequest,
     connection_id: str | None = None,
@@ -196,6 +200,17 @@ async def validate_connection(connection_id: str) -> dict[str, Any]:
     }
 
 
+@router.post("/api/v1/connections/{connection_id}/opcua/browse-selection")
+async def save_opcua_browse_selection(connection_id: str, request: OPCUABrowseSelectionRequest) -> dict[str, Any]:
+    try:
+        connection = connection_registry.save_opcua_browse_selection(connection_id, request.node_ids)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Connection not found") from exc
+    except ConnectionValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"connection_id": connection_id, "node_ids": connection.config.get("nodes", []), "config_version": connection.config_version, "state": connection.state}
+
+
 @router.post("/api/v1/connections/{connection_id}/test")
 async def test_connection_endpoint(connection_id: str) -> dict[str, Any]:
     connection = connection_registry.get(connection_id)
@@ -213,7 +228,7 @@ async def preview_connection(connection_id: str, node_id: str | None = None, max
     if connection.source_protocol == "opcua":
         from services.edge_ingest.opcua_discovery import OPCUADiscoveryClient
 
-        client = OPCUADiscoveryClient(connection.endpoint, credential_refs=connection.credential_refs)
+        client = OPCUADiscoveryClient(connection.endpoint, credential_refs=connection.credential_refs, security=connection.config.get("security", {}))
         connected = await asyncio.wait_for(client.connect(), timeout=5.0)
         if not connected:
             return {"connection_id": connection_id, "preview": "unavailable", "error": "OPC UA connection failed"}

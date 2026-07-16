@@ -27,6 +27,8 @@ The proxy surface covers the editable UI operations:
 - Observability, federation, and source-health snapshots
 - Source delivery history at `/api/v1/observability/source-delivery`
   - Returns bounded recent delivery attempts from HTTP Push and edge REST connectors; failures include a short actionable error and attempt count.
+- OPC UA browse selection persistence at `/api/v1/connections/{connection_id}/opcua/browse-selection`
+  - Accepts up to 500 node IDs, deduplicates them, and saves them as the next connector node set without storing certificates or keys.
 
 Historian browser clients should use the canonical same-origin query form
 `/api/historian?action=events|trend|assets|scenarios|alarms|replay`. For
