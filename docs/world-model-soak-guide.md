@@ -45,11 +45,11 @@ and the compiled bundle passed its evidence gate.
 That campaign also exposed that an old development
 `industrial.operational_events` table had the telemetry schema, so operational
 fields were not retained in that table. The sink now rejects this mismatch and
-Compose defaults to `operational_events_v2`. A corrected 15-minute rerun must
-be completed after Docker Desktop is healthy; the attempted rerun on
-2026-07-16 was interrupted by Docker Desktop's Linux engine returning API 500
-and Kafka `ApiVersionRequest` timeouts. It must not be counted as a platform
-pass.
+Compose defaults to `operational_events_v2`. After Docker Desktop 29.6.1 was
+installed and restarted, the corrected 15-minute rerun completed with 900
+samples, 8,100 observations, 540 actions, 540 outcomes, and 90 artifact
+references; Kafka acknowledged 9,276/9,276 messages with zero failures. The
+compiled bundle was valid with zero missing observation values.
 
 ## Post-restart lakehouse verification
 
@@ -59,5 +59,10 @@ in `industrial.operational_events_v2` with intact `site_id`, `event_type`,
 `entity_id`, and `payload_json`. The artifact row appeared in
 `industrial.observation_artifacts` with its MinIO URI, byte size, and SHA-256.
 Flink remained `RUNNING`, and the API health check reported Kafka and
-historian healthy. This is a current-path verification; the corrected full
-15-minute campaign remains a separate acceptance run.
+historian healthy. The corrected campaign was also verified downstream using
+exact IDs and a bounded campaign time window: TimescaleDB contained all 8,100
+observations in both historian tables; `industrial.operational_events_v2`
+contained 1,086 complete operational rows; `industrial.observation_artifacts`
+contained all 90 artifact references; and all 90 MinIO objects matched their
+recorded SHA-256 values. This is local evidence validation, not real PLC or
+plant certification.

@@ -11,18 +11,21 @@ table must migrate or choose a new table name explicitly. Added a regression
 test and documented the upgrade behavior in the lakehouse guide and Obsidian
 architecture note.
 
-The post-fix 15-minute rerun was initiated but could not complete because
-Docker Desktop's Linux engine returned API 500 and Kafka began timing out on
-`localhost:19092`. This is recorded as an environment-blocked run, not a
-platform success or failure verdict.
+The first post-fix 15-minute rerun was environment-blocked because Docker
+Desktop's Linux engine returned API 500 and Kafka began timing out on
+`localhost:19092`. After Docker Desktop 29.6.1 was installed and restarted,
+the corrected campaign completed successfully: 9,276/9,276 Kafka
+acknowledgements, 8,100 observations, 540 actions, 540 outcomes, and 90
+artifacts. Exact downstream checks confirmed 8,100 rows in each TimescaleDB
+table, 1,086 complete operational rows in `operational_events_v2`, 90
+artifact rows, and 90 checksum-verified MinIO objects.
 
 After Docker Desktop restart, live lakehouse write-through verification
 passed: two operational records were persisted to
 `industrial.operational_events_v2` with intact envelope fields and one
 artifact reference was persisted to `industrial.observation_artifacts` with
 its MinIO URI, size, and SHA-256. Flink was `RUNNING`, and the API health
-endpoint reported Kafka and historian healthy. This verifies the corrected
-current path, but does not replace the pending corrected 15-minute soak.
+endpoint reported Kafka and historian healthy.
 
 ## 2026-07-16 - World-Model Evidence Soak Harness
 
