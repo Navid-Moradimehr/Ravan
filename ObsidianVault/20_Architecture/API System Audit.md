@@ -1,4 +1,4 @@
-# API System Audit (2026-07-13)\n\n**Status: route wiring verified; browser proxy fixes applied.**
+# API System Audit (2026-07-13)\n\n**Status: route wiring verified; browser proxy and source-ingress contracts applied.**
 
 ## 2026-07-13 Verification
 
@@ -20,6 +20,10 @@
   endpoint.
 - Static scans found no remaining client-component calls that bypass the
   same-origin proxy with `/api/v1/*`.
+- HTTP Push single and batch ingress routes are mounted on the API service and
+  use the registered connection lifecycle before entering canonical ingest.
+- REST Pull preserves the external record on the raw Kafka topic while the
+  normalized topic receives only the canonical industrial event.
 - Container HTTP verification was not possible in this pass because Docker
   Desktop was unavailable (`dockerDesktopLinuxEngine` pipe missing). The
   FastAPI route contract tests passed and the UI production build passed.

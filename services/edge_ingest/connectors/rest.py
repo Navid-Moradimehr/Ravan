@@ -141,6 +141,10 @@ async def run_rest(settings: Settings, publisher: EdgePublisher, stop_event: asy
                         event = event_from_record(record, field_paths=field_paths, connection_id=source.connection_id, site_id=source.site_id, source_id=source.source_id or url)
                         event["event_id"] = _deterministic_event_id(source.connection_id, event)
                         event["ts_source"] = event.get("ts_source") or utc_now()
+                        # Preserve the source record on the raw topic for
+                        # replay and diagnosis; canonical validation drops
+                        # this transport envelope before normalized processing.
+                        event["raw_record"] = record
                         mapped, matched, source_field = source.map_event_with_status(event)
                         publisher.publish_event(mapped)
                         mark_mapping_result(source.connection_id, source.source_protocol, source.site_id, matched=matched, source_field=source_field)

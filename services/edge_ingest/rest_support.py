@@ -13,6 +13,8 @@ from services.edge_ingest.credentials import CredentialResolutionError, resolve_
 
 def deep_get(value: Any, path: str, default: Any = None) -> Any:
     """Read a dotted JSON path, accepting either a mapping or list index."""
+    if not str(path or "").strip():
+        return default
     current = value
     for part in [item for item in str(path or "").strip(".").split(".") if item]:
         if isinstance(current, Mapping):

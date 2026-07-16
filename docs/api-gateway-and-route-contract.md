@@ -21,6 +21,9 @@ The proxy surface covers the editable UI operations:
 - Connection list/create/get/update/delete and enable/disable/validate/test/preview
 - Webhook list/create/delete/test
 - Notification list/create/delete
+- HTTP Push single-event and bounded batch ingress at
+  `/api/v1/connections/<connection_id>/events` and
+  `/api/v1/connections/<connection_id>/events/batch`
 - Observability, federation, and source-health snapshots
 
 Historian browser clients should use the canonical same-origin query form
@@ -61,3 +64,12 @@ The API WebSocket endpoints are `/ws/alarms`, `/ws/events`, and
 another host or TLS terminator must set this value to the externally reachable
 `ws://` or `wss://` URL. The API service still owns the WebSocket routes; the
 AI gateway is used for AI telemetry data, not as the WebSocket host.
+
+HTTP Push is intentionally an API-service ingress, not a browser dashboard
+proxy. A gateway, PLC bridge, or user-owned application posts to the API
+service on port `8020` after an `http_push` connection is enabled. The API
+stamps the registered site/source identity and sends the event through the
+same canonical validation, Kafka, DLQ, processing, and historian path as
+other sources. The single-process idempotency cache is bounded and suitable
+for one-node Compose deployments; multi-replica deployments must put a
+durable/shared idempotency boundary in front of the API.

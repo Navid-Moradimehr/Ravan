@@ -29,8 +29,8 @@ type SurfaceCard = {
 const editableSurfaces: SurfaceCard[] = [
   {
     title: "Source connections",
-    description: "Register OPC UA, MQTT, Modbus, Sparkplug B, REST, file, dataset, and mock sources.",
-    note: "Metadata is edited here; testing and activation use the deployment API boundary.",
+    description: "Register OPC UA, MQTT, Modbus, Sparkplug B, REST Pull, HTTP Push, and reference sources.",
+    note: "Use the guided editor to save drafts, test readiness, preview supported sources, and activate runtime connections without backend code changes.",
     icon: Cable,
     action: { label: "Open editor", href: "#source-connections", tone: "primary" },
   },

@@ -17,6 +17,9 @@ def test_rest_json_paths_and_record_mapping():
     assert event["source_id"] == "sensor-7"
     assert event["asset_id"] == "sensor-7"
     assert event["value"] == 21.5
+    assert event["quality"] == "good"
+    assert event["site"] == "plant-a"
+    assert event["unit"] == ""
 
 
 def test_rest_response_without_records_is_safe():
