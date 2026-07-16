@@ -29,6 +29,14 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function fetchPrometheus<T>(url: string): Promise<PrometheusPayload<T>> {
+  const payload = await fetchJson<PrometheusPayload<T>>(url);
+  if (payload.status && payload.status !== "success") {
+    throw new Error("Prometheus query returned an error");
+  }
+  return payload;
+}
+
 function queryUrl(baseUrl: string, path: string, query: string, params?: Record<string, string | number>) {
   const url = new URL(path, baseUrl);
   url.searchParams.set("query", query);
@@ -87,11 +95,10 @@ function latestThroughput(rows: ObservabilityPoint[]) {
 async function fetchPrometheusSnapshot(baseUrl: string): Promise<ObservabilitySnapshot> {
   const now = Math.floor(Date.now() / 1000);
   const windowStart = now - 3600;
-  const fallback = createObservabilityFallback();
 
   const [throughputResult, latencyResult, protocolMixResult, severityResult, dlqResult, batchSizeResult] =
     await Promise.allSettled([
-      fetchJson<PrometheusPayload<PrometheusRangeSeries>>(
+      fetchPrometheus<PrometheusRangeSeries>(
         queryUrl(
           baseUrl,
           "/api/v1/query_range",
@@ -99,7 +106,7 @@ async function fetchPrometheusSnapshot(baseUrl: string): Promise<ObservabilitySn
           { start: windowStart, end: now, step: 300 },
         ),
       ),
-      fetchJson<PrometheusPayload<PrometheusRangeSeries>>(
+      fetchPrometheus<PrometheusRangeSeries>(
         queryUrl(
           baseUrl,
           "/api/v1/query_range",
@@ -107,28 +114,28 @@ async function fetchPrometheusSnapshot(baseUrl: string): Promise<ObservabilitySn
           { start: windowStart, end: now, step: 300 },
         ),
       ),
-      fetchJson<PrometheusPayload<PrometheusInstantSeries>>(
+      fetchPrometheus<PrometheusInstantSeries>(
         queryUrl(baseUrl, "/api/v1/query", "sum by (protocol) (edge_ingest_events_total)"),
       ),
-      fetchJson<PrometheusPayload<PrometheusInstantSeries>>(
+      fetchPrometheus<PrometheusInstantSeries>(
         queryUrl(baseUrl, "/api/v1/query", "sum by (severity) (ai_gateway_batch_severity_total)"),
       ),
-      fetchJson<PrometheusPayload<PrometheusInstantSeries>>(
+      fetchPrometheus<PrometheusInstantSeries>(
         queryUrl(baseUrl, "/api/v1/query", "sum(edge_ingest_dlq_total)"),
       ),
-      fetchJson<PrometheusPayload<PrometheusInstantSeries>>(
+      fetchPrometheus<PrometheusInstantSeries>(
         queryUrl(baseUrl, "/api/v1/query", "ai_gateway_batch_size"),
       ),
     ]);
   const batchSize =
     batchSizeResult.status === "fulfilled"
       ? latestValue(batchSizeResult.value.data?.result)
-      : Number(fallback.latency[fallback.latency.length - 1]?.batch_size ?? 0);
+      : 0;
 
   const throughput =
     throughputResult.status === "fulfilled"
       ? mergeRangeSeries(throughputResult.value.data?.result ?? [], (metric) => metric.protocol ?? "unknown")
-      : fallback.throughput;
+      : [];
 
   const latency =
     latencyResult.status === "fulfilled"
@@ -137,7 +144,7 @@ async function fetchPrometheusSnapshot(baseUrl: string): Promise<ObservabilitySn
           p95: Number(row.p95 ?? 0),
           batch_size: batchSize,
         }))
-      : fallback.latency;
+      : [];
 
   const protocolMix =
     protocolMixResult.status === "fulfilled"
@@ -145,7 +152,7 @@ async function fetchPrometheusSnapshot(baseUrl: string): Promise<ObservabilitySn
           protocol: series.metric?.protocol ?? "unknown",
           total: series.value ? Number.parseFloat(series.value[1]) : 0,
         }))
-      : fallback.protocolMix;
+      : [];
 
   const severity =
     severityResult.status === "fulfilled"
@@ -153,15 +160,25 @@ async function fetchPrometheusSnapshot(baseUrl: string): Promise<ObservabilitySn
           label: series.metric?.severity ?? "unknown",
           total: series.value ? Number.parseFloat(series.value[1]) : 0,
         }))
-      : fallback.severity;
+      : [];
+
+  const degradedReasons = [
+    throughputResult.status === "rejected" ? "Prometheus throughput query failed." : null,
+    latencyResult.status === "rejected" ? "Prometheus latency query failed." : null,
+    protocolMixResult.status === "rejected" ? "Prometheus protocol mix query failed." : null,
+    severityResult.status === "rejected" ? "Prometheus severity query failed." : null,
+    dlqResult.status === "rejected" ? "Prometheus DLQ query failed." : null,
+    batchSizeResult.status === "rejected" ? "Prometheus batch-size query failed." : null,
+  ].filter((reason): reason is string => reason !== null);
 
   const summary = {
     total_throughput: latestThroughput(throughput),
     ai_latency_p95:
-      latencyResult.status === "fulfilled" ? latestRangeValue(latencyResult.value.data?.result) : fallback.summary.ai_latency_p95,
-    dlq_total: dlqResult.status === "fulfilled" ? latestValue(dlqResult.value.data?.result) : fallback.summary.dlq_total,
+      latencyResult.status === "fulfilled" ? latestRangeValue(latencyResult.value.data?.result) : 0,
+    dlq_total: dlqResult.status === "fulfilled" ? latestValue(dlqResult.value.data?.result) : 0,
     grafana_online: true,
   };
+  const prometheusOnline = degradedReasons.length < 6;
 
   return {
     grafana: {
@@ -170,53 +187,85 @@ async function fetchPrometheusSnapshot(baseUrl: string): Promise<ObservabilitySn
       login_url: baseUrl.replace(/\/$/, ""),
     },
     prometheus: {
-      online: true,
-      status: "online",
+      online: prometheusOnline,
+      status: prometheusOnline && degradedReasons.length === 0 ? "online" : "degraded",
     },
     throughput,
     latency,
     protocolMix,
     severity,
     summary,
+    degraded: degradedReasons.length > 0,
+    degraded_reasons: degradedReasons,
   };
 }
 
-async function fetchGrafanaStatus(baseUrl: string) {
+function publicUrl(value: string) {
+  return value.replace(/\/$/, "");
+}
+
+async function fetchGrafanaStatus(internalBaseUrl: string, publicBaseUrl: string) {
   try {
-    const health = await fetchJson<Record<string, string>>(new URL("/api/health", baseUrl).toString());
+    const health = await fetchJson<Record<string, string>>(new URL("/api/health", internalBaseUrl).toString());
     return {
       online: true,
       status: health.database === "ok" ? "online" : "degraded",
-      login_url: baseUrl.replace(/\/$/, ""),
+      login_url: publicUrl(publicBaseUrl),
     };
   } catch {
-    return createObservabilityFallback().grafana;
+    return {
+      online: false,
+      status: "offline",
+      login_url: publicUrl(publicBaseUrl),
+    };
   }
 }
 
 export async function GET() {
   const prometheusBaseUrl = process.env.PROMETHEUS_BASE_URL ?? "http://localhost:19090";
   const grafanaBaseUrl = process.env.GRAFANA_BASE_URL ?? "http://localhost:13000";
+  const grafanaPublicUrl = process.env.GRAFANA_PUBLIC_URL ?? "http://localhost:13000";
   const fallback = createObservabilityFallback();
 
   const [prometheus, grafana] = await Promise.allSettled([
     fetchPrometheusSnapshot(prometheusBaseUrl),
-    fetchGrafanaStatus(grafanaBaseUrl),
+    fetchGrafanaStatus(grafanaBaseUrl, grafanaPublicUrl),
   ]);
 
   if (prometheus.status === "fulfilled") {
+    const grafanaSnapshot = grafana.status === "fulfilled"
+      ? grafana.value
+      : { ...fallback.grafana, login_url: publicUrl(grafanaPublicUrl) };
+    const degradedReasons = [
+      ...(prometheus.value.degraded_reasons ?? []),
+      ...(!grafanaSnapshot.online ? ["Grafana is unavailable."] : []),
+    ];
     return NextResponse.json({
       ...prometheus.value,
-      grafana: grafana.status === "fulfilled" ? grafana.value : fallback.grafana,
+      grafana: grafanaSnapshot,
       summary: {
         ...prometheus.value.summary,
-        grafana_online: grafana.status === "fulfilled",
+        grafana_online: grafanaSnapshot.online,
       },
+      degraded: degradedReasons.length > 0,
+      degraded_reasons: degradedReasons,
     });
   }
 
+  const grafanaSnapshot = grafana.status === "fulfilled"
+    ? grafana.value
+    : { ...fallback.grafana, login_url: publicUrl(grafanaPublicUrl) };
   return NextResponse.json({
     ...fallback,
-    grafana: grafana.status === "fulfilled" ? grafana.value : fallback.grafana,
+    grafana: grafanaSnapshot,
+    summary: {
+      ...fallback.summary,
+      grafana_online: grafanaSnapshot.online,
+    },
+    degraded: true,
+    degraded_reasons: [
+      "Prometheus is unavailable.",
+      ...(!grafanaSnapshot.online ? ["Grafana is unavailable."] : []),
+    ],
   });
 }

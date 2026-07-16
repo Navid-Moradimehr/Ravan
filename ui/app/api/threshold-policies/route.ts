@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { forwardedHeaders } from "@/lib/server-proxy";
 
 export const dynamic = "force-dynamic";
 const API_SERVICE_BASE = process.env.API_SERVICE_BASE ?? "http://api-service:8020";
@@ -10,7 +11,7 @@ async function forward(request: Request) {
     incoming.searchParams.forEach((value, key) => target.searchParams.set(key, value));
     const response = await fetch(target, {
       method: request.method,
-      headers: { "Content-Type": "application/json" },
+      headers: forwardedHeaders(request, request.method !== "GET"),
       body: request.method === "GET" ? undefined : await request.text(),
       cache: "no-store",
     });

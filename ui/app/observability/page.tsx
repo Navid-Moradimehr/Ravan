@@ -17,9 +17,10 @@ export default function ObservabilityPage() {
     refetchInterval: 30000,
   });
   const snapshot = observability.data ?? createObservabilityFallback();
+  const isDegraded = observability.isError || Boolean(snapshot.degraded);
 
   return (
-    <DashboardFrame systemStatus={observability.isError ? "degraded" : "online"} rightRail={<ObservabilityRail />}>
+    <DashboardFrame systemStatus={isDegraded ? "degraded" : "online"} rightRail={<ObservabilityRail />}>
       <div className="space-y-6">
         <header className="app-card overflow-hidden">
           <div className="border-b border-border-subtle px-6 py-5">
@@ -38,15 +39,22 @@ export default function ObservabilityPage() {
           <StatCard label="Prometheus" value={String(snapshot.prometheus?.status ?? "unknown")} icon={Gauge} tone="info" />
         </section>
 
-        {observability.isError ? (
+        {isDegraded ? (
           <Card className="app-card overflow-hidden border-warning/30 bg-warning/5">
             <CardContent className="flex items-start gap-3 p-4">
               <AlertTriangle className="mt-0.5 size-4 text-warning" />
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-text-primary">Live observability is degraded</p>
                 <p className="text-sm leading-6 text-text-secondary">
-                  The page is rendering a fallback snapshot because one or more observability sources were unavailable.
+                  {observability.isError
+                    ? "The page is rendering a fallback snapshot because the observability gateway is unavailable."
+                    : "One or more observability dependencies are unavailable; affected panels are shown empty rather than as live-looking data."}
                 </p>
+                {snapshot.degraded_reasons?.length ? (
+                  <ul className="list-disc space-y-1 pl-5 text-xs text-text-secondary">
+                    {snapshot.degraded_reasons.map((reason) => <li key={reason}>{reason}</li>)}
+                  </ul>
+                ) : null}
               </div>
             </CardContent>
           </Card>

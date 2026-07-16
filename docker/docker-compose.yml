@@ -384,6 +384,7 @@ services:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
       PROMETHEUS_BASE_URL: http://prometheus:9090
       GRAFANA_BASE_URL: http://grafana:3000
+      GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-http://localhost:13000}
     ports:
       - "3006:3006"
     healthcheck:

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { subscribeTelemetryWebSocket, type Telemetry } from "@/lib/api";
+import { DEFAULT_API_WS_BASE_URL, subscribeTelemetryWebSocket, type Telemetry } from "@/lib/api";
 
 export type { PipelineNode, Telemetry } from "@/lib/api";
 
-export function useTelemetryEvents(wsBaseUrl: string = "ws://localhost:8020") {
+export function useTelemetryEvents(wsBaseUrl: string = DEFAULT_API_WS_BASE_URL) {
   const [data, setData] = useState<Telemetry | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);

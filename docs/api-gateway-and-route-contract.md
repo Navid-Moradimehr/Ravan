@@ -19,6 +19,7 @@ The proxy surface covers the editable UI operations:
 - Historian reads, bounded SQL query submission, and query cancellation
 - KPI list/create/delete
 - Connection list/create/get/update/delete and enable/disable/validate/test/preview
+  plus retire/restore lifecycle actions
 - Webhook list/create/delete/test
 - Notification list/create/delete
 - HTTP Push single-event and bounded batch ingress at
@@ -38,7 +39,8 @@ accepts legacy path aliases such as `/api/historian/assets`,
 `/api/historian/scenarios`, and `/api/historian/replay` and forwards them to
 the same backend historian contracts.
 
-Authorization headers are forwarded on mutation proxies. No identity provider,
+Authorization headers are forwarded consistently by dashboard BFF proxies for
+both reads and mutations. No identity provider,
 token issuer, RBAC model, or reverse proxy is imposed by the project. The built-in
 JWT middleware is opt-in: set `DATASTREAM_AUTH_REQUIRED=true` when the operator
 wants the API to reject unauthenticated mutations. The default is `false` so a
@@ -69,6 +71,18 @@ The API WebSocket endpoints are `/ws/alarms`, `/ws/events`, and
 another host or TLS terminator must set this value to the externally reachable
 `ws://` or `wss://` URL. The API service still owns the WebSocket routes; the
 AI gateway is used for AI telemetry data, not as the WebSocket host.
+
+The dashboard keeps separate Grafana URLs for server-side health checks and the
+browser link. `GRAFANA_BASE_URL` is the internal Docker-reachable URL; optional
+`GRAFANA_PUBLIC_URL` is the URL returned to browsers and defaults to
+`http://localhost:13000`. This prevents Docker-only hostnames such as
+`http://grafana:3000` from leaking into browser links.
+
+Observability responses remain HTTP 200 when one dependency is unavailable so
+the dashboard can render a usable degraded state. They now include `degraded`
+and `degraded_reasons`, and failed Prometheus queries produce empty panels
+instead of synthetic live-looking values. The initial client fallback remains
+visibly marked as fallback data.
 
 HTTP Push is intentionally an API-service ingress, not a browser dashboard
 proxy. A gateway, PLC bridge, or user-owned application posts to the API

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { HttpError, readResponseError } from "@/lib/http";
+import { forwardedHeaders } from "@/lib/server-proxy";
 
 export const dynamic = "force-dynamic";
 
 const API_SERVICE_BASE = process.env.API_SERVICE_BASE ?? "http://localhost:8020";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const response = await fetch(`${API_SERVICE_BASE}/api/v1/notifications`, { cache: "no-store" });
+    const response = await fetch(`${API_SERVICE_BASE}/api/v1/notifications`, { headers: forwardedHeaders(request), cache: "no-store" });
     if (!response.ok) throw await readResponseError(response);
     return NextResponse.json(await response.json());
   } catch (error) {

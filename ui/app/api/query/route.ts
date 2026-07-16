@@ -1,21 +1,17 @@
 import { NextResponse } from "next/server";
 import { HttpError, readResponseError } from "@/lib/http";
+import { forwardedHeaders } from "@/lib/server-proxy";
 
 export const dynamic = "force-dynamic";
 
 const API_SERVICE_BASE = process.env.API_SERVICE_BASE ?? "http://localhost:8020";
-
-function forwardedHeaders(request: Request): HeadersInit {
-  const authorization = request.headers.get("authorization");
-  return authorization ? { Authorization: authorization } : {};
-}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const response = await fetch(`${API_SERVICE_BASE}/api/v1/historian/query`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...forwardedHeaders(request) },
+      headers: forwardedHeaders(request, true),
       body: JSON.stringify(body),
     });
     if (!response.ok) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { HttpError, readResponseError } from "@/lib/http";
 
 const API_SERVICE_BASE = process.env.API_SERVICE_BASE ?? "http://localhost:8020";
-const ACTIONS = new Set(["enable", "disable", "validate"]);
+const ACTIONS = new Set(["enable", "disable", "validate", "retire", "restore"]);
 
 export async function POST(request: Request, context: { params: Promise<{ connectionId: string; action: string }> }) {
   try {

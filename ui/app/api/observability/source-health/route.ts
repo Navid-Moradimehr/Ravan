@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
 import { HttpError, readResponseError } from "@/lib/http";
+import { forwardedHeaders } from "@/lib/server-proxy";
 
 const API_SERVICE_BASE = process.env.API_SERVICE_BASE ?? "http://api-service:8020";
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
+async function fetchJson<T>(url: string, request: Request): Promise<T> {
+  const response = await fetch(url, { headers: forwardedHeaders(request), cache: "no-store" });
   if (!response.ok) {
     throw await readResponseError(response);
   }
   return (await response.json()) as T;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const data = await fetchJson(`${API_SERVICE_BASE}/api/v1/observability/source-health`);
+    const data = await fetchJson(`${API_SERVICE_BASE}/api/v1/observability/source-health`, request);
     return NextResponse.json(data);
   } catch (error) {
     if (error instanceof HttpError) {

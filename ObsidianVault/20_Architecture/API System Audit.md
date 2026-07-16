@@ -130,3 +130,21 @@ reconciled; full suite now 419 passed.
 - OPC UA selected node IDs can be persisted through a bounded API contract without exposing certificate or key material.
 - Sparkplug B birth/death lifecycle topics now update source health and emit canonical state events; command/rebirth orchestration remains outside the core connector.
 - The edge validates OPC UA signed certificate validity and private-key readability without provisioning or exposing trust material. Sparkplug rebirth is an explicit opt-in using the Tahu payload builder; vendor-specific gateways remain outside the core protocol contract.
+
+## 2026-07-16 Gateway hardening
+
+- Consolidated canonical and legacy historian BFF routes onto one handler so
+  action behavior and bearer forwarding cannot drift between route shapes.
+- Added `retire` and `restore` to the connection action proxy allowlist.
+- Shared bearer forwarding now covers dashboard read and mutation proxies,
+  including datasets, thresholds, metadata, source health, federation,
+  notifications, webhooks, and historian queries.
+- Dashboard WebSocket clients honor `NEXT_PUBLIC_API_WS_BASE_URL`.
+- Observability distinguishes dependency degradation from healthy data and no
+  longer presents failed Prometheus queries as live fallback samples.
+- Grafana health probing uses the internal Docker URL while browser links use
+  `GRAFANA_PUBLIC_URL`, defaulting to `http://localhost:13000`.
+
+The authentication boundary remains intentionally operator-owned. The
+dashboard forwards credentials when supplied; token enforcement remains opt-in
+through API deployment configuration and is not replaced by a second login.

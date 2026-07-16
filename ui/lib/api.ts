@@ -20,6 +20,8 @@ export type ObservabilityPoint = {
 };
 
 export type ObservabilitySnapshot = {
+  degraded?: boolean;
+  degraded_reasons?: string[];
   grafana: {
     online: boolean;
     status: string;
@@ -131,7 +133,7 @@ export type ThresholdPolicySyncState = {
   policy_count: number;
 };
 
-const DEFAULT_API_WS_BASE_URL = process.env.NEXT_PUBLIC_API_WS_BASE_URL ?? "ws://localhost:8020";
+export const DEFAULT_API_WS_BASE_URL = process.env.NEXT_PUBLIC_API_WS_BASE_URL ?? "ws://localhost:8020";
 
 export async function getAssetTagCatalog(): Promise<{ items: AssetTagCatalogItem[] }> {
   return requestJson("/api/metadata/asset-tags");
@@ -418,6 +420,8 @@ export function createObservabilityFallback(): ObservabilitySnapshot {
   });
 
   return {
+    degraded: true,
+    degraded_reasons: ["Observability dependencies are unavailable; displayed samples are fallback data."],
     grafana: {
       online: false,
       status: "offline",
