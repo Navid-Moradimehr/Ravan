@@ -149,7 +149,15 @@ def main() -> int:
     import yaml
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
     bundle_result = compile_trajectory_bundle(manifest_path, root / "bundle")
-    report = {"duration_seconds": round(time.monotonic() - started, 3), "configured_sites": sites, "sample_count": sample_index, "telemetry_records": sample_index * len(sites) * len(channels), "operational_records": len(action_rows) + len(outcome_rows) + len(sites) * 2, "artifact_records": len(artifact_rows), "kafka": counters, "bundle": bundle_result, "passed": counters["failed"] == 0 and bundle_result["valid"] and sample_index >= max(1, args.seconds - 2)}
+    bundle_counts = bundle_result.get("quality", {}).get("record_counts", {})
+    expected_operational = len(action_rows) + len(outcome_rows) + len(sites) * 2
+    evidence_complete = (
+        bundle_counts.get("observations") == sample_index * len(sites) * len(channels)
+        and bundle_counts.get("actions") == len(action_rows)
+        and bundle_counts.get("outcomes") == len(outcome_rows)
+        and bundle_counts.get("artifacts") == len(artifact_rows)
+    )
+    report = {"duration_seconds": round(time.monotonic() - started, 3), "configured_sites": sites, "sample_count": sample_index, "telemetry_records": sample_index * len(sites) * len(channels), "operational_records": expected_operational, "action_records": len(action_rows), "outcome_records": len(outcome_rows), "artifact_records": len(artifact_rows), "kafka": counters, "bundle": bundle_result, "evidence_complete": evidence_complete, "passed": counters["failed"] == 0 and bundle_result["valid"] and evidence_complete and sample_index >= max(1, args.seconds - 2)}
     (root / "world-model-soak.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
     return 0 if report["passed"] else 1

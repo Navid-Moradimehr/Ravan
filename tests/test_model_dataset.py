@@ -54,4 +54,5 @@ def test_compile_trajectory_bundle_aligns_without_interpolation(tmp_path):
     assert result["valid"] is True
     assert (tmp_path / "bundle" / "_SUCCESS").exists()
     assert json.loads((tmp_path / "bundle" / "quality-report.json").read_text())["record_counts"]["steps"] == 3
+    assert json.loads((tmp_path / "bundle" / "quality-report.json").read_text())["record_counts"]["outcomes"] == 1
     assert json.loads((tmp_path / "bundle" / "channels.json").read_text())["channels"] == ["pump-1::pressure"]

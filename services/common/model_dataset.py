@@ -74,7 +74,7 @@ def _source_records(source: Any) -> list[dict[str, Any]]:
 
 
 def _timestamp(record: dict[str, Any]) -> datetime | None:
-    value = record.get("ts_source") or record.get("timestamp") or record.get("occurred_at") or record.get("time")
+    value = record.get("ts_source") or record.get("timestamp") or record.get("occurred_at") or record.get("effective_at") or record.get("observed_at") or record.get("time")
     if not value:
         return None
     try:
