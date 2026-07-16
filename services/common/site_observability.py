@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -87,13 +88,26 @@ def _prometheus_query(query: str) -> float | None:
 def _slo_evaluation(deployment_mode: str = "single-site") -> dict[str, Any]:
     """Evaluate only measured Prometheus values; unavailable is not healthy."""
 
-    measurements = {
-        "processing_lag_messages": _prometheus_query("max(datastream_broker_consumer_lag_messages)"),
-        "ai_latency_p95_seconds": _prometheus_query("histogram_quantile(0.95, sum(rate(ai_gateway_llm_request_seconds_bucket[5m])) by (le))"),
-        "historian_write_p95_seconds": _prometheus_query("histogram_quantile(0.95, sum(rate(datastream_fanout_write_latency_seconds_bucket[5m])) by (le))"),
-        "websocket_delivery_p95_seconds": _prometheus_query("histogram_quantile(0.95, sum(rate(datastream_websocket_delivery_lag_seconds_bucket[5m])) by (le))"),
-        "dlq_rate_per_second": _prometheus_query("sum(rate(edge_ingest_dlq_total[5m]))"),
+    queries = {
+        "processing_lag_messages": "max(datastream_broker_consumer_lag_messages)",
+        "ai_latency_p95_seconds": "histogram_quantile(0.95, sum(rate(ai_gateway_llm_request_seconds_bucket[5m])) by (le))",
+        "historian_write_p95_seconds": "histogram_quantile(0.95, sum(rate(datastream_fanout_write_latency_seconds_bucket[5m])) by (le))",
+        "websocket_delivery_p95_seconds": "histogram_quantile(0.95, sum(rate(datastream_websocket_delivery_lag_seconds_bucket[5m])) by (le))",
+        "dlq_rate_per_second": "sum(rate(edge_ingest_dlq_total[5m]))",
     }
+    # Keep an unavailable Prometheus from multiplying the timeout across the
+    # whole release gate. The evidence set is fixed and safe to probe in
+    # parallel.
+    with ThreadPoolExecutor(max_workers=len(queries), thread_name_prefix="slo-probe") as executor:
+        futures = {name: executor.submit(_prometheus_query, query) for name, query in queries.items()}
+        measurements = {}
+        for name, future in futures.items():
+            try:
+                measurements[name] = future.result(timeout=2.0)
+            except Exception:
+                # A slow or broken metrics endpoint is unknown evidence, not
+                # an observability API failure.
+                measurements[name] = None
     targets = _slo_targets(deployment_mode)
     checks = []
     for name, observed in measurements.items():

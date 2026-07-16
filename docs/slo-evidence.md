@@ -31,3 +31,7 @@ blocking local development.
 
 This is a release evidence gate, not an automatic paging system. Prometheus
 alert rules and Grafana remain the continuous operator surfaces.
+
+The fixed SLO query set is evaluated concurrently with bounded request
+timeouts, so a missing Prometheus endpoint does not serialize five independent
+network waits into every observability snapshot.

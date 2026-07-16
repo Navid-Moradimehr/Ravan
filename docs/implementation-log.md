@@ -3023,3 +3023,11 @@ unchanged.
 - Validation: Helm render and focused Kubernetes/Flink tests pass.
 - Added explicit per-service image slots; rehearsal defaults are local names and
   federated Flink deliberately requires a site registry tag override.
+
+### SLO probe latency correction
+
+- SLO evidence queries now run as a fixed-size bounded parallel set. An
+  unavailable Prometheus no longer multiplies five request timeouts across a
+  release-gate snapshot.
+- Site-observability tests pass. Backup-dependent CLI tests still require a
+  responsive Docker/Timescale environment when they are not fully mocked.

@@ -22,5 +22,9 @@ latency, while model latency comes from the AI histogram when available.
 Prometheus/Grafana remain the continuous monitoring layer. The evaluator is a
 bounded release/readiness evidence layer.
 
+The fixed query set is evaluated concurrently with bounded request timeouts so
+an unavailable Prometheus endpoint does not serialize five waits into every
+observability snapshot.
+
 [[Agent Governance Boundary]]
 [[Production Readiness Validation 2026-07-15]]

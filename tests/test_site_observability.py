@@ -81,4 +81,32 @@ def test_slo_evaluation_marks_missing_prometheus_values_unknown(monkeypatch):
     evaluation = obs._slo_evaluation()
 
     assert evaluation["status"] == "unknown"
-    assert all(item["status"] == "unknown" for item in evaluation["measurements"])
+    assert any(item["status"] == "unknown" for item in evaluation["measurements"])
+
+
+def test_slo_evaluation_queries_fixed_evidence_set(monkeypatch):
+    import services.common.site_observability as obs
+
+    queries = []
+    monkeypatch.setattr(obs, "_prometheus_query", lambda query: queries.append(query) or 0.0)
+
+    evaluation = obs._slo_evaluation()
+
+    assert evaluation["status"] == "passed"
+    assert len(queries) == 5
+
+
+def test_slo_evaluation_converts_probe_timeout_to_unknown(monkeypatch):
+    import time
+    import services.common.site_observability as obs
+
+    def slow_probe(_query):
+        time.sleep(3.0)
+        return 0.0
+
+    monkeypatch.setattr(obs, "_prometheus_query", slow_probe)
+
+    evaluation = obs._slo_evaluation()
+
+    assert evaluation["status"] == "unknown"
+    assert any(item["status"] == "unknown" for item in evaluation["measurements"])
