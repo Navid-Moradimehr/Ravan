@@ -3084,3 +3084,19 @@ lockup.
 - Verification: full suite `696 passed`; event-level Docker probe matched four
   value shapes across normalized Kafka, raw historian, Flink processing, and
   processed historian; Flink remained `RUNNING` with `2/2` tasks.
+## 2026-07-17 - Operational AI Briefings And Delivery Verification
+
+- Replaced transient report execution with database-backed job claiming, leases,
+  retries, and terminal failure visibility.
+- Added site-isolated scheduled jobs plus independent anomaly and recovery
+  transitions.
+- Added the validated `operational-briefing.v1` contract, bounded short-term
+  report continuity, deterministic evidence selection, guided JSON generation,
+  and provider prompt-cache metadata.
+- Added a report inbox, activity/error view, policy controls, provider readiness,
+  controlled report rendering, and Command Center/Observability projections.
+- Added explicit provider-response, fallback, Kafka acknowledgement, and
+  historian-persistence indicators. Provider errors remain visible when a
+  deterministic fallback is shown.
+- Corrected the AI historian uniqueness contract for a Timescale hypertable and
+  preserved the report generation timestamp during fan-out.

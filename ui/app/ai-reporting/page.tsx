@@ -34,6 +34,7 @@ type Policy = {
 };
 
 type ReportingStatus = { site_id: string; policy: Policy; source: string; min_interval_seconds: number; max_interval_seconds: number };
+type ProviderStatus = { reachable: boolean; status: string; provider?: string | null; model?: string | null; credential_configured: boolean; last_error?: string | null; degraded_reason?: string | null };
 
 const defaultPolicy: Policy = {
   enabled: true,
@@ -79,16 +80,22 @@ function AIReportingWorkspace() {
       return Array.from(new Set([...assetTags.items.map((item) => item.site_id), ...connections.connections.map((item) => item.site_id)])).filter(Boolean).sort();
     },
   });
+  const providerStatus = useQuery({
+    queryKey: ["ai-reporting", "provider-status"],
+    queryFn: () => requestJson<ProviderStatus>("/api/ai/provider-status"),
+    refetchInterval: 15000,
+  });
 
   const reports = useQuery({
     queryKey: ["ai-reporting", "reports", siteId, reportType],
     queryFn: () => requestJson<AIReportJob[]>(`/api/ai/reports?limit=100${siteId === "*" ? "" : `&site_id=${encodeURIComponent(siteId)}`}${reportType === "all" ? "" : `&report_type=${encodeURIComponent(reportType)}`}`),
     refetchInterval: 10000,
   });
-  const linkedDetail = useQuery({
-    queryKey: ["ai-reporting", "detail", linkedReport],
-    queryFn: () => requestJson<AIReportJob>(`/api/ai/reports/${encodeURIComponent(linkedReport ?? "")}`),
-    enabled: Boolean(linkedReport && !reports.data?.some((job) => job.job_id === linkedReport)),
+  const reportDetail = useQuery({
+    queryKey: ["ai-reporting", "detail", selectedId],
+    queryFn: () => requestJson<AIReportJob>(`/api/ai/reports/${encodeURIComponent(selectedId ?? "")}`),
+    enabled: Boolean(selectedId),
+    refetchInterval: (query) => query.state.data?.delivery?.historian_persisted ? false : 5000,
   });
 
   const filteredReports = (reports.data ?? []).filter((job) => {
@@ -98,7 +105,7 @@ function AIReportingWorkspace() {
   });
   const completed = filteredReports.filter((job) => job.status === "completed" && job.result?.briefing);
   const activity = filteredReports.filter((job) => job.status !== "completed");
-  const selected = linkedDetail.data ?? filteredReports.find((job) => job.job_id === selectedId) ?? completed[0];
+  const selected = reportDetail.data ?? filteredReports.find((job) => job.job_id === selectedId) ?? completed[0];
 
   useEffect(() => {
     if (!selectedId && completed[0]) setSelectedId(completed[0].job_id);
@@ -157,7 +164,7 @@ function AIReportingWorkspace() {
         <TabsContent value="reports" className="space-y-4">
           <Card className="app-card">
             <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_12rem_12rem]">
-              <label className="space-y-1 font-sans text-sm"><span className="flex items-center gap-2"><Filter className="size-4 text-accent" />Search reports</span><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Headline, site, asset, or trigger" /></label>
+              <label className="space-y-1 font-sans text-sm"><span className="flex items-center gap-2"><Filter className="size-4 text-accent" />Search reports <HelpTip label="Report filters help" content="Filters apply to the durable report inbox already returned by the API. Search matches site, report type, trigger, headline, and summary; it does not send a new query to the model." /></span><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Headline, site, asset, or trigger" /></label>
               <label className="space-y-1 font-sans text-sm">Site<select className="app-select" value={siteId} onChange={(event) => setSiteId(event.target.value)}><option value="*">All sites</option>{siteCatalog.data?.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
               <label className="space-y-1 font-sans text-sm">Type<select className="app-select" value={reportType} onChange={(event) => setReportType(event.target.value)}><option value="all">All briefings</option><option value="scheduled">Scheduled</option><option value="anomaly">Anomaly</option><option value="recovery">Recovery</option><option value="manual">Manual</option></select></label>
             </CardContent>
@@ -166,12 +173,12 @@ function AIReportingWorkspace() {
           {reports.isError ? <BriefingFailure message={formatErrorMessage(reports.error)} /> : reports.isLoading ? <div className="grid gap-4 xl:grid-cols-[21rem_minmax(0,1fr)]"><Skeleton className="h-96 bg-surface-2" /><Skeleton className="h-96 bg-surface-2" /></div> : completed.length ? (
             <div className="grid items-start gap-4 xl:grid-cols-[21rem_minmax(0,1fr)]">
               <Card className="app-card overflow-hidden xl:sticky xl:top-[4.5rem]">
-                <CardHeader className="app-card-header"><CardTitle className="text-base">Report inbox</CardTitle><CardDescription>{completed.length} completed briefing{completed.length === 1 ? "" : "s"}</CardDescription></CardHeader>
+                <CardHeader className="app-card-header"><CardTitle className="flex items-center gap-2 text-base">Report inbox <HelpTip label="Report inbox help" content="Completed scheduled, anomaly, recovery, and operator-requested jobs appear here after their structured output is persisted. Selecting one loads its durable detail and verifies downstream historian projection." /></CardTitle><CardDescription>{completed.length} completed briefing{completed.length === 1 ? "" : "s"}</CardDescription></CardHeader>
                 <CardContent className="max-h-[70dvh] space-y-2 overflow-y-auto p-3">
                   {completed.map((job) => <button key={job.job_id} type="button" onClick={() => setSelectedId(job.job_id)} className={`w-full rounded-xl border p-3 text-left transition-colors ${selected?.job_id === job.job_id ? "border-accent/40 bg-accent-subtle" : "border-border-subtle bg-surface-2 hover:border-border-strong"}`}><div className="flex items-center gap-2"><Badge variant="outline" className="capitalize">{job.report_type}</Badge><span className="ml-auto font-mono text-[11px] text-text-muted">{job.site_id}</span></div><p className="mt-2 line-clamp-2 font-heading text-sm font-semibold leading-5 text-text-primary">{job.result?.briefing?.headline}</p><p className="mt-2 font-sans text-xs text-text-muted">{formatDate(job.updated_at ?? job.created_at)}</p></button>)}
                 </CardContent>
               </Card>
-              <Card className="app-card"><CardContent className="p-4 md:p-5">{selected ? <OperationalBriefingDetail job={selected} /> : <BriefingEmptyState />}</CardContent></Card>
+              <Card className="app-card"><CardContent className="p-4 md:p-5">{reportDetail.isError ? <BriefingFailure message={`The report exists but its detail could not be retrieved: ${formatErrorMessage(reportDetail.error)}`} /> : selected ? <OperationalBriefingDetail job={selected} /> : <BriefingEmptyState />}</CardContent></Card>
             </div>
           ) : <BriefingEmptyState />}
         </TabsContent>
@@ -184,7 +191,10 @@ function AIReportingWorkspace() {
         </TabsContent>
 
         <TabsContent value="policy" className="space-y-4">
-          <Card className="app-card"><CardHeader className="app-card-header"><CardTitle>Reporting scope</CardTitle><CardDescription>Policies are site-scoped and inherit from the shared policy when no site override exists.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-end gap-3 p-4"><label className="min-w-56 space-y-1 font-sans text-sm">Site ID<select className="app-select" value={siteId} onChange={(event) => { setSiteId(event.target.value); setLoaded(false); }}><option value="*">All sites (shared policy)</option>{siteCatalog.data?.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><Button variant="outline" onClick={loadPolicy}>{loaded ? "Reload policy" : "Load policy"}</Button></CardContent></Card>
+          {providerStatus.isError ? <BriefingFailure message={`Provider status could not be loaded: ${formatErrorMessage(providerStatus.error)}`} /> : (
+            <Card className="app-card"><CardHeader className="app-card-header"><CardTitle className="flex items-center gap-2">Provider readiness <HelpTip label="Provider readiness help" content="The API probes the configured AI gateway health endpoint with a short timeout. It reports reachability, provider, model, and degraded state without returning API keys or other secrets." /></CardTitle><CardDescription>The gateway connection is checked without exposing credentials.</CardDescription></CardHeader><CardContent className="grid gap-3 p-4 sm:grid-cols-3"><div><p className="label-overline">Gateway</p><p className="mt-1 font-sans text-sm text-text-primary">{providerStatus.data?.reachable ? providerStatus.data.status : "Unavailable"}</p></div><div><p className="label-overline">Provider</p><p className="mt-1 font-mono text-sm text-text-primary">{providerStatus.data?.provider ?? "Not reported"} / {providerStatus.data?.model ?? "No model"}</p></div><div><p className="label-overline">Credential</p><p className="mt-1 font-sans text-sm text-text-primary">{providerStatus.data?.credential_configured ? "Configured" : "Not configured or not required locally"}</p></div>{providerStatus.data?.last_error ? <div className="sm:col-span-3"><BriefingFailure message={providerStatus.data.last_error} /></div> : null}</CardContent></Card>
+          )}
+          <Card className="app-card"><CardHeader className="app-card-header"><CardTitle className="flex items-center gap-2">Reporting scope <HelpTip label="Reporting scope help" content="A site-specific policy overrides the shared policy only for that site. Site IDs come from registered source connections and observed asset/tag metadata; this selector does not create a site." /></CardTitle><CardDescription>Policies are site-scoped and inherit from the shared policy when no site override exists.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-end gap-3 p-4"><label className="min-w-56 space-y-1 font-sans text-sm">Site ID<select className="app-select" value={siteId} onChange={(event) => { setSiteId(event.target.value); setLoaded(false); }}><option value="*">All sites (shared policy)</option>{siteCatalog.data?.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><Button variant="outline" onClick={loadPolicy}>{loaded ? "Reload policy" : "Load policy"}</Button></CardContent></Card>
           <Card className="app-card"><CardHeader className="app-card-header"><CardTitle className="flex items-center gap-2"><BrainCircuit className="size-4 text-accent" />Reporting policy <HelpTip label="AI reporting help" content="Scheduled reports broadcast the bounded current situation. Anomaly reports require sustained severity and minimum samples. Recovery reports close a previously reported incident after the rearm period." /></CardTitle><CardDescription>Load the site policy before editing. Intervals remain bounded from 10 minutes to one day.</CardDescription></CardHeader><CardContent className="grid gap-4 p-4 sm:grid-cols-2">
             <label className="flex items-center gap-2 font-sans text-sm sm:col-span-2"><input type="checkbox" checked={policy.enabled} onChange={(event) => update("enabled", event.target.checked)} /> AI briefings enabled</label>
             <label className="flex items-center gap-2 font-sans text-sm"><input type="checkbox" checked={policy.scheduled_enabled} onChange={(event) => update("scheduled_enabled", event.target.checked)} /> Scheduled briefings</label>
@@ -203,7 +213,7 @@ function AIReportingWorkspace() {
         </TabsContent>
       </Tabs>
 
-      <Card className="app-card"><CardContent className="flex gap-3 p-4"><ShieldCheck className="size-5 shrink-0 text-success" /><p className="font-sans text-sm leading-6 text-text-secondary">Operational briefings are advisory and read-only. They publish versioned output events and never perform plant actions. Provider credentials, retention, and deployment authorization remain operator-owned.</p></CardContent></Card>
+      <Card className="app-card"><CardContent className="flex gap-3 p-4"><ShieldCheck className="size-5 shrink-0 text-success" /><div><div className="flex items-center gap-2"><p className="font-heading text-sm font-semibold text-text-primary">Governance boundary</p><HelpTip label="Governance boundary help" content="Briefings can read bounded evidence and publish advisory output. They cannot write PLC values, acknowledge alarms, or execute actions. Deployment owners remain responsible for credentials, retention, network policy, and authorization." /></div><p className="mt-1 font-sans text-sm leading-6 text-text-secondary">Operational briefings are advisory and read-only. They publish versioned output events and never perform plant actions. Provider credentials, retention, and deployment authorization remain operator-owned.</p></div></CardContent></Card>
     </DashboardFrame>
   );
 }

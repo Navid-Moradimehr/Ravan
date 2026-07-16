@@ -159,6 +159,10 @@ def test_ai_gateway_enrich_batch_falls_back_on_invalid_json(monkeypatch):
     assert captured["payload"]["summary"]
     assert captured["payload"]["structured_report"]["situation_status"] == "critical"
     assert captured["payload"]["used_fallback"] is True
+    assert captured["payload"]["generation_metadata"]["structured_mode"] == "guided"
+    assert captured["payload"]["generation_metadata"]["provider_response_received"] is True
+    assert captured["payload"]["generation_metadata"]["used_fallback"] is True
+    assert "output_validation_failed" in captured["payload"]["generation_metadata"]["generation_error"]
     assert captured["payload"]["event_type"] == "ai.summary.generated"
     assert captured["payload"]["event_version"] == 1
     assert captured["payload"]["source_event_ids"]

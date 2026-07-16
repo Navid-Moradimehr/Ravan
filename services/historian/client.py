@@ -538,17 +538,17 @@ def insert_ai_enriched(event: dict[str, Any]) -> None:
                     ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS prompt_template_id TEXT;
                     ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS prompt_version TEXT;
                     ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS source_event_ids JSONB NOT NULL DEFAULT '[]'::jsonb;
-                    CREATE UNIQUE INDEX IF NOT EXISTS ai_enriched_event_id_uniq ON ai_enriched (event_id) WHERE event_id IS NOT NULL;
+                    CREATE UNIQUE INDEX IF NOT EXISTS ai_enriched_event_id_uniq ON ai_enriched (time, event_id) WHERE event_id IS NOT NULL;
                     INSERT INTO ai_enriched (
                         time, source, model, batch_size, summary, latency_seconds,
                         event_id, report_id, site_id, report_type, trigger_reason,
                         situation_status, structured_report, used_fallback,
                         prompt_template_id, prompt_version, source_event_ids
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (event_id) WHERE event_id IS NOT NULL DO NOTHING
+                    ON CONFLICT (time, event_id) WHERE event_id IS NOT NULL DO NOTHING
                     """,
                     (
-                        _coalesce_timestamp(None),
+                        _coalesce_timestamp(event.get("generated_at")),
                         event.get("source"),
                         event.get("model"),
                         event.get("batch_size", 0),
@@ -624,6 +624,16 @@ def query_report_evidence(site_id: str, *, start: Any | None = None, end: Any | 
     where = f" WHERE {' AND '.join(filters)}" if filters else ""
     params.append(max(1, min(int(limit), 1000)))
     return _fetch_rows("processed_events", "ai_report_evidence", f"SELECT * FROM processed_events{where} ORDER BY time DESC LIMIT %s", tuple(params))
+
+
+def query_ai_report_projection(report_id: str) -> dict[str, Any] | None:
+    rows = _fetch_rows(
+        "ai_enriched",
+        "report_projection",
+        "SELECT time, event_id, report_id, report_type, situation_status, used_fallback FROM ai_enriched WHERE report_id = %s ORDER BY time DESC LIMIT 1",
+        (_event_uuid(report_id),),
+    )
+    return rows[0] if rows else None
 
 
 

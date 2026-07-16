@@ -60,10 +60,13 @@ cooldown, evidence bound, and replay policy. It enforces the same interval
 boundary as the API: 10 minutes through one day. Operators can request a manual
 report, which creates a durable job; it does not perform a plant action.
 
-The job history shows durable status, attempts, timestamps, and the latest error
-when a request cannot be completed. Model endpoint, credentials, retention, and
-deployment authentication remain user-owned. AI outputs continue to flow through
-`iot.ai_enriched` and the historian.
+The report inbox shows completed briefings in controlled platform typography.
+The Activity tab shows durable status, attempts, timestamps, and the latest error
+when a request cannot be completed. The Policy tab verifies whether the AI gateway
+is reachable and identifies its configured provider/model without exposing a
+secret. Model endpoint, credentials, retention, and deployment authentication
+remain user-owned. AI outputs continue to flow through `iot.ai_enriched` and the
+historian.
 
 The site selector is not an asset selector. It combines site IDs known by source
 registry and asset/tag metadata, and falls back to the shared `*` scope when a
@@ -71,8 +74,10 @@ deployment has not registered site metadata yet.
 
 For cloud and local model setup, see
 [`ai-provider-configuration.md`](ai-provider-configuration.md). The AI
-Reporting page shows durable job state; generated content is emitted to
-`iot.ai_enriched` and stored in the historian `ai_enriched` table.
+Reporting page shows content, evidence, provider/fallback state, and delivery
+verification. Generated content is emitted to `iot.ai_enriched` and stored in
+the historian `ai_enriched` table. Provider failures remain visible whether the
+job uses deterministic fallback or reaches terminal failure.
 
 ## Pipeline page data contract
 

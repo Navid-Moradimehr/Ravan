@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS ai_enriched (
 
 SELECT create_hypertable('ai_enriched', 'time', if_not_exists => TRUE, migrate_data => TRUE);
 CREATE INDEX IF NOT EXISTS ai_enriched_source_ts_idx ON ai_enriched (source, time DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS ai_enriched_event_id_uniq ON ai_enriched (event_id) WHERE event_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ai_enriched_event_id_uniq ON ai_enriched (time, event_id) WHERE event_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ai_enriched_report_idx ON ai_enriched (report_id, time DESC);
 
 CREATE TABLE IF NOT EXISTS metadata_ai_reporting_policy (

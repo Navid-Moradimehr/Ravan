@@ -1,6 +1,6 @@
 # AI Reporting Policy and Jobs
 
-Status: Phase 2 implementation design
+Status: Implemented
 
 ## Boundary
 
@@ -30,8 +30,17 @@ attempt count, and status. The AI gateway records a job before acknowledging the
 corresponding Kafka work. Failed jobs remain retryable and are not silently lost.
 
 Reports are built from bounded historian aggregations and samples, not from an
-unbounded in-memory buffer. This keeps the normal event path fast and makes a
-restart recoverable.
+unbounded in-memory buffer. Workers claim persisted jobs with database row locks
+and a bounded lease. A stopped worker therefore leaves recoverable work rather
+than losing an in-memory queue item. Scheduled evidence is grouped by `site_id`
+before jobs are created, so one deployment serving several sites does not merge
+their routine briefings.
+
+Completed reports retain a validated `operational-briefing.v1` JSON document,
+the bounded evidence IDs, provider/model metadata, prompt/cache metadata, and
+delivery state. The same structured document is published to `iot.ai_enriched`
+and projected into the historian. The UI renders controlled fields only; it does
+not render provider-generated HTML.
 
 ## Compatibility
 
@@ -58,6 +67,9 @@ The additive API is available under `/api/v1/ai`:
 - `PUT /reporting-policy?site_id=<site>` replaces the validated policy.
 - `GET /reporting-status?site_id=<site>` exposes bounds and effective defaults.
 - `GET /reports?site_id=<site>&limit=50` lists durable report jobs.
+- `GET /reports/{report_id}` returns content plus Kafka/historian delivery checks.
+- `GET /reports/latest?site_id=<site>` returns the latest completed briefing.
+- `GET /provider-status` returns a secret-free AI gateway readiness snapshot.
 - `POST /reports/generate` creates a manual, scheduled, or anomaly job. It does
   not execute an action or bypass the model provider boundary.
 
@@ -82,13 +94,11 @@ asset/tag catalog. `*` means the shared default policy. A site-specific policy
 is useful when one installation hosts more than one site or report jobs must be
 isolated by site.
 
-The gateway records scheduled or sustained-anomaly evidence as a durable job and
-places the work on a bounded in-process queue. Kafka polling is separated from
-model execution, so a slow local model does not block the consumer loop. The
-queue defaults to 16 jobs and one model worker; deployments can set
-`AI_REPORT_QUEUE_SIZE` and `AI_REPORT_MAX_IN_FLIGHT` when the model server and
-GPU memory support more concurrency. A full queue leaves the job retryable and
-does not silently discard evidence.
+The gateway records scheduled, sustained-anomaly, recovery, and manual evidence
+as durable jobs. Independent workers claim those jobs from the database, so a
+slow local model does not block Kafka polling. Deployments can set
+`AI_REPORT_MAX_IN_FLIGHT` when the model server and GPU memory support safe
+concurrency. The default remains conservative.
 
 Sustained anomaly reports are evaluated independently per `site_id`, `asset_id`,
 and `tag`. Three pumps can therefore produce three independent warning incidents
@@ -99,7 +109,16 @@ thresholds: the deterministic processor or a user-owned mapping must assign the
 event severity before the tracker evaluates it.
 
 A failed report remains retryable, increments `attempts`, and records
-`next_attempt_at` and `last_error`. The current worker retries queue delivery
-through the normal Kafka replay path after a restart; a future separate job
-claimer is warranted only when pending-job recovery becomes a measured
-operational requirement.
+`next_attempt_at` and `last_error`. A processing lease that outlives its worker is
+reclaimed. After the retry limit the job remains visibly failed. If provider
+fallback is enabled, the report is explicitly marked as deterministic fallback;
+the provider error is preserved and shown in the report workspace. Kafka
+acknowledgement and historian persistence are checked separately.
+
+## User-visible workflow
+
+The **Operational briefings** page is the report inbox. **Reports** displays
+completed structured briefings, evidence, limitations, provider/fallback state,
+and downstream delivery verification. **Activity** displays pending, processing,
+retrying, and failed work. **Policy** displays provider readiness and controls
+site-scoped scheduled, anomaly, and recovery behavior.
