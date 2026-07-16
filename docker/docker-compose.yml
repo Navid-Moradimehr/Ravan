@@ -757,6 +757,7 @@ services:
       DATASTREAM_NOTIFICATION_REGISTRY_PATH: /data/notifications.json
       DATASTREAM_DELIVERY_LEDGER_PATH: /data/delivery-ledger.json
       MODEL_REGISTRY_PATH: /data/model-registry.json
+      MODEL_LIFECYCLE_PATH: /data/model-lifecycle.json
       PROMPT_REGISTRY_PATH: /data/prompt-registry.json
       SCHEMA_REGISTRY_PATH: /data/schema-registry.json
       DATASET_CATALOG_PATH: /data/dataset-catalog.json

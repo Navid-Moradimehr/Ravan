@@ -2966,3 +2966,18 @@ and is not a passing full-stack result.
 Verification: `python -m py_compile scripts/world-model-soak.py
 services/common/model_dataset.py`; focused soak/model tests passed (`5
 passed`). A full 15-minute campaign is the next runtime validation gate.
+
+# 2026-07-16: Provider-neutral model lifecycle ledger
+
+Added a lightweight file-backed model lifecycle ledger and API contract. Model
+versions now carry provider, artifact, dataset, manifest, site, evaluation,
+promotion, and rollback metadata. The ledger requires a passing evaluation
+before approval, retires a competing active version on explicit activation,
+and preserves transition history. The existing HTTP MLflow adapter is exposed
+through an optional synchronization endpoint; MLflow is not a runtime
+dependency and the internal ledger remains authoritative.
+
+Compose persists this state through the existing `api-data` volume at
+`/data/model-lifecycle.json`. Multi-replica operators must provide a shared
+metadata backend before concurrent writes. Verification: lifecycle, modeling,
+MLflow adapter tests and Compose rendering passed (`18 passed`).
