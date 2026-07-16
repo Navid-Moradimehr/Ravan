@@ -50,3 +50,14 @@ be completed after Docker Desktop is healthy; the attempted rerun on
 2026-07-16 was interrupted by Docker Desktop's Linux engine returning API 500
 and Kafka `ApiVersionRequest` timeouts. It must not be counted as a platform
 pass.
+
+## Post-restart lakehouse verification
+
+After Docker Desktop was restarted, a live write-through probe published two
+operational events and one artifact reference. The operational rows appeared
+in `industrial.operational_events_v2` with intact `site_id`, `event_type`,
+`entity_id`, and `payload_json`. The artifact row appeared in
+`industrial.observation_artifacts` with its MinIO URI, byte size, and SHA-256.
+Flink remained `RUNNING`, and the API health check reported Kafka and
+historian healthy. This is a current-path verification; the corrected full
+15-minute campaign remains a separate acceptance run.

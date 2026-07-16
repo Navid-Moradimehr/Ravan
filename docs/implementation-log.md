@@ -16,6 +16,14 @@ Docker Desktop's Linux engine returned API 500 and Kafka began timing out on
 `localhost:19092`. This is recorded as an environment-blocked run, not a
 platform success or failure verdict.
 
+After Docker Desktop restart, live lakehouse write-through verification
+passed: two operational records were persisted to
+`industrial.operational_events_v2` with intact envelope fields and one
+artifact reference was persisted to `industrial.observation_artifacts` with
+its MinIO URI, size, and SHA-256. Flink was `RUNNING`, and the API health
+endpoint reported Kafka and historian healthy. This verifies the corrected
+current path, but does not replace the pending corrected 15-minute soak.
+
 ## 2026-07-16 - World-Model Evidence Soak Harness
 
 Added `scripts/world-model-soak.py`, a dedicated 15-minute campaign for

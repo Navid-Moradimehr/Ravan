@@ -28,3 +28,13 @@ Docker Desktop's Linux engine returned API 500 and Kafka timed out. The
 corrected lakehouse persistence path therefore remains pending a healthy
 Docker rerun; this note deliberately does not call that interrupted run a
 pass.
+
+## Post-restart verification
+
+After Docker Desktop recovered, a live probe published two operational events
+and one artifact reference. Both operational rows were persisted in
+`industrial.operational_events_v2` with the expected envelope fields, and the
+artifact row was persisted in `industrial.observation_artifacts` with its
+MinIO URI, size, and SHA-256. Flink was `RUNNING` and the API health endpoint
+reported Kafka and historian healthy. A fresh corrected 15-minute acceptance
+soak is still distinct from this short write-through verification.
