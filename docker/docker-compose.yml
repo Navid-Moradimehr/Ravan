@@ -342,6 +342,7 @@ services:
       EDGE_PROTOCOLS: ${EDGE_PROTOCOLS:-mqtt,opcua,modbus}
       EDGE_STORE_FORWARD_DIR: /var/lib/datastream/edge-buffer
       EDGE_SOURCE_HEALTH_HISTORY_PATH: /var/lib/datastream/source-health.json
+      DATASTREAM_SOURCE_DELIVERY_HISTORY_PATH: /var/lib/datastream/source-delivery.json
       DATASTREAM_CONNECTION_REGISTRY_PATH: /data/connection-registry.json
       MQTT_HOST: mqtt-broker
       MQTT_PORT: 1883
@@ -770,7 +771,6 @@ services:
       SCHEMA_REGISTRY_PATH: /data/schema-registry.json
       DATASET_CATALOG_PATH: /data/dataset-catalog.json
       EDGE_SOURCE_HEALTH_HISTORY_PATH: /var/lib/datastream/source-health.json
-      DATASTREAM_SOURCE_DELIVERY_HISTORY_PATH: /var/lib/datastream/source-delivery.json
     ports:
       - "8020:8020"
     healthcheck:
