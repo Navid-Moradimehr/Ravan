@@ -52,6 +52,18 @@ telemetry_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
 _policy_cache: tuple[float, AIReportingPolicy] | None = None
 
 
+def _append_bounded_evidence(
+    batch: list[tuple[str, int, int, dict[str, Any]]],
+    item: tuple[str, int, int, dict[str, Any]],
+    max_events: int,
+) -> None:
+    """Retain only the evidence window needed by the next scheduled report."""
+
+    batch.append(item)
+    if len(batch) > max_events:
+        del batch[:-max_events]
+
+
 @dataclass(slots=True)
 class ReportWorkItem:
     batch: list[tuple[str, int, int, dict[str, Any]]]
@@ -329,6 +341,7 @@ async def consume_loop() -> None:
     ]
 
     batch: list[tuple[str, int, int, dict[str, Any]]] = []
+    pending_offsets: dict[tuple[str, int], int] = {}
     anomaly_tracker = SustainedAnomalyTracker()
     deadline = time.monotonic() + reporting_policy().scheduled_interval_seconds
 
@@ -338,8 +351,19 @@ async def consume_loop() -> None:
             if message and not message.error():
                 consumed_events.inc()
                 event = json.loads(message.value().decode("utf-8"))
-                batch.append((message.topic(), message.partition(), message.offset(), event))
                 policy = reporting_policy()
+                if policy.scheduled_enabled:
+                    _append_bounded_evidence(
+                        batch,
+                        (message.topic(), message.partition(), message.offset(), event),
+                        policy.max_evidence_events,
+                    )
+                    pending_offsets[(message.topic(), message.partition())] = message.offset() + 1
+                else:
+                    # A disabled scheduled policy must not retain normal events
+                    # in memory while anomaly reporting remains independent.
+                    batch.clear()
+                    pending_offsets.clear()
                 anomaly_evidence = anomaly_tracker.update(event, policy)
                 if anomaly_evidence:
                     anomaly_batch = [(message.topic(), message.partition(), message.offset(), evidence) for evidence in anomaly_evidence]
@@ -399,10 +423,14 @@ async def consume_loop() -> None:
                         batch=batch[: policy.max_evidence_events],
                         policy=policy,
                         job=job,
-                        offsets=[TopicPartition(topic, partition, offset + 1) for topic, partition, offset, _ in batch],
+                        offsets=[
+                            TopicPartition(topic, partition, offset)
+                            for (topic, partition), offset in pending_offsets.items()
+                        ],
                     ),
                 )
                 batch = []
+                pending_offsets = {}
                 deadline = time.monotonic() + policy.scheduled_interval_seconds
 
             await asyncio.sleep(0)

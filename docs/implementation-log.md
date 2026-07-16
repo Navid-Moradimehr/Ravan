@@ -3031,3 +3031,18 @@ unchanged.
   release-gate snapshot.
 - Site-observability tests pass. Backup-dependent CLI tests still require a
   responsive Docker/Timescale environment when they are not fully mocked.
+
+### Bounded AI report staging
+
+The first live Flink soak attempt exposed an unbounded AI-gateway staging path:
+normal processed events were retained until the scheduled report interval even
+though only the evidence limit was sent to the model. The gateway now retains
+only the bounded evidence window and tracks the latest Kafka offset separately.
+When scheduled reporting is disabled, normal events are not retained. Memory
+cost is therefore proportional to the configured evidence limit, not event
+rate or reporting interval.
+
+Verification: the regression test retains 100 events after 10,000 appends. The
+interrupted live run is not a performance result; it reached approximately
+8.1 GB in the AI-gateway container before being stopped to avoid another WSL
+lockup.

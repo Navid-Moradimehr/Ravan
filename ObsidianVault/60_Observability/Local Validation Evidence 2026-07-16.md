@@ -12,8 +12,11 @@
 - Extended protocol, pipeline, model-data, lakehouse, governance, and Flink
   suites.
 
-## Blocked by host environment
+## Live runtime finding
 
-Docker Compose live state and the real 15-minute full-stack soak could not be
-verified because Docker Desktop/WSL commands timed out. This is an environment
-gate, not a passing or failing application result. Retry after Docker responds.
+Docker Compose recovered after a host restart and all core endpoints became
+healthy. The first restarted 15-minute campaign was intentionally stopped
+before acceptance when the AI gateway reached approximately 8.1 GB. The cause
+was an unbounded scheduled-report evidence buffer, now bounded by
+`max_evidence_events`. This campaign is not a passing or failing soak result;
+rerun it after the fix.

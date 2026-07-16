@@ -40,6 +40,10 @@ ownership. Operator mode renders a PyFlink `FlinkDeployment` using
 - Docker live checks: **not available during this pass** because Docker/WSL
   commands timed out before returning container state. No live soak result is
   attributed to this code change.
+- The first restarted live soak was intentionally stopped before acceptance:
+  the AI gateway reached approximately 8.1 GB while normal reporting was
+  disabled for the campaign. This exposed and corrected an unbounded in-memory
+  evidence buffer; the run is not a benchmark result.
 
 ## Remaining gates
 
