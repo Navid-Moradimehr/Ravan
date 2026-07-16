@@ -2951,6 +2951,18 @@ missing identity, duplicate observation IDs, and unit changes within a
 channel. V1/v2 compilation behavior is unchanged.
 
 Verification: focused model-dataset and benchmark tests passed (`5 passed`).
-The next phase will update the 15-minute soak harness to generate unique
-campaign/episode IDs and verify v3 output against Kafka, Flink, historian, and
-lakehouse evidence.
+
+# 2026-07-16: World-model soak campaign integrity
+
+Updated `scripts/world-model-soak.py` to use unique campaign directories and
+IDs, write explicit episode boundary exports, include site/episode identity in
+telemetry/action/outcome records, and compile manifest v3 bundles. Artifact
+paths and IDs are campaign-scoped, preventing two runs from overwriting the
+same MinIO objects. The report now checks v3 episode/channel/transition
+counts and performs bounded downstream checks for TimescaleDB, Iceberg,
+MinIO checksums, and Flink job state. `--skip-downstream-verify` is explicit
+and is not a passing full-stack result.
+
+Verification: `python -m py_compile scripts/world-model-soak.py
+services/common/model_dataset.py`; focused soak/model tests passed (`5
+passed`). A full 15-minute campaign is the next runtime validation gate.

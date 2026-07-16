@@ -7,7 +7,7 @@ move scalar telemetry.
 It publishes canonical telemetry for three sites and three channels per site,
 publishes action/outcome and episode-boundary events, uploads small real
 artifact objects to MinIO, publishes artifact references to Kafka, and compiles
-the captured records into a manifest-v2 bundle.
+the captured records into a manifest-v3 bundle.
 
 ## Run
 
@@ -17,7 +17,8 @@ py -3.13 scripts/world-model-soak.py --seconds 900 --sites 3 --telemetry-rate 1
 
 The runner starts the required Docker services with the `extended` and
 `world-model` profiles. Reports are written to
-`.datastream/reports/world-model-soak/`.
+`.datastream/reports/world-model-soak/<campaign-id>/`, with a stable
+`latest.json` pointer at the report root.
 
 ## Evidence checked
 
@@ -25,14 +26,23 @@ The runner starts the required Docker services with the `extended` and
 - Three-site identity preservation
 - Telemetry, action, outcome, boundary, and artifact record counts
 - Real MinIO object upload and SHA-256 reference
-- Deterministic manifest-v2 compilation
+- Deterministic manifest-v3 compilation with site-qualified channels
+- Explicit episode boundaries and whole-episode train/validation/test splits
+- Transition rows linking current/next observations to action/outcome IDs
 - Fixed-grid steps and missing-value masks
 - Parquet bundle, lineage, semantic context, quality report, and `_SUCCESS`
+- Exact downstream checks using bounded IDs for TimescaleDB, Iceberg, MinIO
+  checksums, and Flink job state
 
 This does not certify PLC drivers, real industrial networks, GPU training,
 Kubernetes, or customer retention policies. The runner publishes directly to
 the normalized Kafka boundary; protocol-specific connector certification
 remains covered by the protocol edge-case matrix.
+
+Use `--skip-downstream-verify` only for compiler-only or intentionally
+isolated runs. It is not a passing full-stack result. Supply `--campaign-id`
+for reproducibility; otherwise the runner generates one and uses it in event
+metadata, episode IDs, artifact keys, the manifest, and report path.
 
 ## Current local evidence
 
