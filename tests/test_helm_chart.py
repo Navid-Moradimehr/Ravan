@@ -21,6 +21,8 @@ def test_values_yaml_has_service_toggles():
     assert "secrets:" in content
     assert "existingSecret:" in content
     assert "RUNTIME_MODE:" in content
+    assert "KAFKA_BROKERS:" in content
+    assert "REDPANDA_BROKERS:" not in content
 
 
 def test_deployment_template_creates_multiple_deployments():
@@ -32,6 +34,10 @@ def test_deployment_template_creates_multiple_deployments():
     assert "component: edge-ingest" in content
     assert "secretRef" in content
     assert "runtimeMode" in content or "RUNTIME_MODE" in content
+    assert "not .Values.flinkJob.operator.enabled" in content
+    values = (HELM_DIR / "values.yaml").read_text()
+    assert "services.api_service.main:app" in values
+    assert "services.ai_gateway.main:app" in values
 
 
 def test_service_template_creates_multiple_services():

@@ -3009,3 +3009,15 @@ WebSocket delivery p95, and DLQ rate. Missing Prometheus values are explicitly
 Verification: site-observability tests and CLI import checks are pending in
 the phase validation run; the existing dashboard/alerting surfaces remain
 unchanged.
+### Phase 6: Kubernetes/Flink deployment contract hardening
+
+- Corrected Helm profiles to use `KAFKA_BROKERS`, matching the runtime services
+  and removing the stale Redpanda variable.
+- Added service-specific commands and optional image overrides so one generic
+  image cannot silently launch the wrong process.
+- Added an optional Helm `FlinkDeployment` template using the PyFlink
+  `PythonDriver` contract, and prevented the legacy Deployment/HPA from being
+  rendered at the same time.
+- Updated the Flink job image and static example to include the matching
+  Flink-Python runtime JAR and bounded task-manager capacity.
+- Validation: Helm render and focused Kubernetes/Flink tests pass.

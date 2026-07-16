@@ -5,7 +5,7 @@ env:
   RUNTIME_MODE: "flink-production"
   REGION: "tehran-east"
   NETWORK_ZONE: "plant-ops"
-  REDPANDA_BROKERS: "redpanda.plant-b.svc.cluster.local:9092"
+  KAFKA_BROKERS: "kafka.plant-b.svc.cluster.local:9092"
   DATASTREAM_BACKUP_DIR: "backups/plant-b"
   DATASTREAM_FEDERATION_ENABLED: "true"
   DATASTREAM_FEDERATION_EXPORT_MODE: "rollup"
@@ -19,6 +19,8 @@ processor:
 
 flinkJob:
   enabled: true
+  operator:
+    enabled: true
 
 autoScaling:
   apiService:

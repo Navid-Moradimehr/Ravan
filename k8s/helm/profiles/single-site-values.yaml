@@ -5,7 +5,7 @@ env:
   RUNTIME_MODE: "python-fallback"
   REGION: "local-lab"
   NETWORK_ZONE: "zone-a"
-  REDPANDA_BROKERS: "redpanda:9092"
+  KAFKA_BROKERS: "kafka:9092"
   DATASTREAM_BACKUP_DIR: "backups/demo-site"
   DATASTREAM_FEDERATION_ENABLED: "false"
   DATASTREAM_FEDERATION_EXPORT_MODE: "none"

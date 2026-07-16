@@ -11,6 +11,17 @@ the install values site-owned and do not move secrets or storage into the repo.
 For local validation, use `scripts/kind-rehearsal.ps1` and the companion guide
 in `docs/local-kubernetes-rehearsal.md`.
 
+## Helm ownership boundary
+
+With `flinkJob.operator.enabled=true`, Helm renders one `FlinkDeployment` and
+does not render the legacy Flink Deployment or its HPA. With the flag false,
+the local fallback Deployment may be used. Never enable both owners for one
+release.
+
+The job uses the matching Flink Python JAR with `PythonDriver`; the image must
+contain the platform source under `/opt/stream`, the Kafka connector, and
+checkpoint/savepoint storage access.
+
 ## Deployment artifact
 
 The deployment example lives at `k8s/flink-operator/flinkdeployment.yaml`.

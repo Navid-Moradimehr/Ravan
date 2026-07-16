@@ -7,6 +7,9 @@ RUN apt-get update \
     && curl -fsSL https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.8.1/kafka-clients-3.8.1.jar -o /opt/flink/lib/kafka-clients-3.8.1.jar \
     && python3 -m pip install --no-cache-dir protobuf ruamel.yaml PyYAML psycopg2-binary==2.9.10 \
     && ln -sf /usr/bin/python3 /usr/local/bin/python \
+    && cp /opt/flink/opt/flink-python-1.20.0.jar /opt/flink/lib/flink-python-1.20.0.jar \
+    && python3 -c "import zipfile; zipfile.ZipFile('/opt/flink/opt/python/pyflink.zip').extractall('/opt/flink/opt/python')" \
+    && chmod +x /opt/flink/opt/python/pyflink/bin/pyflink-udf-runner.sh \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/stream

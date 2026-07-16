@@ -19,9 +19,15 @@ spec:
     resource:
       cpu: 1
       memory: "1024m"
+    replicas: 3
   job:
-    jarURI: local:///opt/stream/services/processor/iot_anomaly_job.py
-    entryClass: ""
+    jarURI: local:///opt/flink/lib/flink-python-1.20.0.jar
+    entryClass: org.apache.flink.client.python.PythonDriver
+    args:
+      - "-py"
+      - "/opt/stream/services/processor/iot_anomaly_job.py"
+      - "-pyfs"
+      - "/opt/stream"
     parallelism: 3
     upgradeMode: savepoint
     state: running
@@ -30,7 +36,7 @@ spec:
   flinkConfiguration:
     high-availability: org.apache.flink.kubernetes.highavailability.KubernetesHaServicesFactory
     high-availability.storageDir: s3://datastream-state/ha/
-    pipeline.max-parallelism: "3"
+    pipeline.max-parallelism: "120"
     taskmanager.numberOfTaskSlots: "1"
     state.checkpoints.dir: s3://datastream-checkpoints/checkpoints/
     state.savepoints.dir: s3://datastream-checkpoints/savepoints/

@@ -105,6 +105,18 @@ For controlled shutdowns:
 
 ## Ownership boundary
 
+When `flinkJob.operator.enabled=true`, the platform Helm chart renders one
+`FlinkDeployment` and suppresses the legacy Flink `Deployment` and its HPA.
+When the flag is false, the local fallback Deployment may be used. Do not
+enable both runtime owners for the same release.
+
+The Operator job is a PyFlink submission: `jarURI` points to the matching
+versioned `flink-python` JAR and `PythonDriver` receives the platform job path
+through `args`. The image must be built from
+`docker/Dockerfile.flink-job` or an equivalent image containing the matching
+Flink Python runtime, Kafka connector, `/opt/stream/services`, and configured
+checkpoint/savepoint storage access.
+
 Platform-owned:
 
 - job contract

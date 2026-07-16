@@ -21,6 +21,11 @@ nameOverride: ""
 apiService:
   enabled: true
   replicaCount: 1
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: ""
+  command: ["python", "-m", "uvicorn", "services.api_service.main:app", "--host", "0.0.0.0", "--port", "8020", "--no-access-log"]
   port: 8020
   targetPort: 8020
   resources:
@@ -34,6 +39,11 @@ apiService:
 aiGateway:
   enabled: true
   replicaCount: 1
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: ""
+  command: ["uvicorn", "services.ai_gateway.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
   port: 8080
   targetPort: 8080
   resources:
@@ -47,6 +57,11 @@ aiGateway:
 processor:
   enabled: true
   replicaCount: 1
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: ""
+  command: ["python", "-m", "services.processor.runtime_processor"]
   resources:
     limits:
       cpu: 1000m
@@ -58,6 +73,11 @@ processor:
 flinkJob:
   enabled: false
   replicaCount: 1
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: ""
+  command: ["bash", "/opt/stream/flink-job-entrypoint.sh"]
   autoscaling:
     mode: operator
   capacity:
@@ -67,6 +87,15 @@ flinkJob:
     taskmanagerReplicas: 1
   operator:
     enabled: false
+    serviceAccount: data-stream-flink
+    image: ""
+    flinkVersion: v1_20
+    jobManager:
+      cpu: 1
+      memory: "1024m"
+    taskManager:
+      cpu: 1
+      memory: "1024m"
     autoscalerEnabled: false
     minParallelism: 1
     maxParallelism: 120
@@ -74,8 +103,8 @@ flinkJob:
     catchUpDuration: 10m
     metricsWindow: 15m
     stabilizationInterval: 5m
-    checkpointDir: ""
-    savepointDir: ""
+    checkpointDir: "s3://datastream-checkpoints/checkpoints/"
+    savepointDir: "s3://datastream-checkpoints/savepoints/"
   resources:
     limits:
       cpu: 1000m
@@ -87,6 +116,11 @@ flinkJob:
 edgeIngest:
   enabled: true
   replicaCount: 1
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: ""
+  command: ["python", "-m", "services.edge_ingest.main"]
   port: 8090
   targetPort: 8090
   resources:
@@ -142,7 +176,7 @@ env:
   REGION: "local-lab"
   NETWORK_ZONE: "zone-a"
   RUNTIME_MODE: "python-fallback"
-  REDPANDA_BROKERS: "redpanda:9092"
+  KAFKA_BROKERS: "kafka:9092"
   TIMESCALE_HOST: "timescaledb"
   TIMESCALE_PORT: "5432"
   TIMESCALE_DB: "stream_engine"

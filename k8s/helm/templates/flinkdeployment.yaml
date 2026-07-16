@@ -1,0 +1,44 @@
+{{- if and .Values.flinkJob.enabled .Values.flinkJob.operator.enabled }}
+{{- $fullname := include "data-stream.fullname" . -}}
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: {{ $fullname }}-flink-job
+  namespace: {{ include "data-stream.namespace" . }}
+  labels:
+    app: {{ include "data-stream.name" . }}
+    component: flink-job
+spec:
+  image: {{ default .Values.image.repository .Values.flinkJob.operator.image | quote }}
+  flinkVersion: {{ .Values.flinkJob.operator.flinkVersion }}
+  serviceAccount: {{ .Values.flinkJob.operator.serviceAccount }}
+  mode: native
+  jobManager:
+    resource:
+      cpu: {{ .Values.flinkJob.operator.jobManager.cpu }}
+      memory: {{ .Values.flinkJob.operator.jobManager.memory | quote }}
+  taskManager:
+    resource:
+      cpu: {{ .Values.flinkJob.operator.taskManager.cpu }}
+      memory: {{ .Values.flinkJob.operator.taskManager.memory | quote }}
+    replicas: {{ .Values.flinkJob.capacity.taskmanagerReplicas }}
+  job:
+    jarURI: local:///opt/flink/lib/flink-python-1.20.0.jar
+    entryClass: org.apache.flink.client.python.PythonDriver
+    args:
+      - "-py"
+      - "/opt/stream/services/processor/iot_anomaly_job.py"
+      - "-pyfs"
+      - "/opt/stream"
+    parallelism: {{ .Values.flinkJob.capacity.parallelism }}
+    upgradeMode: savepoint
+    state: running
+  flinkConfiguration:
+    high-availability: org.apache.flink.kubernetes.highavailability.KubernetesHaServicesFactory
+    high-availability.storageDir: s3://datastream-state/ha/
+    pipeline.max-parallelism: {{ .Values.flinkJob.capacity.maxParallelism | quote }}
+    taskmanager.numberOfTaskSlots: {{ .Values.flinkJob.capacity.taskmanagerSlots | quote }}
+    state.checkpoints.dir: {{ .Values.flinkJob.operator.checkpointDir | quote }}
+    state.savepoints.dir: {{ .Values.flinkJob.operator.savepointDir | quote }}
+    execution.checkpointing.interval: "10000"
+{{- end }}

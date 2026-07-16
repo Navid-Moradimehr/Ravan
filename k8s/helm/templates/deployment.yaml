@@ -33,8 +33,10 @@ spec:
     spec:
       containers:
         - name: api-service
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ default $.Values.image.repository .Values.apiService.image.repository }}:{{ default $.Values.image.tag .Values.apiService.image.tag }}"
+          imagePullPolicy: {{ default $.Values.image.pullPolicy .Values.apiService.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.apiService.command | nindent 12 }}
           ports:
             - containerPort: {{ .Values.apiService.targetPort }}
               name: http
@@ -80,8 +82,10 @@ spec:
     spec:
       containers:
         - name: ai-gateway
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ default $.Values.image.repository .Values.aiGateway.image.repository }}:{{ default $.Values.image.tag .Values.aiGateway.image.tag }}"
+          imagePullPolicy: {{ default $.Values.image.pullPolicy .Values.aiGateway.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.aiGateway.command | nindent 12 }}
           ports:
             - containerPort: {{ .Values.aiGateway.targetPort }}
               name: http
@@ -127,8 +131,10 @@ spec:
     spec:
       containers:
         - name: processor
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ default $.Values.image.repository .Values.processor.image.repository }}:{{ default $.Values.image.tag .Values.processor.image.tag }}"
+          imagePullPolicy: {{ default $.Values.image.pullPolicy .Values.processor.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.processor.command | nindent 12 }}
           envFrom:
             - configMapRef:
                 name: {{ $fullname }}-env
@@ -147,7 +153,7 @@ spec:
 
 ---
 {{- /* Flink Job */ -}}
-{{- if and .Values.flinkJob.enabled (or (eq $runtimeMode "flink-local") (eq $runtimeMode "flink-production")) }}
+{{- if and .Values.flinkJob.enabled (not .Values.flinkJob.operator.enabled) (or (eq $runtimeMode "flink-local") (eq $runtimeMode "flink-production")) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -171,8 +177,10 @@ spec:
     spec:
       containers:
         - name: flink-job
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ default $.Values.image.repository .Values.flinkJob.image.repository }}:{{ default $.Values.image.tag .Values.flinkJob.image.tag }}"
+          imagePullPolicy: {{ default $.Values.image.pullPolicy .Values.flinkJob.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.flinkJob.command | nindent 12 }}
           envFrom:
             - configMapRef:
                 name: {{ $fullname }}-env
@@ -215,8 +223,10 @@ spec:
     spec:
       containers:
         - name: edge-ingest
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ default $.Values.image.repository .Values.edgeIngest.image.repository }}:{{ default $.Values.image.tag .Values.edgeIngest.image.tag }}"
+          imagePullPolicy: {{ default $.Values.image.pullPolicy .Values.edgeIngest.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.edgeIngest.command | nindent 12 }}
           ports:
             - containerPort: {{ .Values.edgeIngest.targetPort }}
               name: metrics
