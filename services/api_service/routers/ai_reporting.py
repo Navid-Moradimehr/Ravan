@@ -10,6 +10,8 @@ from services.common.ai_reporting import (
     AIReportingPolicy,
     create_report_job,
     get_policy,
+    get_latest_report,
+    get_report_job,
     list_report_jobs,
     reporting_status,
     save_policy,
@@ -46,8 +48,27 @@ async def get_reporting_status(site_id: str = "*") -> dict[str, Any]:
 
 
 @router.get("/reports")
-async def get_reports(site_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
-    return list_report_jobs(site_id=site_id, limit=limit)
+async def get_reports(site_id: str | None = None, report_type: str | None = None, status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    return list_report_jobs(site_id=site_id, report_type=report_type, status=status, limit=limit)
+
+
+@router.get("/reports/latest")
+async def latest_report(site_id: str | None = None) -> dict[str, Any] | None:
+    return get_latest_report(site_id=site_id)
+
+
+@router.get("/reports/{report_id}")
+async def report_detail(report_id: str) -> dict[str, Any]:
+    report = get_report_job(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="AI report not found")
+    return report
+
+
+@router.get("/report-activity")
+async def report_activity(site_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    jobs = list_report_jobs(site_id=site_id, limit=limit)
+    return [job for job in jobs if job.get("status") != "completed"]
 
 
 @router.post("/reports/generate")

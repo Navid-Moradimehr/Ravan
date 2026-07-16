@@ -22,3 +22,15 @@ def test_tracker_excludes_replay_events():
     policy = AIReportingPolicy(anomaly_enabled=True, anomaly_severity="warning")
     tracker = SustainedAnomalyTracker()
     assert tracker.update({**event(), "replay_source": "dataset"}, policy, now=100) is None
+
+
+def test_tracker_emits_recovery_transition_after_rearm():
+    policy = AIReportingPolicy(anomaly_enabled=True, anomaly_severity="warning", anomaly_duration_seconds=20, anomaly_min_samples=3, anomaly_rearm_seconds=5)
+    tracker = SustainedAnomalyTracker()
+    tracker.update_transition(event(), policy, now=0)
+    tracker.update_transition(event(), policy, now=10)
+    anomaly = tracker.update_transition(event(), policy, now=20)
+    assert anomaly and anomaly["kind"] == "anomaly"
+    assert tracker.update_transition(event("normal"), policy, now=21) is None
+    recovery = tracker.update_transition(event("normal"), policy, now=26)
+    assert recovery and recovery["kind"] == "recovery"

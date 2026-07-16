@@ -83,6 +83,19 @@ def test_provider_catalog_does_not_contain_credentials():
     assert all("key" not in item and "secret" not in item for item in catalog)
 
 
+def test_structured_schema_is_mapped_to_provider_native_contracts():
+    schema = {"type": "object", "required": ["headline"], "properties": {"headline": {"type": "string"}}}
+    openai = LLMProviderClient(Settings(llm_provider="openai_compat", llm_endpoint_url="http://localhost:1234/v1")).request_spec("JSON report", output_schema=schema)
+    anthropic = LLMProviderClient(Settings(llm_provider="anthropic")).request_spec("JSON report", output_schema=schema)
+    gemini = LLMProviderClient(Settings(llm_provider="gemini")).request_spec("JSON report", output_schema=schema)
+    ollama = LLMProviderClient(Settings(llm_provider="ollama", llm_endpoint_url="http://localhost:11434")).request_spec("JSON report", output_schema=schema)
+    assert openai.body["response_format"]["json_schema"]["schema"] == schema
+    assert anthropic.body["output_config"]["format"]["schema"] == schema
+    assert anthropic.body["system"][0]["cache_control"]["type"] == "ephemeral"
+    assert gemini.body["generationConfig"]["responseJsonSchema"] == schema
+    assert ollama.body["format"] == schema
+
+
 def test_response_parsers_handle_openai_and_ollama_shapes():
     settings = Settings()
     client = LLMProviderClient(settings)
@@ -116,8 +129,8 @@ def test_build_industrial_prompt_uses_structured_contract():
 def test_ai_gateway_enrich_batch_falls_back_on_invalid_json(monkeypatch):
     import services.ai_gateway.main as gateway
 
-    async def fake_summarize(prompt: str, timeout_seconds: int, client=None) -> str:
-        return "not-json"
+    async def fake_summarize(prompt: str, *, output_schema, timeout_seconds: int, cache_mode="auto"):
+        return "not-json", {"structured_mode": "guided", "cache_mode": cache_mode}
 
     captured: dict[str, object] = {}
 
@@ -129,7 +142,7 @@ def test_ai_gateway_enrich_batch_falls_back_on_invalid_json(monkeypatch):
         def poll(self, timeout):
             captured["polled"] = True
 
-    monkeypatch.setattr(gateway.llm_client, "summarize", fake_summarize)
+    monkeypatch.setattr(gateway.llm_client, "summarize_structured", fake_summarize)
     gateway.service_state.mark_ok()
 
     asyncio.run(
@@ -144,7 +157,8 @@ def test_ai_gateway_enrich_batch_falls_back_on_invalid_json(monkeypatch):
 
     assert captured["topic"] == gateway.settings.ai_enriched_topic
     assert captured["payload"]["summary"]
-    assert captured["payload"]["summary"].count("deterministic_fallback") == 1
+    assert captured["payload"]["structured_report"]["situation_status"] == "critical"
+    assert captured["payload"]["used_fallback"] is True
     assert captured["payload"]["event_type"] == "ai.summary.generated"
     assert captured["payload"]["event_version"] == 1
     assert captured["payload"]["source_event_ids"]

@@ -5,7 +5,7 @@ import contextlib
 import json
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -19,16 +19,30 @@ from fastapi.responses import StreamingResponse
 from services.ai_gateway.config import Settings
 from services.ai_gateway.providers import (
     LLMProviderClient,
-    build_fallback_summary,
-    build_industrial_prompt,
     provider_catalog,
 )
 from services.common.ai_event_contract import build_ai_summary_event, DEFAULT_AI_PROMPT_TEMPLATE_ID
 from services.common.prompt_registry import prompt_registry
-from services.common.structured_output import validate_industrial_summary
 from services.common.service_health import ServiceHealthState
 from services.common.runtime_metrics import set_consumer_lag
-from services.common.ai_reporting import AIReportingPolicy, SustainedAnomalyTracker, complete_report_job, create_report_job, fail_report_job, get_policy
+from services.common.ai_reporting import (
+    AIReportingPolicy,
+    SustainedAnomalyTracker,
+    claim_next_report_job,
+    complete_report_job,
+    create_report_job,
+    fail_report_job,
+    get_policy,
+    list_report_jobs,
+    mark_report_job_processing,
+)
+from services.common.operational_briefing import (
+    briefing_json_schema,
+    build_briefing_context,
+    build_briefing_prompt,
+    deterministic_briefing,
+    validate_briefing,
+)
 
 
 settings = Settings()
@@ -92,10 +106,10 @@ async def report_worker(
             return
         report_workers_active.inc()
         try:
-            success = await enrich_batch(item.batch, producer, policy=item.policy, job=item.job)
-            if success:
+            result = await enrich_batch(item.batch, producer, policy=item.policy, job=item.job)
+            if result:
                 if item.job:
-                    complete_report_job(str(item.job["job_id"]), {"event_id": "emitted"})
+                    complete_report_job(str(item.job["job_id"]), result)
                 report_jobs_completed.inc()
                 consumer.commit(offsets=item.offsets, asynchronous=False)
             elif item.job:
@@ -125,6 +139,45 @@ async def enqueue_report(queue: asyncio.Queue[ReportWorkItem | None], item: Repo
         report_jobs_failed.inc()
         service_state.mark_degraded("AI report queue full", "increase capacity or reduce report frequency")
         return False
+
+
+async def durable_job_worker(producer: Producer) -> None:
+    """Claim API-created and retryable reports from the durable job table."""
+    from services.historian.client import query_report_evidence
+
+    worker_id = f"ai-gateway-{id(producer)}"
+    while service_state.running:
+        try:
+            job = await asyncio.to_thread(claim_next_report_job, worker_id)
+        except Exception as exc:
+            service_state.mark_degraded("AI report queue unavailable", str(exc))
+            await asyncio.sleep(2)
+            continue
+        if job is None:
+            await asyncio.sleep(1)
+            continue
+        try:
+            policy = AIReportingPolicy.model_validate(job.get("policy_snapshot") or {})
+            evidence = list(job.get("evidence") or [])
+            if not evidence:
+                evidence = await asyncio.to_thread(
+                    query_report_evidence,
+                    str(job.get("site_id") or "*"),
+                    start=job.get("window_start"),
+                    end=job.get("window_end"),
+                    limit=policy.max_evidence_events,
+                )
+            batch = [(settings.processed_topic, 0, index, event) for index, event in enumerate(evidence)]
+            result = await enrich_batch(batch, producer, policy=policy, job=job)
+            if result:
+                complete_report_job(str(job["job_id"]), result)
+                report_jobs_completed.inc()
+            else:
+                fail_report_job(str(job["job_id"]), "AI output was not acknowledged")
+                report_jobs_failed.inc()
+        except Exception as exc:
+            fail_report_job(str(job["job_id"]), str(exc))
+            report_jobs_failed.inc()
 
 
 def reporting_policy() -> AIReportingPolicy:
@@ -353,6 +406,7 @@ async def consume_loop() -> None:
         asyncio.create_task(report_worker(report_queue, producer, consumer))
         for _ in range(max(1, settings.ai_report_max_in_flight))
     ]
+    durable_worker = asyncio.create_task(durable_job_worker(producer))
 
     batch: list[tuple[str, int, int, dict[str, Any]]] = []
     pending_offsets: dict[tuple[str, int], int] = {}
@@ -366,6 +420,14 @@ async def consume_loop() -> None:
                 consumed_events.inc()
                 event = json.loads(message.value().decode("utf-8"))
                 policy = reporting_policy()
+                if not policy.enabled:
+                    batch.clear()
+                    pending_offsets.clear()
+                    consumer.commit(
+                        offsets=[TopicPartition(message.topic(), message.partition(), message.offset() + 1)],
+                        asynchronous=False,
+                    )
+                    continue
                 if policy.scheduled_enabled:
                     _append_bounded_evidence(
                         batch,
@@ -378,14 +440,16 @@ async def consume_loop() -> None:
                     # in memory while anomaly reporting remains independent.
                     batch.clear()
                     pending_offsets.clear()
-                anomaly_evidence = anomaly_tracker.update(event, policy)
-                if anomaly_evidence:
+                anomaly_transition = anomaly_tracker.update_transition(event, policy)
+                if anomaly_transition:
+                    anomaly_evidence = list(anomaly_transition["evidence"])
+                    transition_kind = str(anomaly_transition["kind"])
                     anomaly_batch = [(message.topic(), message.partition(), message.offset(), evidence) for evidence in anomaly_evidence]
                     try:
                         anomaly_job = create_report_job(
                             site_id=_batch_site(anomaly_evidence),
-                            report_type="anomaly",
-                            trigger_reason="sustained_anomaly",
+                            report_type="recovery" if transition_kind == "recovery" else "anomaly",
+                            trigger_reason="anomaly_recovered" if transition_kind == "recovery" else "sustained_anomaly",
                             window_start=None,
                             window_end=None,
                             policy=policy,
@@ -394,6 +458,7 @@ async def consume_loop() -> None:
                     except Exception as exc:
                         service_state.mark_degraded("anomaly report failed", str(exc))
                     else:
+                        mark_report_job_processing(str(anomaly_job["job_id"]), "kafka-consumer")
                         await enqueue_report(
                             report_queue,
                             ReportWorkItem(
@@ -420,17 +485,20 @@ async def consume_loop() -> None:
                 job = None
                 try:
                     payloads = [_batch_payload(item) for item in batch[: policy.max_evidence_events]]
+                    window_end = datetime.now(timezone.utc)
                     job = create_report_job(
                         site_id=_batch_site(payloads),
                         report_type="scheduled",
                         trigger_reason="interval",
-                        window_start=None,
-                        window_end=None,
+                        window_start=window_end - timedelta(seconds=policy.scheduled_interval_seconds),
+                        window_end=window_end,
                         policy=policy,
                         evidence=payloads,
                     )
                 except Exception as exc:
                     service_state.mark_degraded("AI report job could not be recorded", str(exc))
+                if job:
+                    mark_report_job_processing(str(job["job_id"]), "kafka-consumer")
                 await enqueue_report(
                     report_queue,
                     ReportWorkItem(
@@ -449,9 +517,10 @@ async def consume_loop() -> None:
 
             await asyncio.sleep(0)
     finally:
+        durable_worker.cancel()
         for _ in worker_tasks:
             await report_queue.put(None)
-        await asyncio.gather(*worker_tasks, return_exceptions=True)
+        await asyncio.gather(*worker_tasks, durable_worker, return_exceptions=True)
         consumer.close()
         producer.flush(5)
 
@@ -462,30 +531,51 @@ async def enrich_batch(
     *,
     policy: AIReportingPolicy | None = None,
     job: dict[str, Any] | None = None,
-) -> bool:
+) -> dict[str, Any] | None:
     batch_size_gauge.set(len(batch))
     payloads = [_batch_payload(item) for item in batch]
     for severity in ("normal", "warning", "critical"):
         count = sum(1 for event in payloads if event.get("severity") == severity)
         if count:
             batch_severity_total.labels(severity=severity).inc(count)
-    prompt = build_industrial_prompt(payloads[: settings.llm_max_batch_size])
+    site_id = str(job.get("site_id") if job else _batch_site(payloads))
+    previous_reports = list_report_jobs(
+        site_id=None if site_id == "*" else site_id,
+        status="completed",
+        limit=settings.ai_report_memory_count,
+    )
+    context = build_briefing_context(
+        payloads[: settings.llm_max_batch_size],
+        report_type=str(job.get("report_type") if job else "scheduled"),
+        site_id=site_id,
+        previous_reports=previous_reports,
+        max_events=policy.max_evidence_events if policy else settings.llm_max_batch_size,
+        memory_hours=settings.ai_report_memory_hours,
+    )
+    prompt = build_briefing_prompt(context)
 
     started = time.monotonic()
     content: str | None = None
     used_fallback = False
+    generation_metadata: dict[str, Any] = {}
     prompt_template = prompt_registry.get(DEFAULT_AI_PROMPT_TEMPLATE_ID)
     prompt_version = prompt_template.version if prompt_template is not None else "1.0.0"
     try:
-        content = await llm_client.summarize(prompt, settings.llm_timeout_seconds)
-        valid, errors, _payload = validate_industrial_summary(content)
+        content, generation_metadata = await llm_client.summarize_structured(
+            prompt,
+            output_schema=briefing_json_schema(),
+            timeout_seconds=settings.llm_timeout_seconds,
+            cache_mode=settings.llm_prompt_cache_mode,
+        )
+        valid, errors, parsed_briefing = validate_briefing(content)
         if not valid:
             fallback_reason = "; ".join(errors)
             if not settings.llm_allow_fallback:
                 service_state.mark_degraded("llm output validation failed", f"LLM output validation failed: {fallback_reason}")
                 asyncio.create_task(_broadcast_telemetry())
-                return False
-            content = build_fallback_summary(payloads, f"output_validation_failed: {fallback_reason}")
+                return None
+            parsed_briefing = deterministic_briefing(context, f"output_validation_failed: {fallback_reason}")
+            content = json.dumps(parsed_briefing, separators=(",", ":"))
             service_state.mark_degraded("llm fallback active", f"LLM fallback active: output validation failed: {fallback_reason}")
             used_fallback = True
             asyncio.create_task(_broadcast_telemetry())
@@ -493,9 +583,10 @@ async def enrich_batch(
         if not settings.llm_allow_fallback:
             service_state.mark_degraded("llm request failed", str(exc))
             asyncio.create_task(_broadcast_telemetry())
-            return False
+            return None
         fallback_reason = f"{type(exc).__name__}: {exc}"
-        content = build_fallback_summary(payloads, fallback_reason)
+        parsed_briefing = deterministic_briefing(context, fallback_reason)
+        content = json.dumps(parsed_briefing, separators=(",", ":"))
         service_state.mark_degraded("llm fallback active", f"LLM fallback active: {fallback_reason}")
         used_fallback = True
         asyncio.create_task(_broadcast_telemetry())
@@ -503,11 +594,16 @@ async def enrich_batch(
         llm_latency.observe(time.monotonic() - started)
 
     if content is None:
-        return False
+        return None
+
+    valid, _errors, briefing = validate_briefing(content)
+    if not valid or briefing is None:
+        briefing = deterministic_briefing(context, "final_validation_failed")
+        used_fallback = True
 
     enriched_payload = build_ai_summary_event(
         payloads,
-        summary=content,
+        summary=str(briefing.get("executive_summary") or briefing.get("headline") or ""),
         provider=settings.llm_provider,
         model_id=settings.llm_model_id,
         endpoint=settings.llm_endpoint_url,
@@ -519,6 +615,10 @@ async def enrich_batch(
         report_type=str(job["report_type"]) if job else "scheduled",
         trigger_reason=str(job["trigger_reason"]) if job else "interval",
         policy_snapshot=policy.model_dump(mode="json") if policy else None,
+        window_start=str(job.get("window_start")) if job and job.get("window_start") else None,
+        window_end=str(job.get("window_end")) if job and job.get("window_end") else None,
+        structured_report=briefing,
+        generation_metadata=generation_metadata,
     )
     producer.produce(settings.ai_enriched_topic, value=json.dumps(enriched_payload).encode("utf-8"))
     # Do not let the input consumer commit before the AI event has reached the
@@ -536,7 +636,7 @@ async def enrich_batch(
     if remaining:
         service_state.mark_degraded("AI event delivery pending", f"{remaining} Kafka event(s) not acknowledged")
         asyncio.create_task(_broadcast_telemetry())
-        return False
+        return None
     enriched_events.inc()
     last_success_epoch.set(time.time())
     if not used_fallback:
@@ -545,7 +645,20 @@ async def enrich_batch(
     # Signal the push-driven dashboard bus so subscribers refresh now instead of
     # waiting for the next fixed-interval poll.
     historian_refresh_event.set()
-    return True
+    return {
+        "event_id": enriched_payload["event_id"],
+        "briefing": briefing,
+        "generation": {
+            **generation_metadata,
+            "provider": settings.llm_provider,
+            "model": settings.llm_model_id,
+            "latency_seconds": enriched_payload.get("latency_seconds"),
+            "used_fallback": used_fallback,
+            "prompt_template_id": DEFAULT_AI_PROMPT_TEMPLATE_ID,
+            "prompt_version": prompt_version,
+        },
+        "evidence_event_ids": enriched_payload.get("source_event_ids", []),
+    }
 
 
 def _batch_payload(item: Any) -> dict[str, Any]:

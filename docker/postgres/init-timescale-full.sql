@@ -150,11 +150,24 @@ CREATE TABLE IF NOT EXISTS ai_enriched (
     model TEXT NOT NULL,
     batch_size INTEGER NOT NULL DEFAULT 0,
     summary TEXT NOT NULL DEFAULT '',
-    latency_seconds DOUBLE PRECISION NOT NULL DEFAULT 0
+    latency_seconds DOUBLE PRECISION NOT NULL DEFAULT 0,
+    event_id UUID,
+    report_id UUID,
+    site_id TEXT,
+    report_type TEXT,
+    trigger_reason TEXT,
+    situation_status TEXT,
+    structured_report JSONB,
+    used_fallback BOOLEAN NOT NULL DEFAULT FALSE,
+    prompt_template_id TEXT,
+    prompt_version TEXT,
+    source_event_ids JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
 SELECT create_hypertable('ai_enriched', 'time', if_not_exists => TRUE, migrate_data => TRUE);
 CREATE INDEX IF NOT EXISTS ai_enriched_source_ts_idx ON ai_enriched (source, time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS ai_enriched_event_id_uniq ON ai_enriched (event_id) WHERE event_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ai_enriched_report_idx ON ai_enriched (report_id, time DESC);
 
 CREATE TABLE IF NOT EXISTS metadata_ai_reporting_policy (
     policy_id TEXT PRIMARY KEY,
@@ -163,6 +176,8 @@ CREATE TABLE IF NOT EXISTS metadata_ai_reporting_policy (
     version INTEGER NOT NULL DEFAULT 1,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE ai_report_jobs ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+ALTER TABLE ai_report_jobs ADD COLUMN IF NOT EXISTS worker_id TEXT;
 
 CREATE TABLE IF NOT EXISTS ai_report_jobs (
     job_id UUID PRIMARY KEY,

@@ -80,7 +80,7 @@ class LLMProviderClient:
     def provider(self) -> str:
         return str(self.settings.llm_provider).lower().strip()
 
-    def request_spec(self, prompt: str) -> LLMRequestSpec:
+    def request_spec(self, prompt: str, *, output_schema: dict[str, Any] | None = None, cache_mode: str = "auto") -> LLMRequestSpec:
         provider = self.provider
         if provider == "disabled":
             raise LLMDisabledError("LLM provider is disabled")
@@ -106,33 +106,86 @@ class LLMProviderClient:
                 "messages": self._messages(prompt),
                 "stream": False,
             }
+            if output_schema:
+                body["format"] = output_schema
         elif canonical == "anthropic":
             body = {
                 "model": self.settings.llm_model_id,
                 "max_tokens": max(1, int(self.settings.llm_max_output_tokens)),
-                "system": "You are an operations analyst for a streaming industrial platform.",
+                "system": [{
+                    "type": "text",
+                    "text": "You are an operations analyst for a streaming industrial platform.",
+                    **({"cache_control": {"type": "ephemeral"}} if cache_mode == "auto" else {}),
+                }],
                 "messages": [{"role": "user", "content": prompt}],
             }
+            if output_schema:
+                body["output_config"] = {"format": {"type": "json_schema", "schema": output_schema}}
         elif canonical == "gemini":
             body = {
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
                 "systemInstruction": {"parts": [{"text": "You are an operations analyst for a streaming industrial platform."}]},
                 "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(1, int(self.settings.llm_max_output_tokens))},
             }
+            if output_schema:
+                body["generationConfig"].update({"responseMimeType": "application/json", "responseJsonSchema": output_schema})
         elif self.settings.llm_request_format == "completion":
             body = {
                 "model": self.settings.llm_model_id,
                 "prompt": prompt,
                 "temperature": 0.2,
             }
+            if output_schema:
+                body["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {"name": "operational_briefing", "strict": True, "schema": output_schema},
+                }
         else:
             body = {
                 "model": self.settings.llm_model_id,
                 "messages": self._messages(prompt),
                 "temperature": 0.2,
             }
+            if output_schema:
+                body["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {"name": "operational_briefing", "strict": True, "schema": output_schema},
+                }
 
         return LLMRequestSpec(url=url, headers=headers, body=body)
+
+    async def summarize_structured(
+        self,
+        prompt: str,
+        *,
+        output_schema: dict[str, Any],
+        timeout_seconds: int,
+        cache_mode: str = "auto",
+    ) -> tuple[str, dict[str, Any]]:
+        spec = self.request_spec(prompt, output_schema=output_schema, cache_mode=cache_mode)
+        structured_mode = "guided"
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            try:
+                payload = await self._post(client, spec)
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code not in {400, 404, 422}:
+                    raise
+                structured_mode = "validation_fallback"
+                payload = await self._post(client, self.request_spec(prompt, cache_mode=cache_mode))
+        usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
+        cached_tokens = (
+            ((usage.get("prompt_tokens_details") or {}).get("cached_tokens"))
+            or usage.get("cached_tokens")
+            or usage.get("total_cached_tokens")
+            or 0
+        )
+        return self.extract_content(payload), {
+            "structured_mode": structured_mode,
+            "cache_mode": cache_mode,
+            "prompt_tokens": usage.get("prompt_tokens") or usage.get("input_tokens"),
+            "cached_tokens": cached_tokens,
+            "output_tokens": usage.get("completion_tokens") or usage.get("output_tokens"),
+        }
 
     async def summarize(self, prompt: str, timeout_seconds: int, client: httpx.AsyncClient | None = None) -> str:
         spec = self.request_spec(prompt)

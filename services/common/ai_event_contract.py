@@ -128,6 +128,8 @@ def build_ai_summary_event(
     policy_snapshot: dict[str, Any] | None = None,
     window_start: str | None = None,
     window_end: str | None = None,
+    structured_report: dict[str, Any] | None = None,
+    generation_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     source_event_ids = _collect_source_event_ids(batch)
     source_sites = sorted({str(event.get("site_id", "")) for event in batch if event.get("site_id")})
@@ -170,5 +172,7 @@ def build_ai_summary_event(
         "policy_snapshot": policy_snapshot,
         "window_start": window_start,
         "window_end": window_end,
+        "structured_report": structured_report or {},
+        "generation_metadata": generation_metadata or {},
     }
     return event

@@ -8,6 +8,7 @@ def test_reporting_defaults_are_safe_for_local_and_air_gapped_deployments():
     policy = default_policy()
     assert policy.scheduled_interval_seconds == 3600
     assert policy.anomaly_enabled is False
+    assert policy.recovery_enabled is True
     assert policy.anomaly_duration_seconds == 20
     assert policy.anomaly_severity == "critical"
     assert policy.exclude_replay is True
@@ -24,4 +25,3 @@ def test_anomaly_policy_rejects_unbounded_or_unsupported_values():
         AIReportingPolicy(anomaly_duration_seconds=19)
     with pytest.raises(ValidationError):
         AIReportingPolicy(anomaly_severity="normal")
-

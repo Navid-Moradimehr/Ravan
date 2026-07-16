@@ -527,9 +527,25 @@ def insert_ai_enriched(event: dict[str, Any]) -> None:
             with conn.cursor() as cur:
                 cur.execute(
                     """
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS event_id UUID;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS report_id UUID;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS site_id TEXT;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS report_type TEXT;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS trigger_reason TEXT;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS situation_status TEXT;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS structured_report JSONB;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS used_fallback BOOLEAN NOT NULL DEFAULT FALSE;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS prompt_template_id TEXT;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS prompt_version TEXT;
+                    ALTER TABLE ai_enriched ADD COLUMN IF NOT EXISTS source_event_ids JSONB NOT NULL DEFAULT '[]'::jsonb;
+                    CREATE UNIQUE INDEX IF NOT EXISTS ai_enriched_event_id_uniq ON ai_enriched (event_id) WHERE event_id IS NOT NULL;
                     INSERT INTO ai_enriched (
-                        time, source, model, batch_size, summary, latency_seconds
-                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                        time, source, model, batch_size, summary, latency_seconds,
+                        event_id, report_id, site_id, report_type, trigger_reason,
+                        situation_status, structured_report, used_fallback,
+                        prompt_template_id, prompt_version, source_event_ids
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (event_id) WHERE event_id IS NOT NULL DO NOTHING
                     """,
                     (
                         _coalesce_timestamp(None),
@@ -538,6 +554,17 @@ def insert_ai_enriched(event: dict[str, Any]) -> None:
                         event.get("batch_size", 0),
                         event.get("summary", ""),
                         event.get("latency_seconds", 0),
+                        _event_uuid(event.get("event_id")),
+                        _event_uuid(event.get("report_id")) if event.get("report_id") else None,
+                        (event.get("source_site_ids") or [None])[0],
+                        event.get("report_type"),
+                        event.get("trigger_reason"),
+                        (event.get("structured_report") or {}).get("situation_status"),
+                        Json(event.get("structured_report") or {}),
+                        bool(event.get("used_fallback")),
+                        event.get("prompt_template_id"),
+                        event.get("prompt_version"),
+                        Json(event.get("source_event_ids") or []),
                     ),
                 )
             conn.commit()
@@ -580,6 +607,23 @@ def query_recent_events(table: str, limit: int = 100) -> list[dict[str, Any]]:
     if table not in ALLOWED_QUERY_TABLES:
         raise ValueError(f"unsupported table: {table}")
     return _fetch_rows(table, "recent_events", f"SELECT * FROM {table} ORDER BY time DESC LIMIT %s", (limit,))
+
+
+def query_report_evidence(site_id: str, *, start: Any | None = None, end: Any | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    filters: list[str] = []
+    params: list[Any] = []
+    if site_id and site_id != "*":
+        filters.append("site_id = %s")
+        params.append(site_id)
+    if start is not None:
+        filters.append("time >= %s")
+        params.append(start)
+    if end is not None:
+        filters.append("time <= %s")
+        params.append(end)
+    where = f" WHERE {' AND '.join(filters)}" if filters else ""
+    params.append(max(1, min(int(limit), 1000)))
+    return _fetch_rows("processed_events", "ai_report_evidence", f"SELECT * FROM processed_events{where} ORDER BY time DESC LIMIT %s", tuple(params))
 
 
 
