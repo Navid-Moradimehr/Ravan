@@ -10,6 +10,7 @@ def test_site_observability_snapshot_uses_health_and_backup(monkeypatch, tmp_pat
     monkeypatch.setattr(obs, "probe_historian", lambda: True)
     monkeypatch.setattr(obs, "probe_ai_gateway", lambda: False)
     monkeypatch.setattr(obs, "get_walg_status", lambda: {"installed": True})
+    monkeypatch.setattr(obs, "_prometheus_query", lambda _query: 0.0)
 
     profile_path = tmp_path / "site.yaml"
     profile_path.write_text(
@@ -62,6 +63,7 @@ def test_site_observability_api_route_returns_snapshot(monkeypatch) -> None:
     monkeypatch.setattr(obs, "probe_historian", lambda: True)
     monkeypatch.setattr(obs, "probe_ai_gateway", lambda: True)
     monkeypatch.setattr(obs, "get_walg_status", lambda: {"installed": False})
+    monkeypatch.setattr(obs, "_prometheus_query", lambda _query: 0.0)
 
     client = TestClient(app)
     response = client.get("/api/v1/observability/site")
@@ -71,3 +73,12 @@ def test_site_observability_api_route_returns_snapshot(monkeypatch) -> None:
     assert body["plane"] == "site-observability"
     assert body["availability"]["historian_health"] is True
 
+
+def test_slo_evaluation_marks_missing_prometheus_values_unknown(monkeypatch):
+    import services.common.site_observability as obs
+
+    monkeypatch.setattr(obs, "_prometheus_query", lambda _query: None)
+    evaluation = obs._slo_evaluation()
+
+    assert evaluation["status"] == "unknown"
+    assert all(item["status"] == "unknown" for item in evaluation["measurements"])

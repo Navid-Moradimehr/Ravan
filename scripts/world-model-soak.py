@@ -69,7 +69,7 @@ def _verify_timescale(
         import psycopg2
 
         connection = psycopg2.connect(
-            os.getenv("WORLD_MODEL_DATABASE_URL", "postgresql://stream:stream@localhost:15432/stream_engine"),
+            os.getenv("WORLD_MODEL_DATABASE_URL", "postgresql://stream:stream@localhost:15433/stream_engine"),
             connect_timeout=5,
         )
         connection.autocommit = True
@@ -119,7 +119,7 @@ def _verify_lakehouse(
             os.getenv("LAKEHOUSE_CATALOG", "sql"),
             type=os.getenv("LAKEHOUSE_CATALOG", "sql"),
             warehouse=os.getenv("WORLD_MODEL_LAKEHOUSE_WAREHOUSE", "s3://lakehouse/"),
-            uri=os.getenv("WORLD_MODEL_LAKEHOUSE_CATALOG_URI", "postgresql+psycopg2://stream:stream@localhost:15432/stream_engine"),
+            uri=os.getenv("WORLD_MODEL_LAKEHOUSE_CATALOG_URI", "postgresql+psycopg2://stream:stream@localhost:15433/stream_engine"),
             **{
                 "s3.endpoint": os.getenv("WORLD_MODEL_MINIO_ENDPOINT", "http://localhost:19000"),
                 "s3.access-key-id": os.getenv("WORLD_MODEL_MINIO_ACCESS_KEY", "minio"),

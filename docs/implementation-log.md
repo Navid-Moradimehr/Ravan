@@ -2995,3 +2995,17 @@ Timescale initialization/migration creates the missing `audit_logs` table.
 Verification: modeling contracts `16 passed`; lifecycle and MLflow tests `5
 passed`; Compose rendering passed. User-owned agents, MCP servers, skills,
 prompts, identity, and action executors remain outside the core.
+
+# 2026-07-16: Measured SLO evidence
+
+Replaced the site-observability API health constant and boolean AI-latency
+signal with bounded probe timing plus Prometheus-backed SLO evaluation. The
+snapshot now reports consumer lag, AI request p95, fan-out write p95,
+WebSocket delivery p95, and DLQ rate. Missing Prometheus values are explicitly
+`unknown`; they are never treated as healthy or zero. Added the
+`/api/v1/observability/slo` route and `datastreamctl observability slo`, with
+`--require-slo-evidence` for strict release gates.
+
+Verification: site-observability tests and CLI import checks are pending in
+the phase validation run; the existing dashboard/alerting surfaces remain
+unchanged.

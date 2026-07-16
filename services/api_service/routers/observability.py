@@ -18,6 +18,19 @@ async def site_observability(site_profile: str | None = None) -> dict[str, Any]:
     )
 
 
+@router.get("/api/v1/observability/slo")
+async def slo_observability(site_profile: str | None = None) -> dict[str, Any]:
+    snapshot = build_site_observability_snapshot(
+        site_profile_path=Path(site_profile) if site_profile else None,
+    )
+    return {
+        "generated_at": snapshot["generated_at"],
+        "deployment_mode": snapshot["deployment_mode"],
+        "targets": snapshot["slo_targets"],
+        "evaluation": snapshot["slo_evaluation"],
+    }
+
+
 @router.get("/api/v1/observability/source-health")
 async def source_health(limit: int = 100, expected_interval_seconds: float = 10.0) -> dict[str, Any]:
     try:

@@ -1012,6 +1012,24 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_observability(args: argparse.Namespace) -> int:
+    status, body = _http_get(f"{args.api_base}/api/v1/observability/slo")
+    payload = {"http_status": status, "response": body}
+    evaluation = body.get("evaluation", {}) if isinstance(body, dict) else {}
+    evidence_status = evaluation.get("status", "unknown")
+    passed = status == 200 and evidence_status == "passed"
+    if args.json:
+        print(json.dumps({**payload, "passed": passed}, indent=2))
+    else:
+        print("datastream SLO evidence")
+        print("=" * 40)
+        _print_row("API status", status or "offline")
+        _print_row("evidence", evidence_status)
+        for item in evaluation.get("measurements", []):
+            _print_row(item.get("name", "measurement"), f"{item.get('status')} observed={item.get('observed')} target={item.get('target')}")
+    return 0 if passed or not args.require_slo_evidence else 2
+
+
 def cmd_preflight(args: argparse.Namespace) -> int:
     report = run_preflight(
         site_profile=args.site_profile,
@@ -2622,6 +2640,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("doctor", help="Run health/diagnostic checks").set_defaults(func=cmd_doctor)
     sub.add_parser("config", help="Show effective control configuration").set_defaults(func=cmd_config)
+    observability = sub.add_parser("observability", help="Inspect measured SLO evidence")
+    observability_sub = observability.add_subparsers(dest="action", required=True)
+    slo = observability_sub.add_parser("slo", help="Evaluate Prometheus-backed SLO signals")
+    slo.add_argument("--require-slo-evidence", action="store_true", help="Fail unless every configured SLO has a measured passing value")
+    slo.add_argument("--json", action="store_true")
+    slo.set_defaults(func=cmd_observability)
     preflight = sub.add_parser("preflight", help="Validate deployment files and contracts before startup")
     preflight.add_argument("--site-profile", default="config/site-profiles/single-site.yaml")
     preflight.add_argument("--project-manifest", default="config/project-manifest.yaml")
