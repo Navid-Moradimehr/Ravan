@@ -2,6 +2,28 @@
 
 **Date**: 2026-07-03
 
+**Latest implementation pass**: 2026-07-16
+
+### Current implementation status
+
+- [x] Site-aware model dataset manifest v3 with episodes, transitions,
+  channel identity, lineage, and deterministic split contracts.
+- [x] World-model soak evidence is campaign-scoped and verifies bounded
+  Timescale, Iceberg/MinIO, Flink, and artifact evidence without broad scans.
+- [x] Provider-neutral model lifecycle ledger supports evaluation gates,
+  approval/activation/rollback, audit history, and optional MLflow sync.
+- [x] Diagnostic agent dispatch is read-only, argument-validated, timeout
+  bounded, and audit-visible; supervised actions remain approval records only.
+- [x] Measured SLO evidence endpoint and CLI report unknown metrics explicitly;
+  unavailable Prometheus data is not treated as a passing production result.
+- [x] Helm deployment contracts use `KAFKA_BROKERS`, explicit per-service
+  commands/images, and one Flink owner. Operator mode renders a valid
+  PyFlink `FlinkDeployment`; fallback mode renders the local Deployment.
+
+These are platform-owned implementation improvements. They do not claim that
+the repository has passed real PLC commissioning, target-site sizing, a real
+multi-node cluster, or an installer acceptance test.
+
 This document tracks what is already complete, what is still incomplete, and what remains necessary before the platform should be treated as an industry-standard industrial rollout package.
 
 Packaging and installer work is intentionally excluded from the current scope.
@@ -92,11 +114,16 @@ startup scan; this prevents a large historian from blocking API readiness.
 - Live benchmark calibration using the target industrial network.
 - Production-pipeline validation against the real Flink/Kafka/Timescale deployment topology.
 - Repeatability checks over several benchmark sessions to separate regression noise from actual performance loss.
-- Model evaluation lifecycle and promotion workflow.
+- External MLflow evaluation/promotion integration and site-specific approval
+  policy remain deployment-owned extensions; the provider-neutral internal
+  ledger and transition gates are implemented.
 - Diagnostic-agent productization beyond the scaffold.
 - Supervised action-agent productization beyond the scaffold.
 - Broader connector/vendor validation against actual devices.
 - Enterprise rollout validation across branches, plants, and subnets.
+- Live Docker/Kubernetes soak evidence must be refreshed after the current
+  image/deployment changes when Docker Desktop and the local cluster are
+  responsive.
 - Further package cleanup is still possible, but the major runtime splits are in place.
 - The current host still shows benchmark variance large enough that small code changes should be treated as neutral until repeated.
 - The compiled boundary experiment should stay opt-in unless it is revalidated on target hardware.
