@@ -61,6 +61,19 @@ def lifecycle_event(topic: str, site: str, source_id: str, lifecycle: dict[str, 
     }
 
 
+def build_rebirth_command() -> bytes:
+    """Build the Sparkplug Node Control/Rebirth command using Tahu."""
+    try:
+        from tahutils.tahu import sparkplug_b as spb
+    except ImportError as exc:
+        raise RuntimeError("Sparkplug rebirth requires the optional tahutils dependency") from exc
+    payload = spb.Payload()
+    payload.timestamp = int(round(time.time() * 1000))
+    payload.seq = spb.getSeqNum()
+    spb.addMetric(payload, "Node Control/Rebirth", None, spb.MetricDataType.Boolean, True)
+    return payload.SerializeToString()
+
+
 def decode_binary_payload(payload: bytes, topic: str, site: str, source_id: str) -> list[dict[str, Any]]:
     """Decode a real Sparkplug B protobuf payload through TahUtils/Eclipse Tahu."""
     try:

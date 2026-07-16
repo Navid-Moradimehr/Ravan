@@ -37,8 +37,10 @@ class OPCUADiscoveryClient:
         try:
             self._client = Client(url=self.endpoint_url)
             from services.edge_ingest.credentials import resolve_credentials
+            from services.edge_ingest.opcua_security import validate_security_material
 
             credentials = resolve_credentials(self.credential_refs)
+            validate_security_material(credentials, self.security)
             if credentials.get("username"):
                 self._client.set_user(credentials["username"])
             if credentials.get("password"):

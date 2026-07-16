@@ -15,6 +15,7 @@ from mqtt_sparkplug_b import (
     SparkplugTopicBuilder,
     parse_lifecycle_topic,
     lifecycle_event,
+    build_rebirth_command,
 )
 
 
@@ -108,6 +109,12 @@ def test_sparkplug_lifecycle_topics_become_state_events():
     assert event["tag"] == "__sparkplug_lifecycle__"
     assert event["value"] == "disconnected"
     assert event["value_kind"] == "state"
+
+
+def test_sparkplug_rebirth_command_is_binary_tahu_payload():
+    payload = build_rebirth_command()
+    assert isinstance(payload, bytes)
+    assert payload
 
 
 def test_infer_datatype():

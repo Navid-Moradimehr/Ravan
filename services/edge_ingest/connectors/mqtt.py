@@ -105,6 +105,20 @@ async def run_mqtt(settings: Settings, publisher: EdgePublisher, stop_event: asy
         if reason_code == 0:
             mark_source(source.connection_id, source.source_protocol, source.site_id, "connected")
             client.subscribe(topic_filter, qos=int(options.get("qos", settings.mqtt_qos)))
+            if sparkplug_mode and bool(options.get("request_rebirth_on_connect", False)):
+                group_id = str(options.get("group_id", "")).strip()
+                edge_node_id = str(options.get("edge_node_id", "")).strip()
+                if group_id and edge_node_id:
+                    try:
+                        from services.edge_ingest.mqtt_sparkplug_b import SparkplugTopicBuilder, build_rebirth_command
+
+                        client.publish(SparkplugTopicBuilder.node_command(group_id, edge_node_id), build_rebirth_command(), qos=1)
+                    except Exception as exc:
+                        mark_source(source.connection_id, source.source_protocol, source.site_id, "error", f"Sparkplug rebirth request failed: {exc}")
+                        adapter_errors.labels(protocol="sparkplug_b").inc()
+                else:
+                    mark_source(source.connection_id, source.source_protocol, source.site_id, "error", "Sparkplug rebirth requires config.group_id and config.edge_node_id")
+                    adapter_errors.labels(protocol="sparkplug_b").inc()
         else:
             mark_source(source.connection_id, source.source_protocol, source.site_id, "error", str(reason_code))
             adapter_errors.labels(protocol="mqtt").inc()

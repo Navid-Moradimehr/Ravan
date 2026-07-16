@@ -129,3 +129,4 @@ reconciled; full suite now 419 passed.
 - OPC UA supports security-string execution hooks and bounded browse previews. Certificate/trust-store lifecycle management remains operator-owned and is not claimed as complete.
 - OPC UA selected node IDs can be persisted through a bounded API contract without exposing certificate or key material.
 - Sparkplug B birth/death lifecycle topics now update source health and emit canonical state events; command/rebirth orchestration remains outside the core connector.
+- The edge validates OPC UA signed certificate validity and private-key readability without provisioning or exposing trust material. Sparkplug rebirth is an explicit opt-in using the Tahu payload builder; vendor-specific gateways remain outside the core protocol contract.

@@ -13,6 +13,7 @@ from services.edge_ingest.source_health import mark_source, mark_source_success
 from services.edge_ingest.source_health import mark_mapping_result
 from services.edge_ingest.settings import Settings, SourceRuntime
 from services.edge_ingest.credentials import CredentialResolutionError, resolve_credentials
+from services.edge_ingest.opcua_security import validate_security_material
 
 
 async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
@@ -33,6 +34,10 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
             async with Client(endpoint, **client_kwargs) as client:
                 security = source.options.get("security", {}) if isinstance(source.options.get("security", {}), dict) else {}
                 security_string = str(credentials.get("security_string", security.get("security_string", ""))).strip()
+                try:
+                    validate_security_material(credentials, security)
+                except ValueError as exc:
+                    raise CredentialResolutionError(str(exc)) from exc
                 if security_string:
                     await client.set_security_string(security_string)
                 username = credentials.get("username", "")

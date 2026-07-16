@@ -196,6 +196,11 @@ class SourceConnection:
         if protocol in {"mqtt", "sparkplug_b"}:
             if not str(self.config.get("topic", "")).strip():
                 errors.append("MQTT requires config.topic before activation")
+        if protocol == "sparkplug_b" and bool(self.config.get("request_rebirth_on_connect", False)):
+            if not str(self.config.get("group_id", "")).strip():
+                errors.append("Sparkplug rebirth requires config.group_id")
+            if not str(self.config.get("edge_node_id", "")).strip():
+                errors.append("Sparkplug rebirth requires config.edge_node_id")
         if protocol in {"modbus", "modbus_rtu"}:
             registers = self.config.get("registers") if isinstance(self.config, dict) else None
             if not isinstance(registers, list) or not registers:

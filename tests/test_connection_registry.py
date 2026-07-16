@@ -107,6 +107,16 @@ def test_opcua_browse_selection_is_persisted_and_deduplicated(tmp_path):
     assert updated.config_version == 2
 
 
+def test_sparkplug_rebirth_requires_node_identity(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    saved = registry.put(SourceConnection(
+        "sparkplug-rebirth", "Sparkplug", "sparkplug_b", "plant-a", "mqtt://broker:1883",
+        config={"topic": "spBv1.0/group/#", "request_rebirth_on_connect": True},
+    ))
+    assert not saved.activation_ready
+    assert "config.group_id" in " ".join(saved.activation_errors())
+
+
 def test_registry_retire_preserves_history_and_hides_from_active_list(tmp_path):
     registry = ConnectionRegistry(tmp_path / "connections.json")
     registry.put(_connection())
