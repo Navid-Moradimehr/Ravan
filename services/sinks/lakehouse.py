@@ -277,6 +277,7 @@ class LakehouseSink:
         rows = []
         for event in events:
             row = dict(event)
+            original_row = dict(row)
             row.setdefault("event_stage", "normalized")
             row.setdefault("ts_ingest", row.get("ts_source", ""))
             row.setdefault("project_id", row.get("site", ""))
@@ -285,7 +286,21 @@ class LakehouseSink:
             if self._event_family == "operational":
                 row.setdefault("payload_json", json.dumps(row.get("payload", {}), sort_keys=True, default=str))
             elif self._event_family == "telemetry":
-                row.setdefault("payload_json", json.dumps(row, sort_keys=True, default=str))
+                # Iceberg's query-friendly value column is numeric, while the
+                # canonical contract also permits boolean and string states.
+                # Keep the exact scalar in payload_json and never fabricate a
+                # numeric zero for a non-numeric state.
+                row.setdefault("payload_json", json.dumps(original_row, sort_keys=True, default=str))
+                value = row.get("value")
+                if isinstance(value, bool):
+                    row["value"] = 1.0 if value else 0.0
+                elif isinstance(value, (int, float)):
+                    row["value"] = float(value)
+                else:
+                    try:
+                        row["value"] = float(str(value))
+                    except (TypeError, ValueError):
+                        row["value"] = None
             if self._event_family == "artifact":
                 row.setdefault("shape", [])
             rows.append({name: row.get(name) for name in columns})

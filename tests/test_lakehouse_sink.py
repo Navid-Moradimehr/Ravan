@@ -209,6 +209,30 @@ def test_build_arrow_table_uses_only_passed_events():
     assert rows[0]["site"] == "site-a"
 
 
+def test_lakehouse_keeps_non_numeric_scalar_in_payload_json():
+    sink = LakehouseSink.from_env({})
+
+    class _FakeSchema:
+        fields = [SimpleNamespace(name="event_id"), SimpleNamespace(name="value"), SimpleNamespace(name="payload_json")]
+
+        @staticmethod
+        def as_arrow():
+            return pa.schema([
+                pa.field("event_id", pa.string()),
+                pa.field("value", pa.float64()),
+                pa.field("payload_json", pa.string()),
+            ])
+
+    class _FakeTable:
+        @staticmethod
+        def schema(): return _FakeSchema()
+
+    table = sink._build_arrow_table(pa, _FakeTable(), [{"event_id": "state-1", "value": "RUNNING"}])
+    row = table.to_pylist()[0]
+    assert row["value"] is None
+    assert '"value": "RUNNING"' in row["payload_json"]
+
+
 def test_registry_builds_lakehouse_sink():
     """SinkRegistry recognises the 'lakehouse' name."""
     from services.sinks.base import SinkRegistry

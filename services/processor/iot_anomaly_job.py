@@ -221,8 +221,11 @@ class IndustrialRuntimeProcessFunction(KeyedProcessFunction):
     def process_element(self, value: str, ctx) -> Iterable[str]:  # type: ignore[override]
         try:
             event = RuntimeEventRecord.from_raw_mapping(json.loads(value))
-        except Exception:
-            return []
+        except Exception as exc:
+            # A bad normalized record must not be checkpointed as if it had
+            # been processed. Failing the task keeps the Kafka offset
+            # replayable and makes the poison record visible to operators.
+            raise ValueError("invalid normalized event in Flink runtime") from exc
 
         samples = list(self._sample_state.get() or [])
         temperature_sum = float(self._temperature_sum_state.value() or 0.0)
@@ -320,8 +323,8 @@ class ProcessedEventsSink(SinkFunction):
     def invoke(self, value: str, context: object = None) -> None:  # type: ignore[override]
         try:
             payload = json.loads(value)
-        except json.JSONDecodeError:
-            return
+        except json.JSONDecodeError as exc:
+            raise ValueError("invalid processed event in Flink historian sink") from exc
         self._buffer.append(payload)
         if len(self._buffer) >= self._batch_size:
             self.flush()
@@ -331,15 +334,20 @@ class ProcessedEventsSink(SinkFunction):
             return
         self._ensure_client()
         batch = self._buffer[:]
-        self._buffer.clear()
         try:
             self._insert_batch(batch)
-        except Exception:
+        except Exception as batch_exc:
+            failed: list[Exception] = []
             for event in batch:
                 try:
                     self._insert_single(event)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    failed.append(exc)
+            if failed:
+                raise RuntimeError(
+                    f"historian rejected {len(failed)} of {len(batch)} processed events"
+                ) from batch_exc
+        self._buffer.clear()
 
 
 def _partition_key(raw: str) -> str:

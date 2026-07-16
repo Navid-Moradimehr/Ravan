@@ -3064,3 +3064,23 @@ lockup.
 - Updated source onboarding runbooks and the Obsidian vault. AuthN/AuthZ,
   endpoint credentials, certificates, network policy, and external secret
   ownership remain deployment-owned.
+
+## 2026-07-16 - End-to-End Data Integrity Hardening
+
+- Preserved boolean and string values through runtime processing and both
+  historian write modes instead of reducing them to ambiguous numeric zeros.
+- Preserved legacy composite frames, including device identity, temperature,
+  vibration, pressure, and source timestamp; marked them explicitly as
+  `value_type=composite`.
+- Made OPC UA use `DataValue` source timestamps and quality StatusCodes, and
+  made Sparkplug conversion emit timezone-aware source and ingest timestamps.
+- Changed fan-out/archive consumers to advance offsets only after durable sink
+  success or acknowledged DLQ publication.
+- Changed Flink malformed-input and historian failure paths from silent skip to
+  visible task failure and replay.
+- Added edge-producer in-flight delivery tracking and shutdown spooling.
+- Preserved exact canonical payloads in lakehouse telemetry rows while keeping
+  nonnumeric numeric projections null.
+- Verification: full suite `696 passed`; event-level Docker probe matched four
+  value shapes across normalized Kafka, raw historian, Flink processing, and
+  processed historian; Flink remained `RUNNING` with `2/2` tasks.

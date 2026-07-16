@@ -215,6 +215,20 @@ def test_delivery_failure_counter_incremented(monkeypatch):
     assert _mod.delivery_failures.labels(topic="industrial.normalized")._value.get() >= 1
 
 
+def test_shutdown_flush_raises_when_delivery_is_unresolved_without_spool(monkeypatch):
+    class FakeProducer:
+        def __init__(self, *args, **kwargs): pass
+        def produce(self, topic, key=None, value=None, on_delivery=None): pass
+        def poll(self, timeout=None): return 0
+        def flush(self, timeout=None): return 1
+
+    _mod, publisher = _make_publisher(monkeypatch, FakeProducer)
+    publisher.publish_raw("mqtt", "source-1", {"value": 1})
+
+    with pytest.raises(RuntimeError, match="delivery incomplete"):
+        publisher.flush()
+
+
 def test_mqtt_queue_full_routes_to_dlq(monkeypatch):
     """When the MQTT decoupling queue is saturated, the message goes to the DLQ."""
     produced: list[tuple[str, bytes, bytes]] = []

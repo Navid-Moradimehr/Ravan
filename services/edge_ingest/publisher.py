@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from datetime import datetime
 from typing import Any
 
 from confluent_kafka import Producer
@@ -67,6 +68,9 @@ class EdgePublisher:
         self._flush_interval_ms = flush_interval_ms
         self._buffer: list[tuple[str, bytes, bytes]] = []
         self._last_flush = time.time()
+        self._inflight: dict[int, tuple[str, bytes, bytes]] = {}
+        self._inflight_lock = threading.Lock()
+        self._next_delivery_token = 0
         spool_dir = __import__("os").getenv("EDGE_STORE_FORWARD_DIR", "")
         self._spool = DiskEventSpool(spool_dir) if spool_dir else None
 
@@ -79,7 +83,11 @@ class EdgePublisher:
         key: bytes,
         value: bytes,
         spool_on_failure: bool = True,
+        delivery_token: int | None = None,
     ) -> None:
+        if delivery_token is not None:
+            with self._inflight_lock:
+                self._inflight.pop(delivery_token, None)
         if err is not None:
             delivery_failures.labels(topic=msg.topic() if msg is not None else topic).inc()
             logger.warning("kafka delivery failed: %s", err)
@@ -93,21 +101,29 @@ class EdgePublisher:
             self._route_oversize(topic, key, value, origin)
             return
         while True:
+            with self._inflight_lock:
+                self._next_delivery_token += 1
+                delivery_token = self._next_delivery_token
+                self._inflight[delivery_token] = (topic, key, value)
             try:
                 self.producer.produce(
                     topic,
                     key=key,
                     value=value,
                     on_delivery=lambda err, msg: self._delivery_report(
-                        err, msg, topic=topic, key=key, value=value
+                        err, msg, topic=topic, key=key, value=value, delivery_token=delivery_token
                     ),
                 )
                 return
             except BufferError:
+                with self._inflight_lock:
+                    self._inflight.pop(delivery_token, None)
                 # Internal queue full: drain delivery reports and retry so the
                 # caller experiences natural backpressure instead of crashing.
                 self.producer.poll(0.5)
             except Exception as exc:
+                with self._inflight_lock:
+                    self._inflight.pop(delivery_token, None)
                 if self._spool is not None:
                     self._spool.append(topic, key, value)
                     store_forward_spooled.labels(topic=topic).inc()
@@ -261,12 +277,24 @@ class EdgePublisher:
 
     def flush(self) -> None:
         self._flush_buffer()
-        self.producer.flush(10)
+        remaining = self.producer.flush(10)
+        with self._inflight_lock:
+            unresolved = list(self._inflight.values())
+            self._inflight.clear()
+        if remaining or unresolved:
+            if self._spool is not None:
+                for topic, key, value in unresolved:
+                    self._spool.append(topic, key, value)
+                    store_forward_spooled.labels(topic=topic).inc()
+                store_forward_pending.set(self._spool.count())
+                logger.warning("spooled %d Kafka messages still unresolved at shutdown", len(unresolved))
+                return
+            raise RuntimeError(f"Kafka delivery incomplete: {max(int(remaining or 0), len(unresolved))} message(s) unresolved")
 
 
 def observe_latency(event: IndustrialEvent) -> None:
     try:
-        source_epoch = time.mktime(time.strptime(event.ts_source[:19], "%Y-%m-%dT%H:%M:%S"))
+        source_epoch = datetime.fromisoformat(event.ts_source.replace("Z", "+00:00")).timestamp()
         ingest_latency.labels(protocol=event.source_protocol).observe(max(time.time() - source_epoch, 0))
     except Exception:
         return

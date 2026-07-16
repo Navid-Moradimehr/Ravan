@@ -219,11 +219,12 @@ def test_insert_processed_event_builds_correct_tuple(monkeypatch):
     historian_client.insert_processed_event(event)
 
     params = captured["params"]
-    # New columns present in order: asset_id, tag, value, unit (positions 3-6).
+    # Typed scalar columns preserve state values before the unit projection.
     assert params[3] == "M-1"
     assert params[4] == "Torque"
     assert params[5] == 12.5
-    assert params[6] == "Nm"
+    assert params[6:9] == [None, None, "number"]
+    assert params[9] == "Nm"
     # triggered_rules is a plain list (psycopg2 adapts), baseline/evaluation wrapped in Json.
     from psycopg2.extras import Json
 

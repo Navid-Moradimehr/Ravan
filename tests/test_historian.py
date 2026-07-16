@@ -196,6 +196,72 @@ def test_insert_industrial_events_preserves_canonical_site_id(monkeypatch) -> No
     assert captured["rows"][0][12] == "plant-a"
 
 
+def test_insert_industrial_events_prefers_source_timestamp(monkeypatch) -> None:
+    from services.historian import client
+
+    captured: dict[str, object] = {}
+
+    class FakeCursor:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+
+    class FakeConn:
+        def cursor(self): return FakeCursor()
+        def commit(self): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+
+    monkeypatch.setattr(client, "get_connection", lambda: FakeConn())
+    monkeypatch.setattr(client, "execute_values", lambda cur, query, rows, page_size=None: captured.update(rows=list(rows)))
+
+    client.insert_industrial_events([{
+        "event_id": "timestamp-1",
+        "source_protocol": "opcua",
+        "source_id": "plc-1",
+        "asset_id": "pump-1",
+        "tag": "Temperature",
+        "value": 42.0,
+        "ts_source": "2026-01-01T00:00:00Z",
+        "ts_ingest": "2026-01-01T00:00:09Z",
+    }])
+
+    assert captured["rows"][0][0] == "2026-01-01T00:00:00Z"
+
+
+def test_insert_processed_events_preserves_string_scalar_columns(monkeypatch) -> None:
+    from services.historian import client
+
+    captured: dict[str, object] = {}
+
+    class FakeCursor:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+
+    class FakeConn:
+        def cursor(self): return FakeCursor()
+        def commit(self): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+
+    monkeypatch.setattr(client, "get_connection", lambda: FakeConn())
+    monkeypatch.setattr(client, "execute_values", lambda cur, query, rows, page_size=None: captured.update(query=query, rows=list(rows)))
+
+    client.insert_processed_events([{
+        "event_id": "state-1",
+        "timestamp": "2026-01-01T00:00:00Z",
+        "asset_id": "pump-1",
+        "tag": "State",
+        "value": 0.0,
+        "value_text_raw": "RUNNING",
+        "value_bool": None,
+        "value_type": "string",
+    }])
+
+    row = captured["rows"][0]
+    assert row[5:9] == (0.0, "RUNNING", None, "string")
+    assert "value_text_raw, value_bool, value_type" in captured["query"]
+
+
 def test_insert_processed_events_uses_execute_values(monkeypatch) -> None:
     from services.historian import client
 
@@ -327,6 +393,25 @@ def test_insert_processed_events_uses_on_conflict(monkeypatch) -> None:
 
     assert "ON CONFLICT (time, event_id) DO NOTHING" in captured["query"]
     assert captured["committed"] is True
+
+
+def test_composite_dimensions_use_device_identity() -> None:
+    from services.historian.client import _industrial_dimensions, _typed_event_value, _typed_industrial_value
+
+    event = {
+        "device_id": "compressor-07",
+        "temperature_c": 73.4,
+        "vibration_mm_s": 4.8,
+        "pressure_bar": 8.2,
+    }
+    assert _industrial_dimensions(event) == ("unknown", "compressor-07", "compressor-07", "__composite__")
+    assert _typed_industrial_value(event) == (0.0, None, None, "composite")
+    assert _typed_event_value({"value": 0.0, "value_type": "composite"}) == (
+        0.0,
+        None,
+        None,
+        "composite",
+    )
 
 
 def test_query_alarms_includes_triggering_value_and_unit(monkeypatch) -> None:

@@ -99,8 +99,8 @@ def test_processed_events_sink_batches_and_flushes(monkeypatch):
     assert batch_calls[1] == payloads[3:]
 
 
-def test_processed_events_sink_skips_malformed(monkeypatch):
-    """Malformed payloads are skipped, not crash."""
+def test_processed_events_sink_rejects_malformed(monkeypatch):
+    """Malformed payloads fail visibly instead of being checkpointed as processed."""
     from services.processor import iot_anomaly_job as flink_mod
 
     from services.historian import client as historian_client
@@ -109,11 +109,8 @@ def test_processed_events_sink_skips_malformed(monkeypatch):
     monkeypatch.setattr(historian_client, "insert_processed_event", lambda e: None)
 
     sink = flink_mod.ProcessedEventsSink(batch_size=10)
-    sink.invoke("not-json{")
-    sink.invoke(json.dumps({"event_id": "ok"}))
-    sink.flush()
-    # The malformed record was skipped; only the valid one reached the buffer.
-    # We can't easily inspect the buffer, but no exception is the contract.
+    with pytest.raises(ValueError, match="invalid processed event"):
+        sink.invoke("not-json{")
 
 
 def test_processed_events_sink_falls_back_per_event(monkeypatch):
@@ -140,3 +137,25 @@ def test_processed_events_sink_falls_back_per_event(monkeypatch):
     sink.flush()
 
     assert single_calls == events
+
+
+def test_processed_events_sink_does_not_swallow_persistent_write_failure(monkeypatch):
+    from services.processor import iot_anomaly_job as flink_mod
+    from services.historian import client as historian_client
+
+    monkeypatch.setattr(
+        historian_client,
+        "insert_processed_events",
+        lambda events: (_ for _ in ()).throw(RuntimeError("batch failed")),
+    )
+    monkeypatch.setattr(
+        historian_client,
+        "insert_processed_event",
+        lambda event: (_ for _ in ()).throw(RuntimeError("single failed")),
+    )
+
+    sink = flink_mod.ProcessedEventsSink(batch_size=2)
+    sink.invoke(json.dumps({"event_id": "1"}))
+    with pytest.raises(RuntimeError, match="historian rejected 2 of 2"):
+        sink.invoke(json.dumps({"event_id": "2"}))
+    assert len(sink._buffer) == 2

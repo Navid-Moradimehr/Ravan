@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import math
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -57,6 +58,24 @@ class IndustrialEvent(BaseModel):
     def require_non_empty(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("value must not be empty")
+        return value
+
+    @field_validator("value")
+    @classmethod
+    def require_finite_numeric_value(cls, value: float | int | bool | str) -> float | int | bool | str:
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError("numeric value must be finite")
+        return value
+
+    @field_validator("ts_source")
+    @classmethod
+    def require_timezone_aware_source_timestamp(cls, value: str) -> str:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("ts_source must be an ISO-8601 timestamp") from exc
+        if parsed.tzinfo is None:
+            raise ValueError("ts_source must include a timezone")
         return value
 
 

@@ -13,10 +13,11 @@ import os
 import signal
 import time
 
-from confluent_kafka import Consumer, Producer
+from confluent_kafka import Consumer, Producer, TopicPartition
 
 from services.common.brokers import resolve_kafka_brokers
 from services.sinks.lakehouse import LakehouseSink
+from services.common.kafka_dlq import publish_malformed_record
 from services.processor.raw_archive_policy import sanitize_raw_event
 
 logger = logging.getLogger(__name__)
@@ -35,8 +36,8 @@ def main() -> None:
     sink = LakehouseSink.from_env(env)
     max_bytes = max(1, int(os.getenv("RAW_ARCHIVE_MAX_BYTES", "1048576")))
     redact_fields = tuple(item.strip() for item in os.getenv("RAW_ARCHIVE_REDACT_FIELDS", "").split(",") if item.strip())
-    dlq_topic = os.getenv("RAW_ARCHIVE_DLQ_TOPIC", "")
-    dlq_producer = Producer({"bootstrap.servers": resolve_kafka_brokers("localhost:19092")}) if dlq_topic else None
+    dlq_topic = os.getenv("RAW_ARCHIVE_DLQ_TOPIC", os.getenv("INDUSTRIAL_DLQ_TOPIC", "industrial.dlq"))
+    dlq_producer = Producer({"bootstrap.servers": resolve_kafka_brokers("localhost:19092"), "client.id": "raw-archive-dlq"})
     consumer = Consumer(
         {
             "bootstrap.servers": resolve_kafka_brokers("localhost:19092"),
@@ -55,6 +56,7 @@ def main() -> None:
     signal.signal(signal.SIGTERM, stop)
     consumer.subscribe([topic])
     buffer: list[dict[str, object]] = []
+    offsets: list[tuple[str, int, int]] = []
     last_flush = time.monotonic()
 
     def flush(force: bool = False) -> None:
@@ -62,10 +64,15 @@ def main() -> None:
         if not buffer or (not force and len(buffer) < batch_size and time.monotonic() - last_flush < 1):
             return
         batch = buffer[:]
-        buffer.clear()
+        pending = offsets[:]
         sink.write_batch_strict(batch)
         sink.flush_strict()
-        consumer.commit(asynchronous=False)
+        consumer.commit(
+            offsets=[TopicPartition(topic_name, partition, offset + 1) for topic_name, partition, offset in pending],
+            asynchronous=False,
+        )
+        del buffer[:len(batch)]
+        del offsets[:len(pending)]
         last_flush = time.monotonic()
 
     try:
@@ -80,23 +87,43 @@ def main() -> None:
             try:
                 event = json.loads(message.value().decode("utf-8"))
                 event, rejection = sanitize_raw_event(event, max_bytes=max_bytes, redact_fields=redact_fields)
-                if rejection:
-                    logger.warning("raw archive rejected record: %s", rejection)
-                    if dlq_producer and dlq_topic:
-                        dlq_producer.produce(dlq_topic, value=json.dumps({"reason": rejection, "source_topic": message.topic(), "offset": message.offset()}).encode("utf-8"))
-                        dlq_producer.flush(5)
-                    consumer.commit(message=message, asynchronous=False)
-                    continue
-                assert event is not None
-                event.setdefault("site", event.get("site_id", ""))
-                event.setdefault("ts_ingest", event.get("ts_source", ""))
-                buffer.append(event)
-                flush()
             except Exception as exc:
-                logger.warning("raw archive skipped invalid record: %s", exc)
+                flush(force=True)
+                logger.warning("raw archive routing invalid record to DLQ: %s", exc)
+                publish_malformed_record(
+                    dlq_producer,
+                    dlq_topic=dlq_topic,
+                    source_topic=message.topic(),
+                    partition=message.partition(),
+                    offset=message.offset(),
+                    value=message.value(),
+                    error=f"raw archive decode failed: {exc}",
+                )
                 consumer.commit(message=message, asynchronous=False)
+                continue
+            if rejection:
+                flush(force=True)
+                logger.warning("raw archive rejected record: %s", rejection)
+                publish_malformed_record(
+                    dlq_producer,
+                    dlq_topic=dlq_topic,
+                    source_topic=message.topic(),
+                    partition=message.partition(),
+                    offset=message.offset(),
+                    value=message.value(),
+                    error=f"raw archive rejected record: {rejection}",
+                )
+                consumer.commit(message=message, asynchronous=False)
+                continue
+            assert event is not None
+            event.setdefault("site", event.get("site_id", ""))
+            event.setdefault("ts_ingest", event.get("ts_source", ""))
+            buffer.append(event)
+            offsets.append((message.topic(), message.partition(), message.offset()))
+            flush()
     finally:
         flush(force=True)
+        dlq_producer.flush(10)
         sink.close()
         consumer.close()
 

@@ -32,6 +32,31 @@ def test_processor_keeps_legacy_event_shape() -> None:
     assert normalize_runtime_event(legacy) is legacy
 
 
+def test_runtime_record_preserves_composite_sensor_frame() -> None:
+    record = RuntimeEventRecord.from_raw_mapping(
+        {
+            "event_id": "evt-composite-1",
+            "device_id": "compressor-07",
+            "source_protocol": "simulator",
+            "site_id": "plant-a",
+            "timestamp": "2026-07-16T10:00:00+00:00",
+            "temperature_c": 73.4,
+            "vibration_mm_s": 4.8,
+            "pressure_bar": 8.2,
+        }
+    )
+
+    assert record.asset_id == "compressor-07"
+    assert record.source_id == "compressor-07"
+    assert record.device_id == "compressor-07"
+    assert record.tag == "__composite__"
+    assert record.value_type == "composite"
+    assert record.timestamp == "2026-07-16T10:00:00+00:00"
+    assert record.temperature_c == 73.4
+    assert record.vibration_mm_s == 4.8
+    assert record.pressure_bar == 8.2
+
+
 def test_runtime_record_preserves_partition_key_and_serialization() -> None:
     record = RuntimeEventRecord.from_industrial_event(
         IndustrialEvent(

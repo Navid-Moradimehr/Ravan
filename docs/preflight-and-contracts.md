@@ -14,7 +14,10 @@ PLC, or storage checks owned by the installing company.
 The event contract tests verify that an event keeps its identity and context
 through canonical validation, normalization, and runtime enrichment. The
 checked fields include event ID, source, asset, tag, site, timestamp, unit,
-mapping version, source configuration version, and lineage ID.
+mapping version, source configuration version, lineage ID, quality, scalar
+type, and legacy composite measurements. See
+[Data Integrity Contract](data-integrity-contract.md) for delivery, replay,
+historian, lakehouse, and failure semantics.
 
 The runtime path is still intentionally event-driven: validation occurs at the
 edge boundary, normalized data is published to Kafka, processors enrich it,

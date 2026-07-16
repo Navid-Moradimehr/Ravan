@@ -22,40 +22,66 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _typed_scalar(value: Any) -> tuple[float, str | None, bool | None, str]:
+    """Keep the original scalar alongside the numeric processing projection."""
+    if isinstance(value, bool):
+        return (1.0 if value else 0.0, None, value, "boolean")
+    if isinstance(value, (int, float)):
+        return (float(value), None, None, "number")
+    text = str(value)
+    try:
+        return (float(text), None, None, "number")
+    except (TypeError, ValueError):
+        return (0.0, text, None, "string")
+
+
 def _build_record_from_mapping(event: dict[str, Any]) -> "RuntimeEventRecord":
     get = event.get
-    tag = str(get("tag", ""))
-    value = _to_float(get("value", 0))
+    has_scalar_value = "value" in event
+    tag = str(get("tag") or ("__composite__" if not has_scalar_value else ""))
+    if has_scalar_value:
+        value, value_text_raw, value_bool, value_type = _typed_scalar(get("value"))
+    else:
+        value, value_text_raw, value_bool, value_type = (0.0, None, None, "composite")
+    asset_id = str(get("asset_id") or get("device_id") or "unknown-asset")
+    device_id = str(get("device_id") or asset_id)
     record = RuntimeEventRecord(
         event_id=str(get("event_id", "")),
         source_protocol=str(get("source_protocol", "unknown")),
-        source_id=str(get("source_id", get("asset_id", "unknown-source"))),
-        asset_id=str(get("asset_id", "unknown-asset")),
+        source_id=str(get("source_id") or device_id or asset_id or "unknown-source"),
+        asset_id=asset_id,
         tag=tag,
         value=value,
+        value_text_raw=value_text_raw,
+        value_bool=value_bool,
+        value_type=value_type,
         quality=str(get("quality", "good")),
         unit=str(get("unit", "") or ""),
         site_id=str(get("site", get("site_id", "demo-site"))),
         line=str(get("line", get("line_id", "line-01"))),
         schema_version=_to_int(get("schema_version", 1), 1),
-        timestamp=str(get("ts_source") or get("ts_ingest") or ""),
-        device_id=str(get("asset_id", get("device_id", "unknown-asset"))),
+        timestamp=str(get("ts_source") or get("timestamp") or get("ts_ingest") or ""),
+        device_id=device_id,
         project_id=str(get("project_id", get("site", get("site_id", ""))) or ""),
         source_connection_id=str(get("source_connection_id", "")),
         source_config_version=_to_int(get("source_config_version", 0), 0),
         mapping_version=str(get("mapping_version", "")),
         lineage_id=str(get("lineage_id", get("event_id", ""))),
+        temperature_c=_to_float(get("temperature_c", 0)),
+        vibration_mm_s=_to_float(get("vibration_mm_s", 0)),
+        pressure_bar=_to_float(get("pressure_bar", 0)),
         fault_type=str(get("fault_type", "normal")),
         scenario_id=str(get("scenario_id", "sc-000")),
         ground_truth_severity=str(get("ground_truth_severity", "normal")),
     )
-    legacy_field = tag_to_legacy_field(tag)
-    if legacy_field == "temperature_c":
-        record.temperature_c = value
-    elif legacy_field == "vibration_mm_s":
-        record.vibration_mm_s = value
-    elif legacy_field == "pressure_bar":
-        record.pressure_bar = value
+    if has_scalar_value:
+        legacy_field = tag_to_legacy_field(tag)
+        if legacy_field == "temperature_c":
+            record.temperature_c = value
+        elif legacy_field == "vibration_mm_s":
+            record.vibration_mm_s = value
+        elif legacy_field == "pressure_bar":
+            record.pressure_bar = value
     return record
 
 
@@ -74,6 +100,9 @@ class RuntimeEventRecord:
     schema_version: int
     timestamp: str
     device_id: str
+    value_text_raw: str | None = None
+    value_bool: bool | None = None
+    value_type: str = "number"
     project_id: str = ""
     source_connection_id: str = ""
     source_config_version: int = 0
@@ -175,6 +204,9 @@ class RuntimeEventRecord:
             "asset_id": self.asset_id,
             "tag": self.tag,
             "value": self.value,
+            "value_text_raw": self.value_text_raw,
+            "value_bool": self.value_bool,
+            "value_type": self.value_type,
             "quality": self.quality,
             "unit": self.unit,
             "site_id": self.site_id,

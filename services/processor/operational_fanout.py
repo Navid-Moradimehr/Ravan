@@ -13,9 +13,10 @@ import os
 import signal
 import time
 
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, Producer, TopicPartition
 
 from services.common.brokers import resolve_kafka_brokers
+from services.common.kafka_dlq import publish_malformed_record
 from services.sinks.base import SinkRegistry
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,8 @@ def main() -> None:
             "enable.auto.commit": False,
         }
     )
+    dlq_producer = Producer({"bootstrap.servers": resolve_kafka_brokers("localhost:19092"), "client.id": "operational-fanout-dlq"})
+    dlq_topic = os.getenv("INDUSTRIAL_DLQ_TOPIC", "industrial.dlq")
     running = True
 
     def stop(_signum: int, _frame: object) -> None:
@@ -57,12 +60,15 @@ def main() -> None:
             return
         batch = buffer[:]
         pending = offsets[:]
-        buffer.clear()
-        offsets.clear()
         sink.write_batch_strict(batch)
         sink.flush_strict()
         if pending:
-            consumer.commit(asynchronous=False)
+            consumer.commit(
+                offsets=[TopicPartition(topic_name, partition, offset + 1) for topic_name, partition, offset in pending],
+                asynchronous=False,
+            )
+        del buffer[:len(batch)]
+        del offsets[:len(pending)]
         last_flush = time.monotonic()
 
     try:
@@ -76,14 +82,32 @@ def main() -> None:
                 continue
             try:
                 event = json.loads(message.value().decode("utf-8"))
-                event["event_stage"] = "operational"
-                buffer.append(event)
-                offsets.append((message.topic(), message.partition(), message.offset()))
-                flush()
             except Exception as exc:
-                logger.warning("operational event archive failed: %s", exc)
+                flush(force=True)
+                logger.warning("operational fanout routing malformed record to DLQ: %s", exc)
+                publish_malformed_record(
+                    dlq_producer, dlq_topic=dlq_topic, source_topic=message.topic(),
+                    partition=message.partition(), offset=message.offset(), value=message.value(),
+                    error=f"operational fanout decode failed: {exc}",
+                )
+                consumer.commit(message=message, asynchronous=False)
+                continue
+            if not isinstance(event, dict):
+                flush(force=True)
+                publish_malformed_record(
+                    dlq_producer, dlq_topic=dlq_topic, source_topic=message.topic(),
+                    partition=message.partition(), offset=message.offset(), value=message.value(),
+                    error="operational event must be a JSON object",
+                )
+                consumer.commit(message=message, asynchronous=False)
+                continue
+            event["event_stage"] = "operational"
+            buffer.append(event)
+            offsets.append((message.topic(), message.partition(), message.offset()))
+            flush()
     finally:
         flush(force=True)
+        dlq_producer.flush(10)
         sink.close()
         consumer.close()
 

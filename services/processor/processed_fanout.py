@@ -13,10 +13,11 @@ import os
 import signal
 import time
 
-from confluent_kafka import Consumer, TopicPartition
+from confluent_kafka import Consumer, Producer, TopicPartition
 from prometheus_client import start_http_server
 
 from services.common.brokers import resolve_kafka_brokers
+from services.common.kafka_dlq import publish_malformed_record
 from services.common.runtime_metrics import observe_fanout_write, set_consumer_lag
 from services.historian.client import insert_processed_events
 
@@ -46,6 +47,8 @@ def main() -> None:
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
     consumer.subscribe([topic])
+    dlq_producer = Producer({"bootstrap.servers": resolve_kafka_brokers("localhost:19092"), "client.id": "processed-fanout-dlq"})
+    dlq_topic = os.getenv("INDUSTRIAL_DLQ_TOPIC", "industrial.dlq")
     buffer: list[dict[str, object]] = []
     offsets: list[tuple[str, int, int]] = []
     last_flush = time.monotonic()
@@ -106,14 +109,28 @@ def main() -> None:
                 event = json.loads(message.value().decode("utf-8"))
                 if not isinstance(event, dict):
                     raise ValueError("processed event must be a JSON object")
-            except Exception:
-                logger.exception("processed fan-out received malformed event; offset left for retry")
+            except Exception as exc:
+                logger.exception("processed fan-out routing malformed event to DLQ")
+                publish_malformed_record(
+                    dlq_producer,
+                    dlq_topic=dlq_topic,
+                    source_topic=message.topic(),
+                    partition=message.partition(),
+                    offset=message.offset(),
+                    value=message.value(),
+                    error=f"processed fan-out decode failed: {exc}",
+                )
+                consumer.commit(
+                    offsets=[TopicPartition(message.topic(), message.partition(), message.offset() + 1)],
+                    asynchronous=False,
+                )
                 continue
             buffer.append(event)
             offsets.append((message.topic(), message.partition(), message.offset()))
             flush()
     finally:
         flush(force=True)
+        dlq_producer.flush(10)
         consumer.close()
 
 

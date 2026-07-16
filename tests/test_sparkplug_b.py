@@ -75,6 +75,8 @@ def test_decoder_to_industrial_event():
     assert event["tag"] == "Temperature"
     assert event["value"] == 51.2
     assert event["source_protocol"] == "sparkplug_b"
+    assert event["ts_source"].endswith("+00:00")
+    assert event["ts_ingest"].endswith("+00:00")
 
 
 def test_roundtrip_conversion():

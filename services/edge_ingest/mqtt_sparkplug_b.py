@@ -12,6 +12,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 try:
@@ -264,6 +265,7 @@ class SparkplugBDecoder:
         asset_id = parts[0] if len(parts) > 0 else "unknown"
         tag = parts[1] if len(parts) > 1 else "unknown"
 
+        source_time = datetime.fromtimestamp(payload.timestamp / 1000, tz=timezone.utc).isoformat()
         return {
             "source_protocol": "sparkplug_b",
             "asset_id": asset_id,
@@ -273,10 +275,8 @@ class SparkplugBDecoder:
             "unit": metric.metadata.get("unit", ""),
             "site": metric.metadata.get("site", "demo-site"),
             "line": metric.metadata.get("line", "line-01"),
-            "ts_ingest": time.strftime(
-                "%Y-%m-%dT%H:%M:%S",
-                time.localtime(payload.timestamp / 1000),
-            ),
+            "ts_source": source_time,
+            "ts_ingest": datetime.now(timezone.utc).isoformat(),
             "schema_version": 1,
         }
 

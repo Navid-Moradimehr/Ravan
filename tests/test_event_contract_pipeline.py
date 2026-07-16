@@ -38,3 +38,42 @@ def test_canonical_event_context_survives_normalize_and_enrich():
         assert enriched[field] == runtime.to_dict()[field]
     assert enriched["anomaly_score"] >= 0
     assert enriched["severity"] in {"normal", "warning", "critical"}
+
+
+def test_state_scalar_survives_runtime_projection_without_becoming_false_zero():
+    runtime = RuntimeEventRecord.from_raw_mapping({
+        "event_id": "state-1",
+        "source_protocol": "sparkplug_b",
+        "source_id": "edge-1",
+        "asset_id": "pump-1",
+        "tag": "__sparkplug_lifecycle__",
+        "value": "DEATH",
+        "quality": "good",
+        "site": "site-a",
+        "ts_source": "2026-01-01T00:00:00Z",
+    })
+
+    payload = runtime.to_dict()
+    assert payload["value"] == 0.0
+    assert payload["value_text_raw"] == "DEATH"
+    assert payload["value_bool"] is None
+    assert payload["value_type"] == "string"
+
+
+def test_boolean_scalar_survives_runtime_projection():
+    runtime = RuntimeEventRecord.from_raw_mapping({
+        "event_id": "bool-1",
+        "source_protocol": "opcua",
+        "source_id": "plc-1",
+        "asset_id": "pump-1",
+        "tag": "Running",
+        "value": False,
+        "quality": "good",
+        "site": "site-a",
+        "ts_source": "2026-01-01T00:00:00Z",
+    })
+
+    payload = runtime.to_dict()
+    assert payload["value"] == 0.0
+    assert payload["value_bool"] is False
+    assert payload["value_type"] == "boolean"

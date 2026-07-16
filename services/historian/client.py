@@ -125,6 +125,27 @@ def _typed_value(value: Any) -> tuple[float, str | None, bool | None, str]:
         return (0.0, text, None, "string")
 
 
+def _typed_event_value(event: dict[str, Any]) -> tuple[float, str | None, bool | None, str]:
+    """Restore the original scalar from a processed-event projection."""
+    value_type = str(event.get("value_type", "number"))
+    if value_type == "string":
+        return _typed_value(event.get("value_text_raw"))
+    if value_type == "boolean":
+        return _typed_value(event.get("value_bool"))
+    if value_type == "composite":
+        return (0.0, None, None, "composite")
+    return _typed_value(event.get("value", 0))
+
+
+def _typed_industrial_value(event: dict[str, Any]) -> tuple[float, str | None, bool | None, str]:
+    """Classify legacy multi-measurement frames without inventing a scalar."""
+    if "value" not in event and any(
+        field in event for field in ("temperature_c", "vibration_mm_s", "pressure_bar")
+    ):
+        return (0.0, None, None, "composite")
+    return _typed_value(event.get("value", 0))
+
+
 def _event_uuid(value: Any) -> str:
     """Keep UUID-backed historian tables compatible with external event IDs."""
     text = str(value or "")
@@ -145,7 +166,9 @@ def _industrial_dimensions(event: dict[str, Any]) -> tuple[str, str, str, str]:
         or "unknown"
     )
     asset_id = str(event.get("asset_id") or event.get("device_id") or source_id)
-    tag = str(event.get("tag") or "value")
+    tag = str(event.get("tag") or ("__composite__" if any(
+        field in event for field in ("temperature_c", "vibration_mm_s", "pressure_bar")
+    ) else "value"))
     return protocol, source_id, asset_id, tag
 
 
@@ -324,7 +347,7 @@ def insert_industrial_event(event: dict[str, Any]) -> None:
                         source_id,
                         asset_id,
                         tag,
-                        *_typed_value(event.get("value", 0)),
+                        *_typed_industrial_value(event),
                         event.get("quality", "good"),
                         event.get("unit"),
                         event.get("site") or event.get("site_id") or "demo-site",
@@ -349,13 +372,13 @@ def insert_industrial_events(events: list[dict[str, Any]]) -> None:
         protocol, source_id, asset_id, tag = _industrial_dimensions(event)
         rows.append(
             (
-                _coalesce_timestamp(event.get("ts_ingest")),
+                _coalesce_timestamp(event.get("ts_source") or event.get("timestamp") or event.get("ts_ingest")),
                 _event_uuid(event.get("event_id")),
                 protocol,
                 source_id,
                 asset_id,
                 tag,
-                *_typed_value(event.get("value", 0)),
+                *_typed_industrial_value(event),
                 event.get("quality", "good"),
                 event.get("unit"),
                 event.get("site") or event.get("site_id") or "demo-site",
@@ -392,14 +415,15 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                 cur.execute(
                     """
                     INSERT INTO processed_events (
-                        time, event_id, device_id, asset_id, tag, value, unit,
+                        time, event_id, device_id, asset_id, tag,
+                        value, value_text_raw, value_bool, value_type, unit,
                         site_id, source_protocol, quality,
                         schema_version, temperature_c, vibration_mm_s, pressure_bar,
                         processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
                         anomaly_score, severity, threshold_severity, threshold_status,
                         threshold_source, threshold_policy_version, threshold_breached,
                         triggered_rules, baseline, evaluation
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (time, event_id) DO NOTHING
                     """,
                     (
@@ -408,7 +432,7 @@ def insert_processed_event(event: dict[str, Any]) -> None:
                         device_id,
                         asset_id,
                         tag,
-                        float(event.get("value", 0) or 0),
+                        *_typed_event_value(event),
                         event.get("unit", ""),
                         event.get("site_id"),
                         event.get("source_protocol") or "unknown",
@@ -453,7 +477,7 @@ def insert_processed_events(events: list[dict[str, Any]]) -> None:
                 device_id,
                 asset_id,
                 tag,
-                float(event.get("value", 0) or 0),
+                *_typed_event_value(event),
                 event.get("unit", ""),
                 event.get("site_id"),
                 event.get("source_protocol") or "unknown",
@@ -482,7 +506,8 @@ def insert_processed_events(events: list[dict[str, Any]]) -> None:
         "processed_events",
         """
         INSERT INTO processed_events (
-            time, event_id, device_id, asset_id, tag, value, unit,
+            time, event_id, device_id, asset_id, tag,
+            value, value_text_raw, value_bool, value_type, unit,
             site_id, source_protocol, quality,
             schema_version, temperature_c, vibration_mm_s, pressure_bar,
             processed_at, window_size, temperature_avg_c, vibration_avg_mm_s,
