@@ -33,3 +33,20 @@ This does not certify PLC drivers, real industrial networks, GPU training,
 Kubernetes, or customer retention policies. The runner publishes directly to
 the normalized Kafka boundary; protocol-specific connector certification
 remains covered by the protocol edge-case matrix.
+
+## Current local evidence
+
+The completed campaign before the schema-compatibility fix recorded 900
+samples, 8,100 observations, 540 actions, 540 outcomes, and 90 artifact
+references with 9,276/9,276 Kafka acknowledgements and a `RUNNING` Flink job.
+Exact event-id checks found all 8,100 observations in both TimescaleDB tables,
+and the compiled bundle passed its evidence gate.
+
+That campaign also exposed that an old development
+`industrial.operational_events` table had the telemetry schema, so operational
+fields were not retained in that table. The sink now rejects this mismatch and
+Compose defaults to `operational_events_v2`. A corrected 15-minute rerun must
+be completed after Docker Desktop is healthy; the attempted rerun on
+2026-07-16 was interrupted by Docker Desktop's Linux engine returning API 500
+and Kafka `ApiVersionRequest` timeouts. It must not be counted as a platform
+pass.

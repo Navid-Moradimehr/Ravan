@@ -11,6 +11,11 @@ table must migrate or choose a new table name explicitly. Added a regression
 test and documented the upgrade behavior in the lakehouse guide and Obsidian
 architecture note.
 
+The post-fix 15-minute rerun was initiated but could not complete because
+Docker Desktop's Linux engine returned API 500 and Kafka began timing out on
+`localhost:19092`. This is recorded as an environment-blocked run, not a
+platform success or failure verdict.
+
 ## 2026-07-16 - World-Model Evidence Soak Harness
 
 Added `scripts/world-model-soak.py`, a dedicated 15-minute campaign for
