@@ -2,7 +2,8 @@
 
 ## Decision
 
-Ship the platform as a native, self-hosted industrial runtime first.
+Ship the platform as a self-hosted industrial runtime first, with a native
+operator experience and a managed service/appliance runtime.
 
 The default release shape should be:
 
@@ -22,7 +23,16 @@ Industrial users usually install these systems on:
 - virtualization hosts
 - sometimes Kubernetes nodes for large sites
 
-That is the same deployment pattern used by major industrial tools: service-first, console-assisted, locally managed, and able to run without a cloud dependency.
+That is the same deployment pattern used by major industrial tools: service-first,
+console-assisted, locally managed, and able to run without a cloud dependency.
+
+The complete Kafka/Flink/TimescaleDB stack should not be described as a small
+desktop application. Linux Site Server is the primary complete runtime. Windows
+Full Node may host the same runtime through a managed Linux appliance, while
+Windows and macOS Operator packages connect to a runtime.
+
+See [Installation Options And Requirements](installation-options-and-requirements.md)
+for package roles and resource tiers.
 
 ## WSL2 recommendation
 

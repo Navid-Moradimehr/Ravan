@@ -156,6 +156,14 @@ Still needed for a full installer pipeline:
 - smoke-test automation after install
 - offline dependency bundle generation
 
+Resource-profile requirement:
+
+- document separate Edge, Core Site, Production Site, AI, and Lakehouse sizing
+- do not make GPU a platform prerequisite
+- do not present the full Docker Compose development footprint as the minimum
+- make remote/cloud/local model placement an explicit installation choice
+- keep persistent data outside replaceable application artifacts
+
 ## 9. Suggested release order
 
 1. Fix build metadata and package discovery.
