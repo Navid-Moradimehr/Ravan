@@ -205,7 +205,7 @@ async def test_connection_endpoint(connection_id: str) -> dict[str, Any]:
 
 
 @router.post("/api/v1/connections/{connection_id}/preview")
-async def preview_connection(connection_id: str, node_id: str | None = None, max_tags: int = 100) -> dict[str, Any]:
+async def preview_connection(connection_id: str, node_id: str | None = None, max_tags: int = 100, max_depth: int = 5) -> dict[str, Any]:
     """Preview source metadata without enabling ingestion or publishing events."""
     connection = connection_registry.get(connection_id)
     if connection is None:
@@ -221,7 +221,7 @@ async def preview_connection(connection_id: str, node_id: str | None = None, max
             if node_id:
                 tags = [await asyncio.wait_for(client.read_tag(node_id), timeout=5.0)]
             else:
-                tags = (await asyncio.wait_for(client.browse_tags(), timeout=10.0))[:max(1, min(max_tags, 1000))]
+                tags = (await asyncio.wait_for(client.browse_tags(max_depth=max_depth), timeout=10.0))[:max(1, min(max_tags, 1000))]
             return {"connection_id": connection_id, "preview": "opcua", "endpoint": connection.endpoint, "tags": tags}
         finally:
             await client.disconnect()

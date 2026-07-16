@@ -21,6 +21,7 @@ from services.edge_ingest.rest_support import deep_get, event_from_record, recor
 from services.edge_ingest.credentials import resolve_credentials
 from services.edge_ingest.settings import Settings, SourceRuntime
 from services.edge_ingest.source_health import mark_mapping_result, mark_source, mark_source_success
+from services.edge_ingest.delivery_history import record_delivery
 
 logger = logging.getLogger(__name__)
 
@@ -157,10 +158,12 @@ async def run_rest(settings: Settings, publisher: EdgePublisher, stop_event: asy
                             break
                 mark_source(source.connection_id, source.source_protocol, source.site_id, "connected")
                 mark_source_success(source.connection_id, source.source_protocol, source.site_id)
+                record_delivery(connection_id=source.connection_id, protocol=source.source_protocol, site=source.site_id, status="accepted", records=total_records)
             except (httpx.HTTPError, ValueError, OSError, RuntimeError) as exc:
                 mark_source(source.connection_id, source.source_protocol, source.site_id, "error", str(exc))
                 adapter_errors.labels(protocol="rest").inc()
                 adapter_reconnects.labels(protocol="rest").inc()
+                record_delivery(connection_id=source.connection_id, protocol=source.source_protocol, site=source.site_id, status="failed", attempts=retries + 1, error=str(exc))
             elapsed = time.monotonic() - started
             if not stop_event.is_set():
                 try:

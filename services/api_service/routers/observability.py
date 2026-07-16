@@ -53,6 +53,15 @@ async def source_health(limit: int = 100, expected_interval_seconds: float = 10.
         raise HTTPException(status_code=503, detail=f"source health unavailable: {exc}") from exc
 
 
+@router.get("/api/v1/observability/source-delivery")
+async def source_delivery(limit: int = 100) -> dict[str, Any]:
+    try:
+        from services.edge_ingest.delivery_history import recent
+        return {"history": recent(limit)}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"source delivery history unavailable: {exc}") from exc
+
+
 @router.get("/api/v1/observability/federation")
 async def federation_observability() -> dict[str, Any]:
     from services.federation.health import federation_health

@@ -26,34 +26,9 @@ from services.historian.client import (
     manual_compress_chunk,
 )
 from services.common.connection_registry import connection_registry
+from services.api_service.http_push_idempotency import IdempotencyUnavailable
 
 router = APIRouter(tags=["historian"])
-
-_HTTP_PUSH_CACHE: dict[str, tuple[float, dict[str, str]]] = {}
-_HTTP_PUSH_CACHE_MAX = 10000
-_HTTP_PUSH_CACHE_TTL_SECONDS = 86400.0
-
-
-def _push_cache_get(key: str) -> dict[str, str] | None:
-    import time
-
-    item = _HTTP_PUSH_CACHE.get(key)
-    if item is None:
-        return None
-    if time.monotonic() - item[0] > _HTTP_PUSH_CACHE_TTL_SECONDS:
-        _HTTP_PUSH_CACHE.pop(key, None)
-        return None
-    return {**item[1], "status": "duplicate"}
-
-
-def _push_cache_put(key: str, result: dict[str, str]) -> None:
-    import time
-
-    if len(_HTTP_PUSH_CACHE) >= _HTTP_PUSH_CACHE_MAX:
-        oldest = next(iter(_HTTP_PUSH_CACHE), None)
-        if oldest:
-            _HTTP_PUSH_CACHE.pop(oldest, None)
-    _HTTP_PUSH_CACHE[key] = (time.monotonic(), result)
 
 
 class SqlQueryRequest(BaseModel):
@@ -175,8 +150,13 @@ async def push_connection_event(connection_id: str, event: dict[str, Any], idemp
     if not connection.enabled:
         raise HTTPException(status_code=409, detail="connection must be enabled before it accepts events")
     key = idempotency_key or str(event.get("event_id", ""))
-    if key:
-        duplicate = _push_cache_get(f"{connection_id}:{key}")
+    durable_key = f"{connection_id}:{key}" if key else ""
+    if durable_key:
+        try:
+            from services.api_service.http_push_idempotency import claim
+            duplicate = claim(durable_key, str(event.get("event_id", "")))
+        except IdempotencyUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         if duplicate:
             return duplicate
     payload = {
@@ -188,10 +168,30 @@ async def push_connection_event(connection_id: str, event: dict[str, Any], idemp
     }
     result = _do_ingest_event(payload)
     if result.get("status") == "publish_failed":
+        if durable_key:
+            try:
+                from services.api_service.http_push_idempotency import release
+                release(durable_key)
+            except IdempotencyUnavailable:
+                pass
         raise HTTPException(status_code=503, detail=result)
     result = {**result, "connection_id": connection_id}
-    if key:
-        _push_cache_put(f"{connection_id}:{key}", result)
+    if durable_key:
+        try:
+            from services.api_service.http_push_idempotency import complete
+            complete(durable_key, result)
+        except IdempotencyUnavailable as exc:
+            from services.api_service.http_push_idempotency import release
+            try:
+                release(durable_key)
+            except IdempotencyUnavailable:
+                pass
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+    try:
+        from services.edge_ingest.delivery_history import record_delivery
+        record_delivery(connection_id=connection_id, protocol="http_push", site=connection.site_id, status="accepted", records=1)
+    except Exception:
+        pass
     return result
 
 

@@ -9,6 +9,7 @@ from services.edge_ingest.publisher import EdgePublisher, adapter_errors
 from services.edge_ingest.source_health import mark_mapping_result
 from services.edge_ingest.settings import Settings, SourceRuntime
 from services.edge_ingest.source_health import mark_source, mark_source_success
+from services.edge_ingest.connectors.modbus_registers import decode_registers, normalize_register, register_count
 
 
 async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
@@ -19,24 +20,33 @@ async def run_modbus_rtu(settings: Settings, publisher: EdgePublisher, stop_even
     port = str(options.get("port") or os.getenv("MODBUS_RTU_PORT", "/dev/ttyUSB0"))
     baudrate = int(options.get("baudrate") or os.getenv("MODBUS_RTU_BAUDRATE", "9600"))
     slave_id = int(options.get("slave_id") or os.getenv("MODBUS_RTU_SLAVE_ID", "1"))
-    register_text = str(options.get("registers") or os.getenv("MODBUS_RTU_REGISTERS", "0:1"))
-    registers = [(int(a.split(":")[0]), int(a.split(":")[1])) for a in register_text.split(",") if ":" in a]
+    configured_registers = options.get("registers")
+    if isinstance(configured_registers, list):
+        registers = [normalize_register(item) for item in configured_registers]
+    else:
+        register_text = str(configured_registers or os.getenv("MODBUS_RTU_REGISTERS", "0:1"))
+        registers = [{"address": int(a.split(":")[0]), "count": int(a.split(":")[1]), "tag": f"register_{a.split(':')[0]}", "unit": "", "scale": 1.0, "offset": 0.0, "unit_id": slave_id, "data_type": "uint16", "byte_order": "big", "word_order": "big"} for a in register_text.split(",") if ":" in a]
     client = ModbusRTUClient(port=port, baudrate=baudrate, slave_id=slave_id)
     while not stop_event.is_set():
         try:
             if not client._client or not client._client.connected:
                 client.connect()
             mark_source(source.connection_id, source.source_protocol, source.site_id, "connected")
-            for addr, count in registers:
+            for register in registers:
+                addr = register["address"]
+                count = register.get("count", register_count(register["data_type"]))
                 values = client.read_holding_registers(addr, count)
                 if values:
-                    for i, val in enumerate(values):
+                    value = decode_registers(values[:count], register["data_type"], register["byte_order"], register["word_order"])
+                    if register["data_type"] != "bool":
+                        value = value * register["scale"] + register["offset"]
+                    for i, val in enumerate(values) if register["data_type"] == "uint16" and count == 1 else [(0, value)]:
                         payload = {
                             "source_protocol": "modbus_rtu",
                             "source_id": source.source_id or f"{port}:{slave_id}:hr/{addr+i}",
                             "asset_id": str(options.get("asset_id", f"RTU-{slave_id}")),
-                            "tag": f"register_{addr+i}",
-                            "value": float(val),
+                            "tag": register["tag"] if count != 1 or register["tag"] else f"register_{addr+i}",
+                            "value": val if register["data_type"] == "bool" else float(val),
                             "quality": "good",
                             "unit": "",
                             "site": source.site_id,

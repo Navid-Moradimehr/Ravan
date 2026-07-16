@@ -25,6 +25,8 @@ The proxy surface covers the editable UI operations:
   `/api/v1/connections/<connection_id>/events` and
   `/api/v1/connections/<connection_id>/events/batch`
 - Observability, federation, and source-health snapshots
+- Source delivery history at `/api/v1/observability/source-delivery`
+  - Returns bounded recent delivery attempts from HTTP Push and edge REST connectors; failures include a short actionable error and attempt count.
 
 Historian browser clients should use the canonical same-origin query form
 `/api/historian?action=events|trend|assets|scenarios|alarms|replay`. For

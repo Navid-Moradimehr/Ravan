@@ -78,7 +78,7 @@ class OPCUADiscoveryClient:
             ],
         }
 
-    async def browse_tags(self, node_id: str | None = None) -> list[dict[str, Any]]:
+    async def browse_tags(self, node_id: str | None = None, max_depth: int = 5) -> list[dict[str, Any]]:
         """Browse OPC UA tags recursively.
 
         Returns a flat list of all Variable nodes with their browse names and node IDs.
@@ -89,7 +89,9 @@ class OPCUADiscoveryClient:
         root = self._client.get_node(node_id) if node_id else self._client.get_objects_node()
         tags = []
 
-        async def _browse_recursive(node: Node, depth: int = 0, max_depth: int = 5) -> None:
+        max_depth = max(1, min(int(max_depth), 20))
+
+        async def _browse_recursive(node: Node, depth: int = 0, max_depth: int = max_depth) -> None:
             if depth > max_depth:
                 return
 

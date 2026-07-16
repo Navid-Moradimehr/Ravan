@@ -36,6 +36,10 @@ PROTOCOL_CAPABILITIES: dict[str, tuple[str, ...]] = {
     "dataset": ("metadata_reference",),
     "mock": ("metadata_reference",),
 }
+MODBUS_DATA_TYPES = {"uint16", "int16", "bool", "uint32", "int32", "float32", "uint64", "int64", "float64"}
+MODBUS_BYTE_ORDERS = {"big", "little"}
+MODBUS_WORD_ORDERS = {"big", "little"}
+OPCUA_SECURITY_MODES = {"None", "Sign", "SignAndEncrypt"}
 
 
 class ConnectionValidationError(ValueError):
@@ -192,10 +196,26 @@ class SourceConnection:
         if protocol in {"mqtt", "sparkplug_b"}:
             if not str(self.config.get("topic", "")).strip():
                 errors.append("MQTT requires config.topic before activation")
-        if protocol == "modbus":
+        if protocol in {"modbus", "modbus_rtu"}:
             registers = self.config.get("registers") if isinstance(self.config, dict) else None
             if not isinstance(registers, list) or not registers:
-                errors.append("Modbus TCP requires an explicit config.registers map; demo registers are not used for registry sources")
+                errors.append(f"{protocol} requires an explicit config.registers map; demo registers are not used for registry sources")
+            else:
+                for index, register in enumerate(registers):
+                    if not isinstance(register, dict):
+                        if protocol == "modbus_rtu" and isinstance(register, str) and ":" in register:
+                            continue
+                        errors.append(f"{protocol} config.registers[{index}] must be an object")
+                        continue
+                    data_type = str(register.get("data_type", "uint16")).lower()
+                    if data_type not in MODBUS_DATA_TYPES:
+                        errors.append(f"Modbus registers[{index}].data_type must be one of {sorted(MODBUS_DATA_TYPES)}")
+                    byte_order = str(register.get("byte_order", "big")).lower()
+                    word_order = str(register.get("word_order", "big")).lower()
+                    if byte_order not in MODBUS_BYTE_ORDERS:
+                        errors.append(f"Modbus registers[{index}].byte_order must be big or little")
+                    if word_order not in MODBUS_WORD_ORDERS:
+                        errors.append(f"Modbus registers[{index}].word_order must be big or little")
         if protocol == "modbus_rtu":
             if not str(self.config.get("port", "")).strip():
                 errors.append("Modbus RTU requires config.port")
@@ -221,6 +241,16 @@ class SourceConnection:
                     errors.append(f"REST response.field_paths.{field} is required")
         if protocol in {"rest", "http_push"}:
             errors.extend(_validate_config_references(self.config))
+        if protocol == "opcua":
+            security = self.config.get("security", {}) if isinstance(self.config.get("security", {}), dict) else {}
+            mode = str(security.get("mode", "None"))
+            if mode not in OPCUA_SECURITY_MODES:
+                errors.append(f"OPC UA security.mode must be one of {sorted(OPCUA_SECURITY_MODES)}")
+            if mode != "None" and not str(security.get("policy", "")).strip():
+                errors.append("OPC UA security.policy is required when security.mode is not None")
+            browse_nodes = self.config.get("browse_nodes", [])
+            if browse_nodes and not isinstance(browse_nodes, list):
+                errors.append("OPC UA config.browse_nodes must be a list")
         return errors
 
     def validate(self) -> list[str]:

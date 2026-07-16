@@ -707,6 +707,8 @@ services:
         -c "CREATE INDEX IF NOT EXISTS metadata_asset_tags_updated_idx ON metadata_asset_tags (updated_at DESC);"
         -c "CREATE TABLE IF NOT EXISTS audit_logs (time TIMESTAMPTZ NOT NULL DEFAULT now(), user_id TEXT NOT NULL DEFAULT '', action TEXT NOT NULL, resource TEXT NOT NULL DEFAULT '', details JSONB NOT NULL DEFAULT '{}'::jsonb);"
         -c "CREATE INDEX IF NOT EXISTS audit_logs_time_idx ON audit_logs (time DESC);"
+        -c "CREATE TABLE IF NOT EXISTS http_push_idempotency (idempotency_key TEXT PRIMARY KEY, event_id TEXT NOT NULL DEFAULT '', response JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());"
+        -c "CREATE INDEX IF NOT EXISTS http_push_idempotency_created_idx ON http_push_idempotency (created_at DESC);"
         -c "CREATE INDEX IF NOT EXISTS audit_logs_resource_idx ON audit_logs (resource, time DESC);"
         -c "CREATE TABLE IF NOT EXISTS metadata_threshold_policies (site_id TEXT NOT NULL, asset_id TEXT NOT NULL, tag TEXT NOT NULL, unit TEXT, mode TEXT NOT NULL DEFAULT 'outside_range', warning_low DOUBLE PRECISION, warning_high DOUBLE PRECISION, critical_low DOUBLE PRECISION, critical_high DOUBLE PRECISION, deadband DOUBLE PRECISION NOT NULL DEFAULT 0, on_delay_seconds DOUBLE PRECISION NOT NULL DEFAULT 0, off_delay_seconds DOUBLE PRECISION NOT NULL DEFAULT 0, enabled BOOLEAN NOT NULL DEFAULT TRUE, source TEXT NOT NULL DEFAULT 'user', version INTEGER NOT NULL DEFAULT 1, effective_from TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (site_id, asset_id, tag));"
         -c "CREATE INDEX IF NOT EXISTS metadata_threshold_policies_site_idx ON metadata_threshold_policies (site_id, asset_id, tag);"
@@ -759,6 +761,8 @@ services:
       DATASTREAM_WEBHOOK_REGISTRY_PATH: /data/webhooks.json
       DATASTREAM_NOTIFICATION_REGISTRY_PATH: /data/notifications.json
       DATASTREAM_DELIVERY_LEDGER_PATH: /data/delivery-ledger.json
+      DATASTREAM_SOURCE_DELIVERY_HISTORY_PATH: /data/source-delivery.json
+      DATASTREAM_EDGE_SOURCE_DELIVERY_HISTORY_PATH: /var/lib/datastream/source-delivery.json
       MODEL_REGISTRY_PATH: /data/model-registry.json
       MODEL_LIFECYCLE_PATH: /data/model-lifecycle.json
       AGENT_ACTION_LEDGER_PATH: /data/agent-actions.json
@@ -766,6 +770,7 @@ services:
       SCHEMA_REGISTRY_PATH: /data/schema-registry.json
       DATASET_CATALOG_PATH: /data/dataset-catalog.json
       EDGE_SOURCE_HEALTH_HISTORY_PATH: /var/lib/datastream/source-health.json
+      DATASTREAM_SOURCE_DELIVERY_HISTORY_PATH: /var/lib/datastream/source-delivery.json
     ports:
       - "8020:8020"
     healthcheck:

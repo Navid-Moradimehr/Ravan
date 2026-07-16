@@ -11,6 +11,11 @@ from services.edge_ingest.publisher import EdgePublisher, adapter_errors, adapte
 from services.edge_ingest.source_health import mark_mapping_result
 from services.edge_ingest.settings import Settings, SourceRuntime
 from services.edge_ingest.source_health import mark_source, mark_source_success
+from services.edge_ingest.connectors.modbus_registers import normalize_register, register_count, decode_registers
+
+# Kept as local aliases for existing connector tests and integrations.
+_register_count = register_count
+_decode_registers = decode_registers
 
 
 async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: asyncio.Event, source: SourceRuntime | None = None) -> None:
@@ -21,10 +26,7 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
     port = int(endpoint_port or settings.modbus_port)
     configured_registers = source.options.get("registers") or []
     if configured_registers:
-        register_map = [
-            (int(item["address"]), str(item.get("tag", f"register_{item['address']}")), str(item.get("unit", "")), float(item.get("scale", 1.0)), float(item.get("offset", 0.0)), int(item.get("unit_id", item.get("slave_id", 1))))
-            for item in configured_registers
-        ]
+        register_map = [normalize_register(item) for item in configured_registers]
     elif not source.registry_managed:
         register_map = [(0, "Temperature", "c", 0.1, 0.0, 1), (1, "Vibration", "mm/s", 0.01, 0.0, 1), (2, "Pressure", "bar", 0.1, 0.0, 1)]
     else:
@@ -48,18 +50,20 @@ async def run_modbus(settings: Settings, publisher: EdgePublisher, stop_event: a
                 raise ConnectionError("modbus connect failed")
             mark_source(source.connection_id, source.source_protocol, source.site_id, "connected")
             while not stop_event.is_set():
-                for address, tag, unit, scale, offset, slave_id in register_map:
-                    result = client.read_holding_registers(address=address, count=1, slave=slave_id)
+                for register in register_map:
+                    address = register["address"]
+                    data_type = register["data_type"]
+                    result = client.read_holding_registers(address=address, count=register_count(data_type), slave=register["unit_id"])
                     if result.isError():
                         raise RuntimeError(str(result))
                     payload = {
                         "source_protocol": "modbus",
                         "source_id": source.source_id or f"{host}:{port}/hr/{address}",
                         "asset_id": str(source.options.get("asset_id", "Pump-03")),
-                        "tag": tag,
-                        "value": result.registers[0] * scale + offset,
+                        "tag": register["tag"],
+                        "value": decode_registers(result.registers, data_type, register["byte_order"], register["word_order"]) * register["scale"] + register["offset"] if data_type != "bool" else decode_registers(result.registers, data_type, register["byte_order"], register["word_order"]),
                         "quality": "good",
-                        "unit": unit,
+                        "unit": register["unit"],
                         "site": source.site_id,
                         "ts_source": utc_now(),
                     }

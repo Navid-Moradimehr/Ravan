@@ -50,7 +50,7 @@ Modbus sources accept declarative register entries with address, tag, unit, scal
 
 REST Pull is a runtime source. Configure an HTTP(S) endpoint, GET or POST, bounded poll interval and timeout, optional deployment-owned authentication reference, response records path, canonical field paths, and bounded pagination. Each record becomes a deterministic canonical event and uses the same Kafka, DLQ, lineage, processor, historian, and optional sink path as PLC telemetry. REST retries, page counts, records per poll, and request timeouts are bounded.
 
-HTTP Push is a runtime ingress for gateways and applications that already own the outbound connection. After an `http_push` connection is enabled, post one event to `/api/v1/connections/<connection_id>/events` or up to 1,000 events to `/events/batch`. The route requires a registered enabled connection, stamps source/site lineage, uses the canonical ingest path, and deduplicates repeated `Idempotency-Key` or `event_id` values in a bounded local cache. Authentication is deliberately left to the operator's reverse proxy or API boundary.
+HTTP Push is a runtime ingress for gateways and applications that already own the outbound connection. After an `http_push` connection is enabled, post one event to `/api/v1/connections/<connection_id>/events` or up to 1,000 events to `/events/batch`. The route requires a registered enabled connection, stamps source/site lineage, uses the canonical ingest path, and deduplicates repeated `Idempotency-Key` or `event_id` values in the TimescaleDB-backed idempotency ledger. If durable storage is unavailable, the route fails closed instead of silently weakening deduplication. Authentication is deliberately left to the operator's reverse proxy or API boundary.
 
 ## Multi-site deployment options
 
@@ -110,7 +110,8 @@ supplied.
 - Implemented: versioned connection contract, persisted registry, secret-reference validation, list/create/update/delete/enable/disable APIs, bounded TCP diagnostics, Docker persistence, multiple registry-backed edge source descriptors, and legacy environment fallback.
 - Implemented: per-source Prometheus health metrics labeled by connection, protocol, and site, plus runtime mapping-match and mapping-miss diagnostics.
 - Implemented: draft lifecycle, protocol-specific activation readiness, REST Pull polling, HTTP Push single/batch ingress, bounded retries/pagination, deterministic REST event IDs, and the guided source editor.
-- Partially implemented: MQTT Sparkplug B activation, richer Modbus datatype/byte-order editing, durable health history, OAuth2/mTLS diagnostics beyond connector execution, and deeper source-to-asset mapping UI.
+- Implemented: bounded persistent source-health transition history, source delivery history at `/api/v1/observability/source-delivery`, durable HTTP Push idempotency, typed Modbus TCP and RTU datatype/byte/word-order decoding, and OPC UA security-string configuration hooks. In Compose, API-origin delivery records live in `/data`, while edge-origin records live on the shared edge volume and are merged by the API.
+- Partially implemented: richer Modbus register editing beyond the guided CSV form, OPC UA trust-store lifecycle and persistent browse session management, OAuth2/mTLS diagnostics beyond connector execution, full Sparkplug B lifecycle management, and deeper source-to-asset mapping UI.
 - User-owned: credentials, certificates, network access, firewall rules, asset topology, register-map correctness, external storage, external brokers, SMTP, and authentication/authorization.
 - Future: durable connector task orchestration, richer protocol diagnostics,
   durable HTTP Push idempotency across process restarts, and per-route delivery

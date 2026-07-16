@@ -77,6 +77,25 @@ def test_http_push_has_generated_activation_contract(tmp_path):
     assert saved.capabilities == ("push", "batch", "idempotency", "canonical_ingest")
 
 
+def test_modbus_register_map_accepts_explicit_datatype_and_orders(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    saved = registry.put(SourceConnection(
+        "modbus-rich", "Rich Modbus", "modbus", "plant-a", "modbus://127.0.0.1:502",
+        config={"registers": [{"address": 10, "tag": "Flow", "data_type": "float32", "byte_order": "little", "word_order": "little"}]},
+    ))
+    assert saved.activation_ready
+
+
+def test_opcua_security_requires_policy_for_signed_modes(tmp_path):
+    registry = ConnectionRegistry(tmp_path / "connections.json")
+    saved = registry.put(SourceConnection(
+        "opcua-secure", "Secure OPC UA", "opcua", "plant-a", "opc.tcp://127.0.0.1:4840",
+        config={"nodes": ["ns=2;s=Pump.Temperature"], "security": {"mode": "SignAndEncrypt"}},
+    ))
+    assert not saved.activation_ready
+    assert "security.policy" in " ".join(saved.activation_errors())
+
+
 def test_registry_retire_preserves_history_and_hides_from_active_list(tmp_path):
     registry = ConnectionRegistry(tmp_path / "connections.json")
     registry.put(_connection())

@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS audit_logs_time_idx ON audit_logs (time DESC);
 CREATE INDEX IF NOT EXISTS audit_logs_resource_idx ON audit_logs (resource, time DESC);
 
+CREATE TABLE IF NOT EXISTS http_push_idempotency (
+    idempotency_key TEXT PRIMARY KEY,
+    event_id TEXT NOT NULL DEFAULT '',
+    response JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS http_push_idempotency_created_idx ON http_push_idempotency (created_at DESC);
+
+
 CREATE TABLE IF NOT EXISTS metadata_threshold_policies (
     site_id TEXT NOT NULL,
     asset_id TEXT NOT NULL,

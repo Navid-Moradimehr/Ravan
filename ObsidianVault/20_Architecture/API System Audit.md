@@ -121,3 +121,9 @@ reconciled; full suite now 419 passed.
   `used_fallback` guard so `mark_ok()` only runs when the LLM actually succeeded.
   This is the only production-code change in this pass; it preserves the
   degraded signal operators rely on.
+## 2026-07-16 Source hardening evidence
+
+- HTTP Push idempotency is now durable in the TimescaleDB `http_push_idempotency` table and fails closed with `503` if the ledger cannot be consulted.
+- Source delivery history is bounded and persistent. Compose merges API-origin records from `/data` with edge connector records from the shared edge volume at `/api/v1/observability/source-delivery`.
+- Modbus TCP and RTU use the same typed register contract for datatype, scaling, byte order, and word order; legacy RTU `address:count` maps remain accepted.
+- OPC UA supports security-string execution hooks and bounded browse previews. Certificate/trust-store lifecycle management remains operator-owned and is not claimed as complete.

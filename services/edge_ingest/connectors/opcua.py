@@ -31,6 +31,10 @@ async def run_opcua(settings: Settings, publisher: EdgePublisher, stop_event: as
                 client_kwargs["certificate"] = opcua_cert
                 client_kwargs["private_key"] = opcua_key
             async with Client(endpoint, **client_kwargs) as client:
+                security = source.options.get("security", {}) if isinstance(source.options.get("security", {}), dict) else {}
+                security_string = str(security.get("security_string", "")).strip()
+                if security_string:
+                    await client.set_security_string(security_string)
                 username = credentials.get("username", "")
                 password = credentials.get("password", "")
                 if username:
