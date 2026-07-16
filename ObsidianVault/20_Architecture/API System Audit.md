@@ -28,6 +28,20 @@
   Desktop was unavailable (`dockerDesktopLinuxEngine` pipe missing). The
   FastAPI route contract tests passed and the UI production build passed.
 
+## 2026-07-16 Verification
+
+- Rebuilt `api-service`, `edge-ingest`, and `dashboard` from the current tree
+  with Docker Desktop.
+- `GET /health`, the dashboard Integrations page, Kafka UI, Grafana proxy, and
+  Prometheus readiness all returned HTTP 200.
+- HTTP Push was exercised through the live API: a registered enabled source
+  accepted a canonical event, repeated `Idempotency-Key` delivery returned a
+  duplicate, and the source was retired cleanly.
+- Playwright loaded `/integrations` with zero console errors; source, health,
+  threshold, update, and navigation requests returned HTTP 200.
+- The 2026-07-13 Docker limitation above is historical and superseded by this
+  verification.
+
 ## Findings
 
 ### Connectivity / wiring
