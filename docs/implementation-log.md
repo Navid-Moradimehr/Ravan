@@ -3021,3 +3021,5 @@ unchanged.
 - Updated the Flink job image and static example to include the matching
   Flink-Python runtime JAR and bounded task-manager capacity.
 - Validation: Helm render and focused Kubernetes/Flink tests pass.
+- Added explicit per-service image slots; rehearsal defaults are local names and
+  federated Flink deliberately requires a site registry tag override.

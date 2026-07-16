@@ -22,7 +22,7 @@ apiService:
   enabled: true
   replicaCount: 1
   image:
-    repository: ""
+    repository: "data-stream-api"
     tag: ""
     pullPolicy: ""
   command: ["python", "-m", "uvicorn", "services.api_service.main:app", "--host", "0.0.0.0", "--port", "8020", "--no-access-log"]
@@ -40,7 +40,7 @@ aiGateway:
   enabled: true
   replicaCount: 1
   image:
-    repository: ""
+    repository: "data-stream-ai-gateway"
     tag: ""
     pullPolicy: ""
   command: ["uvicorn", "services.ai_gateway.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
@@ -58,7 +58,7 @@ processor:
   enabled: true
   replicaCount: 1
   image:
-    repository: ""
+    repository: "data-stream-processor"
     tag: ""
     pullPolicy: ""
   command: ["python", "-m", "services.processor.runtime_processor"]
@@ -74,7 +74,7 @@ flinkJob:
   enabled: false
   replicaCount: 1
   image:
-    repository: ""
+    repository: "data-stream-flink-job"
     tag: ""
     pullPolicy: ""
   command: ["bash", "/opt/stream/flink-job-entrypoint.sh"]
@@ -88,7 +88,7 @@ flinkJob:
   operator:
     enabled: false
     serviceAccount: data-stream-flink
-    image: ""
+    image: "data-stream-flink-job:latest"
     flinkVersion: v1_20
     jobManager:
       cpu: 1
@@ -117,7 +117,7 @@ edgeIngest:
   enabled: true
   replicaCount: 1
   image:
-    repository: ""
+    repository: "data-stream-edge-ingest"
     tag: ""
     pullPolicy: ""
   command: ["python", "-m", "services.edge_ingest.main"]

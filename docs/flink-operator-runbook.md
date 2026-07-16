@@ -59,6 +59,12 @@ Before applying it:
 - keep operator autoscaling settings in the operator Helm values, not inside
   the workload spec
 
+The Helm chart has explicit image slots for API, AI gateway, processor, edge
+ingest, and Flink. The defaults are local image names for rehearsal only. For
+a real cluster, override them with site-approved registry tags; the federated
+profile intentionally uses `REPLACE_ME` for the Flink Operator image so it
+cannot be mistaken for a deployable production reference.
+
 ## 3. Apply the Flink deployment
 
 ```powershell
