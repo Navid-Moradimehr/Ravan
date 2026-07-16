@@ -170,12 +170,12 @@ function AIReportingWorkspace() {
             </CardContent>
           </Card>
 
-          {reports.isError ? <BriefingFailure message={formatErrorMessage(reports.error)} /> : reports.isLoading ? <div className="grid gap-4 xl:grid-cols-[21rem_minmax(0,1fr)]"><Skeleton className="h-96 bg-surface-2" /><Skeleton className="h-96 bg-surface-2" /></div> : completed.length ? (
-            <div className="grid items-start gap-4 xl:grid-cols-[21rem_minmax(0,1fr)]">
-              <Card className="app-card overflow-hidden xl:sticky xl:top-[4.5rem]">
+          {reports.isError ? <BriefingFailure message={formatErrorMessage(reports.error)} /> : reports.isLoading ? <div className="grid gap-4 2xl:grid-cols-[21rem_minmax(0,1fr)]"><Skeleton className="h-96 bg-surface-2" /><Skeleton className="h-96 bg-surface-2" /></div> : completed.length ? (
+            <div className="grid items-start gap-4 2xl:grid-cols-[21rem_minmax(0,1fr)]">
+              <Card className="app-card overflow-hidden 2xl:sticky 2xl:top-[4.5rem]">
                 <CardHeader className="app-card-header"><CardTitle className="flex items-center gap-2 text-base">Report inbox <HelpTip label="Report inbox help" content="Completed scheduled, anomaly, recovery, and operator-requested jobs appear here after their structured output is persisted. Selecting one loads its durable detail and verifies downstream historian projection." /></CardTitle><CardDescription>{completed.length} completed briefing{completed.length === 1 ? "" : "s"}</CardDescription></CardHeader>
                 <CardContent className="max-h-[70dvh] space-y-2 overflow-y-auto p-3">
-                  {completed.map((job) => <button key={job.job_id} type="button" onClick={() => setSelectedId(job.job_id)} className={`w-full rounded-xl border p-3 text-left transition-colors ${selected?.job_id === job.job_id ? "border-accent/40 bg-accent-subtle" : "border-border-subtle bg-surface-2 hover:border-border-strong"}`}><div className="flex items-center gap-2"><Badge variant="outline" className="capitalize">{job.report_type}</Badge><span className="ml-auto font-mono text-[11px] text-text-muted">{job.site_id}</span></div><p className="mt-2 line-clamp-2 font-heading text-sm font-semibold leading-5 text-text-primary">{job.result?.briefing?.headline}</p><p className="mt-2 font-sans text-xs text-text-muted">{formatDate(job.updated_at ?? job.created_at)}</p></button>)}
+                  {completed.map((job) => <button key={job.job_id} type="button" onClick={() => setSelectedId(job.job_id)} className={`w-full rounded-xl border p-3 text-left transition-colors ${selected?.job_id === job.job_id ? "border-accent/40 bg-accent-subtle" : "border-border-subtle bg-surface-2 hover:border-border-strong"}`}><p className="line-clamp-2 font-heading text-sm font-semibold leading-5 text-text-primary">{job.result?.briefing?.headline}</p><p className="mt-2 font-sans text-xs text-text-muted">{formatDate(job.updated_at ?? job.created_at)}</p></button>)}
                 </CardContent>
               </Card>
               <Card className="app-card"><CardContent className="p-4 md:p-5">{reportDetail.isError ? <BriefingFailure message={`The report exists but its detail could not be retrieved: ${formatErrorMessage(reportDetail.error)}`} /> : selected ? <OperationalBriefingDetail job={selected} /> : <BriefingEmptyState />}</CardContent></Card>
