@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     )
     llm_request_path: str | None = Field(default=None, validation_alias=AliasChoices("llm_request_path", "LLM_REQUEST_PATH"))
     llm_request_format: str = Field(default="chat", validation_alias=AliasChoices("llm_request_format", "LLM_REQUEST_FORMAT"))
+    llm_max_output_tokens: int = Field(default=2048, validation_alias=AliasChoices("llm_max_output_tokens", "LLM_MAX_OUTPUT_TOKENS"))
     llm_batch_seconds: int = 5
     llm_max_batch_size: int = 100
     llm_timeout_seconds: int = 8

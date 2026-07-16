@@ -21,6 +21,7 @@ from services.ai_gateway.providers import (
     LLMProviderClient,
     build_fallback_summary,
     build_industrial_prompt,
+    provider_catalog,
 )
 from services.common.ai_event_contract import build_ai_summary_event, DEFAULT_AI_PROMPT_TEMPLATE_ID
 from services.common.prompt_registry import prompt_registry
@@ -170,6 +171,19 @@ async def health() -> dict[str, Any]:
         "last_error": service_state.last_error,
         "degraded": service_state.degraded,
         "degraded_reason": service_state.degraded_reason,
+        "credential_configured": bool(settings.llm_api_key),
+    }
+
+
+@app.get("/providers")
+async def providers() -> dict[str, Any]:
+    """Expose provider choices without exposing credentials."""
+    return {
+        "providers": provider_catalog(),
+        "configured_provider": settings.llm_provider,
+        "configured_model": settings.llm_model_id,
+        "credential_configured": bool(settings.llm_api_key),
+        "local_only": bool(settings.llm_local_only),
     }
 
 

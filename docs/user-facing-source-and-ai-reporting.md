@@ -69,6 +69,11 @@ The site selector is not an asset selector. It combines site IDs known by source
 registry and asset/tag metadata, and falls back to the shared `*` scope when a
 deployment has not registered site metadata yet.
 
+For cloud and local model setup, see
+[`ai-provider-configuration.md`](ai-provider-configuration.md). The AI
+Reporting page shows durable job state; generated content is emitted to
+`iot.ai_enriched` and stored in the historian `ai_enriched` table.
+
 ## Pipeline page data contract
 
 The Pipeline page reads source health from

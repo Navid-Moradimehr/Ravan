@@ -6,7 +6,7 @@ import json
 import httpx
 
 from services.ai_gateway.config import Settings
-from services.ai_gateway.providers import LLMProviderClient, build_fallback_summary, build_industrial_prompt
+from services.ai_gateway.providers import LLMProviderClient, build_fallback_summary, build_industrial_prompt, provider_catalog
 from services.common.structured_output import validate_industrial_summary
 
 
@@ -47,6 +47,40 @@ def test_ollama_request_spec_uses_api_chat():
     assert spec.url == "http://localhost:11434/api/chat"
     assert spec.body["stream"] is False
     assert spec.body["model"] == "mistral"
+
+
+def test_anthropic_request_spec_uses_messages_contract():
+    settings = Settings(llm_provider="anthropic", llm_api_key="anthropic-key", llm_model_id="claude-test")
+    spec = LLMProviderClient(settings).request_spec("Inspect pump")
+    assert spec.url == "https://api.anthropic.com/v1/messages"
+    assert spec.headers["x-api-key"] == "anthropic-key"
+    assert spec.headers["anthropic-version"] == "2023-06-01"
+    assert spec.body["max_tokens"] == 2048
+    assert spec.body["messages"][0]["role"] == "user"
+
+
+def test_gemini_request_spec_uses_generate_content_contract():
+    settings = Settings(llm_provider="gemini", llm_api_key="gemini-key", llm_model_id="gemini-test")
+    spec = LLMProviderClient(settings).request_spec("Inspect pump")
+    assert spec.url == "https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent"
+    assert spec.headers["x-goog-api-key"] == "gemini-key"
+    assert spec.body["contents"][0]["parts"][0]["text"] == "Inspect pump"
+
+
+def test_openai_compatible_cloud_presets_use_override_and_parse_native_shapes():
+    settings = Settings(llm_provider="deepseek", llm_endpoint_url="https://gateway.example/v1", llm_api_key="key")
+    spec = LLMProviderClient(settings).request_spec("Inspect pump")
+    assert spec.url == "https://gateway.example/v1/chat/completions"
+    assert spec.headers["Authorization"] == "Bearer key"
+    assert LLMProviderClient(Settings(llm_provider="anthropic")).extract_content({"content": [{"type": "text", "text": "report"}]}) == "report"
+    assert LLMProviderClient(Settings(llm_provider="gemini")).extract_content({"candidates": [{"content": {"parts": [{"text": "report"}]}}]}) == "report"
+
+
+def test_provider_catalog_does_not_contain_credentials():
+    catalog = provider_catalog()
+    ids = {item["id"] for item in catalog}
+    assert {"anthropic", "gemini", "deepseek", "qwen", "kimi", "glm"}.issubset(ids)
+    assert all("key" not in item and "secret" not in item for item in catalog)
 
 
 def test_response_parsers_handle_openai_and_ollama_shapes():

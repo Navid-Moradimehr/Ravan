@@ -146,7 +146,7 @@ const catalogSurfaces: SurfaceCard[] = [
   },
   {
     title: "AI providers",
-    description: "OpenAI-compatible, LM Studio, vLLM, Ollama, and local models.",
+    description: "Anthropic, Gemini, OpenAI, DeepSeek, Qwen, Kimi, GLM, Ollama, and compatible local/cloud gateways.",
     note: "Configured through environment variables and provider routing.",
     icon: DatabaseZap,
     action: { label: "Setup guide", href: "#ai-providers", tone: "secondary" },
@@ -157,9 +157,10 @@ const catalogSurfaces: SurfaceCard[] = [
         "services/ai_gateway/providers.py",
       ],
       steps: [
-        "Set `LLM_PROVIDER`, `LLM_ENDPOINT_URL`, `LLM_MODEL_ID`, and the provider credential in the deployment environment.",
-        "Choose the local or remote provider endpoint per deployment.",
-        "Leave provider credentials and GPU sizing to the operator.",
+        "Set `LLM_PROVIDER`, `LLM_MODEL_ID`, and `LLM_API_KEY` in the deployment environment; use `LLM_ENDPOINT_URL` for regional or private gateways.",
+        "Use `GET http://localhost:8080/providers` to verify the selected non-secret configuration.",
+        "Read report job state in `/ai-reporting`; full generated reports are durable on Kafka topic `iot.ai_enriched` and historian table `ai_enriched`.",
+        "Leave provider credentials, network egress, quotas, retention, and GPU sizing to the operator.",
       ],
     },
   },

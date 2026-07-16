@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import ipaddress
 from dataclasses import dataclass
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from typing import Any
 
 import httpx
@@ -26,6 +26,52 @@ class LLMDisabledError(LLMProviderError):
     pass
 
 
+# Providers with a native API use an adapter below. Providers whose public API
+# is OpenAI-compatible intentionally share the existing request contract.
+PROVIDER_PRESETS: dict[str, dict[str, str]] = {
+    "openai": {"canonical": "openai_compat", "base_url": "https://api.openai.com/v1", "auth": "bearer"},
+    "openai_compat": {"canonical": "openai_compat", "auth": "bearer"},
+    "anthropic": {"canonical": "anthropic", "base_url": "https://api.anthropic.com", "auth": "x-api-key"},
+    "gemini": {"canonical": "gemini", "base_url": "https://generativelanguage.googleapis.com", "auth": "x-goog-api-key"},
+    "google": {"canonical": "gemini", "base_url": "https://generativelanguage.googleapis.com", "auth": "x-goog-api-key"},
+    "google_gemini": {"canonical": "gemini", "base_url": "https://generativelanguage.googleapis.com", "auth": "x-goog-api-key"},
+    "deepseek": {"canonical": "openai_compat", "base_url": "https://api.deepseek.com", "auth": "bearer"},
+    "qwen": {"canonical": "openai_compat", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "auth": "bearer"},
+    "dashscope": {"canonical": "openai_compat", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "auth": "bearer"},
+    "kimi": {"canonical": "openai_compat", "base_url": "https://api.moonshot.ai/v1", "auth": "bearer"},
+    "moonshot": {"canonical": "openai_compat", "base_url": "https://api.moonshot.ai/v1", "auth": "bearer"},
+    "glm": {"canonical": "openai_compat", "base_url": "https://open.bigmodel.cn/api/paas/v4", "auth": "bearer"},
+    "zhipu": {"canonical": "openai_compat", "base_url": "https://open.bigmodel.cn/api/paas/v4", "auth": "bearer"},
+    "ollama": {"canonical": "ollama", "auth": "none"},
+}
+
+
+def provider_catalog() -> list[dict[str, Any]]:
+    """Return safe provider metadata for operators and UI setup guides."""
+    names = {
+        "openai": "OpenAI",
+        "openai_compat": "OpenAI-compatible gateway",
+        "anthropic": "Anthropic",
+        "gemini": "Google Gemini",
+        "deepseek": "DeepSeek",
+        "qwen": "Qwen / DashScope",
+        "kimi": "Kimi / Moonshot",
+        "glm": "GLM / Zhipu",
+        "ollama": "Ollama",
+    }
+    return [
+        {
+            "id": provider,
+            "name": names.get(provider, provider),
+            "protocol": "native" if preset.get("canonical") in {"anthropic", "gemini", "ollama"} else "openai_compatible",
+            "default_endpoint": preset.get("base_url"),
+            "credential": preset.get("auth", "bearer"),
+        }
+        for provider, preset in PROVIDER_PRESETS.items()
+        if provider not in {"google", "google_gemini", "dashscope", "moonshot", "zhipu"}
+    ]
+
+
 class LLMProviderClient:
     def __init__(self, settings: Any):
         self.settings = settings
@@ -39,19 +85,39 @@ class LLMProviderClient:
         if provider == "disabled":
             raise LLMDisabledError("LLM provider is disabled")
 
-        base_url = self.settings.llm_endpoint_url.rstrip("/")
+        preset = PROVIDER_PRESETS.get(provider, PROVIDER_PRESETS["openai_compat"])
+        canonical = preset.get("canonical", provider)
+        base_url = self._effective_base_url(preset).rstrip("/")
         self._validate_endpoint(base_url)
-        path = self._request_path()
+        path = self._request_path(canonical)
         url = f"{base_url}{path}"
         headers = {"Content-Type": "application/json"}
-        if self.settings.llm_api_key:
+        if self.settings.llm_api_key and preset.get("auth") == "bearer":
             headers["Authorization"] = f"Bearer {self.settings.llm_api_key}"
+        elif self.settings.llm_api_key and preset.get("auth") == "x-api-key":
+            headers["x-api-key"] = self.settings.llm_api_key
+            headers["anthropic-version"] = "2023-06-01"
+        elif self.settings.llm_api_key and preset.get("auth") == "x-goog-api-key":
+            headers["x-goog-api-key"] = self.settings.llm_api_key
 
-        if provider == "ollama":
+        if canonical == "ollama":
             body = {
                 "model": self.settings.llm_model_id,
                 "messages": self._messages(prompt),
                 "stream": False,
+            }
+        elif canonical == "anthropic":
+            body = {
+                "model": self.settings.llm_model_id,
+                "max_tokens": max(1, int(self.settings.llm_max_output_tokens)),
+                "system": "You are an operations analyst for a streaming industrial platform.",
+                "messages": [{"role": "user", "content": prompt}],
+            }
+        elif canonical == "gemini":
+            body = {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "systemInstruction": {"parts": [{"text": "You are an operations analyst for a streaming industrial platform."}]},
+                "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(1, int(self.settings.llm_max_output_tokens))},
             }
         elif self.settings.llm_request_format == "completion":
             body = {
@@ -80,13 +146,30 @@ class LLMProviderClient:
         return self.extract_content(response_json)
 
     def extract_content(self, response_json: dict[str, Any]) -> str:
-        if self.provider == "ollama":
+        canonical = PROVIDER_PRESETS.get(self.provider, {}).get("canonical", self.provider)
+        if canonical == "ollama":
             if "message" in response_json and isinstance(response_json["message"], dict):
                 content = response_json["message"].get("content")
                 if content is not None:
                     return str(content)
             if "response" in response_json:
                 return str(response_json["response"])
+
+        if canonical == "anthropic":
+            blocks = response_json.get("content")
+            if isinstance(blocks, list):
+                text = "".join(str(block.get("text", "")) for block in blocks if isinstance(block, dict))
+                if text:
+                    return text
+
+        if canonical == "gemini":
+            candidates = response_json.get("candidates")
+            if isinstance(candidates, list) and candidates:
+                parts = ((candidates[0] or {}).get("content") or {}).get("parts", [])
+                if isinstance(parts, list):
+                    text = "".join(str(part.get("text", "")) for part in parts if isinstance(part, dict))
+                    if text:
+                        return text
 
         choices = response_json.get("choices")
         if isinstance(choices, list) and choices:
@@ -103,12 +186,26 @@ class LLMProviderClient:
 
         return json.dumps(response_json, separators=(",", ":"))
 
-    def _request_path(self) -> str:
+    def _request_path(self, canonical: str | None = None) -> str:
         if self.settings.llm_request_path:
             return self._normalize_path(self.settings.llm_request_path)
-        if self.provider == "ollama":
+        canonical = canonical or PROVIDER_PRESETS.get(self.provider, {}).get("canonical", self.provider)
+        if canonical == "ollama":
             return "/api/chat"
+        if canonical == "anthropic":
+            return "/v1/messages"
+        if canonical == "gemini":
+            model = quote(str(self.settings.llm_model_id).removeprefix("models/"), safe="._-~")
+            return f"/v1beta/models/{model}:generateContent"
         return "/chat/completions"
+
+    def _effective_base_url(self, preset: dict[str, str]) -> str:
+        configured = str(self.settings.llm_endpoint_url or "").strip()
+        default_local = {"", "http://172.17.0.1:1234/v1", "http://host.docker.internal:1234/v1"}
+        named_default = preset.get("base_url")
+        if named_default and configured in default_local:
+            return named_default
+        return configured or named_default or "http://localhost:1234/v1"
 
     @staticmethod
     def _normalize_path(path: str) -> str:
