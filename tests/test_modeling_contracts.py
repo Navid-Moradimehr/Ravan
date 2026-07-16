@@ -246,6 +246,39 @@ def test_diagnostic_runtime_rejects_non_read_only_tools():
         pass
 
 
+def test_diagnostic_runtime_dispatches_validated_read_only_tool(monkeypatch):
+    import services.common.agent_runtime as agent_runtime
+    import services.common.agent_tools as agent_tools
+
+    captured = []
+    monkeypatch.setattr(agent_runtime, "insert_audit_log", lambda event: captured.append(event) or event)
+    monkeypatch.setattr(agent_tools, "query_recent_events", lambda table, limit: [{"table": table, "limit": limit}])
+
+    result = agent_runtime.DiagnosticAgentRuntime(actor_id="agent-1", site_id="plant-a").dispatch_tool(
+        call_id="call-dispatch-1",
+        tool_name="historian.recent_events",
+        arguments={"table": "industrial_events", "limit": 2},
+        timeout_seconds=2,
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["result"] == [{"table": "industrial_events", "limit": 2}]
+    assert captured[0]["action"] == "agent_tool_call"
+
+
+def test_diagnostic_runtime_rejects_unbounded_tool_arguments(monkeypatch):
+    import services.common.agent_runtime as agent_runtime
+
+    monkeypatch.setattr(agent_runtime, "insert_audit_log", lambda event: event)
+    result = agent_runtime.DiagnosticAgentRuntime(actor_id="agent-1").dispatch_tool(
+        call_id="call-dispatch-2",
+        tool_name="historian.recent_events",
+        arguments={"table": "industrial_events", "limit": 1001},
+    )
+    assert result["status"] == "failed"
+    assert "maximum" in result["error"]
+
+
 def test_supervised_action_runtime_audits_action_requests(monkeypatch):
     import services.common.agent_runtime as agent_runtime
 
@@ -264,3 +297,18 @@ def test_supervised_action_runtime_audits_action_requests(monkeypatch):
     assert payload["status"] == "pending_approval"
     assert captured and captured[0]["action"] == "agent_action_requested"
     assert captured[0]["details"]["status"] == "pending_approval"
+
+
+def test_supervised_action_request_is_persisted_and_decision_is_explicit(monkeypatch, tmp_path):
+    import services.common.agent_runtime as agent_runtime
+
+    captured = []
+    monkeypatch.setenv("AGENT_ACTION_LEDGER_PATH", str(tmp_path / "actions.json"))
+    monkeypatch.setattr(agent_runtime, "insert_audit_log", lambda event: captured.append(event) or event)
+    runtime = agent_runtime.SupervisedActionRuntime(actor_id="agent-4", site_id="plant-a")
+    request = runtime.request_action(action_id="action-persisted", action_name="restart", target_resource="asset/pump-1", requested_by="agent-4")
+    decision = runtime.decide("action-persisted", status="approved", actor="operator-1", reason="maintenance window")
+
+    assert request["status"] == "pending_approval"
+    assert decision["status"] == "approved"
+    assert [event["action"] for event in captured] == ["agent_action_requested", "agent_action_approved"]

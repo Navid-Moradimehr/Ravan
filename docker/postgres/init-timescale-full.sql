@@ -16,6 +16,16 @@ CREATE TABLE IF NOT EXISTS metadata_asset_tags (
 CREATE INDEX IF NOT EXISTS metadata_asset_tags_lookup_idx ON metadata_asset_tags (site_id, asset_id, tag);
 CREATE INDEX IF NOT EXISTS metadata_asset_tags_updated_idx ON metadata_asset_tags (updated_at DESC);
 
+CREATE TABLE IF NOT EXISTS audit_logs (
+    time TIMESTAMPTZ NOT NULL DEFAULT now(),
+    user_id TEXT NOT NULL DEFAULT '',
+    action TEXT NOT NULL,
+    resource TEXT NOT NULL DEFAULT '',
+    details JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS audit_logs_time_idx ON audit_logs (time DESC);
+CREATE INDEX IF NOT EXISTS audit_logs_resource_idx ON audit_logs (resource, time DESC);
+
 CREATE TABLE IF NOT EXISTS metadata_threshold_policies (
     site_id TEXT NOT NULL,
     asset_id TEXT NOT NULL,

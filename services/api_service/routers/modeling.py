@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from services.common.agent_runtime import build_agent_runtime_contract
+from services.common.agent_runtime import ActionRequestLedger, DiagnosticAgentRuntime, SupervisedActionRuntime, build_agent_runtime_contract
 from services.common.agent_tools import build_context_package, tool_registry
 from services.common.modeling import ModelRegistry
 from services.common.model_lifecycle import ModelLifecycleError, ModelLifecycleLedger
@@ -143,3 +144,50 @@ async def get_context(
 @router.get("/api/v1/modeling/agent-runtime")
 async def get_agent_runtime() -> dict[str, Any]:
     return build_agent_runtime_contract()
+
+
+@router.post("/api/v1/modeling/diagnostic/dispatch")
+async def dispatch_diagnostic_tool(request: dict[str, Any]) -> dict[str, Any]:
+    try:
+        runtime = DiagnosticAgentRuntime(actor_id=str(request.get("actor_id", "diagnostic-agent")), site_id=str(request.get("site_id", "")), approval_required=bool(request.get("approval_required", False)))
+        return runtime.dispatch_tool(
+            call_id=str(request.get("call_id", "")) or str(uuid.uuid4()),
+            tool_name=str(request.get("tool_name", "")),
+            arguments=dict(request.get("arguments") or {}),
+            timeout_seconds=float(request.get("timeout_seconds", 10)),
+            metadata=dict(request.get("metadata") or {}),
+        )
+    except (ValueError, TimeoutError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/api/v1/modeling/agent-actions")
+async def list_agent_actions(status: str | None = None) -> list[dict[str, Any]]:
+    return ActionRequestLedger.from_env().list(status=status)
+
+
+@router.post("/api/v1/modeling/agent-actions")
+async def request_agent_action(request: dict[str, Any]) -> dict[str, Any]:
+    try:
+        runtime = SupervisedActionRuntime(actor_id=str(request.get("actor_id", "agent")), site_id=str(request.get("site_id", "")))
+        return runtime.request_action(
+            action_id=str(request.get("action_id", "")),
+            action_name=str(request.get("action_name", "")),
+            target_resource=str(request.get("target_resource", "")),
+            requested_by=str(request.get("requested_by", request.get("actor_id", "agent"))),
+            details=dict(request.get("details") or {}),
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/v1/modeling/agent-actions/{action_id}/{decision}")
+async def decide_agent_action(action_id: str, decision: str, request: dict[str, Any]) -> dict[str, Any]:
+    if decision not in {"approve", "reject", "cancel"}:
+        raise HTTPException(status_code=400, detail="decision must be approve, reject, or cancel")
+    try:
+        status = {"approve": "approved", "reject": "rejected", "cancel": "cancelled"}[decision]
+        runtime = SupervisedActionRuntime(actor_id=str(request.get("actor_id", "operator")), site_id=str(request.get("site_id", "")))
+        return runtime.decide(action_id, status=status, actor=str(request.get("actor_id", "operator")), reason=str(request.get("reason", "")))
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

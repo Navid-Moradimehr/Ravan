@@ -2981,3 +2981,17 @@ Compose persists this state through the existing `api-data` volume at
 `/data/model-lifecycle.json`. Multi-replica operators must provide a shared
 metadata backend before concurrent writes. Verification: lifecycle, modeling,
 MLflow adapter tests and Compose rendering passed (`18 passed`).
+
+# 2026-07-16: Agent dispatch and governance durability
+
+Added validated read-only dispatch for the registered historian, asset,
+report, scenario, and semantic tools. Dispatch rejects unknown arguments,
+enforces schema bounds, applies a bounded timeout, and records success/failure
+outcomes. Added a file-backed supervised-action request ledger with explicit
+pending, approved, rejected, and cancelled states; approvals remain records
+and do not execute actions. Audit writes are no longer swallowed, and the
+Timescale initialization/migration creates the missing `audit_logs` table.
+
+Verification: modeling contracts `16 passed`; lifecycle and MLflow tests `5
+passed`; Compose rendering passed. User-owned agents, MCP servers, skills,
+prompts, identity, and action executors remain outside the core.

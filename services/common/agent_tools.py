@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from pathlib import Path
 from typing import Any
 
@@ -157,6 +158,79 @@ class ToolRegistry:
 
 
 tool_registry = ToolRegistry()
+
+
+def _validate_tool_arguments(spec: ToolSpec, arguments: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(arguments, dict):
+        raise ValueError("tool arguments must be an object")
+    schema = spec.input_schema
+    properties = schema.get("properties", {})
+    unknown = sorted(set(arguments) - set(properties))
+    if unknown:
+        raise ValueError(f"unsupported arguments for {spec.name}: {', '.join(unknown)}")
+    missing = [name for name in schema.get("required", []) if name not in arguments]
+    if missing:
+        raise ValueError(f"missing required arguments for {spec.name}: {', '.join(missing)}")
+    result = dict(arguments)
+    defaults = {"limit": 25, "hours": 6, "table": "industrial_events"}
+    for key, value in defaults.items():
+        if key in properties and key not in result:
+            result[key] = value
+    for key, definition in properties.items():
+        if key not in result:
+            continue
+        value = result[key]
+        if definition.get("type") == "integer":
+            if isinstance(value, bool):
+                raise ValueError(f"{key} must be an integer")
+            result[key] = int(value)
+            if "minimum" in definition and result[key] < definition["minimum"]:
+                raise ValueError(f"{key} is below the allowed minimum")
+            if "maximum" in definition and result[key] > definition["maximum"]:
+                raise ValueError(f"{key} is above the allowed maximum")
+        elif definition.get("type") == "string" and not isinstance(value, str):
+            raise ValueError(f"{key} must be a string")
+    return result
+
+
+def _execute_tool(name: str, arguments: dict[str, Any]) -> Any:
+    if name == "historian.recent_events":
+        return query_recent_events(arguments["table"], arguments["limit"])
+    if name == "historian.trend":
+        return query_trend(arguments["asset_id"], arguments["tag"], arguments["hours"])
+    if name == "historian.alarms":
+        return query_alarms(arguments.get("limit", 25))
+    if name == "assets.hierarchy":
+        return hierarchy_to_tree(load_hierarchy(Path("config/assets.yaml")))
+    if name == "reports.templates":
+        return report_engine.list_templates()
+    if name == "scenarios.list":
+        return list_scenarios()
+    if name == "semantic.graph_search":
+        graph = get_semantic_store().graph()
+        return graph.graph_search(arguments["query"], limit=arguments.get("limit", 25), site_id=arguments.get("site_id"))
+    if name == "semantic.lineage":
+        from services.historian.client import list_semantic_lineage
+
+        return list_semantic_lineage(site_id=arguments.get("site_id"), limit=arguments.get("limit", 25))
+    raise ValueError(f"unknown read-only tool: {name}")
+
+
+def execute_read_only_tool(name: str, arguments: dict[str, Any], *, timeout_seconds: float = 10.0) -> Any:
+    """Validate and execute one registered read-only tool with a hard wait bound."""
+
+    spec = tool_registry.get(name)
+    if spec is None or not spec.read_only:
+        raise ValueError(f"tool is not registered as read-only: {name}")
+    validated = _validate_tool_arguments(spec, arguments)
+    timeout = min(max(float(timeout_seconds), 0.1), 30.0)
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="agent-readonly") as executor:
+        future = executor.submit(_execute_tool, name, validated)
+        try:
+            return future.result(timeout=timeout)
+        except FutureTimeoutError as exc:
+            future.cancel()
+            raise TimeoutError(f"read-only tool timed out after {timeout:g}s: {name}") from exc
 
 
 def query_alarms(limit: int) -> list[dict[str, Any]]:
