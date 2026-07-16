@@ -121,6 +121,27 @@ of capacity for a production industrial site.
 
 ## Latest Single-Site vs Multisite Live Comparison
 
+## Latest Flink Full-Stack Soak
+
+On 2026-07-16, the corrected Flink-primary default scenario completed its
+900-second wall-clock campaign after Docker Desktop/WSL recovery. It generated
+114,649 simulator events and observed 118,350 edge events across the OPC UA,
+MQTT, and Modbus simulator path. Warmup, sustained traffic, the 470 events/sec
+burst, source reconnect, `flink-job` restart, recovery, and drain completed.
+Flink, Prometheus, Kafka UI, Grafana, API, and AI health probes were healthy in
+every phase. Final aggregate lag was zero and the report passed its configured
+gates. Final probe latencies were Prometheus 13.47 ms, Kafka UI 11.36 ms, and
+Grafana 13.65 ms.
+
+The gateway memory fix was exercised: AI-gateway memory remained bounded at
+approximately 184-246 MiB during the campaign and was 184.9 MiB afterward.
+Aggregate container memory peaked at 5,159.5 MiB, so host sizing still matters.
+The broker was reused rather than reset; it contained 12,761,368 messages of
+pre-existing AI consumer lag at the initial snapshot and drained to zero. DLQ
+and unaccounted-event counters were unavailable in this Compose profile, so
+the run is evidence of runtime/recovery behavior, not a clean lossless capacity
+or production sizing claim.
+
 On 2026-07-13, the same local Docker stack was used for valid 15-minute
 wall-clock soaks. Each generator ran for the full duration, flushed Kafka
 delivery callbacks, and wrote an acknowledged-delivery report. The configured

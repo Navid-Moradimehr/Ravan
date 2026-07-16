@@ -44,6 +44,13 @@ ownership. Operator mode renders a PyFlink `FlinkDeployment` using
   the AI gateway reached approximately 8.1 GB while normal reporting was
   disabled for the campaign. This exposed and corrected an unbounded in-memory
   evidence buffer; the run is not a benchmark result.
+- Corrected Flink-primary live soak completed: **114,649 simulator events**,
+  **118,350 edge events**, all phases including Flink restart/recovery/drain,
+  final lag **0**, and Flink/Prometheus/Kafka UI/Grafana/API/AI probes healthy.
+  AI-gateway memory stayed approximately **184-246 MiB** after the fix.
+- This run reused a broker with **12,761,368 pre-existing AI consumer lag** at
+  its initial snapshot and had unavailable DLQ/unaccounted counters. It is
+  valid runtime/recovery evidence, but not clean lossless capacity evidence.
 
 ## Remaining gates
 

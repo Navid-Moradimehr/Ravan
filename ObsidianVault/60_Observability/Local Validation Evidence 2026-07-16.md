@@ -20,3 +20,16 @@ before acceptance when the AI gateway reached approximately 8.1 GB. The cause
 was an unbounded scheduled-report evidence buffer, now bounded by
 `max_evidence_events`. This campaign is not a passing or failing soak result;
 rerun it after the fix.
+
+## Corrected Flink Soak
+
+The rerun completed the 900-second Flink-primary scenario with OPC UA, MQTT,
+and Modbus simulators: 114,649 generated events, 118,350 edge events, source
+reconnect, `flink-job` restart, recovery, and drain. Final lag was zero and
+Flink, Prometheus, Kafka UI, Grafana, API, and AI probes stayed healthy. The
+AI gateway remained approximately 184-246 MiB after the bounded staging fix.
+
+The broker was reused and began with 12,761,368 pre-existing AI consumer lag,
+which drained to zero. DLQ and unaccounted counters were unavailable, so this
+is recovery evidence rather than a clean lossless throughput or production
+sizing result.
