@@ -112,7 +112,20 @@ For systemd deployments:
 datastreamctl project-manifest package config/project-manifest.yaml /tmp/datastream --site-id demo-site --format both --layout systemd
 ```
 
-Then install the generated `systemd/install.sh` on the target host.
+For a release bundle, prefer the native staging target so the runtime source
+tree is placed beside the generated site directory:
+
+```bash
+python3 scripts/package-release.py --output-dir dist --archive tar.gz linux
+```
+
+Extract the result and run the generated `systemd/install.sh` with `sudo`. It
+creates a private `runtime/.venv`, installs the pinned Python requirements, and
+registers the systemd unit. Set `RAVAN_SKIP_PIP_INSTALL=1` only when an
+approved offline dependency installation has already been completed. Host
+native mode still expects Kafka, TimescaleDB, Flink, and other infrastructure
+to be supplied separately; use the Compose bundle for the complete single-host
+stack.
 
 For Kubernetes deployments, use the Flink operator runbook at
 [`docs/flink-operator-runbook.md`](docs/flink-operator-runbook.md) and the
