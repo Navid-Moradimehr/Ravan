@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Cable, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleCheck, CircleX, Pencil, Plus, Power, Radio, Router, Server, TestTube, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -107,6 +107,8 @@ export function SourceConnectionPanel() {
   const [baudrate, setBaudrate] = useState("9600");
   const [slaveId, setSlaveId] = useState("1");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingVersion, setEditingVersion] = useState<number | null>(null);
+  const [initialFormSignature, setInitialFormSignature] = useState<string | null>(null);
   const [connectionsExpanded, setConnectionsExpanded] = useState(false);
   const [connectionPage, setConnectionPage] = useState(1);
   const [previewResult, setPreviewResult] = useState<Record<string, unknown> | null>(null);
@@ -127,6 +129,8 @@ export function SourceConnectionPanel() {
   const [restAuthLocation, setRestAuthLocation] = useState("header");
   const [restPageMode, setRestPageMode] = useState("none");
   const [restMaxPages, setRestMaxPages] = useState("10");
+  const editorRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const connections = useQuery({ queryKey: ["connections"], queryFn: getConnections });
   const sourceHealth = useQuery({ queryKey: ["source-health"], queryFn: getSourceHealth, refetchInterval: 10000 });
@@ -178,8 +182,58 @@ export function SourceConnectionPanel() {
     onError: (error) => showToast({ title: "Source preview failed", description: formatErrorMessage(error, "The source preview could not run."), variant: "error" }),
   });
 
+  const formSignature = JSON.stringify({
+    name,
+    protocol,
+    siteId,
+    endpoint,
+    credentialRef,
+    credentialRefs,
+    sourceId,
+    configJson,
+    mappingsJson,
+    mappingRows,
+    nodesText,
+    topic,
+    mqttQos,
+    payloadMode,
+    modbusAsset,
+    registersText,
+    rtuPort,
+    baudrate,
+    slaveId,
+    restMethod,
+    restInterval,
+    restTimeout,
+    restRecordsPath,
+    restSourcePath,
+    restAssetPath,
+    restTagPath,
+    restValuePath,
+    restTimestampPath,
+    restQualityPath,
+    restUnitPath,
+    restAuthType,
+    restAuthName,
+    restAuthLocation,
+    restPageMode,
+    restMaxPages,
+  });
+  const formDirty = editingId !== null && initialFormSignature !== null && initialFormSignature !== formSignature;
+
+  useEffect(() => {
+    if (!editingId || initialFormSignature !== null) return;
+    setInitialFormSignature(formSignature);
+  }, [editingId, formSignature, initialFormSignature]);
+
+  useEffect(() => {
+    if (!editingId) return;
+    editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    nameInputRef.current?.focus({ preventScroll: true });
+  }, [editingId]);
+
   function resetForm() {
-    setName(""); setProtocol("opcua"); setSiteId("demo-site"); setEndpoint(""); setCredentialRef(""); setCredentialRefs({ username: "", password: "", token: "", api_key: "", client_id: "", client_secret: "", certificate: "", private_key: "", ca_cert: "", client_cert: "", client_key: "" }); setSourceId(""); setConfigJson(emptyJson); setMappingsJson("[]"); setMappingRows([{ ...emptyMapping }]); setNodesText(""); setTopic(""); setMqttQos("1"); setPayloadMode("json"); setModbusAsset(""); setRegistersText(""); setRtuPort(""); setBaudrate("9600"); setSlaveId("1"); setEditingId(null); setStep(1); setPreviewResult(null); setRestMethod("GET"); setRestInterval("60"); setRestTimeout("15"); setRestRecordsPath(""); setRestSourcePath("source_id"); setRestAssetPath("asset_id"); setRestTagPath("tag"); setRestValuePath("value"); setRestTimestampPath("timestamp"); setRestQualityPath("quality"); setRestUnitPath("unit"); setRestAuthType("none"); setRestAuthName("X-API-Key"); setRestAuthLocation("header"); setRestPageMode("none"); setRestMaxPages("10");
+    setName(""); setProtocol("opcua"); setSiteId("demo-site"); setEndpoint(""); setCredentialRef(""); setCredentialRefs({ username: "", password: "", token: "", api_key: "", client_id: "", client_secret: "", certificate: "", private_key: "", ca_cert: "", client_cert: "", client_key: "" }); setSourceId(""); setConfigJson(emptyJson); setMappingsJson("[]"); setMappingRows([{ ...emptyMapping }]); setNodesText(""); setTopic(""); setMqttQos("1"); setPayloadMode("json"); setModbusAsset(""); setRegistersText(""); setRtuPort(""); setBaudrate("9600"); setSlaveId("1"); setEditingId(null); setEditingVersion(null); setInitialFormSignature(null); setStep(1); setPreviewResult(null); setRestMethod("GET"); setRestInterval("60"); setRestTimeout("15"); setRestRecordsPath(""); setRestSourcePath("source_id"); setRestAssetPath("asset_id"); setRestTagPath("tag"); setRestValuePath("value"); setRestTimestampPath("timestamp"); setRestQualityPath("quality"); setRestUnitPath("unit"); setRestAuthType("none"); setRestAuthName("X-API-Key"); setRestAuthLocation("header"); setRestPageMode("none"); setRestMaxPages("10");
   }
 
   function parseJson(value: string, label: string) {
@@ -205,7 +259,12 @@ export function SourceConnectionPanel() {
     const response = (config.response ?? {}) as Record<string, any>;
     const paths = (response.field_paths ?? {}) as Record<string, any>;
     const auth = (config.auth ?? {}) as Record<string, any>;
-    setEditingId(connection.connection_id); setName(connection.name); setProtocol(connection.source_protocol); setSiteId(connection.site_id); setEndpoint(connection.endpoint); setCredentialRef(connection.credential_ref ?? ""); setCredentialRefs({ username: connection.credential_refs?.username ?? "", password: connection.credential_refs?.password ?? "", token: connection.credential_refs?.token ?? "", api_key: connection.credential_refs?.api_key ?? "", client_id: connection.credential_refs?.client_id ?? "", client_secret: connection.credential_refs?.client_secret ?? "", certificate: connection.credential_refs?.certificate ?? "", private_key: connection.credential_refs?.private_key ?? "", ca_cert: connection.credential_refs?.ca_cert ?? "", client_cert: connection.credential_refs?.client_cert ?? "", client_key: connection.credential_refs?.client_key ?? "" }); setSourceId(connection.source_id ?? ""); setConfigJson(JSON.stringify(config, null, 2)); setMappingsJson(JSON.stringify(connection.mappings ?? [], null, 2)); setMappingRows(rows.length ? rows : [{ ...emptyMapping }]); setNodesText(Array.isArray(config.nodes) ? config.nodes.join("\n") : ""); setTopic(String(config.topic ?? "")); setMqttQos(String(config.qos ?? 1)); setPayloadMode(String(config.payload_mode ?? "json")); setModbusAsset(String(config.asset_id ?? "")); setRegistersText(Array.isArray(config.registers) ? config.registers.map((row: any) => [row.address, row.tag, row.unit ?? "", row.scale ?? 1, row.offset ?? 0, row.unit_id ?? 1, row.data_type ?? "uint16", row.byte_order ?? "big", row.word_order ?? "big"].join(",")).join("\n") : String(config.registers ?? "")); setRtuPort(String(config.port ?? "")); setBaudrate(String(config.baudrate ?? 9600)); setSlaveId(String(config.slave_id ?? 1)); setRestMethod(String(config.method ?? "GET")); setRestInterval(String(config.poll_interval_seconds ?? 60)); setRestTimeout(String(config.timeout_seconds ?? 15)); setRestRecordsPath(String(response.records_path ?? "")); setRestSourcePath(String(paths.source_id ?? "source_id")); setRestAssetPath(String(paths.asset_id ?? "asset_id")); setRestTagPath(String(paths.tag ?? "tag")); setRestValuePath(String(paths.value ?? "value")); setRestTimestampPath(String(paths.ts_source ?? "timestamp")); setRestQualityPath(String(paths.quality ?? "quality")); setRestUnitPath(String(paths.unit ?? "unit")); setRestAuthType(String(auth.type ?? "none")); setRestAuthName(String(auth.name ?? "X-API-Key")); setRestAuthLocation(String(auth.location ?? "header")); setRestPageMode(String((config.pagination as any)?.mode ?? "none")); setRestMaxPages(String((config.pagination as any)?.max_pages ?? 10)); setStep(1); setPreviewResult(null);
+    setInitialFormSignature(null); setEditingId(connection.connection_id); setEditingVersion(connection.config_version); setName(connection.name); setProtocol(connection.source_protocol); setSiteId(connection.site_id); setEndpoint(connection.endpoint); setCredentialRef(connection.credential_ref ?? ""); setCredentialRefs({ username: connection.credential_refs?.username ?? "", password: connection.credential_refs?.password ?? "", token: connection.credential_refs?.token ?? "", api_key: connection.credential_refs?.api_key ?? "", client_id: connection.credential_refs?.client_id ?? "", client_secret: connection.credential_refs?.client_secret ?? "", certificate: connection.credential_refs?.certificate ?? "", private_key: connection.credential_refs?.private_key ?? "", ca_cert: connection.credential_refs?.ca_cert ?? "", client_cert: connection.credential_refs?.client_cert ?? "", client_key: connection.credential_refs?.client_key ?? "" }); setSourceId(connection.source_id ?? ""); setConfigJson(JSON.stringify(config, null, 2)); setMappingsJson(JSON.stringify(connection.mappings ?? [], null, 2)); setMappingRows(rows.length ? rows : [{ ...emptyMapping }]); setNodesText(Array.isArray(config.nodes) ? config.nodes.join("\n") : ""); setTopic(String(config.topic ?? "")); setMqttQos(String(config.qos ?? 1)); setPayloadMode(String(config.payload_mode ?? "json")); setModbusAsset(String(config.asset_id ?? "")); setRegistersText(Array.isArray(config.registers) ? config.registers.map((row: any) => [row.address, row.tag, row.unit ?? "", row.scale ?? 1, row.offset ?? 0, row.unit_id ?? 1, row.data_type ?? "uint16", row.byte_order ?? "big", row.word_order ?? "big"].join(",")).join("\n") : String(config.registers ?? "")); setRtuPort(String(config.port ?? "")); setBaudrate(String(config.baudrate ?? 9600)); setSlaveId(String(config.slave_id ?? 1)); setRestMethod(String(config.method ?? "GET")); setRestInterval(String(config.poll_interval_seconds ?? 60)); setRestTimeout(String(config.timeout_seconds ?? 15)); setRestRecordsPath(String(response.records_path ?? "")); setRestSourcePath(String(paths.source_id ?? "source_id")); setRestAssetPath(String(paths.asset_id ?? "asset_id")); setRestTagPath(String(paths.tag ?? "tag")); setRestValuePath(String(paths.value ?? "value")); setRestTimestampPath(String(paths.ts_source ?? "timestamp")); setRestQualityPath(String(paths.quality ?? "quality")); setRestUnitPath(String(paths.unit ?? "unit")); setRestAuthType(String(auth.type ?? "none")); setRestAuthName(String(auth.name ?? "X-API-Key")); setRestAuthLocation(String(auth.location ?? "header")); setRestPageMode(String((config.pagination as any)?.mode ?? "none")); setRestMaxPages(String((config.pagination as any)?.max_pages ?? 10)); setStep(1); setPreviewResult(null);
+  }
+
+  function cancelEditing() {
+    if (formDirty && !window.confirm("Discard unsaved changes to this source?")) return;
+    resetForm();
   }
   function saveConnection() {
     try {
@@ -237,26 +296,37 @@ export function SourceConnectionPanel() {
     : allConnections.slice(0, 5);
 
   return (
-    <Card className="app-card">
+    <div ref={editorRef} id="source-connection-editor" className="scroll-mt-6">
+    <Card className={`app-card transition-colors ${editingId ? "border-accent/50 shadow-[0_0_0_1px_rgba(218,165,32,0.18)]" : ""}`}>
       <CardHeader className="app-card-header">
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          <Cable className="size-4 text-accent" /> Source connections
+          <Cable className="size-4 text-accent" /> {editingId ? "Edit source connection" : "Source connections"}
           <HelpTip label="Source connections help" content="Add a PLC, sensor gateway, broker, or supported source without editing backend code. Choose a protocol, enter its endpoint and fields, reference operator-managed credentials, save, test, preview when available, and press Enable. The platform stores definitions and runtime state, never secret values." />
         </CardTitle>
-        <CardDescription className="text-text-secondary">The operational bridge between plant protocols and Kafka.</CardDescription>
+        <CardDescription className="text-text-secondary">{editingId ? "Update the selected source definition, then validate and test it before enabling it." : "The operational bridge between plant protocols and Kafka."}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
+        {editingId ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-3 py-3" role="status" aria-live="polite">
+          <div className="flex min-w-0 items-center gap-3">
+            <Badge className="shrink-0 border-accent/40 bg-accent/15 text-accent">Editing</Badge>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-text-primary">{name || "Selected source"}</p>
+              <p className="text-xs text-text-secondary">{protocol.toUpperCase()} · {siteId} · configuration v{editingVersion ?? "-"}</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={cancelEditing}>Cancel editing</Button>
+        </div> : null}
         <div className="grid gap-2 rounded-lg border border-border-subtle bg-surface-1 p-2 sm:grid-cols-5">
           {["Identity", "Connectivity", "Discover / sample", "Map data", "Review / enable"].map((label, index) => <button key={label} type="button" onClick={() => setStep(index + 1)} className={`rounded-md px-2 py-2 text-left text-xs transition-colors ${step === index + 1 ? "bg-accent/15 text-accent" : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"}`}><span className="mr-1 font-mono">0{index + 1}</span>{label}</button>)}
         </div>
         <div className={`${step === 1 ? "" : "hidden"} grid gap-3 md:grid-cols-2 xl:grid-cols-5`}>
-          <label className="space-y-1 text-xs text-text-secondary">Connection name<Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Connection name" /></label>
+          <label className="space-y-1 text-xs text-text-secondary">Connection name<Input ref={nameInputRef} value={name} onChange={(event) => setName(event.target.value)} placeholder="Connection name" /></label>
           <label className="space-y-1 text-xs text-text-secondary">Protocol<select aria-label="Source protocol" value={protocol} onChange={(event) => setProtocol(event.target.value)} className="app-select w-full">
             <option value="opcua">OPC UA</option><option value="mqtt">MQTT</option><option value="sparkplug_b">Sparkplug B over MQTT</option><option value="modbus">Modbus TCP</option><option value="modbus_rtu">Modbus RTU</option><option value="rest">REST Pull</option><option value="http_push">HTTP Push</option><option value="file">File reference</option><option value="dataset">Dataset replay reference</option><option value="mock">Mock generator reference</option>
           </select></label>
           <label className="space-y-1 text-xs text-text-secondary">Site ID<Input value={siteId} onChange={(event) => setSiteId(event.target.value)} placeholder="Site ID" /></label>
           <label className="space-y-1 text-xs text-text-secondary">Endpoint<Input value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="opc.tcp://host:4840" /></label>
-          <div className="flex items-end gap-2"><Button onClick={() => { if (!name || !siteId) return; setStep(2); }} disabled={!name || !siteId}><ChevronRight className="size-4" /> Configure source</Button>{editingId ? <Button variant="outline" onClick={resetForm}>Cancel</Button> : null}</div>
+          <div className="flex items-end gap-2"><Button onClick={() => { if (!name || !siteId) return; setStep(2); }} disabled={!name || !siteId}><ChevronRight className="size-4" /> {editingId ? "Continue editing" : "Configure source"}</Button>{editingId ? <Button variant="outline" onClick={cancelEditing}>Cancel</Button> : null}</div>
         </div>
         <div className={`${step === 2 ? "" : "hidden"} space-y-3`}><div className="grid gap-3 md:grid-cols-3"><label className="space-y-1 text-xs text-text-secondary">Endpoint / URL<Input value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder={protocol === "http_push" ? "Generated after activation" : "opc.tcp://host:4840"} /></label><label className="space-y-1 text-xs text-text-secondary">Legacy credential reference<Input value={credentialRef} onChange={(event) => setCredentialRef(event.target.value)} placeholder="secret://plant-a/source" /></label><label className="space-y-1 text-xs text-text-secondary">Source ID<Input value={sourceId} onChange={(event) => setSourceId(event.target.value)} placeholder="Optional source identifier" /></label></div><div className="rounded-lg border border-border-subtle bg-surface-1 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium">Protocol settings</p><HelpTip label="Protocol settings help" content="These fields become the edge connector definition. Use env://NAME, file://path, path://path, or secret://provider references. The platform reads referenced values only inside the runtime." /></div>
           {protocol === "opcua" ? <label className="block space-y-1 text-xs text-text-secondary">OPC UA node IDs, one per line<textarea className="app-textarea min-h-20 w-full" value={nodesText} onChange={(event) => setNodesText(event.target.value)} placeholder="Discover in the next step, or enter ns=2;s=Pump-01.Temperature" /></label> : null}
@@ -269,7 +339,7 @@ export function SourceConnectionPanel() {
         </div><div className="flex justify-between gap-2"><Button variant="outline" onClick={() => setStep(1)}>Back</Button><Button onClick={() => setStep(3)}><ChevronRight className="size-4" /> Discover or sample</Button></div></div>
         {step === 3 ? <div className="rounded-lg border border-border-subtle bg-surface-1 p-4"><p className="text-sm font-medium">Discover or sample data</p><p className="mt-1 text-xs leading-5 text-text-secondary">Save the draft first, then use Preview on the source card to browse OPC UA tags or inspect the declared Modbus, MQTT, and REST shape. Discovery never enables ingestion or publishes data.</p>{previewResult ? <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-2 p-3 font-mono text-xs text-text-secondary">{JSON.stringify(previewResult, null, 2)}</pre> : <p className="mt-3 text-xs text-text-muted">No preview has been run for this draft yet. Save it, then select Preview on the source card.</p>}<div className="mt-4 flex justify-between gap-2"><Button variant="outline" onClick={() => setStep(2)}>Back</Button><Button onClick={() => setStep(4)}><ChevronRight className="size-4" /> Map data</Button></div></div> : null}
         {step === 4 ? <div className="rounded-lg border border-border-subtle bg-surface-1 p-3"><div className="mb-2 flex items-center justify-between"><div><p className="text-sm font-medium">Signal mapping</p><p className="text-xs text-text-secondary">Map source fields to the platform&apos;s asset and tag identity.</p></div><Button variant="outline" size="sm" onClick={() => setMappingRows([...mappingRows, { ...emptyMapping }])}><Plus className="size-4" /> Add mapping</Button></div><div className="space-y-2">{mappingRows.map((row, index) => <div key={index} className="grid gap-2 rounded-md border border-border-subtle p-2 md:grid-cols-[1.2fr_1fr_1fr_.8fr_.6fr_.6fr_auto]"><Input placeholder="Source field" value={row.source_field} onChange={(event) => setMappingRows(mappingRows.map((item, i) => i === index ? { ...item, source_field: event.target.value } : item))} /><Input placeholder="Asset ID" value={row.asset_id} onChange={(event) => setMappingRows(mappingRows.map((item, i) => i === index ? { ...item, asset_id: event.target.value } : item))} /><Input placeholder="Tag" value={row.tag} onChange={(event) => setMappingRows(mappingRows.map((item, i) => i === index ? { ...item, tag: event.target.value } : item))} /><Input placeholder="Unit" value={row.unit} onChange={(event) => setMappingRows(mappingRows.map((item, i) => i === index ? { ...item, unit: event.target.value } : item))} /><Input placeholder="Scale" value={row.scale} onChange={(event) => setMappingRows(mappingRows.map((item, i) => i === index ? { ...item, scale: event.target.value } : item))} /><Input placeholder="Offset" value={row.offset} onChange={(event) => setMappingRows(mappingRows.map((item, i) => i === index ? { ...item, offset: event.target.value } : item))} /><Button variant="ghost" size="sm" aria-label={`Remove mapping ${index + 1}`} onClick={() => setMappingRows(mappingRows.length === 1 ? [{ ...emptyMapping }] : mappingRows.filter((_, i) => i !== index))}>Remove</Button></div>)}</div><div className="mt-4 flex justify-between gap-2"><Button variant="outline" onClick={() => setStep(3)}>Back</Button><Button onClick={() => setStep(5)}><ChevronRight className="size-4" /> Review</Button></div></div> : null}
-        {step === 5 ? <div className="space-y-3 rounded-lg border border-accent/30 bg-accent/5 p-4"><p className="text-sm font-medium">Review and save</p><p className="text-xs leading-5 text-text-secondary">Save creates or updates the draft. Validate and Test on the source card show readiness and connectivity; Enable starts supported runtime sources. REST Pull and HTTP Push use the same canonical Kafka, DLQ, lineage, and historian fan-out path.</p><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-2 p-3 font-mono text-xs text-text-secondary">{JSON.stringify({ name, protocol, siteId, endpoint: endpoint || "generated by platform", sourceId, mappings: mappingRows.filter((row) => row.source_field || row.asset_id || row.tag).length }, null, 2)}</pre><div className="flex justify-between gap-2"><Button variant="outline" onClick={() => setStep(4)}>Back</Button><Button disabled={add.isPending || update.isPending} onClick={saveConnection}><Plus className="size-4" /> {editingId ? "Update draft" : "Save draft"}</Button></div></div> : null}
+        {step === 5 ? <div className="space-y-3 rounded-lg border border-accent/30 bg-accent/5 p-4"><p className="text-sm font-medium">{editingId ? "Review and save changes" : "Review and save"}</p><p className="text-xs leading-5 text-text-secondary">{editingId ? "Save creates a new configuration version for this source. Validate and Test on the source card after saving; enabled runtime sources are reconciled from the updated registry definition." : "Save creates or updates the draft. Validate and Test on the source card show readiness and connectivity; Enable starts supported runtime sources."} REST Pull and HTTP Push use the same canonical Kafka, DLQ, lineage, and historian fan-out path.</p><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-2 p-3 font-mono text-xs text-text-secondary">{JSON.stringify({ name, protocol, siteId, endpoint: endpoint || "generated by platform", sourceId, mappings: mappingRows.filter((row) => row.source_field || row.asset_id || row.tag).length }, null, 2)}</pre><div className="flex justify-between gap-2"><Button variant="outline" onClick={() => setStep(4)}>Back</Button><Button disabled={add.isPending || update.isPending} onClick={saveConnection}><Plus className="size-4" /> {editingId ? "Save changes" : "Save draft"}</Button></div></div> : null}
         {connections.isError ? <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm">{formatErrorMessage(connections.error, "Connections could not be loaded.")}</p> : null}
         {sourceHealth.isError ? <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-text-primary">Mapping diagnostics are temporarily unavailable, so live match counts are hidden until the observability endpoint recovers.</p> : null}
         <div className="space-y-2">
@@ -281,12 +351,13 @@ export function SourceConnectionPanel() {
             const mappingWarning = health && typeof health.mapping_missed === "number" && health.mapping_missed > 0;
             const retired = connection.state === "retired";
             const runtimeSupported = connection.runtime_supported !== false && !retired;
-            return <div key={connection.connection_id} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 ${retired ? "border-border-subtle bg-surface-1 opacity-85" : "border-border-subtle bg-surface-0"}`}>
+            const selected = editingId === connection.connection_id;
+            return <div key={connection.connection_id} aria-current={selected ? "true" : undefined} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 transition-colors ${retired ? "border-border-subtle bg-surface-1 opacity-85" : selected ? "border-accent/60 bg-accent/10 shadow-[0_0_0_1px_rgba(218,165,32,0.16)]" : "border-border-subtle bg-surface-0"}`}>
               <div className="flex min-w-0 items-center gap-3"><Icon className="size-4 shrink-0 text-accent" /><div className="min-w-0"><p className="truncate text-sm font-medium">{connection.name}</p><p className="truncate font-mono text-xs text-text-secondary">{connection.endpoint}</p></div></div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{connection.source_protocol}</Badge><Badge variant="outline">v{connection.config_version}</Badge><Badge variant={retired ? "secondary" : "outline"}>{connection.state}</Badge>{runtimeSupported ? <Badge variant="outline" className={connection.activation_ready === false ? "border-warning/30 bg-warning/10 text-warning" : "border-success/30 bg-success/10 text-success"}>{connection.activation_ready === false ? "needs setup" : "runtime-ready"}</Badge> : <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">{retired ? "archived" : "reference-only"}</Badge>}
-                {mappingSummary ? <Badge variant={mappingWarning ? "destructive" : "outline"}>{mappingSummary}</Badge> : null}
-                <Button variant="ghost" size="sm" onClick={() => edit(connection)}><Pencil className="size-4" /> Edit</Button>
+                {selected ? <Badge className="border-accent/40 bg-accent/15 text-accent">Editing</Badge> : null}{mappingSummary ? <Badge variant={mappingWarning ? "destructive" : "outline"}>{mappingSummary}</Badge> : null}
+                <Button variant={selected ? "outline" : "ghost"} size="sm" aria-pressed={selected} title="Open this source in the editor" onClick={() => edit(connection)}><Pencil className="size-4" /> {selected ? "Editing" : "Edit configuration"}</Button>
                 {!retired ? <Button variant="ghost" size="sm" onClick={() => validate.mutate(connection.connection_id)} disabled={validate.isPending}>Validate</Button> : null}
                 {!retired ? <Button variant="ghost" size="sm" onClick={() => test.mutate(connection.connection_id)} disabled={test.isPending}><TestTube className="size-4" /> Test</Button> : null}
                 {!retired ? <Button variant="ghost" size="sm" onClick={() => preview.mutate(connection.connection_id)} disabled={preview.isPending}>Preview</Button> : null}
@@ -305,5 +376,6 @@ export function SourceConnectionPanel() {
         {previewResult ? <div className="rounded-lg border border-border-subtle bg-surface-2 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium">Preview result</p><Button variant="ghost" size="sm" onClick={() => setPreviewResult(null)}>Dismiss</Button></div><pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-text-secondary">{JSON.stringify(previewResult, null, 2)}</pre></div> : null}
       </CardContent>
     </Card>
+    </div>
   );
 }
