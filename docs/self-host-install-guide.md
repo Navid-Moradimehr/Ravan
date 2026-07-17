@@ -112,6 +112,13 @@ For systemd deployments:
 datastreamctl project-manifest package config/project-manifest.yaml /tmp/datastream --site-id demo-site --format both --layout systemd
 ```
 
+The generated systemd unit runs `datastreamd supervise` in the foreground. Do
+not replace it with `datastreamd up`: `up` is a detached operator convenience
+command, while `supervise` is the process owned by systemd or another service
+manager. It writes child logs below the configured site runtime and applies a
+bounded restart budget so a permanently broken service does not create an
+unbounded restart storm.
+
 For a release bundle, prefer the native staging target so the runtime source
 tree is placed beside the generated site directory:
 
@@ -126,6 +133,12 @@ approved offline dependency installation has already been completed. Host
 native mode still expects Kafka, TimescaleDB, Flink, and other infrastructure
 to be supplied separately; use the Compose bundle for the complete single-host
 stack.
+
+The generated Linux uninstall is data-preserving by default. It stops and
+removes the service unit but leaves the site directory, configuration, logs,
+backups, and runtime data available for rollback. Pass `1` as the second
+argument to the generated `systemd/uninstall.sh` only when the operator has
+explicitly approved purging that site directory.
 
 For Kubernetes deployments, use the Flink operator runbook at
 [`docs/flink-operator-runbook.md`](docs/flink-operator-runbook.md) and the

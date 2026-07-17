@@ -233,7 +233,13 @@ def _load_project_manifest_context(path: str | None, site_id: str | None = None)
     return env, meta
 
 
-def _start_one(spec: ServiceSpec, extra_env: dict[str, str] | None = None, profile_meta: dict[str, str] | None = None) -> ProcRecord | None:
+def _spawn_one(
+    spec: ServiceSpec,
+    extra_env: dict[str, str] | None = None,
+    profile_meta: dict[str, str] | None = None,
+    *,
+    detached: bool,
+) -> tuple[subprocess.Popen, ProcRecord, Any] | None:
     log_dir = PID_DIR / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{spec.name}.log"
@@ -250,13 +256,13 @@ def _start_one(spec: ServiceSpec, extra_env: dict[str, str] | None = None, profi
             stdout=log_fp,
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
-            start_new_session=True,
+            start_new_session=detached,
         )
     except Exception as exc:
+        log_fp.close()
         print(f"[{spec.name}] failed to start: {exc}")
         return None
-    print(f"[{spec.name}] started pid={proc.pid} module={spec.module} log={log_path}")
-    return ProcRecord(
+    record = ProcRecord(
         name=spec.name,
         pid=proc.pid,
         module=spec.module,
@@ -269,6 +275,16 @@ def _start_one(spec: ServiceSpec, extra_env: dict[str, str] | None = None, profi
         project_manifest=(profile_meta or {}).get("project_manifest", ""),
         project_id=(profile_meta or {}).get("project_id", ""),
     )
+    return proc, record, log_fp
+
+
+def _start_one(spec: ServiceSpec, extra_env: dict[str, str] | None = None, profile_meta: dict[str, str] | None = None) -> ProcRecord | None:
+    spawned = _spawn_one(spec, extra_env=extra_env, profile_meta=profile_meta, detached=True)
+    if spawned is None:
+        return None
+    proc, record, _log_fp = spawned
+    print(f"[{spec.name}] started pid={proc.pid} module={spec.module} log={PID_DIR / 'logs' / f'{spec.name}.log'}")
+    return record
 
 
 def _resolve_order(names: list[str]) -> list[str]:
@@ -324,6 +340,108 @@ def cmd_up(args: argparse.Namespace) -> int:
     _save_records(records)
     print(f"started={started} managed={len(records)} pid_file={PID_FILE}")
     return 0
+
+
+def _terminate_process(proc: subprocess.Popen, timeout: float) -> None:
+    if proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=max(0.1, timeout))
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=max(0.1, timeout))
+
+
+def cmd_supervise(args: argparse.Namespace) -> int:
+    """Run the managed service set as a foreground OS-service process."""
+    extra_env, profile_meta = {}, {}
+    if args.project_manifest:
+        extra_env, profile_meta = _load_project_manifest_context(args.project_manifest, args.site_id)
+    elif args.site_profile:
+        extra_env, profile_meta = _load_site_profile_context(args.site_profile)
+
+    if args.only:
+        wanted = [name.strip() for name in args.only.split(",") if name.strip()]
+    else:
+        wanted = _services_for_runtime_mode((profile_meta or {}).get("runtime_mode"))
+    order = _resolve_order(wanted)
+    children: dict[str, tuple[subprocess.Popen, ProcRecord, Any]] = {}
+    restart_history: dict[str, list[float]] = {name: [] for name in order}
+    stop_requested = False
+    old_handlers: dict[int, Any] = {}
+
+    def request_stop(_signum: int, _frame: Any) -> None:
+        nonlocal stop_requested
+        stop_requested = True
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            old_handlers[sig] = signal.getsignal(sig)
+            signal.signal(sig, request_stop)
+        except (AttributeError, ValueError):
+            pass
+
+    def launch(name: str) -> bool:
+        spec = SPEC_BY_NAME[name]
+        spawned = _spawn_one(spec, extra_env=extra_env, profile_meta=profile_meta, detached=False)
+        if spawned is None:
+            return False
+        proc, record, log_fp = spawned
+        children[name] = (proc, record, log_fp)
+        _save_records({key: value[1] for key, value in children.items()})
+        print(f"[{name}] supervised pid={proc.pid} module={spec.module} log={PID_DIR / 'logs' / f'{name}.log'}")
+        if args.wait and spec.health_url:
+            _wait_health(spec, args.wait)
+        return True
+
+    exit_code = 0
+    try:
+        for name in order:
+            if not launch(name):
+                print(f"[{name}] supervision could not start the service", file=sys.stderr)
+                exit_code = 1
+                stop_requested = True
+                break
+
+        while children and not stop_requested:
+            for name, (proc, record, log_fp) in list(children.items()):
+                return_code = proc.poll()
+                if return_code is None:
+                    continue
+                log_fp.close()
+                children.pop(name, None)
+                history = restart_history[name]
+                now = time.time()
+                history[:] = [started_at for started_at in history if now - started_at < args.restart_window]
+                history.append(now)
+                print(f"[{name}] exited code={return_code}; restart {len(history)}/{args.max_restarts}", file=sys.stderr)
+                if len(history) > args.max_restarts:
+                    print(f"[{name}] restart budget exceeded; stopping supervision", file=sys.stderr)
+                    exit_code = 1
+                    stop_requested = True
+                    break
+                time.sleep(min(5.0, 0.5 * (2 ** min(len(history) - 1, 3))))
+                if not stop_requested and not launch(name):
+                    exit_code = 1
+                    stop_requested = True
+                    break
+            _save_records({key: value[1] for key, value in children.items()})
+            time.sleep(0.25)
+    except KeyboardInterrupt:
+        stop_requested = True
+    finally:
+        for proc, _record, log_fp in list(children.values()):
+            _terminate_process(proc, args.shutdown_timeout)
+            log_fp.close()
+        children.clear()
+        _save_records({})
+        for sig, handler in old_handlers.items():
+            try:
+                signal.signal(sig, handler)
+            except (AttributeError, ValueError):
+                pass
+    return exit_code
 
 
 def _wait_health(spec: ServiceSpec, timeout: float) -> bool:
@@ -491,6 +609,17 @@ def build_parser() -> argparse.ArgumentParser:
     up.add_argument("--project-manifest", default=os.getenv("DATASTREAM_PROJECT_MANIFEST"), help="Optional project manifest YAML")
     up.add_argument("--site-id", default=os.getenv("DATASTREAM_SITE_ID"), help="Select a site from the project manifest")
     up.set_defaults(func=cmd_up)
+
+    supervise = sub.add_parser("supervise", help="Run managed services in the foreground for an OS service")
+    supervise.add_argument("--only", default=None, help="Comma-separated subset to supervise")
+    supervise.add_argument("--wait", type=float, default=0.0, help="Seconds to wait for each health check")
+    supervise.add_argument("--max-restarts", type=int, default=5, help="Maximum restarts per service within the restart window")
+    supervise.add_argument("--restart-window", type=float, default=60.0, help="Restart accounting window in seconds")
+    supervise.add_argument("--shutdown-timeout", type=float, default=10.0, help="Seconds to wait before killing a child")
+    supervise.add_argument("--site-profile", default=os.getenv("DATASTREAM_SITE_PROFILE"), help="Optional site profile YAML")
+    supervise.add_argument("--project-manifest", default=os.getenv("DATASTREAM_PROJECT_MANIFEST"), help="Optional project manifest YAML")
+    supervise.add_argument("--site-id", default=os.getenv("DATASTREAM_SITE_ID"), help="Select a site from the project manifest")
+    supervise.set_defaults(func=cmd_supervise)
 
     down = sub.add_parser("down", help="Stop managed services")
     down.add_argument("--only", default=None, help="Comma-separated subset to stop")

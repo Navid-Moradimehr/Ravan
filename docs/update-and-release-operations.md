@@ -69,3 +69,13 @@ and rollback sequence in `docs/self-host-install-guide.md`.
    stop ingestion, processing, or historian writes.
 6. For plant deployments, mirror approved artifacts to the company's internal
    registry and point `DATASTREAM_UPDATE_MANIFEST_URL` there.
+
+## Service lifecycle invariant
+
+OS service managers must own one foreground process. For generated native
+layouts that process is `python -m services.cli.datastreamd supervise`; the
+detached `up` command is not suitable for `systemd`, Windows Service Control,
+or another supervisor because it exits after creating child processes. This
+distinction is important during upgrades: stop the service first, preserve the
+site data, replace the runtime, then start the foreground supervisor and run
+the release gate.

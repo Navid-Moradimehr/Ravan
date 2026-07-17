@@ -91,8 +91,13 @@ def test_manifest_export_systemd_layout(tmp_path: Path):
     assert (site_root / "systemd" / "uninstall.sh").exists()
     unit = (site_root / "systemd" / "datastreamd.service").read_text(encoding="utf-8")
     installer = (site_root / "systemd" / "install.sh").read_text(encoding="utf-8")
-    assert "/runtime/.venv/bin/python -m services.cli.datastreamd" in unit
+    assert "/runtime/.venv/bin/python -m services.cli.datastreamd supervise" in unit
+    assert "up --site-profile" not in unit
     assert "RAVAN_SKIP_PIP_INSTALL" in installer
+    uninstall = (site_root / "systemd" / "uninstall.sh").read_text(encoding="utf-8")
+    assert "systemctl stop" in uninstall
+    assert "preserved" in uninstall
+    assert "rm -rf \"/etc/datastream/demo-industrial-fleet/demo-site\"" not in uninstall
     assert "\r\n" not in installer
     assert any(path.name == "datastreamd.service" for path in written)
 
@@ -114,6 +119,7 @@ def test_manifest_export_windows_layout(tmp_path: Path):
     wrapper = (site_root / "windows" / "bin" / "datastreamctl.cmd").read_text(encoding="utf-8")
     assert "RuntimeDir" in installer
     assert "-m venv" in installer
+    assert "datastreamd supervise" in installer
     assert "RAVAN_RUNTIME_DIR" in wrapper
     assert any(path.name == "install.ps1" for path in written)
 

@@ -45,14 +45,20 @@ Flink image into the cluster's registry, then render and validate the chart
 before applying it. The local kind rehearsal validates manifests and operator
 reconciliation; it is not a production multi-node certification.
 
-## Later Targets
+## Advanced Host Runtime Target
 
-Linux systemd, Windows full-node, Windows Operator, and macOS Operator packages
-are separate later products. They require bundled runtime dependency strategy,
-service lifecycle handling, upgrade and rollback behavior, code signing, clean
-machine acceptance, and OS-specific network/device testing. They must not be
-represented as finished installers merely because their generated configuration
-files already exist.
+The generated Linux systemd and Windows service layouts are an advanced host
+runtime target, not a replacement for the complete Compose site bundle. They
+run the Ravan application processes under an OS service manager while Kafka,
+TimescaleDB, Flink, and other infrastructure remain operator-supplied. The
+service manager now starts the foreground `datastreamd supervise` command,
+which owns child processes, performs bounded restarts, and shuts them
+down as one unit. These layouts still require clean-machine, dependency, and
+device network acceptance before being advertised as polished installers.
+
+Windows and macOS operator shells remain separate later products. They should
+control a Site Server rather than silently pretending that a workstation can
+replace the complete industrial runtime.
 
 ## Target Selection
 
