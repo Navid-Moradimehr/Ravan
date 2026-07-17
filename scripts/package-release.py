@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Stage repo-based release packages for Windows, Linux, and offline installs.
+"""Stage repo-based release packages for Compose, Kubernetes, and host installs.
 
 This script is intentionally thin: it reuses the existing project-manifest
 exports and copies the runtime source tree that already exists in the repo.
 
 Modes:
+    compose  - supported Docker Compose site bundle with public operator docs
+    kubernetes - Helm/Kubernetes bundle and generated site values
     windows  - native Windows host package
     linux    - native Linux/systemd host package
     offline  - air-gapped source bundle plus docs and sample data
@@ -48,6 +50,8 @@ PUBLIC_DOCUMENT_FILES = (
     "docs/observability-walkthrough.md",
     "docs/kafka-ui-guide.md",
     "docs/prometheus-guide.md",
+    "docs/flink-operator-runbook.md",
+    "docs/local-kubernetes-rehearsal.md",
     "docs/ai-provider-configuration.md",
     "docs/ai-reporting-policy-and-jobs.md",
     "docs/lakehouse-and-s3-guide.md",
@@ -192,6 +196,53 @@ def _finalize_bundle(stage_root: Path, archive_format: str) -> dict[str, object]
     return payload
 
 
+def build_compose(manifest_path: Path, output_dir: Path, site_id: str, fmt: str, sign: bool, signing_key_env: str, archive_format: str) -> dict[str, object]:
+    manifest = load_project_manifest(manifest_path)
+    errors = validate_project_manifest(manifest)
+    if errors:
+        raise ValueError("; ".join(errors))
+    stage_root = output_dir / f"{site_id}-compose"
+    shutil.rmtree(stage_root, ignore_errors=True)
+    written = _copy_runtime_tree(stage_root / "runtime", include_docs=True)
+    written.extend(_export_site_bundle(manifest, stage_root, site_id, layout="flat", fmt=fmt, sign=sign, signing_key_env=signing_key_env))
+    written.append(_write_json(stage_root / "package-manifest.json", {
+        "mode": "compose",
+        "site_id": site_id,
+        "manifest": str(manifest_path),
+        "runtime": "docker-compose",
+        "written": [str(path.relative_to(stage_root)) for path in written],
+    }))
+    payload = _finalize_bundle(stage_root, archive_format)
+    payload.update({"mode": "compose", "site_id": site_id, "manifest": str(manifest_path)})
+    _write_json(stage_root / "release-summary.json", payload)
+    return payload
+
+
+def build_kubernetes(manifest_path: Path, output_dir: Path, site_id: str, fmt: str, sign: bool, signing_key_env: str, archive_format: str) -> dict[str, object]:
+    manifest = load_project_manifest(manifest_path)
+    errors = validate_project_manifest(manifest)
+    if errors:
+        raise ValueError("; ".join(errors))
+    stage_root = output_dir / f"{site_id}-kubernetes"
+    shutil.rmtree(stage_root, ignore_errors=True)
+    written = _copy_runtime_tree(stage_root / "runtime", include_docs=True)
+    chart_src = REPO_ROOT / "k8s"
+    if chart_src.exists():
+        written.extend(_copy_dir(chart_src, stage_root / "k8s"))
+    written.extend(_export_site_bundle(manifest, stage_root, site_id, layout="kubernetes", fmt=fmt, sign=sign, signing_key_env=signing_key_env))
+    written.append(_write_json(stage_root / "package-manifest.json", {
+        "mode": "kubernetes",
+        "site_id": site_id,
+        "manifest": str(manifest_path),
+        "runtime": "helm-kubernetes",
+        "written": [str(path.relative_to(stage_root)) for path in written],
+    }))
+    payload = _finalize_bundle(stage_root, archive_format)
+    payload.update({"mode": "kubernetes", "site_id": site_id, "manifest": str(manifest_path)})
+    _write_json(stage_root / "release-summary.json", payload)
+    return payload
+
+
 def build_windows(manifest_path: Path, output_dir: Path, site_id: str, fmt: str, sign: bool, signing_key_env: str, archive_format: str) -> dict[str, object]:
     manifest = load_project_manifest(manifest_path)
     errors = validate_project_manifest(manifest)
@@ -256,7 +307,7 @@ def build_offline(manifest_path: Path, output_dir: Path, site_id: str, fmt: str,
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Stage repo-based packaging outputs for Windows, Linux, and offline installs.")
+    parser = argparse.ArgumentParser(description="Stage repo-based packaging outputs for Compose, Kubernetes, host, and offline installs.")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--site-id", default="demo-site")
@@ -265,6 +316,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--signing-key-env", default="DATASTREAM_RELEASE_SIGNING_KEY")
     parser.add_argument("--archive", choices=["zip", "tar.gz", "none"], default="zip")
     sub = parser.add_subparsers(dest="mode", required=True)
+    sub.add_parser("compose", help="Stage the supported Docker Compose bundle")
+    sub.add_parser("kubernetes", help="Stage the Helm/Kubernetes bundle")
     sub.add_parser("windows", help="Stage a native Windows package")
     sub.add_parser("linux", help="Stage a native Linux package")
     sub.add_parser("offline", help="Stage an offline bundle")
@@ -274,7 +327,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    if args.mode == "windows":
+    if args.mode == "compose":
+        payload = build_compose(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)
+    elif args.mode == "kubernetes":
+        payload = build_kubernetes(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)
+    elif args.mode == "windows":
         payload = build_windows(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)
     elif args.mode == "linux":
         payload = build_linux(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)

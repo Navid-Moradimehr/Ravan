@@ -12,16 +12,18 @@ installer for every feature:
 
 | Package | Target | Role |
 |---|---|---|
-| Site Server | Linux x86-64 | Complete single-site runtime |
+| Compose Site Bundle | Linux, Windows, macOS with Docker | Supported first-release complete single-site runtime |
+| Site Server | Linux x86-64 | Future host-native complete single-site runtime |
 | Edge Collector | Linux x86-64 and ARM64 | Collection and store-and-forward near equipment |
-| Windows Full Node | Windows x64 | Complete local runtime through a managed Linux appliance |
+| Windows Full Node | Windows x64 | Future complete local runtime through a managed Linux appliance |
 | Windows Operator | Windows x64 | Desktop client for a local or remote runtime |
 | macOS Operator | macOS universal | Desktop client for a local or remote runtime |
-| Kubernetes Bundle | Helm/Kubernetes | Multi-node and multi-site deployment |
+| Kubernetes Bundle | Helm/Kubernetes | Supported cluster deployment contract; operator-owned infrastructure |
 
-Docker Compose remains the developer and laboratory deployment. It is not a
-separate production edition. Air-gapped releases are offline copies of these
-packages with images and dependencies included.
+Docker Compose is the supported first-release installation path for a complete
+single-site runtime. It is also the reference implementation for the other
+deployment targets. Air-gapped releases are offline copies of the Compose or
+Kubernetes bundles with images and dependencies included.
 
 ## What Runs Where
 
@@ -196,3 +198,16 @@ data remain available in the appropriate bundle. This is still release
 staging, not a finished native installer. Final OS installer generation,
 signing, upgrade automation, dependency assembly for clean machines, and
 clean-machine acceptance tests remain packaging work.
+
+The explicit staging targets are now:
+
+```powershell
+py -3.13 scripts/package-release.py --output-dir .datastream/release compose
+py -3.13 scripts/package-release.py --output-dir .datastream/release kubernetes
+```
+
+The Compose target is the first release product. The Kubernetes target contains
+the Helm chart, operator example, generated site values, runtime build inputs,
+and public operator documentation. Neither target embeds customer secrets or
+claims that Kafka, TimescaleDB, MinIO, GPUs, or the Flink Operator are supplied
+by the platform.

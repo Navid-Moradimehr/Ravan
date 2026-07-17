@@ -28,3 +28,4 @@ logs, and the maintainer Obsidian vault.
 - [Local full-stack validation](local-validation-guide.md)
 - [Release and update operations](update-and-release-operations.md)
 - [Release identity](release-identity.md)
+- [Deployment targets](deployment-targets.md)
