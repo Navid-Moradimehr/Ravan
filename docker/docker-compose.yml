@@ -3,6 +3,9 @@ name: ravan
 services:
   kafka:
     image: apache/kafka:4.1.2
+    # The JMX JVM agent resolves this value during broker bootstrap, before
+    # Compose service aliases are reliably available to the process.
+    hostname: kafka
     restart: unless-stopped
     command:
       - bash
