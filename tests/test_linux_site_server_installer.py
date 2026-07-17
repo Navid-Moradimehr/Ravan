@@ -45,3 +45,6 @@ def test_operator_build_helpers_are_reproducible() -> None:
     assert "--bundles" in powershell
     assert "--bundles" in shell
     assert ".msi" in powershell and ".dmg" in powershell
+    assert "RAVAN_OPERATOR_VERSION" in powershell
+    assert "RAVAN_OPERATOR_VERSION" in shell
+    assert "--config" in powershell and "--config" in shell

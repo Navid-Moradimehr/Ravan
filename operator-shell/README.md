@@ -36,8 +36,9 @@ They use the committed npm lockfile and copy generated bundles into
 `dist/operator-installer`.
 
 The release workflow builds unsigned Windows NSIS/MSI and macOS DMG artifacts.
-The native bundle uses a numeric prerelease version (`1.0.0-1`) because MSI
-does not accept the platform's human-readable `beta.1` prerelease label.
+The native bundle uses a numeric prerelease version (for example `1.0.0-1`)
+because MSI does not accept the platform's human-readable `beta.1` prerelease
+label. The release workflow derives this safe native version from the Git tag.
 Code signing, notarization, update channels, icons, and clean-machine
 acceptance require maintainer-owned release credentials and remain explicit
 release work. The operator shell is still only a client for a Site Server; it

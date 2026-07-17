@@ -78,12 +78,26 @@ jobs:
           cache: npm
           cache-dependency-path: operator-shell/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
+      - name: Resolve MSI-safe operator version
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          base="${version%%-*}"
+          if [[ "$version" == *-* ]]; then
+            prerelease="${version##*.}"
+            if ! [[ "$prerelease" =~ ^[0-9]+$ ]]; then prerelease=1; fi
+            native="${base}-${prerelease}"
+          else
+            native="$base"
+          fi
+          echo "native=$native" >> "$GITHUB_OUTPUT"
       - name: Build unsigned Tauri installer
         working-directory: operator-shell
         shell: bash
         run: |
           npm ci
-          npm run tauri -- build --bundles "${{ matrix.bundles }}" --ci
+          npm run tauri -- build --bundles "${{ matrix.bundles }}" --ci --config '{"version":"${{ steps.version.outputs.native }}"}'
       - name: Upload operator installer
         uses: actions/upload-artifact@v4
         with:
