@@ -4,6 +4,7 @@ from __future__ import annotations
 
 PRODUCT_NAME = "Ravan"
 VERSION = "1.0.0-beta.1"
+PYPROJECT_VERSION = "1.0.0b1"
 REPOSITORY_URL = "https://github.com/Navid-Moradimehr/Ravan"
 
 
@@ -11,6 +12,7 @@ def release_metadata() -> dict[str, str]:
     return {
         "product": PRODUCT_NAME,
         "version": VERSION,
+        "python_version": PYPROJECT_VERSION,
         "repository_url": REPOSITORY_URL,
         "license": "Apache-2.0",
     }

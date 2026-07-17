@@ -4,16 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ravan-industrial-platform"
-version = "1.0.0b1"
 description = "Industrial streaming, historian, analytics, and AI-assisted operations platform."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Navid Moradimehr" }]
-dynamic = ["dependencies"]
+dynamic = ["dependencies", "version"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
+version = { attr = "services.common.release.PYPROJECT_VERSION" }
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.4"]
 
 [project.scripts]
 datastreamctl = "services.cli.datastreamctl:main"

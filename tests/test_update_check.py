@@ -1,6 +1,6 @@
 import httpx
 
-from services.common.update_check import check_for_update, version_key
+from services.common.update_check import check_for_update, current_version, version_key
 
 
 def test_version_key_accepts_v_prefix():
@@ -11,6 +11,11 @@ def test_update_check_is_disabled_by_default():
     result = check_for_update(enabled=False, current="0.3.0")
     assert result.available is False
     assert result.enabled is False
+
+
+def test_current_version_uses_ravan_release_identity(monkeypatch):
+    monkeypatch.delenv("DATASTREAM_RELEASE_VERSION", raising=False)
+    assert current_version() == "1.0.0-beta.1"
 
 
 def test_update_check_reports_new_release():

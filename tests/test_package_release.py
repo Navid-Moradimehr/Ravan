@@ -13,6 +13,7 @@ _ignore_generated = _MODULE._ignore_generated
 build_compose = _MODULE.build_compose
 build_kubernetes = _MODULE.build_kubernetes
 verify_bundle = _MODULE.verify_bundle
+verify_release_path = _MODULE.verify_release_path
 
 
 def test_release_package_excludes_development_artifacts() -> None:
@@ -98,3 +99,20 @@ def test_verify_rejects_development_and_secret_artifacts(tmp_path: Path) -> None
     assert verification["valid"] is False
     assert any("development artifact" in error for error in verification["errors"])
     assert any("secret file" in error for error in verification["errors"])
+
+
+def test_verify_accepts_a_downloaded_archive(tmp_path: Path) -> None:
+    result = build_compose(
+        _MODULE.DEFAULT_MANIFEST,
+        tmp_path,
+        "demo-site",
+        "both",
+        False,
+        "DATASTREAM_RELEASE_SIGNING_KEY",
+        "zip",
+    )
+
+    verification = verify_release_path(Path(result["archive"]), "compose")
+
+    assert verification["valid"] is True
+    assert verification["archive"] == str(Path(result["archive"]).resolve())

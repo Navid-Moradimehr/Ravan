@@ -136,26 +136,22 @@ against realistic industrial batches without depending on a live model server.
 - `Guide.md` contains the original product brief.
 - `docs/app-functionality.md` explains the platform in plain language: what each part does, its inputs and outputs, and how users interact with it.
 - `docs/first-time-plc-ingest-guide.md` explains how a new user connects PLCs and sensors, how protocol differences are handled, and how multiple sources stay separate while still being correlatable.
-- `docs/industrial-deployment-and-cli-architecture-note.md` summarizes the site-local vs central deployment model, dashboard expectations, and the CLI role.
-- `docs/feature-audit.md` lists the implemented feature set and current completion status.
-- `docs/phase8-distribution.md` evaluates installable distribution options for the open-source release.
+- `docs/deployment-targets.md` summarizes site-local, Compose, Kubernetes, and operator deployment models.
+- `docs/app-functionality.md` lists the implemented feature set and current completion status.
 - `docs/self-host-install-guide.md` gives the operator-facing local install and upgrade flow.
-- `docs/release-packaging-checklist.md` maps installer contents to the actual repo structure.
+- `docs/release-content-policy.md` defines installer and public-repository content boundaries.
 - `docs/multi-site-rollout.md` defines the production-hardening plan for multi-site industrial deployment.
-- `docs/model-agent-roadmap.md` defines the production model stack plan, including LLM roles, future agent infrastructure, and production gaps.
+- `docs/world-model-data-foundation.md` explains the model-data and future-agent infrastructure.
 - `services/api_service/routers/modeling.py` exposes the read-only model, prompt, tool, and context contract surface.
 - `services/api_service/routers/retrieval.py` exposes deterministic retrieval/search over historian, alarms, assets, reports, and scenarios.
 - `config/site-profiles/` contains example site profile contracts for `single-site`, `plant-local`, and `federated` rollout shapes.
-- `docs/testing-data-catalog.md` catalogs real, synthetic, and mock datasets that fit the platform.
-- `docs/benchmark-results.md` includes the latest local benchmark numbers for the mixed replay path, repeat-run site matrix, and release-package verification.
+- `docs/local-validation-guide.md` explains the local validation and simulator datasets.
 - `services/api_service/routers/historian.py` and `services/api_service/runtime.py` hold the split historian routing and shared API runtime helpers.
 - `scripts/benchmark_mixed_replay.py` runs the mixed replay benchmark against the local industrial replay pack.
 - `scripts/benchmark_ai_gateway_mock.py` benchmarks the provider-neutral AI gateway against realistic mock industrial batches.
 - `scripts/site-profile-soak.ps1` runs a live site-profile release gate and soak harness against the host-run runtime services.
 - `data/benchmarks/industrial_mixed_benchmark.csv` is a local replay pack for mixed-protocol benchmark and stress cases.
-- `ObsidianVault/` is the project knowledge base.
-- `docs/deployment-payload-boundaries.md` defines installer, public-repository, and development-only file boundaries.
-- `docs/` contains implementation-facing references and operational notes.
+- `docs/` contains curated user-facing operator references.
 
 ## Useful URLs
 

@@ -11,20 +11,21 @@ import os
 import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 import httpx
+
+from services.common.release import VERSION
 
 
 _VERSION_RE = re.compile(r"^(?:v)?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-+].*)?$")
 
 
 def current_version() -> str:
-    try:
-        return version("local-stream-engine")
-    except PackageNotFoundError:
-        return "0.3.0"
+    # The source tree is authoritative during editable installs and release
+    # staging. An older distribution left in the host environment must not
+    # make a current checkout report a stale version.
+    return os.getenv("DATASTREAM_RELEASE_VERSION", VERSION).strip() or VERSION
 
 
 def version_key(value: str) -> tuple[int, int, int]:

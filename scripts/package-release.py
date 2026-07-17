@@ -32,7 +32,7 @@ from services.common.project_manifest import load_project_manifest, validate_pro
 DEFAULT_MANIFEST = REPO_ROOT / "config" / "project-manifest.yaml"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "dist"
 RUNTIME_COPY_DIRS = ("services", "config", "ui", "rust", "docker")
-RUNTIME_COPY_FILES = ("README.md", "LICENSE", "NOTICE", "pyproject.toml", "requirements.txt", ".env.production.example")
+RUNTIME_COPY_FILES = ("README.md", "LICENSE", "NOTICE", "pyproject.toml", "requirements.txt", "uv.lock", ".env.production.example")
 RUNTIME_SCRIPT_FILES = ("ravan.ps1", "ravan.sh", "ravanctl.ps1", "ravanctl.sh")
 OFFLINE_EXTRA_DIRS = ("data",)
 PUBLIC_DOCUMENT_FILES = (
@@ -262,7 +262,7 @@ def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[s
     if mode in {"windows", "linux"}:
         if not (bundle_root / "runtime" / "requirements.txt").is_file():
             errors.append("native host runtime is missing runtime/requirements.txt")
-    if mode in {"compose", "kubernetes", "offline"}:
+    if mode in {"compose", "kubernetes", "windows", "linux", "offline"}:
         if not (bundle_root / "runtime" / "docs" / "README.md").is_file():
             errors.append("public operator documentation is missing runtime/docs/README.md")
     if not (bundle_root / "site").is_dir():
@@ -276,6 +276,55 @@ def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[s
         "file_count": len(files),
         "errors": errors,
     }
+
+
+def _safe_extract_archive(archive_path: Path, target_dir: Path) -> Path:
+    """Extract a release archive while rejecting path traversal entries."""
+    target_dir = target_dir.resolve()
+    if archive_path.suffix == ".zip":
+        with zipfile.ZipFile(archive_path) as archive:
+            members = archive.infolist()
+            for member in members:
+                destination = (target_dir / member.filename).resolve()
+                if destination != target_dir and target_dir not in destination.parents:
+                    raise ValueError(f"archive entry escapes extraction directory: {member.filename}")
+            archive.extractall(target_dir)
+    elif archive_path.suffixes[-2:] == [".tar", ".gz"]:
+        with tarfile.open(archive_path, "r:gz") as archive:
+            for member in archive.getmembers():
+                destination = (target_dir / member.name).resolve()
+                if destination != target_dir and target_dir not in destination.parents:
+                    raise ValueError(f"archive entry escapes extraction directory: {member.name}")
+            archive.extractall(target_dir, filter="data")
+    else:
+        raise ValueError(f"unsupported release archive: {archive_path.name}")
+    roots = [path for path in target_dir.iterdir() if path.is_dir()]
+    if len(roots) != 1:
+        raise ValueError("release archive must contain exactly one bundle directory")
+    return roots[0]
+
+
+def verify_release_path(path: Path, expected_mode: str | None = None) -> dict[str, object]:
+    """Verify either a staged bundle directory or its downloaded archive."""
+    if path.is_dir():
+        return verify_bundle(path, expected_mode)
+    if not path.is_file():
+        return verify_bundle(path, expected_mode)
+    import tempfile
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="ravan-release-verify-") as directory:
+            root = _safe_extract_archive(path, Path(directory))
+            result = verify_bundle(root, expected_mode)
+            result["archive"] = str(path.resolve())
+            return result
+    except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile) as exc:
+        return {
+            "valid": False,
+            "archive": str(path.resolve()),
+            "file_count": 0,
+            "errors": [str(exc)],
+        }
 
 
 def build_compose(manifest_path: Path, output_dir: Path, site_id: str, fmt: str, sign: bool, signing_key_env: str, archive_format: str) -> dict[str, object]:
@@ -332,7 +381,7 @@ def build_windows(manifest_path: Path, output_dir: Path, site_id: str, fmt: str,
         raise ValueError("; ".join(errors))
     stage_root = output_dir / f"{site_id}-windows"
     shutil.rmtree(stage_root, ignore_errors=True)
-    written = _copy_runtime_tree(stage_root / "runtime", include_docs=False)
+    written = _copy_runtime_tree(stage_root / "runtime", include_docs=True)
     written.extend(_export_site_bundle(manifest, stage_root, site_id, layout="windows", fmt=fmt, sign=sign, signing_key_env=signing_key_env))
     written.append(_write_json(stage_root / "package-manifest.json", {
         "mode": "windows",
@@ -353,7 +402,7 @@ def build_linux(manifest_path: Path, output_dir: Path, site_id: str, fmt: str, s
         raise ValueError("; ".join(errors))
     stage_root = output_dir / f"{site_id}-linux"
     shutil.rmtree(stage_root, ignore_errors=True)
-    written = _copy_runtime_tree(stage_root / "runtime", include_docs=False)
+    written = _copy_runtime_tree(stage_root / "runtime", include_docs=True)
     written.extend(_export_site_bundle(manifest, stage_root, site_id, layout="systemd", fmt=fmt, sign=sign, signing_key_env=signing_key_env))
     written.append(_write_json(stage_root / "package-manifest.json", {
         "mode": "linux",
@@ -404,7 +453,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("linux", help="Stage a native Linux package")
     sub.add_parser("offline", help="Stage an offline bundle")
     verify = sub.add_parser("verify", help="Verify a staged release directory")
-    verify.add_argument("bundle_dir", type=Path)
+    verify.add_argument("bundle_dir", type=Path, help="staged directory or .zip/.tar.gz release archive")
     verify.add_argument(
         "--mode",
         dest="expected_mode",
@@ -416,7 +465,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.mode == "verify":
-        result = verify_bundle(args.bundle_dir, args.expected_mode)
+        result = verify_release_path(args.bundle_dir, args.expected_mode)
         print(json.dumps(result, indent=2))
         return 0 if result["valid"] else 1
     args.output_dir.mkdir(parents=True, exist_ok=True)
