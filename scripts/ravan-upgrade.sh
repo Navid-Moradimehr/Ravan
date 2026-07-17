@@ -47,6 +47,6 @@ fi
 
 echo "Upgrade failed; stopping the new stack and restoring the previous Compose configuration." >&2
 docker compose -f "$NEW_COMPOSE" stop || true
-docker compose -f "$BACKUP_COMPOSE" up -d
+docker compose -f "$BACKUP_COMPOSE" --profile ui --profile edge up -d
 echo "Rollback started from $BACKUP_COMPOSE" >&2
 exit 1

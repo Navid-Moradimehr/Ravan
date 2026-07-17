@@ -34,5 +34,5 @@ while ((Get-Date) -lt $deadline) {
 
 Write-Warning "Upgrade failed; restoring the previous Compose configuration."
 docker compose -f $ComposeFile stop
-docker compose -f $backupCompose up -d
+docker compose -f $backupCompose --profile ui --profile edge up -d
 throw "Upgrade failed; rollback started from $backupCompose"
