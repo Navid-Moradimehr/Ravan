@@ -135,8 +135,9 @@ def test_ai_gateway_enrich_batch_falls_back_on_invalid_json(monkeypatch):
     captured: dict[str, object] = {}
 
     class DummyProducer:
-        def produce(self, topic, value):
+        def produce(self, topic, key=None, value=None, on_delivery=None):
             captured["topic"] = topic
+            captured["key"] = key
             captured["payload"] = json.loads(value.decode("utf-8"))
 
         def poll(self, timeout):
@@ -156,6 +157,7 @@ def test_ai_gateway_enrich_batch_falls_back_on_invalid_json(monkeypatch):
     )
 
     assert captured["topic"] == gateway.settings.ai_enriched_topic
+    assert captured["key"] == captured["payload"]["event_id"]
     assert captured["payload"]["summary"]
     assert captured["payload"]["structured_report"]["situation_status"] == "critical"
     assert captured["payload"]["used_fallback"] is True

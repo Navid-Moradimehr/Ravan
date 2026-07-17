@@ -565,7 +565,24 @@ async def enrich_batch(
         structured_report=briefing,
         generation_metadata=generation_record,
     )
-    producer.produce(settings.ai_enriched_topic, value=json.dumps(enriched_payload).encode("utf-8"))
+    # ``iot.ai_enriched`` is compacted, so every record must have a stable key.
+    # Reports use their durable job id; non-job enrichments use the generated
+    # event id. Delivery callbacks are checked because confluent-kafka's
+    # ``flush`` return value only reports messages still queued, not broker
+    # delivery errors.
+    delivery_errors: list[str] = []
+
+    def _on_delivery(error: Any, _message: Any) -> None:
+        if error is not None:
+            delivery_errors.append(str(error))
+
+    event_key = str(enriched_payload.get("report_id") or enriched_payload["event_id"])
+    producer.produce(
+        settings.ai_enriched_topic,
+        key=event_key,
+        value=json.dumps(enriched_payload).encode("utf-8"),
+        on_delivery=_on_delivery,
+    )
     # Do not let the input consumer commit before the AI event has reached the
     # broker. This path is intentionally at-least-once; the historian sink is
     # idempotent and can safely retry after a process restart.
@@ -578,6 +595,11 @@ async def enrich_batch(
         # flush(), so this fallback is only a compatibility seam.
         producer.poll(0)
         remaining = 0
+    if delivery_errors:
+        error = "; ".join(delivery_errors)
+        service_state.mark_degraded("AI event delivery failed", error)
+        asyncio.create_task(_broadcast_telemetry())
+        raise RuntimeError(f"AI report event delivery failed: {error}")
     if remaining:
         service_state.mark_degraded("AI event delivery pending", f"{remaining} Kafka event(s) not acknowledged")
         asyncio.create_task(_broadcast_telemetry())

@@ -66,6 +66,15 @@ gateway was operational but degraded because the configured local model
 returned HTTP 400, which is an optional-model integration result rather than a
 stream-processing failure.
 
+The separate LM Studio acceptance check was then run with
+`LLM_ENDPOINT_URL=http://192.168.100.7:1234/v1` and model
+`openai/gpt-oss-20b`. The report completed with a provider response, Kafka
+acknowledgement, zero AI-topic lag, and a matching row in the `ai_enriched`
+historian projection. This check caught and fixed a compacted-topic defect: AI
+events without Kafka keys were rejected by the broker even though producer
+`flush()` returned zero queued messages. The gateway now uses the report/event ID
+as the key and surfaces delivery-callback errors.
+
 ## Backup And Offline Checks
 
 Run the isolated backup drill against the rehearsal project after the historian

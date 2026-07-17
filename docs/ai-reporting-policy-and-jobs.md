@@ -42,6 +42,12 @@ delivery state. The same structured document is published to `iot.ai_enriched`
 and projected into the historian. The UI renders controlled fields only; it does
 not render provider-generated HTML.
 
+`iot.ai_enriched` is a compacted Kafka topic. Ravan publishes each report with
+its durable `report_id` as the Kafka record key, or the generated event ID for
+non-job enrichments. The gateway checks producer delivery callbacks as well as
+the flush result, so broker rejections become visible delivery failures instead
+of false acknowledgements.
+
 ## Compatibility
 
 The existing `iot.processed` and `iot.ai_enriched` topics remain unchanged as
@@ -58,6 +64,9 @@ they no longer define governed report scheduling when a reporting policy is acti
 5. Existing AI provider fallback behavior remains available.
 6. Unit and contract tests cover policy validation and job lifecycle without a
    running Kafka or LLM service.
+7. A keyed AI event is accepted by Kafka, consumed by the AI fan-out, and
+   visible in the `ai_enriched` historian projection before delivery is shown as
+   complete.
 
 ## API
 
