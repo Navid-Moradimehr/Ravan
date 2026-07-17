@@ -1,9 +1,9 @@
 # Ravan Operator Shell
 
-This directory is the desktop operator shell scaffold for Windows and macOS.
+This directory contains the desktop operator shell for Windows and macOS.
 It is intentionally not a local Kafka, Flink, TimescaleDB, or Python runtime.
 The shell asks for the URL of a running Ravan Site Server and opens that URL
-inside a native window.
+inside a native dedicated window. It does not install or manage the runtime.
 
 ## Prerequisites
 

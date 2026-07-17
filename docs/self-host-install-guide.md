@@ -199,9 +199,10 @@ export DATASTREAM_UPDATE_MANIFEST_URL=https://github.com/OWNER/REPO/releases/lat
 datastreamctl update check --manifest-url "$DATASTREAM_UPDATE_MANIFEST_URL"
 ```
 
-The dashboard may show the same result as an in-app toast. Automatic download,
-replacement, and rollback are deliberately deferred until the installer/update
-agent exists. See [`docs/update-and-release-operations.md`](update-and-release-operations.md).
+The dashboard may show the same result as an in-app toast. The Site Server
+installer and data-preserving upgrade helper now exist, but upgrades remain
+operator-approved rather than automatic browser downloads. See
+[`docs/update-and-release-operations.md`](update-and-release-operations.md).
 
 For a production deployment, do not reuse the Compose demo credentials or
 floating demo endpoints. Supply operator-owned secrets and TLS/authentication
@@ -222,7 +223,8 @@ The release workflow publishes unsigned Windows NSIS/MSI and macOS DMG
 artifacts. Install the artifact for the operator's OS; do not install the
 operator shell on the Site Server itself. Signed builds and notarization are
 release-pipeline requirements that must be configured by the maintainer before
-an enterprise distribution.
+an enterprise distribution. See [`docs/operator-desktop-guide.md`](operator-desktop-guide.md)
+for the simple Docker Desktop and dedicated-window workflow.
 
 ## What operators own
 

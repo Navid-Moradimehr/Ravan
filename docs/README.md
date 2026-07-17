@@ -9,6 +9,7 @@ logs, and the maintainer Obsidian vault.
 - [Platform capabilities](app-functionality.md)
 - [Self-host installation](self-host-install-guide.md)
 - [Linux Site Server installer](linux-site-server-install.md)
+- [Desktop Operator workflow](operator-desktop-guide.md)
 - [Docker operator guide](docker-operator-guide.md)
 - [Connect industrial sources](source-connection-walkthrough.md)
 - [Historian and dashboards](historian-guide.md)

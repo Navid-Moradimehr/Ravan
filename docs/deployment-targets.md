@@ -92,9 +92,9 @@ They run the Ravan application processes under an OS service manager while
 Kafka, TimescaleDB, Flink, and other infrastructure remain operator-supplied.
 The complete Site Server path is the Docker-based installer above.
 
-Windows and macOS operator shells remain separate later products. They should
-control a Site Server rather than silently pretending that a workstation can
-replace the complete industrial runtime.
+Windows and macOS operator shells are supported desktop client products. They
+control a Site Server rather than pretending that a workstation can replace
+the complete industrial runtime.
 
 ## Target Selection
 
