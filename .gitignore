@@ -20,5 +20,6 @@ docker/prometheus/data/
 Thumbs.db
 .datastream/
 .refs/
+ObsidianVault/
 data/semantic/
 rust/fastpath/target/

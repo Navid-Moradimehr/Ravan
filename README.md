@@ -85,9 +85,9 @@ datastreamd down
 
 `datastreamd` manages the Python service surface only; run `docker compose` first for Kafka, Postgres/TimescaleDB, and Grafana. The distributed Flink processor is available through the compose `flink-job` service.
 
-See `docs/phase8-distribution.md` for the full distribution plan.
-See `docs/update-and-release-operations.md` for the opt-in release check and
-the operator-controlled upgrade procedure.
+See `docs/self-host-install-guide.md` for deployment and
+`docs/update-and-release-operations.md` for the opt-in release check and
+operator-controlled upgrade procedure.
 
 ## Industrial Simulation
 

@@ -29,17 +29,41 @@ from services.common.project_manifest import load_project_manifest, validate_pro
 
 DEFAULT_MANIFEST = REPO_ROOT / "config" / "project-manifest.yaml"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "dist"
-RUNTIME_COPY_DIRS = ("services", "config", "scripts", "ui", "rust")
-RUNTIME_COPY_FILES = ("README.md", "pyproject.toml", "requirements.txt")
+RUNTIME_COPY_DIRS = ("services", "config", "ui", "rust", "docker")
+RUNTIME_COPY_FILES = ("README.md", "LICENSE", "NOTICE", "pyproject.toml", "requirements.txt", ".env.production.example")
+RUNTIME_SCRIPT_FILES = ("ravan.ps1", "ravan.sh", "ravanctl.ps1", "ravanctl.sh")
 OFFLINE_EXTRA_DIRS = ("data",)
-OFFLINE_EXTRA_FILES = (
+PUBLIC_DOCUMENT_FILES = (
+    "docs/README.md",
+    "docs/app-functionality.md",
     "docs/self-host-install-guide.md",
-    "docs/deployment-decision-memo.md",
-    "docs/release-packaging-checklist.md",
-    "docs/phase8-distribution.md",
-    "services/ingestion/debezium-postgres-orders.json",
+    "docs/docker-operator-guide.md",
+    "docs/installation-options-and-requirements.md",
+    "docs/source-connection-walkthrough.md",
+    "docs/source-connection-and-deployment.md",
+    "docs/first-time-plc-ingest-guide.md",
+    "docs/pipeline-walkthrough.md",
+    "docs/historian-guide.md",
+    "docs/custom-dashboard-guide.md",
+    "docs/observability-walkthrough.md",
+    "docs/kafka-ui-guide.md",
+    "docs/prometheus-guide.md",
+    "docs/ai-provider-configuration.md",
+    "docs/ai-reporting-policy-and-jobs.md",
+    "docs/lakehouse-and-s3-guide.md",
+    "docs/multi-site-rollout.md",
+    "docs/self-hosted-secrets.md",
+    "docs/update-and-release-operations.md",
+    "docs/release-identity.md",
+    "docs/jepa-training-guide.md",
+    "docs/dreamer-training-guide.md",
+    "docs/muzero-training-guide.md",
+    "docs/world-model-data-foundation.md",
 )
-IGNORE_NAMES = {"__pycache__", ".git", ".venv", "node_modules", ".next", "dist", "build", "coverage"}
+IGNORE_NAMES = {
+    "__pycache__", ".git", ".venv", "node_modules", ".next", "dist", "build", "coverage",
+    "benchmarks", "tests", "ObsidianVault",
+}
 
 
 def _ignore_generated(_: str, names: list[str]) -> set[str]:
@@ -103,6 +127,10 @@ def _copy_runtime_tree(stage_root: Path, include_docs: bool) -> list[Path]:
         src = REPO_ROOT / entry
         if src.exists():
             written.extend(_copy_dir(src, stage_root / entry))
+    for script_name in RUNTIME_SCRIPT_FILES:
+        src = REPO_ROOT / "scripts" / script_name
+        if src.exists():
+            written.extend(_copy_file(src, stage_root / "scripts" / script_name))
     for entry in RUNTIME_COPY_FILES:
         src = REPO_ROOT / entry
         if src.exists():
@@ -112,7 +140,7 @@ def _copy_runtime_tree(stage_root: Path, include_docs: bool) -> list[Path]:
             src = REPO_ROOT / entry
             if src.exists():
                 written.extend(_copy_dir(src, stage_root / entry))
-        for entry in OFFLINE_EXTRA_FILES:
+        for entry in PUBLIC_DOCUMENT_FILES:
             src = REPO_ROOT / entry
             if src.exists():
                 written.extend(_copy_file(src, stage_root / entry))
