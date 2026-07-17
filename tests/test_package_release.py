@@ -12,6 +12,7 @@ _SPEC.loader.exec_module(_MODULE)
 _ignore_generated = _MODULE._ignore_generated
 build_compose = _MODULE.build_compose
 build_kubernetes = _MODULE.build_kubernetes
+verify_bundle = _MODULE.verify_bundle
 
 
 def test_release_package_excludes_development_artifacts() -> None:
@@ -60,3 +61,40 @@ def test_kubernetes_target_contains_chart_and_generated_site_bundle(tmp_path: Pa
     assert (root / "site" / "demo-site" / "kubernetes" / "helm" / "values.generated.yaml").exists()
     assert not (root / "runtime" / "tests").exists()
     assert not (root / "runtime" / "ObsidianVault").exists()
+
+
+def test_verify_accepts_a_valid_compose_bundle(tmp_path: Path) -> None:
+    result = build_compose(
+        _MODULE.DEFAULT_MANIFEST,
+        tmp_path,
+        "demo-site",
+        "both",
+        False,
+        "DATASTREAM_RELEASE_SIGNING_KEY",
+        "none",
+    )
+    verification = verify_bundle(Path(result["stage_root"]), "compose")
+    assert verification["valid"] is True
+    assert verification["errors"] == []
+
+
+def test_verify_rejects_development_and_secret_artifacts(tmp_path: Path) -> None:
+    result = build_compose(
+        _MODULE.DEFAULT_MANIFEST,
+        tmp_path,
+        "demo-site",
+        "both",
+        False,
+        "DATASTREAM_RELEASE_SIGNING_KEY",
+        "none",
+    )
+    root = Path(result["stage_root"])
+    (root / "runtime" / "tests").mkdir()
+    (root / "runtime" / "tests" / "test_secret.py").write_text("", encoding="utf-8")
+    (root / "runtime" / ".env").write_text("SECRET=value\n", encoding="utf-8")
+
+    verification = verify_bundle(root, "compose")
+
+    assert verification["valid"] is False
+    assert any("development artifact" in error for error in verification["errors"])
+    assert any("secret file" in error for error in verification["errors"])

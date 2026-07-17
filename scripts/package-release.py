@@ -64,6 +64,26 @@ PUBLIC_DOCUMENT_FILES = (
     "docs/muzero-training-guide.md",
     "docs/world-model-data-foundation.md",
 )
+FORBIDDEN_RELEASE_PARTS = {
+    ".git",
+    ".next",
+    "__pycache__",
+    "benchmarks",
+    "build",
+    "coverage",
+    "node_modules",
+    "obsidianvault",
+    "target",
+    "tests",
+}
+FORBIDDEN_SECRET_NAMES = {
+    ".env",
+    ".env.local",
+    ".env.production",
+    "credentials.json",
+    "secrets.yaml",
+    "secrets.yml",
+}
 IGNORE_NAMES = {
     "__pycache__", ".git", ".venv", "node_modules", ".next", "dist", "build", "coverage",
     "benchmarks", "tests", "ObsidianVault", "target",
@@ -196,6 +216,68 @@ def _finalize_bundle(stage_root: Path, archive_format: str) -> dict[str, object]
     return payload
 
 
+def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[str, object]:
+    """Validate a staged release directory without starting the platform."""
+    bundle_root = bundle_root.resolve()
+    errors: list[str] = []
+    if not bundle_root.is_dir():
+        return {
+            "valid": False,
+            "bundle_root": str(bundle_root),
+            "file_count": 0,
+            "errors": [f"bundle directory does not exist: {bundle_root}"],
+        }
+
+    package_manifest_path = bundle_root / "package-manifest.json"
+    if not package_manifest_path.is_file():
+        errors.append("package-manifest.json is missing")
+        package_manifest: dict[str, object] = {}
+    else:
+        try:
+            package_manifest = json.loads(package_manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            package_manifest = {}
+            errors.append(f"package-manifest.json is not valid JSON: {exc}")
+
+    mode = package_manifest.get("mode")
+    if expected_mode and mode != expected_mode:
+        errors.append(f"package mode is {mode!r}, expected {expected_mode!r}")
+
+    files = [path for path in bundle_root.rglob("*") if path.is_file()]
+    for path in files:
+        relative_parts = {part.lower() for part in path.relative_to(bundle_root).parts}
+        if relative_parts & FORBIDDEN_RELEASE_PARTS:
+            errors.append(f"development artifact is included: {path.relative_to(bundle_root)}")
+        if path.name.lower() in FORBIDDEN_SECRET_NAMES:
+            errors.append(f"secret file is included: {path.relative_to(bundle_root)}")
+        if path.suffix.lower() in {".pyc", ".pyo"}:
+            errors.append(f"compiled Python artifact is included: {path.relative_to(bundle_root)}")
+
+    if mode in {"compose", "offline"}:
+        if not (bundle_root / "runtime" / "docker" / "docker-compose.yml").is_file():
+            errors.append("Compose runtime is missing docker/docker-compose.yml")
+    if mode == "kubernetes":
+        if not (bundle_root / "k8s" / "helm" / "Chart.yaml").is_file():
+            errors.append("Kubernetes runtime is missing k8s/helm/Chart.yaml")
+    if mode in {"windows", "linux"}:
+        if not (bundle_root / "runtime" / "requirements.txt").is_file():
+            errors.append("native host runtime is missing runtime/requirements.txt")
+    if mode in {"compose", "kubernetes", "offline"}:
+        if not (bundle_root / "runtime" / "docs" / "README.md").is_file():
+            errors.append("public operator documentation is missing runtime/docs/README.md")
+    if not (bundle_root / "site").is_dir():
+        errors.append("generated site configuration directory is missing")
+
+    return {
+        "valid": not errors,
+        "bundle_root": str(bundle_root),
+        "mode": mode,
+        "site_id": package_manifest.get("site_id"),
+        "file_count": len(files),
+        "errors": errors,
+    }
+
+
 def build_compose(manifest_path: Path, output_dir: Path, site_id: str, fmt: str, sign: bool, signing_key_env: str, archive_format: str) -> dict[str, object]:
     manifest = load_project_manifest(manifest_path)
     errors = validate_project_manifest(manifest)
@@ -321,11 +403,22 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("windows", help="Stage a native Windows package")
     sub.add_parser("linux", help="Stage a native Linux package")
     sub.add_parser("offline", help="Stage an offline bundle")
+    verify = sub.add_parser("verify", help="Verify a staged release directory")
+    verify.add_argument("bundle_dir", type=Path)
+    verify.add_argument(
+        "--mode",
+        dest="expected_mode",
+        choices=["compose", "kubernetes", "windows", "linux", "offline"],
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.mode == "verify":
+        result = verify_bundle(args.bundle_dir, args.expected_mode)
+        print(json.dumps(result, indent=2))
+        return 0 if result["valid"] else 1
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.mode == "compose":
         payload = build_compose(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)

@@ -9,3 +9,15 @@ The packaging allowlist is defined in `scripts/package-release.py` through
 `PUBLIC_DOCUMENT_FILES`. The same public-document boundary is used for the
 repository release branch. Development documentation may remain locally for
 maintainer work but must be untracked before a public release.
+
+Before publishing an archive, verify the staged directory with:
+
+```powershell
+py -3.13 scripts/package-release.py --output-dir .datastream/release compose
+py -3.13 scripts/package-release.py verify .datastream/release/demo-site-compose --mode compose
+```
+
+The verifier checks the package manifest, generated site configuration, required
+runtime files, and deployment-specific assets. It rejects development folders,
+compiled Python files, and common secret filenames. It is a content boundary
+check, not a substitute for clean-machine installation or runtime acceptance.
