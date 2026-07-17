@@ -29,7 +29,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("llm_api_key", "LLM_API_KEY", "OPENAI_API_KEY"),
     )
     llm_model_id: str = Field(
-        default="openai/gpt-oss-20B",
+        default="openai/gpt-oss-20b",
         validation_alias=AliasChoices("llm_model_id", "LLM_MODEL_ID", "OPENAI_MODEL"),
     )
     llm_request_path: str | None = Field(default=None, validation_alias=AliasChoices("llm_request_path", "LLM_REQUEST_PATH"))

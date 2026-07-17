@@ -16,7 +16,7 @@ runtime:
   ai:
     provider: openai_compat
     endpoint_url: http://127.0.0.1:1234/v1
-    model_id: openai/gpt-oss-20B
+    model_id: openai/gpt-oss-20b
     local_only: true
 
 backups:

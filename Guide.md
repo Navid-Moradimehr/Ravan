@@ -60,7 +60,7 @@ Project Structure:
 Please generate the directory structure and the core Docker Compose file first."
 
 ### Testing with Mock Data & GPU
-1.  Local LLM Setup: LM Studio is open on my system. you can find models there that are current;y available on http://172..17.0.1:1234  . i prefere openai/gpt-oss-20B
+1.  Local LLM Setup: LM Studio is open on my system. you can find models there that are currently available on http://172.17.0.1:1234. I prefer openai/gpt-oss-20b.
 
 
 2.  Mock Data: The sources emphasize the importance of "Exactly-Once" semantics and "Schema Evolution" [9, 13]. Ensure your mock generator uses a Schema Registry (included in Redpanda) to maintain data integrity as you test [3, 5].

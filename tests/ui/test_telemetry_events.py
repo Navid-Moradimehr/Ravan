@@ -45,7 +45,7 @@ def test_ai_gateway_build_telemetry_shape():
             {"name": "observe", "status": "active"},
         ],
         "llm": {
-            "model": "openai/gpt-oss-20B",
+            "model": "openai/gpt-oss-20b",
             "base_url": "http://localhost:1234/v1",
             "last_error": None,
         },

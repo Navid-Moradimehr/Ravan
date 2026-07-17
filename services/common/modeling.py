@@ -89,7 +89,7 @@ class ModelRegistry:
                 role="summarization",
                 provider="openai_compat",
                 endpoint_url=self._env("LLM_ENDPOINT_URL", "http://172.17.0.1:1234/v1"),
-                model_id=self._env("LLM_MODEL_ID", "openai/gpt-oss-20B"),
+                model_id=self._env("LLM_MODEL_ID", "openai/gpt-oss-20b"),
                 request_format=self._env("LLM_REQUEST_FORMAT", "chat"),
                 local_only=self._env_bool("LLM_LOCAL_ONLY", False),
                 enabled=self._env("LLM_PROVIDER", "openai_compat").lower() != "disabled",

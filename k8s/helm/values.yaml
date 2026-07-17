@@ -194,7 +194,7 @@ env:
   DATASTREAM_CENTRAL_ENDPOINT: ""
   LLM_PROVIDER: "openai_compat"
   LLM_ENDPOINT_URL: "http://host.docker.internal:1234/v1"
-  LLM_MODEL_ID: "openai/gpt-oss-20B"
+  LLM_MODEL_ID: "openai/gpt-oss-20b"
   LLM_LOCAL_ONLY: "true"
   FLINK_PARALLELISM: "1"
   FLINK_MAX_PARALLELISM: "120"
