@@ -5,6 +5,12 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  workflow_dispatch:
+    inputs:
+      operator_version:
+        description: "Unsigned macOS Operator validation version"
+        required: false
+        default: "1.0.0-1"
 
 jobs:
   validate:
@@ -62,3 +68,29 @@ jobs:
       - name: Validate operator shell manifest
         working-directory: operator-shell
         run: npm ci && cargo check --manifest-path src-tauri/Cargo.toml --locked
+
+  operator-macos:
+    name: Validate macOS Operator bundle
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: operator-shell/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build unsigned DMG
+        working-directory: operator-shell
+        env:
+          RAVAN_OPERATOR_VERSION: ${{ inputs.operator_version }}
+        run: |
+          npm ci
+          npm run tauri -- build --bundles dmg --ci --config '{"version":"'"${RAVAN_OPERATOR_VERSION}"'"}'
+      - name: Upload macOS validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ravan-operator-macos-validation
+          path: operator-shell/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error

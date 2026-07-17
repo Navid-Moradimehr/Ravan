@@ -51,7 +51,9 @@ The Site Server owns the industrial data pipeline. The Operator only provides
 the desktop entry point. Closing the Operator does not stop ingestion,
 processing, storage, or alarms on the Site Server.
 
-Maintainers can run the manual **Ravan Operator macOS Validation** workflow to
-build a DMG on a native macOS runner without publishing a release. The result
-is an unsigned validation artifact until Apple Developer signing and
-notarization credentials are added.
+Maintainers can run the `CI` workflow with **Run workflow** and provide an
+optional operator version to build a DMG on a native macOS runner without
+publishing a release. The result is an unsigned validation artifact until Apple
+Developer signing and notarization credentials are added. The standalone
+`Ravan Operator macOS Validation` workflow is retained as a release-maintainer
+reference, but the active CI workflow is the supported dispatch path.
