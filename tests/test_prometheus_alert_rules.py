@@ -110,3 +110,9 @@ def test_compose_mounts_alert_rules():
     compose = yaml.safe_load(COMPOSE_PATH.read_text(encoding="utf-8"))
     vols = compose["services"]["prometheus"]["volumes"]
     assert any("alert_rules.yml" in v and v.endswith(":ro") for v in vols), vols
+
+
+def test_default_prometheus_does_not_scrape_optional_python_fallback():
+    cfg = yaml.safe_load(PROM_CONFIG_PATH.read_text(encoding="utf-8"))
+    jobs = {job["job_name"]: job for job in cfg["scrape_configs"]}
+    assert "processor" not in jobs

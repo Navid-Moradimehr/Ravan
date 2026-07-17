@@ -32,7 +32,13 @@ If a chart looks wrong, do not start by editing the dashboard. Start by querying
 
 Prometheus is part of the monitoring plane, not the business data plane. It helps validate that the platform is working, but it does not own the industrial events themselves. Those events still flow through Kafka, the processor, and the historian. Prometheus only tracks the health of those flows and the services that support them.
 
+The default Compose deployment runs Flink as the processing owner, so the
+optional Python fallback processor is not registered as a scrape target. This
+prevents a deliberate, stopped fallback container from appearing as a runtime
+failure. If an operator explicitly runs the Python fallback profile, its
+metrics should be inspected through its configured endpoint or a deployment-
+specific Prometheus configuration.
+
 ## Why it matters for operators
 
 Operators use Prometheus when they need to confirm that a signal is live before trusting a dashboard. Engineers use it when they need to understand the source of a number. Platform maintainers use it when they are verifying rollout health, latency, or ingest behavior during a deployment.
-
