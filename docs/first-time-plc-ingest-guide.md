@@ -1,6 +1,6 @@
 # First-Time PLC And Sensor Ingest Guide
 
-This guide is for a first-time user who wants to connect PLCs and sensors from a manufacturing site into Local Stream Engine.
+This guide is for a first-time user who wants to connect PLCs and sensors from a manufacturing site into Ravan.
 
 It covers:
 

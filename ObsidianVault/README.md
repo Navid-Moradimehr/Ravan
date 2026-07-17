@@ -1,4 +1,4 @@
-# Local Stream Engine Vault
+# Ravan Vault
 
 Open this folder as an Obsidian vault to track product reasoning, architecture decisions, runbooks, and UI notes.
 

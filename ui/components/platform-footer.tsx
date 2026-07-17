@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Cable, Database, FileText, Mail, MessageCircleQuestion, Radio } from "lucide-react";
+import { Cable, Database, FileText, MessageCircleQuestion, Radio } from "lucide-react";
 
 const guideLinks = [
   { href: "/help-guidance#sources", label: "Connect a source", icon: Cable },
@@ -19,7 +19,7 @@ export function PlatformFooter() {
                 <Radio aria-hidden="true" className="size-4" />
               </span>
               <span>
-                <span className="block font-heading text-sm font-semibold tracking-tight text-text-primary">Stream Engine</span>
+                <span className="block font-heading text-sm font-semibold tracking-tight text-text-primary">Ravan</span>
                 <span className="block text-xs text-text-secondary">Industrial data control plane</span>
               </span>
             </Link>
@@ -50,21 +50,17 @@ export function PlatformFooter() {
 
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Help and contact</h2>
-            <p className="text-xs leading-5 text-text-secondary">These addresses are placeholders for the open-source release and should be replaced by the deploying organization.</p>
-            <a href="mailto:support@datastream.example" className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-accent">
+            <p className="text-xs leading-5 text-text-secondary">For open-source support and release questions, use the repository issue tracker or contact the maintainer directly.</p>
+            <a href="mailto:navidmoradimehr3@gmail.com" className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-accent">
               <MessageCircleQuestion aria-hidden="true" className="size-4 text-accent" />
-              support@datastream.example
-            </a>
-            <a href="mailto:maintainers@datastream.example" className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-accent">
-              <Mail aria-hidden="true" className="size-4 text-accent" />
-              maintainers@datastream.example
+              navidmoradimehr3@gmail.com
             </a>
             <p className="text-xs leading-5 text-text-muted">For deployment-specific help, use the repository issue tracker and include the platform version, deployment profile, and relevant service logs. Do not include credentials.</p>
           </div>
         </div>
 
         <div className="mt-8 flex flex-col gap-3 border-t border-border-subtle pt-4 text-xs text-text-muted sm:flex-row sm:items-center sm:justify-between">
-          <span>© {new Date().getFullYear()} Stream Engine open-source project</span>
+          <span>© {new Date().getFullYear()} Ravan open-source project</span>
           <span>Self-hosted industrial data infrastructure</span>
         </div>
       </div>

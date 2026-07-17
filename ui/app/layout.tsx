@@ -5,7 +5,7 @@ import { UpdateNotice } from "@/components/update-notice";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Local Stream Engine",
+  title: "Ravan",
   description: "Local real-time streaming and BI control plane",
 };
 

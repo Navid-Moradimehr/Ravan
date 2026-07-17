@@ -22,7 +22,7 @@ export function TopBar({ systemStatus = "online" }: { systemStatus?: "online" | 
             <Radio aria-hidden="true" className="size-4" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate font-heading text-sm font-semibold tracking-tight text-text-primary">Stream Engine</span>
+            <span className="block truncate font-heading text-sm font-semibold tracking-tight text-text-primary">Ravan</span>
             <span className="hidden text-xs text-text-muted sm:block">Industrial data control plane</span>
           </span>
         </Link>

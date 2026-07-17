@@ -1,6 +1,6 @@
-# Local Stream Engine
+# Ravan
 
-Local Stream Engine is a self-hosted real-time data platform inspired by CGR/GITA Streaming and BI product capabilities: industrial edge ingestion, low-latency streaming, stateful processing, operational analytics, and AI-assisted insight generation.
+Ravan is a self-hosted real-time data platform inspired by CGR/GITA Streaming and BI product capabilities: industrial edge ingestion, low-latency streaming, stateful processing, operational analytics, and AI-assisted insight generation.
 
 ## Architecture
 

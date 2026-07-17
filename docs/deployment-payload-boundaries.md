@@ -1,6 +1,6 @@
 # Deployment Payload Boundaries
 
-This document defines what belongs in an installed Local Stream Engine deployment, what belongs in the public GitHub repository, and what is development-only. It is based on the current repository layout and the existing staging script in `scripts/package-release.py`.
+This document defines what belongs in an installed Ravan deployment, what belongs in the public GitHub repository, and what is development-only. It is based on the current repository layout and the existing staging script in `scripts/package-release.py`.
 
 The goal is to ship a usable self-hosted platform with the demo site and demo data available, without shipping private working notes, the Obsidian vault, test suites, benchmark campaigns, local machine state, or generated build output.
 

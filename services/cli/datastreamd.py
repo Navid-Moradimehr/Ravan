@@ -1,4 +1,4 @@
-"""datastreamd - runtime supervisor for Local Stream Engine.
+"""datastreamd - runtime supervisor for Ravan.
 
 Launches the platform services (api_service, ai_gateway, edge_ingest,
 processor, mock generator) as managed subprocesses and tracks their
@@ -480,7 +480,7 @@ def cmd_logs(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="datastreamd",
-        description="Runtime supervisor for Local Stream Engine services.",
+        description="Runtime supervisor for Ravan services.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

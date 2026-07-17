@@ -1,5 +1,5 @@
 {{- $name := include "data-stream.fullname" . -}}
-Data Stream Platform installed.
+Ravan installed.
 
 Services:
 {{- if .Values.apiService.enabled }}

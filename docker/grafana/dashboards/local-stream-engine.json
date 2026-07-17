@@ -1,5 +1,5 @@
 {
-  "title": "Local Stream Engine",
+  "title": "Ravan",
   "uid": "local-stream-engine",
   "schemaVersion": 39,
   "version": 1,
@@ -7,7 +7,7 @@
   "panels": [
     {
       "type": "timeseries",
-      "title": "Edge ingest throughput",
+      "title": "Ravan",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
@@ -18,7 +18,7 @@
     },
     {
       "type": "timeseries",
-      "title": "AI gateway LLM latency",
+      "title": "Ravan",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {

@@ -2,7 +2,7 @@
 
 ## Test Environment
 - **Date**: 2026-06-30
-- **Platform**: Local Stream Engine (Python 3.11, Windows/WSL2)
+- **Platform**: Ravan (Python 3.11, Windows/WSL2)
 - **Hardware**: Single-node development machine
 - **Broker**: Kafka KRaft
 - **Historian**: TimescaleDB
@@ -1015,8 +1015,8 @@ Interpretation:
 | Kafka (current project broker) | 1M+ msgs/sec | <5ms p99 | Standard broker deployment |
 | MQTT brokers (HiveMQ/EMQX) | 1M+ msgs/sec | <5ms | IoT-optimized |
 | Typical Industrial SCADA | 1K-10K tags/sec | 100ms-1s | Legacy protocols |
-| **Local Stream Engine (full pipeline)** | **125K events/sec** | N/A | Python, single-node |
-| **Local Stream Engine (mock generation)** | 1.8K events/sec | N/A | I/O bound (sleep-based) |
+| **Ravan (full pipeline)** | **125K events/sec** | N/A | Python, single-node |
+| **Ravan (mock generation)** | 1.8K events/sec | N/A | I/O bound (sleep-based) |
 
 ## Key Findings
 

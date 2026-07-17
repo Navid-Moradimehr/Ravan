@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This roadmap defines how Local Stream Engine should evolve from:
+This roadmap defines how Ravan should evolve from:
 
 - deterministic industrial streaming and analytics
 - plus LLM-based summarization

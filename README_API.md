@@ -1,4 +1,4 @@
-# Local Stream Engine — API & New Features
+# Ravan - API & New Features
 
 ## REST API Service (`services/api_service/main.py`)
 

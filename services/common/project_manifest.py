@@ -396,7 +396,7 @@ class ProjectManifest:
                 "    Stop-Service -Name $ServiceName -ErrorAction SilentlyContinue",
                 "    sc.exe delete $ServiceName | Out-Null",
                 "}",
-                "New-Service -Name $ServiceName -BinaryPathName $binaryPath -DisplayName $ServiceName -Description 'Local Stream Engine runtime' -StartupType Automatic | Out-Null",
+                "New-Service -Name $ServiceName -BinaryPathName $binaryPath -DisplayName $ServiceName -Description 'Ravan runtime' -StartupType Automatic | Out-Null",
                 "Write-Host ('Installed ' + $ServiceName + ' into ' + $TargetDir)",
                 "",
             ]

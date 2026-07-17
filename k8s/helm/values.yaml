@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Data Stream Platform — Helm values
+# Ravan — Helm values
 # ---------------------------------------------------------------------------
 # Each service can be enabled/disabled independently. Dependencies
 # (TimescaleDB, Redpanda) are expected to be installed separately or via

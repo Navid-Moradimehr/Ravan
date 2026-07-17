@@ -147,7 +147,7 @@ async def test_webhook(hook_id: str) -> dict[str, str]:
     config = webhook_registry[hook_id]
     payload = {
         "event": "test",
-        "message": "Webhook test from Local Stream Engine",
+        "message": "Webhook test from Ravan",
         "timestamp": "2024-01-01T00:00:00Z",
     }
     async with httpx.AsyncClient() as client:

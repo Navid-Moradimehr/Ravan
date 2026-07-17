@@ -146,7 +146,7 @@ async def lifespan(_app: FastAPI):
             await asyncio.gather(consume_task, broadcast_task, return_exceptions=True)
 
 
-app = FastAPI(title="Local Stream Engine AI Gateway", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Ravan AI Gateway", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/health")

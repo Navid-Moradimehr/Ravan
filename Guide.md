@@ -1,5 +1,5 @@
 
-### Product Requirements Document (PRD): "Local Stream Engine" (Inspired by GITA Stream)
+### Product Requirements Document (PRD): "Ravan" (Inspired by GITA Stream)
 
 #### 1. Overview
 The goal is to build a real-time data processing engine that replicates the core capabilities of GITA Stream: low-latency ingestion, stateful stream processing, and AI-driven insights [1, 2]. This version will be optimized for local development on WSL2 (Ubuntu) with NVIDIA GPU acceleration for LLM tasks.

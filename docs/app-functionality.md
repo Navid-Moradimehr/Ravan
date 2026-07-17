@@ -2,7 +2,7 @@
 
 ## What this app is
 
-Local Stream Engine is an industrial data platform for testing streaming, analytics, historian storage, alerting, and AI-assisted operations without needing a real plant.
+Ravan is an industrial data platform for testing streaming, analytics, historian storage, alerting, and AI-assisted operations without needing a real plant.
 
 In plain language, it acts like a small digital factory lab:
 

@@ -245,7 +245,7 @@ async def lifespan(_app: FastAPI):
             pass
 
 
-app = FastAPI(title="Local Stream Engine API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Ravan API", version="0.2.0", lifespan=lifespan)
 
 from services.api_service.routers.historian import router as historian_router
 from services.api_service.routers.operations import router as operations_router

@@ -1,4 +1,4 @@
-"""datastreamctl - admin/control CLI for Local Stream Engine.
+"""datastreamctl - admin/control CLI for Ravan.
 
 Part of the Phase 8 distribution surface. Talks to the already-running
 services (api_service on 8020, ai_gateway on 8080) and surfaces config,
@@ -874,7 +874,7 @@ def _write_site_profile_calibration_report(report_dir: str, result: Any) -> list
 def cmd_status(args: argparse.Namespace) -> int:
     api_base = args.api_base
     ai_base = args.ai_base
-    print("Local Stream Engine status")
+    print("Ravan status")
     print("=" * 40)
 
     api_status, api_body = _http_get(f"{api_base}/health")
@@ -2593,7 +2593,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="datastreamctl",
-        description="Admin/control CLI for Local Stream Engine.",
+        description="Admin/control CLI for Ravan.",
     )
     parser.add_argument("--api-base", default=DEFAULT_API_BASE, help=f"API service base URL (default: {DEFAULT_API_BASE})")
     parser.add_argument("--ai-base", default=DEFAULT_AI_BASE, help=f"AI gateway base URL (default: {DEFAULT_AI_BASE})")

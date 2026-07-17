@@ -2,7 +2,7 @@
 
 ## Goal
 
-Move Local Stream Engine from a single-site development platform to a repeatable industrial platform that can be deployed across many plants, lines, or business units without coupling one site to another.
+Move Ravan from a single-site development platform to a repeatable industrial platform that can be deployed across many plants, lines, or business units without coupling one site to another.
 
 The main design rule is simple:
 

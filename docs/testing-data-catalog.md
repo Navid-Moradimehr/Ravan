@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document lists realistic data sources for validating Local Stream Engine.
+This document lists realistic data sources for validating Ravan.
 
 The catalog is split into:
 

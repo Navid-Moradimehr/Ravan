@@ -25,7 +25,7 @@ export function UpdateNotice() {
         if (window.sessionStorage.getItem(noticeKey)) return;
         window.sessionStorage.setItem(noticeKey, "1");
         showToast({
-          title: `Local Stream Engine ${result.latest_version} is available`,
+          title: `Ravan ${result.latest_version} is available`,
           description: "Review the release notes and follow the operator-controlled update procedure. No files were changed.",
           variant: "info",
           duration: 12000,

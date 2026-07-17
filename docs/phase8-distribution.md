@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Phase 8 is the packaging and delivery phase for turning Local Stream Engine from a developer project into an installable open-source industrial tool.
+Phase 8 is the packaging and delivery phase for turning Ravan from a developer project into an installable open-source industrial tool.
 
 The key decision is not only **how to package it**, but also **what kind of product users will install**:
 

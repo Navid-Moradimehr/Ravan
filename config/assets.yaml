@@ -1,4 +1,4 @@
-# Asset hierarchy and tag metadata for the Local Stream Engine industrial model.
+# Asset hierarchy and tag metadata for the Ravan industrial model.
 # Hierarchy: site -> area -> line -> cell -> asset -> tag
 
 sites:

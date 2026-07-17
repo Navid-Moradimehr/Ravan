@@ -1,9 +1,9 @@
 apiVersion: 1
 
 providers:
-  - name: Local Stream Engine
+  - name: Ravan
     orgId: 1
-    folder: Local Stream Engine
+    folder: Ravan
     type: file
     disableDeletion: false
     updateIntervalSeconds: 10
