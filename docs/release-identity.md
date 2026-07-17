@@ -10,6 +10,11 @@ pilot use, while final OS installers and real-site certification remain later
 release gates. It does not change the self-hosted or operator-owned deployment
 model.
 
+GitHub Actions validates Python tests, the production Compose profile, the Helm
+chart, and the UI build on every change. A `v*` tag publishes a checksummed
+source bundle and `release-manifest.json`. Installer and signed container-image
+publishing remain a later packaging phase.
+
 ## Command compatibility
 
 The public command names are `ravanctl`, `ravand`, and `ravan-import`.

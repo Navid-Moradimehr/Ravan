@@ -11,3 +11,6 @@
   runtime.
 - Existing Docker volume names remain unchanged during beta hardening to
   protect current local Kafka, historian, MinIO, and Grafana data.
+- CI validates Python, Compose, Helm, and the UI build. Tagged releases publish
+  a checksummed source bundle and release manifest; installers and signed image
+  distribution remain deferred.
