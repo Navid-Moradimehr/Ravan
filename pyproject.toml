@@ -3,13 +3,13 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "local-stream-engine"
-version = "0.3.0"
+name = "ravan-industrial-platform"
+version = "1.0.0b1"
 description = "Industrial streaming, historian, analytics, and AI-assisted operations platform."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
-authors = [{ name = "Local Stream Engine Contributors" }]
+license = { text = "Apache-2.0" }
+authors = [{ name = "Navid Moradimehr" }]
 dynamic = ["dependencies"]
 
 [tool.setuptools.dynamic]
@@ -19,6 +19,9 @@ dependencies = { file = ["requirements.txt"] }
 datastreamctl = "services.cli.datastreamctl:main"
 datastreamd = "services.cli.datastreamd:main"
 datastream-import = "services.cli.datastream_import:main"
+ravanctl = "services.cli.datastreamctl:main"
+ravand = "services.cli.datastreamd:main"
+ravan-import = "services.cli.datastream_import:main"
 
 [tool.setuptools]
 include-package-data = true

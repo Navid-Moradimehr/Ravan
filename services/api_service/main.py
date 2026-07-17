@@ -10,6 +10,8 @@ from typing import Any
 from fastapi import FastAPI, Request
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
+from services.common.release import VERSION
+
 
 def _prune_legacy_routes() -> None:
     moved_paths = {
@@ -177,7 +179,7 @@ def _auth_required() -> bool:
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "1.0.0"
+    version: str = VERSION
     uptime_seconds: int = 0
     services: dict[str, Any] = Field(default_factory=dict)
 
@@ -245,7 +247,7 @@ async def lifespan(_app: FastAPI):
             pass
 
 
-app = FastAPI(title="Ravan API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Ravan API", version=VERSION, lifespan=lifespan)
 
 from services.api_service.routers.historian import router as historian_router
 from services.api_service.routers.operations import router as operations_router
@@ -407,7 +409,7 @@ async def health() -> HealthResponse:
     status = "degraded" if (service_state.degraded or dep_down) else "ok"
     return HealthResponse(
         status=status,
-        version="1.0.0",
+        version=VERSION,
         uptime_seconds=int(time.time() - start + 1),
         services={
             "historian": historian_ok,

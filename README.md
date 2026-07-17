@@ -5,12 +5,7 @@ Ravan is a self-hosted real-time data platform inspired by CGR/GITA Streaming an
 ## Architecture
 
 ```text
-OPC UA Simulator -------+
-MQTT Simulator ---------+--> Edge Ingest --> industrial.normalized --+
-Modbus TCP Simulator ---+                                           |
-                                                                    +--> Processor --> AI Gateway
-Mock IoT Generator -------------------------------------------------+
-PostgreSQL orders --> Debezium CDC --> Kafka topics
+OPC UA, MQTT, Modbus, REST, and CDC sources --> Edge Ingest --> Kafka --> Flink --> Historian and AI
 
 Prometheus scrapes edge and AI metrics; Grafana and the web dashboard expose operational views.
 ```
@@ -43,10 +38,7 @@ Error handling is intentionally platform-neutral: the UI uses in-app banners, in
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and adjust ports/model settings.
-2. Start infrastructure: `docker compose -f docker/docker-compose.yml up -d`.
-   Start the API and dashboard profiles explicitly when using the UI:
-   `docker compose --profile ui -f docker/docker-compose.yml up -d`. Add
-   `--profile edge` for the hardware-free protocol simulators and edge ingest.
+2. Start the current development/demo stack with `docker compose -f docker/docker-compose.yml --profile ui up -d`.
 3. Topics are auto-created by the `kafka-init` service on first `up`. To create them manually (non-compose broker), run `powershell -ExecutionPolicy Bypass -File scripts/create-topics.ps1`.
 4. Run the generator: `python services/ingestion/mock_generator.py`.
 5. Run the AI gateway locally or through Docker Compose.
@@ -55,11 +47,14 @@ Error handling is intentionally platform-neutral: the UI uses in-app banners, in
 
 ## Control CLI
 
+Source installs provide the Python CLI. Docker operators use the Compose wrapper
+documented in the deployment guide and do not need host Python.
+
 Install the package and get a browser-free operator surface:
 
 ```bash
 pip install -e .
-datastreamctl status
+ravanctl status
 datastreamctl datasets --category synthetic
 datastreamctl doctor
 datastreamctl preflight

@@ -24,6 +24,7 @@ from services.common.ai_event_contract import build_ai_summary_event, DEFAULT_AI
 from services.common.prompt_registry import prompt_registry
 from services.common.service_health import ServiceHealthState
 from services.common.runtime_metrics import set_consumer_lag
+from services.common.release import VERSION
 from services.common.ai_reporting import (
     AIReportingPolicy,
     SustainedAnomalyTracker,
@@ -146,7 +147,7 @@ async def lifespan(_app: FastAPI):
             await asyncio.gather(consume_task, broadcast_task, return_exceptions=True)
 
 
-app = FastAPI(title="Ravan AI Gateway", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Ravan AI Gateway", version=VERSION, lifespan=lifespan)
 
 
 @app.get("/health")
@@ -156,6 +157,7 @@ async def health() -> dict[str, Any]:
         status = "degraded" if service_state.degraded else "ok"
     return {
         "status": status,
+        "version": VERSION,
         "provider": settings.llm_provider,
         "model": settings.llm_model_id,
         "base_url": settings.llm_endpoint_url,
