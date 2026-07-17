@@ -9,6 +9,8 @@ __pycache__/
 node_modules/
 .next/
 dist/
+!operator-shell/dist/
+!operator-shell/dist/**
 build/
 coverage/
 *.egg-info/

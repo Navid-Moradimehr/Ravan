@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ravan Operator</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <div class="eyebrow">RAVAN / OPERATOR</div>
+      <h1>Connect to your Site Server.</h1>
+      <p class="lede">
+        This desktop window is a lightweight operator client. The industrial
+        runtime remains on the server you configure below.
+      </p>
+      <form id="connect-form" class="connection-card">
+        <label for="site-url">Site Server URL</label>
+        <div class="url-row">
+          <input id="site-url" name="site-url" value="http://localhost:3006" autocomplete="url" />
+          <button type="submit">Open Ravan</button>
+        </div>
+        <p id="status" class="status" role="status">Ready for a local or remote Site Server.</p>
+      </form>
+      <div class="boundary-grid">
+        <div><strong>Client</strong><span>Windows / macOS shell</span></div>
+        <div><strong>Runtime</strong><span>Docker Engine Site Server</span></div>
+        <div><strong>Security</strong><span>Customer-owned AuthN, AuthZ, and TLS</span></div>
+      </div>
+    </main>
+    <script type="module">
+      const form = document.querySelector("#connect-form");
+      const input = document.querySelector("#site-url");
+      const status = document.querySelector("#status");
+      const saved = localStorage.getItem("ravan.siteServerUrl");
+      if (saved) input.value = saved;
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        let url;
+        try {
+          url = new URL(input.value.trim());
+        } catch {
+          status.textContent = "Enter a complete URL, for example http://localhost:3006.";
+          return;
+        }
+        if (!["http:", "https:"].includes(url.protocol)) {
+          status.textContent = "Only HTTP and HTTPS Site Server URLs are supported.";
+          return;
+        }
+        localStorage.setItem("ravan.siteServerUrl", url.toString().replace(/\/$/, ""));
+        status.textContent = `Opening ${url.origin}...`;
+        window.location.assign(url.toString());
+      });
+    </script>
+  </body>
+</html>
