@@ -25,5 +25,6 @@ logs, and the maintainer Obsidian vault.
 - [Secrets boundary](self-hosted-secrets.md)
 - [Flink Kubernetes Operator runbook](flink-operator-runbook.md)
 - [Local Kubernetes rehearsal](local-kubernetes-rehearsal.md)
+- [Local full-stack validation](local-validation-guide.md)
 - [Release and update operations](update-and-release-operations.md)
 - [Release identity](release-identity.md)

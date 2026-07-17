@@ -104,3 +104,28 @@ internal service addresses:
 ```powershell
 docker compose -p ravan-rehearsal --env-file docker/rehearsal.env -f docker/docker-compose.yml --profile ui --profile edge up -d
 ```
+
+For a full local pipeline rehearsal, use the industrial soak command from the
+repository root. It enables the scenario's declared OPC UA, MQTT, and Modbus
+protocols, records per-phase health and lag, restarts the configured component,
+and writes JSON/Markdown evidence. This is a validation workflow, not a
+production scheduler:
+
+```powershell
+$env:COMPOSE_PROJECT_NAME = "ravan-rehearsal"
+Get-Content docker/rehearsal.env | ForEach-Object {
+  if ($_ -match '^\s*([^#=][^=]*)=(.*)$') {
+    [Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim(), "Process")
+  }
+}
+py -3.13 -m services.cli.datastreamctl benchmark industrial-soak `
+  --no-build --report-dir .datastream/industrial-soak --json
+```
+
+The acceptance gate requires healthy API and AI endpoints, a running Flink
+job, reachable Prometheus/Kafka UI/Grafana endpoints, drained aggregate lag,
+and no configured unaccounted-event allowance. Connector counters that are
+not exposed by a selected profile are reported as unavailable rather than
+silently interpreted as zero. Use the generated report together with the
+deployment's own logs and retention policies; it is not a substitute for
+real-site PLC certification or target-hardware sizing.
