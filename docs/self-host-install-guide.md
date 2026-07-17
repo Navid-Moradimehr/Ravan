@@ -2,6 +2,11 @@
 
 This guide describes the first practical install path for the open-source release.
 
+For a complete Linux server installation with a real installer and systemd
+lifecycle, use [Linux Site Server Install](linux-site-server-install.md).
+The Docker Compose commands below remain useful for development, evaluation,
+and operators who want to control the extracted bundle directly.
+
 ## Goal
 
 Install the platform so a company can run it inside its own network without giving the project cloud credentials or shared secrets.
@@ -135,8 +140,16 @@ manager. It writes child logs below the configured site runtime and applies a
 bounded restart budget so a permanently broken service does not create an
 unbounded restart storm.
 
-For a release bundle, prefer the native staging target so the runtime source
-tree is placed beside the generated site directory:
+For a complete Linux Site Server release bundle, use the installer target:
+
+```bash
+python3 scripts/package-release.py --output-dir dist --archive zip site-server
+```
+
+Extract the result and run `sudo install/linux/install.sh`. It installs the
+full Docker-based site runtime, not only the Python host processes. For the
+advanced native host runtime, prefer the separate staging target so the
+runtime source tree is placed beside the generated site directory:
 
 ```bash
 python3 scripts/package-release.py --output-dir dist --archive tar.gz linux

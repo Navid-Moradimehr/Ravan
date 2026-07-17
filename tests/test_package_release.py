@@ -11,6 +11,7 @@ _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
 _ignore_generated = _MODULE._ignore_generated
 build_compose = _MODULE.build_compose
+build_site_server = _MODULE.build_site_server
 build_kubernetes = _MODULE.build_kubernetes
 build_operator = _MODULE.build_operator
 verify_bundle = _MODULE.verify_bundle
@@ -69,6 +70,31 @@ def test_kubernetes_target_contains_chart_and_generated_site_bundle(tmp_path: Pa
     assert (root / "site" / "demo-site" / "kubernetes" / "helm" / "values.generated.yaml").exists()
     assert not (root / "runtime" / "tests").exists()
     assert not (root / "runtime" / "ObsidianVault").exists()
+
+
+def test_site_server_target_contains_functional_linux_installer(tmp_path: Path) -> None:
+    result = build_site_server(
+        _MODULE.DEFAULT_MANIFEST,
+        tmp_path,
+        "demo-site",
+        "both",
+        False,
+        "DATASTREAM_RELEASE_SIGNING_KEY",
+        "none",
+    )
+    root = Path(result["stage_root"])
+    assert (root / "runtime" / "docker" / "docker-compose.yml").exists()
+    assert (root / "runtime" / "docker" / "docker-compose.release.yml").exists()
+    assert (root / "install" / "linux" / "install.sh").exists()
+    assert (root / "install" / "linux" / "doctor.sh").exists()
+    assert (root / "install" / "linux" / "uninstall.sh").exists()
+    assert (root / "install" / "README.md").exists()
+    assert "systemd" in (root / "install" / "linux" / "install.sh").read_text(encoding="utf-8")
+    assert not (root / "runtime" / "tests").exists()
+    assert not (root / "runtime" / "ObsidianVault").exists()
+    verification = verify_bundle(root, "site-server")
+    assert verification["valid"] is True
+    assert verification["errors"] == []
 
 
 def test_verify_accepts_a_valid_compose_bundle(tmp_path: Path) -> None:

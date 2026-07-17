@@ -71,7 +71,7 @@ jobs:
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
-          for mode in compose kubernetes linux windows offline operator; do
+          for mode in compose site-server kubernetes linux windows offline operator; do
             python scripts/package-release.py --output-dir "dist/$mode" --archive zip "$mode"
           done
           git archive --format=tar.gz --prefix="ravan-${version}/" -o "dist/ravan-${version}-source.tar.gz" HEAD

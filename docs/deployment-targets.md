@@ -6,6 +6,25 @@ Kafka topics, historian contract, source configuration, or AI gateway API.
 
 ## First Release Targets
 
+### Linux Site Server Installer
+
+This is the recommended complete first-release install path for a Linux
+industrial server. It wraps the same Docker Compose runtime in a real
+installer, creates a data-preserving systemd service, and provides `doctor`,
+`logs`, and uninstall commands. Use the source-build mode for a local lab or
+air-gapped build host and registry mode for published or internally mirrored
+Ravan images.
+
+Build it with:
+
+```powershell
+py -3.13 scripts/package-release.py --output-dir .datastream/release site-server
+```
+
+Read [Linux Site Server Install](linux-site-server-install.md) for the exact
+host procedure. Docker Engine, Compose v2, systemd, storage, device networking,
+secrets, backups, TLS, and AuthN/AuthZ remain operator-owned prerequisites.
+
 ### Docker Compose Site Bundle
 
 This is the supported first-release product for a complete single-site runtime.
@@ -67,14 +86,11 @@ reconciliation; it is not a production multi-node certification.
 
 ## Advanced Host Runtime Target
 
-The generated Linux systemd and Windows service layouts are an advanced host
-runtime target, not a replacement for the complete Compose site bundle. They
-run the Ravan application processes under an OS service manager while Kafka,
-TimescaleDB, Flink, and other infrastructure remain operator-supplied. The
-service manager now starts the foreground `datastreamd supervise` command,
-which owns child processes, performs bounded restarts, and shuts them
-down as one unit. These layouts still require clean-machine, dependency, and
-device network acceptance before being advertised as polished installers.
+The generated native Linux systemd and Windows service layouts are advanced
+host-runtime targets, not replacements for the complete Site Server installer.
+They run the Ravan application processes under an OS service manager while
+Kafka, TimescaleDB, Flink, and other infrastructure remain operator-supplied.
+The complete Site Server path is the Docker-based installer above.
 
 Windows and macOS operator shells remain separate later products. They should
 control a Site Server rather than silently pretending that a workstation can

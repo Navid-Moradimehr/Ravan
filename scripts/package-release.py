@@ -6,6 +6,7 @@ exports and copies the runtime source tree that already exists in the repo.
 
 Modes:
     compose  - supported Docker Compose site bundle with public operator docs
+    site-server - complete Linux Docker Compose Site Server installer
     kubernetes - Helm/Kubernetes bundle and generated site values
     windows  - native Windows host package
     linux    - native Linux/systemd host package
@@ -49,6 +50,7 @@ PUBLIC_DOCUMENT_FILES = (
     "docs/README.md",
     "docs/app-functionality.md",
     "docs/self-host-install-guide.md",
+    "docs/linux-site-server-install.md",
     "docs/docker-operator-guide.md",
     "docs/installation-options-and-requirements.md",
     "docs/source-connection-walkthrough.md",
@@ -263,10 +265,10 @@ def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[s
         if path.suffix.lower() in {".pyc", ".pyo"}:
             errors.append(f"compiled Python artifact is included: {path.relative_to(bundle_root)}")
 
-    if mode in {"compose", "offline"}:
+    if mode in {"compose", "site-server", "offline"}:
         if not (bundle_root / "runtime" / "docker" / "docker-compose.yml").is_file():
             errors.append("Compose runtime is missing docker/docker-compose.yml")
-    if mode == "compose":
+    if mode in {"compose", "site-server"}:
         if not (bundle_root / "runtime" / "docker" / "docker-compose.release.yml").is_file():
             errors.append("Compose runtime is missing docker/docker-compose.release.yml")
     if mode == "kubernetes":
@@ -275,7 +277,7 @@ def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[s
     if mode in {"windows", "linux"}:
         if not (bundle_root / "runtime" / "requirements.txt").is_file():
             errors.append("native host runtime is missing runtime/requirements.txt")
-    if mode in {"compose", "kubernetes", "windows", "linux", "offline"}:
+    if mode in {"compose", "site-server", "kubernetes", "windows", "linux", "offline"}:
         if not (bundle_root / "runtime" / "docs" / "README.md").is_file():
             errors.append("public operator documentation is missing runtime/docs/README.md")
     if mode == "operator" and not (bundle_root / "docs" / "README.md").is_file():
@@ -284,6 +286,14 @@ def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[s
         errors.append("generated site configuration directory is missing")
     if mode == "operator" and not (bundle_root / "operator-shell" / "src-tauri" / "tauri.conf.json").is_file():
         errors.append("operator shell is missing src-tauri/tauri.conf.json")
+    if mode == "site-server":
+        for relative in (
+            "install/linux/install.sh",
+            "install/linux/doctor.sh",
+            "install/linux/uninstall.sh",
+        ):
+            if not (bundle_root / relative).is_file():
+                errors.append(f"Linux Site Server installer is missing {relative}")
 
     return {
         "valid": not errors,
@@ -368,6 +378,44 @@ def build_compose(manifest_path: Path, output_dir: Path, site_id: str, fmt: str,
     }))
     payload = _finalize_bundle(stage_root, archive_format)
     payload.update({"mode": "compose", "site_id": site_id, "manifest": str(manifest_path)})
+    _write_json(stage_root / "release-summary.json", payload)
+    return payload
+
+
+def build_site_server(manifest_path: Path, output_dir: Path, site_id: str, fmt: str, sign: bool, signing_key_env: str, archive_format: str) -> dict[str, object]:
+    """Build the complete Linux Site Server package and its real installer."""
+    manifest = load_project_manifest(manifest_path)
+    errors = validate_project_manifest(manifest)
+    if errors:
+        raise ValueError("; ".join(errors))
+    stage_root = output_dir / f"{site_id}-site-server"
+    shutil.rmtree(stage_root, ignore_errors=True)
+    written = _copy_runtime_tree(stage_root / "runtime", include_docs=True)
+    from scripts.render_release_compose import render_release_compose
+
+    compose_path = stage_root / "runtime" / "docker" / "docker-compose.yml"
+    release_compose_path = stage_root / "runtime" / "docker" / "docker-compose.release.yml"
+    render_release_compose(compose_path, release_compose_path)
+    written.append(release_compose_path)
+    written.extend(_export_site_bundle(manifest, stage_root, site_id, layout="flat", fmt=fmt, sign=sign, signing_key_env=signing_key_env))
+    installer_files = {
+        "scripts/install-linux-site-server.sh": "install/linux/install.sh",
+        "scripts/ravan-site-doctor.sh": "install/linux/doctor.sh",
+        "scripts/uninstall-linux-site-server.sh": "install/linux/uninstall.sh",
+    }
+    for source, destination in installer_files.items():
+        written.extend(_copy_file(REPO_ROOT / source, stage_root / destination))
+    written.append(_copy_file(REPO_ROOT / "docs" / "linux-site-server-install.md", stage_root / "install" / "README.md")[0])
+    written.append(_write_json(stage_root / "package-manifest.json", {
+        "mode": "site-server",
+        "site_id": site_id,
+        "manifest": str(manifest_path),
+        "runtime": "docker-engine-compose-systemd",
+        "installer": "install/linux/install.sh",
+        "written": [str(path.relative_to(stage_root)) for path in written],
+    }))
+    payload = _finalize_bundle(stage_root, archive_format)
+    payload.update({"mode": "site-server", "site_id": site_id, "manifest": str(manifest_path)})
     _write_json(stage_root / "release-summary.json", payload)
     return payload
 
@@ -496,6 +544,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--archive", choices=["zip", "tar.gz", "none"], default="zip")
     sub = parser.add_subparsers(dest="mode", required=True)
     sub.add_parser("compose", help="Stage the supported Docker Compose bundle")
+    sub.add_parser("site-server", help="Stage the complete Linux Docker Compose Site Server installer")
     sub.add_parser("kubernetes", help="Stage the Helm/Kubernetes bundle")
     sub.add_parser("windows", help="Stage a native Windows package")
     sub.add_parser("linux", help="Stage a native Linux package")
@@ -506,7 +555,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument(
         "--mode",
         dest="expected_mode",
-        choices=["compose", "kubernetes", "windows", "linux", "offline", "operator"],
+        choices=["compose", "site-server", "kubernetes", "windows", "linux", "offline", "operator"],
     )
     return parser
 
@@ -520,6 +569,8 @@ def main(argv: list[str] | None = None) -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.mode == "compose":
         payload = build_compose(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)
+    elif args.mode == "site-server":
+        payload = build_site_server(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)
     elif args.mode == "kubernetes":
         payload = build_kubernetes(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)
     elif args.mode == "windows":
