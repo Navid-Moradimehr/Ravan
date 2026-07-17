@@ -2,7 +2,7 @@
 # beside an existing Ravan deployment without reusing host ports or volumes.
 services:
   kafka:
-    ports: !reset ["29092:29092", "29097:9997"]
+    ports: !reset ["29092:29092"]
   kafka-ui:
     ports: !reset ["28080:8080"]
   postgres:

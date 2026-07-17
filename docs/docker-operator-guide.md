@@ -51,7 +51,8 @@ docker compose -f docker/docker-compose.yml --profile ui --profile edge --profil
 ## Required Operator Configuration
 
 1. Copy `.env.production.example` to `.env`.
-2. Replace demo database, MinIO, Grafana, and model credentials.
+2. Replace every `CHANGE_ME` value, including both database users/passwords,
+   MinIO credentials, and model credentials.
 3. Configure real broker and protocol endpoints through Source Connections or
    deployment configuration. The production `edge` profile has no dependency
    on simulator containers.
@@ -83,9 +84,16 @@ applying it to a real cluster.
 They normally exit with status zero after completing their work. A stopped
 container is expected; inspect its exit code and logs only when it is nonzero.
 
-The Kafka JMX endpoint is enabled for Kafka UI broker metrics. It is intended
-for the local Compose network; expose it beyond the host only through the
-operator's secured observability design.
+Kafka UI topic, consumer-group, and message views are enabled by default.
+Broker JMX metrics are currently disabled because the Apache Kafka image's
+startup agent conflicts with the broker's RMI port in the supported Compose
+path. Do not treat the broker metrics page as an available release feature
+until a separately validated JMX configuration is selected.
+
+The host ports are configurable through `.env`; internal service ports and
+service-to-service names do not change. The rehearsal file
+`docker/rehearsal.env` assigns a complete alternate port set so an isolated
+stack can run beside another Compose deployment.
 
 ## Isolated Local Rehearsal
 
@@ -94,5 +102,5 @@ rehearsal override. It assigns alternate host ports while preserving all
 internal service addresses:
 
 ```powershell
-docker compose -p ravan-rehearsal -f docker/docker-compose.yml -f docker/docker-compose.rehearsal.yml --profile ui --profile edge up -d
+docker compose -p ravan-rehearsal --env-file docker/rehearsal.env -f docker/docker-compose.yml --profile ui --profile edge up -d
 ```

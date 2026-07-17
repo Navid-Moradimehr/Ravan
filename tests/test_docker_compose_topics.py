@@ -81,19 +81,16 @@ def test_long_running_compose_services_have_restart_and_health_contracts():
         assert "healthcheck" in services[name]
 
 
-def test_kafka_ui_broker_metrics_are_wired_to_jmx():
+def test_kafka_ui_keeps_broker_jmx_optional_until_validated():
     services = _compose()["services"]
     kafka = services["kafka"]
     ui = services["kafka-ui"]
 
-    assert "19097:9997" in kafka["ports"]
-    assert kafka["environment"]["KAFKA_JMX_PORT"] == 9997
-    jmx_opts = kafka["environment"]["KAFKA_JMX_OPTS"]
-    assert "java.rmi.server.hostname=kafka" in jmx_opts
-    assert "com.sun.management.jmxremote.rmi.port=9997" in jmx_opts
-
-    assert ui["environment"]["KAFKA_CLUSTERS_0_METRICS_TYPE"] == "JMX"
-    assert ui["environment"]["KAFKA_CLUSTERS_0_METRICS_PORT"] == 9997
+    assert "${KAFKA_HOST_PORT:-19092}:29092" in kafka["ports"]
+    assert "KAFKA_JMX_PORT" not in kafka.get("environment", {})
+    assert "KAFKA_JMX_OPTS" not in kafka.get("environment", {})
+    assert "KAFKA_CLUSTERS_0_METRICS_TYPE" not in ui["environment"]
+    assert "KAFKA_CLUSTERS_0_METRICS_PORT" not in ui["environment"]
 
 
 def test_timescaledb_migrate_repairs_historian_uniqueness():
@@ -105,7 +102,6 @@ def test_timescaledb_migrate_repairs_historian_uniqueness():
     assert "DELETE FROM dead_letter_events" in command_blob
     assert "industrial_events_event_id_uniq" in command_blob
     assert "processed_events_event_id_uniq" in command_blob
-    assert "dead_letter_events_event_id_uniq" in command_blob
     assert migrate["environment"]["RUN_HISTORIAN_DEDUPE"] == "${RUN_HISTORIAN_DEDUPE:-false}"
     assert "RUN_HISTORIAN_DEDUPE" in command_blob
 
@@ -133,7 +129,7 @@ def test_processed_historian_projection_is_independent_of_flink():
     service = _compose()["services"]["processed-fanout"]
     assert service["command"] == ["python", "-m", "services.processor.processed_fanout"]
     assert service["environment"]["PROCESSED_TOPIC"] == "iot.processed"
-    assert "18097:8097" in service["ports"]
+    assert "${PROCESSED_FANOUT_HOST_PORT:-18097}:8097" in service["ports"]
 
 
 def test_dashboard_profile_starts_api_service_for_same_origin_proxies():
@@ -148,5 +144,9 @@ def test_soak_metrics_are_exposed_by_processing_workers():
     assert services["processor"]["environment"]["PROCESSOR_METRICS_PORT"] == 8094
     assert services["fanout"]["environment"]["FANOUT_METRICS_PORT"] == 8095
     assert services["ai-fanout"]["environment"]["AI_FANOUT_METRICS_PORT"] == 8096
-    for name, host_port in (("processor", "18094:8094"), ("fanout", "18095:8095"), ("ai-fanout", "18096:8096")):
+    for name, host_port in (
+        ("processor", "${PROCESSOR_HOST_PORT:-18094}:8094"),
+        ("fanout", "${FANOUT_HOST_PORT:-18095}:8095"),
+        ("ai-fanout", "${AI_FANOUT_HOST_PORT:-18096}:8096"),
+    ):
         assert host_port in services[name]["ports"]

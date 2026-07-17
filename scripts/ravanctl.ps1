@@ -18,5 +18,20 @@ if ($LASTEXITCODE -ne 0) {
 
 # The operator CLI executes in the API container, so Docker deployments do not
 # require Python or Python package installation on the operator workstation.
-docker compose -f $compose exec -T api-service python -m services.cli.datastreamctl @Arguments
+# Preflight is special: it needs the checkout and operator .env, but those
+# should not be copied into the long-running API container.
+if ($Arguments.Count -gt 0 -and $Arguments[0] -eq "preflight") {
+    $root = (Get-Location).Path
+    $extraArgs = @()
+    if ($Arguments.Count -gt 1) {
+        $extraArgs = $Arguments[1..($Arguments.Count - 1)]
+    }
+    $preflightArgs = @("preflight", "--compose-file", "/workspace/docker/docker-compose.yml", "--site-profile", "/workspace/config/site-profiles/single-site.yaml", "--project-manifest", "/workspace/config/project-manifest.yaml", "--soak-scenario", "/workspace/config/benchmarks/industrial-soak.yaml") + $extraArgs
+    if (Test-Path ".env") {
+        $preflightArgs += @("--env-file", "/workspace/.env")
+    }
+    docker compose -f $compose run --rm --no-deps -T -v "${root}:/workspace:ro" -w /workspace api-service python -m services.cli.datastreamctl @preflightArgs
+} else {
+    docker compose -f $compose exec -T api-service python -m services.cli.datastreamctl @Arguments
+}
 exit $LASTEXITCODE

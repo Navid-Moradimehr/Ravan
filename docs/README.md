@@ -23,5 +23,7 @@ logs, and the maintainer Obsidian vault.
 ## Operator References
 
 - [Secrets boundary](self-hosted-secrets.md)
+- [Flink Kubernetes Operator runbook](flink-operator-runbook.md)
+- [Local Kubernetes rehearsal](local-kubernetes-rehearsal.md)
 - [Release and update operations](update-and-release-operations.md)
 - [Release identity](release-identity.md)

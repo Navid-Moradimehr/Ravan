@@ -36,15 +36,40 @@ def _path_check(name: str, value: Path, *, must_exist: bool = True) -> Preflight
     return PreflightCheck(name, passed, detail)
 
 
+def _load_env_file(path: Path | str | None) -> dict[str, str]:
+    """Load simple KEY=VALUE entries without changing the process environment."""
+    if not path:
+        return {}
+    env_path = Path(path)
+    if not env_path.exists():
+        return {}
+    values: dict[str, str] = {}
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        if key:
+            values[key] = value
+    return values
+
+
 def run_preflight(
     *,
     site_profile: Path | str | None = None,
     project_manifest: Path | str | None = None,
     soak_scenario: Path | str | None = None,
     compose_file: Path | str = "docker/docker-compose.yml",
+    env_file: Path | str | None = None,
     strict: bool = False,
 ) -> PreflightReport:
     checks: list[PreflightCheck] = []
+    configured_env = dict(os.environ)
+    configured_env.update(_load_env_file(env_file))
     compose_path = Path(compose_file)
     checks.append(_path_check("compose file", compose_path))
     if compose_path.exists():
@@ -63,7 +88,7 @@ def run_preflight(
         "GF_SECURITY_ADMIN_PASSWORD": "admin",
     }
     for name, demo_value in demo_defaults.items():
-        value = os.getenv(name)
+        value = configured_env.get(name)
         is_demo = value is None or value == demo_value
         checks.append(PreflightCheck(
             f"{name} configured",

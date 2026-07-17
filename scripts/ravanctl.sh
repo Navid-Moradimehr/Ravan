@@ -11,4 +11,15 @@ if ! docker compose -f docker/docker-compose.yml ps api-service --status running
   exit 1
 fi
 
+if [ "${1:-}" = "preflight" ]; then
+  shift
+  preflight_args="preflight --compose-file /workspace/docker/docker-compose.yml --site-profile /workspace/config/site-profiles/single-site.yaml --project-manifest /workspace/config/project-manifest.yaml --soak-scenario /workspace/config/benchmarks/industrial-soak.yaml"
+  if [ -f .env ]; then
+    preflight_args="$preflight_args --env-file /workspace/.env"
+  fi
+  exec docker compose -f docker/docker-compose.yml run --rm --no-deps -T \
+    -v "$(pwd):/workspace:ro" -w /workspace api-service \
+    sh -c "python -m services.cli.datastreamctl $preflight_args \"\$@\"" sh "$@"
+fi
+
 exec docker compose -f docker/docker-compose.yml exec -T api-service python -m services.cli.datastreamctl "$@"

@@ -1036,6 +1036,7 @@ def cmd_preflight(args: argparse.Namespace) -> int:
         project_manifest=args.project_manifest,
         soak_scenario=args.soak_scenario,
         compose_file=args.compose_file,
+        env_file=args.env_file,
         strict=args.strict,
     )
     if args.json:
@@ -2651,6 +2652,7 @@ def build_parser() -> argparse.ArgumentParser:
     preflight.add_argument("--project-manifest", default="config/project-manifest.yaml")
     preflight.add_argument("--soak-scenario", default="config/benchmarks/industrial-soak.yaml")
     preflight.add_argument("--compose-file", default="docker/docker-compose.yml")
+    preflight.add_argument("--env-file", default=None, help="Optional operator environment file used for strict checks")
     preflight.add_argument("--json", action="store_true")
     preflight.add_argument("--strict", action="store_true", help="Fail on demo secrets and floating image tags")
     preflight.set_defaults(func=cmd_preflight)
