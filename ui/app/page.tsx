@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, ArrowRight, BarChart3, Cable, DatabaseZap, Gauge, HardDrive, Workflow } from "lucide-react";
+import { ArrowRight, BarChart3, HardDrive } from "lucide-react";
 import { DashboardFrame } from "@/components/dashboard-frame";
 import { SectionHeader } from "@/components/section-header";
 import { StatCard } from "@/components/stat-card";
@@ -18,25 +18,21 @@ const quickRoutes = [
     href: "/pipeline",
     title: "Pipeline",
     description: "Ingress, normalization, DLQ, processing runtime, and event preview.",
-    icon: Cable,
   },
   {
     href: "/historian",
     title: "Historian",
     description: "SQL, backup, replay, webhooks, and dashboards.",
-    icon: DatabaseZap,
   },
   {
     href: "/observability",
     title: "Observability",
     description: "Throughput, latency, reconnects, and health.",
-    icon: Gauge,
   },
   {
     href: "/integrations",
     title: "Integrations",
     description: "CDC, external sinks, and operational connectors.",
-    icon: BarChart3,
   },
 ];
 
@@ -184,23 +180,16 @@ export default function Home() {
           />
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {quickRoutes.map((route) => {
-              const Icon = route.icon;
               return (
                 <Link key={route.href} href={route.href} className="group">
                   <Card className="h-full border-border bg-surface-2 transition-colors hover:border-accent/40">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <span className="flex size-8 items-center justify-center rounded-lg border border-border-subtle bg-surface-0 text-accent">
-                          <Icon aria-hidden="true" className="size-4" />
-                        </span>
-                        {route.title}
-                      </CardTitle>
+                      <CardTitle className="text-base">{route.title}</CardTitle>
                       <CardDescription>{route.description}</CardDescription>
                     </CardHeader>
                     <CardContent className="text-sm text-text-secondary">
                       <span className="inline-flex items-center gap-2 font-medium text-text-primary">
                         Open route
-                        <ArrowRight aria-hidden="true" className="size-4 transition-transform group-hover:translate-x-1" />
                       </span>
                     </CardContent>
                   </Card>
@@ -240,20 +229,18 @@ export default function Home() {
             description="This mirrors the active service state without turning the home page into a metrics wall."
           />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Grafana" value={String(observabilitySnapshot.grafana?.status ?? "unknown")} icon={BarChart3} tone="default" />
-            <StatCard label="Prometheus" value={String(observabilitySnapshot.prometheus?.status ?? "unknown")} icon={Gauge} tone="default" />
+            <StatCard label="Grafana" value={String(observabilitySnapshot.grafana?.status ?? "unknown")} tone="default" />
+            <StatCard label="Prometheus" value={String(observabilitySnapshot.prometheus?.status ?? "unknown")} tone="default" />
             <StatCard
               label="Throughput"
               value={String(Math.round(observabilitySnapshot.summary?.total_throughput ?? 0))}
               unit="/s"
-              icon={Activity}
               tone="info"
             />
             <StatCard
               label="AI p95"
               value={String(observabilitySnapshot.summary?.ai_latency_p95 ?? 0)}
               unit="s"
-              icon={Workflow}
               tone="warning"
             />
           </div>
