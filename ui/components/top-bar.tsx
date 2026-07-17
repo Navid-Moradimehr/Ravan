@@ -8,7 +8,11 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 export function TopBar({ systemStatus = "online" }: { systemStatus?: "online" | "degraded" | "offline" }) {
   const pathname = usePathname();
-  const currentView = pathname === "/" ? "Operations overview" : pathname.slice(1).split("/")[0].replaceAll("-", " ");
+  const currentView = pathname === "/"
+    ? "Operations overview"
+    : pathname === "/ai-reporting"
+      ? "Operational briefings"
+      : pathname.slice(1).split("/")[0].replaceAll("-", " ");
 
   return (
     <header className="sticky top-0 z-30 border-b border-border-subtle bg-surface-0/80 backdrop-blur-md">
