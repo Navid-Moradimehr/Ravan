@@ -8,8 +8,9 @@ Install the platform so a company can run it inside its own network without givi
 
 ## What ships
 
-- `datastreamd`: runtime supervisor
-- `datastreamctl`: operator CLI
+- `scripts/ravan.ps1` / `scripts/ravan.sh`: Docker Compose runtime wrapper
+- `scripts/ravanctl.ps1` / `scripts/ravanctl.sh`: Docker-native operator CLI
+- `datastreamd` and `datastreamctl`: optional Python source-developer tools
 - `config/`: site and project configuration
 - `data/`: sample benchmarks and replay packs
 - `backups/`: local backup output
@@ -31,13 +32,13 @@ On Windows, use a matching `C:\Datastream\<project>\<site>\` layout.
 
 ## Install flow
 
-1. Install the package.
-2. Copy the project manifest and site profile into the site root.
-3. Put operator-owned secrets into the local secret store or environment.
-4. Start `datastreamd`.
-5. Run `datastreamctl doctor`.
-6. Run `datastreamctl preflight` and review warnings.
-7. Run `datastreamctl status`.
+1. Install Docker Engine or Docker Desktop.
+2. Copy `.env.example` to `.env`, replace demo credentials, and set real broker, historian, and model endpoints.
+3. Copy the project manifest and site profile into the site root.
+4. Start Ravan with `./scripts/ravan.sh up -d` or `./scripts/ravan.ps1 up -d`.
+5. Run `./scripts/ravanctl.sh doctor` or `./scripts/ravanctl.ps1 doctor`.
+6. Run `./scripts/ravanctl.sh preflight` and review warnings.
+7. Run `./scripts/ravanctl.sh status`.
 8. Run a backup drill before connecting the site to federation or cross-site replication.
 
 The Compose deployment uses restart policies and health checks for long-running
@@ -64,7 +65,39 @@ duplicates, schedule maintenance, set `RUN_HISTORIAN_DEDUPE=true`, run the
 one-shot migration, and verify the backup/release gate before returning to the
 normal default.
 
-## Linux example
+## Docker production path
+
+The Docker wrappers are the supported first-release operator path. They execute
+the control CLI inside the running Ravan API container, so the operator machine
+does **not** need Python, `pip`, or a project-local virtual environment.
+
+Linux/macOS:
+
+```bash
+cp .env.example .env
+# Replace development credentials and configure real endpoints in .env.
+./scripts/ravan.sh up -d
+./scripts/ravanctl.sh doctor
+./scripts/ravanctl.sh preflight --strict
+./scripts/ravanctl.sh status
+```
+
+Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+# Replace development credentials and configure real endpoints in .env.
+.\scripts\ravan.ps1 up -d
+.\scripts\ravanctl.ps1 doctor
+.\scripts\ravanctl.ps1 preflight --strict
+.\scripts\ravanctl.ps1 status
+```
+
+`ravan` starts the UI and edge-ingest profiles but deliberately does not start
+the OPC UA, MQTT, or Modbus simulators. Start a demo explicitly with
+`docker compose -f docker/docker-compose.yml --profile demo --profile edge --profile ui up -d`.
+
+## Python source-developer path
 
 ```bash
 pip install -e .
@@ -90,7 +123,7 @@ you apply them to a real cluster.
 
 ## Windows example
 
-Use the same package export flow and keep the runtime rooted under a local directory that the operator controls.
+Use the Docker production path above and keep the runtime rooted under a local directory that the operator controls.
 
 Do not require WSL2 for the production install. If a team wants WSL2 for development or demos, treat it as an optional workstation convenience, not a bundled runtime dependency.
 
@@ -100,8 +133,8 @@ Do not require WSL2 for the production install. If a team wants WSL2 for develop
 2. Export or verify the current package.
 3. Save a local backup and checksum bundle.
 4. Install the new version.
-5. Restart `datastreamd`.
-6. Re-run `datastreamctl doctor` and the site-profile benchmark report.
+5. Restart with `ravan up -d`.
+6. Re-run `ravanctl doctor` and the site-profile benchmark report.
 
 The optional release notification does not install anything:
 

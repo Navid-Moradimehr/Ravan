@@ -38,17 +38,20 @@ Error handling is intentionally platform-neutral: the UI uses in-app banners, in
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and adjust ports/model settings.
-2. Start the current development/demo stack with `docker compose -f docker/docker-compose.yml --profile ui up -d`.
+2. Start the production-shaped local stack without simulators: `./scripts/ravan.sh up -d` on Linux/macOS or `.\scripts\ravan.ps1 up -d` on Windows.
 3. Topics are auto-created by the `kafka-init` service on first `up`. To create them manually (non-compose broker), run `powershell -ExecutionPolicy Bypass -File scripts/create-topics.ps1`.
-4. Run the generator: `python services/ingestion/mock_generator.py`.
-5. Run the AI gateway locally or through Docker Compose.
-6. Start the dashboard locally: `cd ui; npm run dev`.
-7. Open the dashboard: `http://localhost:3006`.
+4. For a hardware-free demo, explicitly add `--profile demo` to the Compose command or run `powershell -ExecutionPolicy Bypass -File scripts/start-industrial-sim.ps1`.
+5. Open the dashboard: `http://localhost:3006`.
 
 ## Control CLI
 
-Source installs provide the Python CLI. Docker operators use the Compose wrapper
-documented in the deployment guide and do not need host Python.
+Source installs provide the Python CLI. Docker operators use `scripts/ravanctl`
+and do not need host Python.
+
+```powershell
+.\scripts\ravanctl.ps1 doctor
+.\scripts\ravanctl.ps1 status
+```
 
 Install the package and get a browser-free operator surface:
 

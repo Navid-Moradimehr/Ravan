@@ -1,4 +1,4 @@
-name: local-stream-engine
+name: ravan
 
 services:
   kafka:
@@ -25,6 +25,7 @@ services:
         -Dcom.sun.management.jmxremote.authenticate=false
         -Dcom.sun.management.jmxremote.ssl=false
         -Djava.rmi.server.hostname=kafka
+        -Dcom.sun.management.jmxremote.port=9997
         -Dcom.sun.management.jmxremote.rmi.port=9997
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
@@ -285,7 +286,7 @@ services:
     ports:
       - "1883:1883"
     profiles:
-      - edge
+      - demo
 
   mqtt-sim:
     build:
@@ -302,7 +303,7 @@ services:
     ports:
       - "18091:8091"
     profiles:
-      - edge
+      - demo
 
   opcua-sim:
     build:
@@ -315,7 +316,7 @@ services:
     environment:
       SIM_METRICS_PORT: 8092
     profiles:
-      - edge
+      - demo
 
   modbus-sim:
     build:
@@ -328,7 +329,7 @@ services:
     environment:
       SIM_METRICS_PORT: 8093
     profiles:
-      - edge
+      - demo
 
   edge-ingest:
     build:
@@ -337,12 +338,6 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      mqtt-broker:
-        condition: service_started
-      opcua-sim:
-        condition: service_started
-      modbus-sim:
-        condition: service_started
     environment:
       TIMESCALE_HOST: timescaledb
       TIMESCALE_PORT: 5432
@@ -352,11 +347,11 @@ services:
       EDGE_SOURCE_HEALTH_HISTORY_PATH: /var/lib/datastream/source-health.json
       DATASTREAM_SOURCE_DELIVERY_HISTORY_PATH: /var/lib/datastream/source-delivery.json
       DATASTREAM_CONNECTION_REGISTRY_PATH: /data/connection-registry.json
-      MQTT_HOST: mqtt-broker
-      MQTT_PORT: 1883
-      OPCUA_ENDPOINT: opc.tcp://opcua-sim:4840/freeopcua/server/
-      MODBUS_HOST: modbus-sim
-      MODBUS_PORT: 5020
+      MQTT_HOST: ${MQTT_HOST:-mqtt-broker}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      OPCUA_ENDPOINT: ${OPCUA_ENDPOINT:-opc.tcp://opcua-sim:4840/freeopcua/server/}
+      MODBUS_HOST: ${MODBUS_HOST:-modbus-sim}
+      MODBUS_PORT: ${MODBUS_PORT:-5020}
       MQTT_QOS: ${MQTT_QOS:-1}
       MQTT_RETAINED: ${MQTT_RETAINED:-true}
       MQTT_WILL_TOPIC: ${MQTT_WILL_TOPIC:-factory/edge-ingest/status}

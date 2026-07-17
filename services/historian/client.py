@@ -98,6 +98,13 @@ _ACTIVE_QUERIES: dict[str, HistorianQueryHandle] = {}
 
 
 def _connection_string() -> str:
+    # Workers and external deployments commonly provide one standard database URL.
+    # Preserve the existing TIMESCALE_/POSTGRES_ contract as the explicit override.
+    database_url = os.getenv("DATABASE_URL")
+    if database_url and not any(os.getenv(name) for name in (
+        "TIMESCALE_HOST", "POSTGRES_HOST", "TIMESCALE_PORT", "POSTGRES_PORT",
+    )):
+        return database_url
     host = os.getenv("TIMESCALE_HOST", os.getenv("POSTGRES_HOST", "localhost"))
     port = os.getenv("TIMESCALE_PORT", os.getenv("POSTGRES_PORT", "15432"))
     db = os.getenv("TIMESCALE_DB", os.getenv("POSTGRES_DB", "stream_engine"))
@@ -1293,7 +1300,9 @@ def setup_retention_policies() -> None:
                 # Add compression policy (compress after 7 days)
                 try:
                     cur.execute(f"""
-                        SELECT add_compression_policy('{table}', INTERVAL '7 days');
+                        SELECT add_compression_policy(
+                            '{table}', INTERVAL '7 days', if_not_exists => TRUE
+                        );
                     """)
                     logger.info(f"Compression policy added for {table}")
                 except psycopg2.Error as e:
@@ -1304,7 +1313,9 @@ def setup_retention_policies() -> None:
                 retention_days = 90 if table == "industrial_events" else 365 if table == "processed_events" else 730
                 try:
                     cur.execute(f"""
-                        SELECT add_retention_policy('{table}', INTERVAL '{retention_days} days');
+                        SELECT add_retention_policy(
+                            '{table}', INTERVAL '{retention_days} days', if_not_exists => TRUE
+                        );
                     """)
                     logger.info(f"Retention policy ({retention_days} days) added for {table}")
                 except psycopg2.Error as e:

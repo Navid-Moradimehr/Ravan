@@ -50,7 +50,7 @@ function Wait-HttpOk {
 }
 
 Write-Host "Preparing infrastructure for site profile soak..."
-docker compose -f $compose --profile edge up -d kafka postgres mqtt-broker mqtt-sim opcua-sim modbus-sim prometheus grafana
+docker compose -f $compose --profile demo --profile edge up -d kafka postgres mqtt-broker mqtt-sim opcua-sim modbus-sim prometheus grafana
 if ($LASTEXITCODE -ne 0) { throw "docker compose up failed" }
 
 Write-Host "Stopping compose-managed app services to avoid port conflicts..."

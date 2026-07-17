@@ -19,6 +19,16 @@ def test_connection_string_uses_env_vars(monkeypatch) -> None:
     assert "testuser:testpass" in conn
 
 
+def test_connection_string_accepts_standard_database_url(monkeypatch) -> None:
+    for name in (
+        "TIMESCALE_HOST", "TIMESCALE_PORT", "TIMESCALE_DB", "TIMESCALE_USER", "TIMESCALE_PASSWORD",
+        "POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://worker:secret@timescaledb:5432/ravan")
+    assert _connection_string() == "postgresql://worker:secret@timescaledb:5432/ravan"
+
+
 def test_historian_boundary_preserves_scalar_types_and_external_ids() -> None:
     numeric = _typed_value(12.5)
     boolean = _typed_value(True)
