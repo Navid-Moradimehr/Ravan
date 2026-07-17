@@ -90,6 +90,19 @@ Collector shape only when connectors must run near equipment and forward to a
 separate Site Server or central Kafka deployment; this remains an architecture
 profile, not a separate installer in the first release.
 
+Use the `operator` package on Windows or macOS when the workstation should
+provide a one-click native window for a Site Server. It does not run Kafka,
+Flink, TimescaleDB, or connectors locally. Build the shell package with:
+
+```powershell
+py -3.13 scripts/package-release.py --output-dir .datastream/release operator
+```
+
+The archive is a Tauri source/build input until the release pipeline adds
+platform-specific signing and notarization. The operator still needs a
+reachable Site Server URL and must configure identity, TLS, and network access
+according to the company's security boundary.
+
 ## Common Contract
 
 All targets preserve:

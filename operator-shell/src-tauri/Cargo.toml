@@ -1,0 +1,19 @@
+[package]
+name = "ravan-operator-shell"
+version = "1.0.0"
+description = "Ravan lightweight Site Server operator shell"
+authors = ["Ravan maintainers"]
+edition = "2021"
+
+[lib]
+name = "ravan_operator_shell_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

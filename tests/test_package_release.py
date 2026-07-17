@@ -12,6 +12,7 @@ _SPEC.loader.exec_module(_MODULE)
 _ignore_generated = _MODULE._ignore_generated
 build_compose = _MODULE.build_compose
 build_kubernetes = _MODULE.build_kubernetes
+build_operator = _MODULE.build_operator
 verify_bundle = _MODULE.verify_bundle
 verify_release_path = _MODULE.verify_release_path
 
@@ -122,3 +123,21 @@ def test_verify_accepts_a_downloaded_archive(tmp_path: Path) -> None:
 
     assert verification["valid"] is True
     assert verification["archive"] == str(Path(result["archive"]).resolve())
+
+
+def test_operator_target_contains_tauri_shell_without_site_runtime(tmp_path: Path) -> None:
+    result = build_operator(
+        _MODULE.DEFAULT_MANIFEST,
+        tmp_path,
+        "demo-site",
+        "both",
+        False,
+        "DATASTREAM_RELEASE_SIGNING_KEY",
+        "none",
+    )
+    root = Path(result["stage_root"])
+    assert (root / "operator-shell" / "src-tauri" / "tauri.conf.json").exists()
+    assert (root / "operator-shell" / "dist" / "index.html").exists()
+    assert not (root / "site").exists()
+    verification = verify_bundle(root, "operator")
+    assert verification["valid"] is True

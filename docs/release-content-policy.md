@@ -26,3 +26,8 @@ The verifier checks the package manifest, generated site configuration, required
 runtime files, the image-based release Compose definition, and deployment-specific assets. It rejects development folders,
 compiled Python files, and common secret filenames. It is a content boundary
 check, not a substitute for clean-machine installation or runtime acceptance.
+
+The `operator` artifact is intentionally different from a Site Server bundle:
+it contains the Tauri shell source and public operator guidance, but no Python
+runtime, Docker Compose stack, Kafka, historian, model endpoint, credentials,
+or Obsidian vault.

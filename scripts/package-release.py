@@ -10,6 +10,7 @@ Modes:
     windows  - native Windows host package
     linux    - native Linux/systemd host package
     offline  - air-gapped source bundle plus docs and sample data
+    operator - lightweight Windows/macOS Tauri operator shell
 """
 from __future__ import annotations
 
@@ -268,8 +269,12 @@ def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[s
     if mode in {"compose", "kubernetes", "windows", "linux", "offline"}:
         if not (bundle_root / "runtime" / "docs" / "README.md").is_file():
             errors.append("public operator documentation is missing runtime/docs/README.md")
-    if not (bundle_root / "site").is_dir():
+    if mode == "operator" and not (bundle_root / "docs" / "README.md").is_file():
+        errors.append("public operator documentation is missing docs/README.md")
+    if mode != "operator" and not (bundle_root / "site").is_dir():
         errors.append("generated site configuration directory is missing")
+    if mode == "operator" and not (bundle_root / "operator-shell" / "src-tauri" / "tauri.conf.json").is_file():
+        errors.append("operator shell is missing src-tauri/tauri.conf.json")
 
     return {
         "valid": not errors,
@@ -446,6 +451,31 @@ def build_offline(manifest_path: Path, output_dir: Path, site_id: str, fmt: str,
     return payload
 
 
+def build_operator(manifest_path: Path, output_dir: Path, site_id: str, fmt: str, sign: bool, signing_key_env: str, archive_format: str) -> dict[str, object]:
+    """Stage the lightweight Windows/macOS operator shell."""
+    manifest = load_project_manifest(manifest_path)
+    errors = validate_project_manifest(manifest)
+    if errors:
+        raise ValueError("; ".join(errors))
+    stage_root = output_dir / "ravan-operator"
+    shutil.rmtree(stage_root, ignore_errors=True)
+    written = _copy_dir(REPO_ROOT / "operator-shell", stage_root / "operator-shell")
+    written.extend(_copy_dir(REPO_ROOT / "operator-shell" / "dist", stage_root / "operator-shell" / "dist"))
+    for entry in PUBLIC_DOCUMENT_FILES:
+        src = REPO_ROOT / entry
+        if src.exists():
+            written.extend(_copy_file(src, stage_root / entry))
+    written.append(_write_json(stage_root / "package-manifest.json", {
+        "mode": "operator",
+        "runtime": "tauri-operator-shell",
+        "written": [str(path.relative_to(stage_root)) for path in written],
+    }))
+    payload = _finalize_bundle(stage_root, archive_format)
+    payload.update({"mode": "operator", "manifest": str(manifest_path)})
+    _write_json(stage_root / "release-summary.json", payload)
+    return payload
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Stage repo-based packaging outputs for Compose, Kubernetes, host, and offline installs.")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -461,12 +491,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("windows", help="Stage a native Windows package")
     sub.add_parser("linux", help="Stage a native Linux package")
     sub.add_parser("offline", help="Stage an offline bundle")
+    sub.add_parser("operator", help="Stage the Windows/macOS Tauri operator shell")
     verify = sub.add_parser("verify", help="Verify a staged release directory")
     verify.add_argument("bundle_dir", type=Path, help="staged directory or .zip/.tar.gz release archive")
     verify.add_argument(
         "--mode",
         dest="expected_mode",
-        choices=["compose", "kubernetes", "windows", "linux", "offline"],
+        choices=["compose", "kubernetes", "windows", "linux", "offline", "operator"],
     )
     return parser
 
@@ -488,6 +519,8 @@ def main(argv: list[str] | None = None) -> int:
         payload = build_linux(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)
     elif args.mode == "offline":
         payload = build_offline(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)
+    elif args.mode == "operator":
+        payload = build_operator(args.manifest, args.output_dir, args.site_id, args.format, args.sign, args.signing_key_env, args.archive)
     else:
         raise ValueError(f"unknown mode: {args.mode}")
     print(json.dumps(payload, indent=2))

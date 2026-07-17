@@ -196,6 +196,15 @@ through the site's secret mechanism, then run the release gate and backup drill.
 The development defaults remain available for local evaluation so upgrades do
 not break existing users.
 
+## Windows and macOS operator shell
+
+The `operator` package is a lightweight native client for a Site Server. It is
+not the complete runtime and does not require Python or Docker on the operator
+workstation. After installation, open Ravan Operator, enter the URL of the
+customer-managed Site Server, and select **Open Ravan**. The shell remembers
+that URL locally for the next launch. It does not store platform secrets or
+change the Site Server's authentication and authorization behavior.
+
 ## What operators own
 
 - broker endpoints
