@@ -7,6 +7,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/top-bar";
+import { PlatformFooter } from "@/components/platform-footer";
 import { Separator } from "@/components/ui/separator";
 
 type NavItem = {
@@ -37,7 +38,7 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
   const pathname = usePathname();
 
   return (
-    <div className="industrial-shell min-h-dvh bg-surface-0 text-text-primary">
+    <div className="industrial-shell flex min-h-dvh flex-col bg-surface-0 text-text-primary">
       <TopBar systemStatus={systemStatus} />
 
       <main className="mx-auto grid max-w-[1560px] gap-5 px-4 py-5 grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)_320px]">
@@ -123,6 +124,7 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
 
         <aside className="space-y-4">{rightRail}</aside>
       </main>
+      <PlatformFooter />
     </div>
   );
 }
