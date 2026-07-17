@@ -40,6 +40,12 @@ def test_compose_target_contains_runtime_and_public_docs(tmp_path: Path) -> None
     )
     root = Path(result["stage_root"])
     assert (root / "runtime" / "docker" / "docker-compose.yml").exists()
+    release_compose = root / "runtime" / "docker" / "docker-compose.release.yml"
+    assert release_compose.exists()
+    release_text = release_compose.read_text(encoding="utf-8")
+    assert "ravan-api:${RAVAN_VERSION:-1.0.0-beta.1}" in release_text
+    assert "build:" not in release_text
+    assert "../services/processor:/opt/processor:ro" not in release_text
     assert (root / "runtime" / "docs" / "self-host-install-guide.md").exists()
     assert (root / "site" / "demo-site.env").exists()
     assert not (root / "runtime" / "tests").exists()

@@ -33,7 +33,7 @@ DEFAULT_MANIFEST = REPO_ROOT / "config" / "project-manifest.yaml"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "dist"
 RUNTIME_COPY_DIRS = ("services", "config", "ui", "rust", "docker")
 RUNTIME_COPY_FILES = ("README.md", "LICENSE", "NOTICE", "pyproject.toml", "requirements.txt", "uv.lock", ".env.production.example")
-RUNTIME_SCRIPT_FILES = ("ravan.ps1", "ravan.sh", "ravanctl.ps1", "ravanctl.sh")
+RUNTIME_SCRIPT_FILES = ("ravan.ps1", "ravan.sh", "ravanctl.ps1", "ravanctl.sh", "render_release_compose.py")
 OFFLINE_EXTRA_DIRS = ("data",)
 PUBLIC_DOCUMENT_FILES = (
     "docs/README.md",
@@ -256,6 +256,9 @@ def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[s
     if mode in {"compose", "offline"}:
         if not (bundle_root / "runtime" / "docker" / "docker-compose.yml").is_file():
             errors.append("Compose runtime is missing docker/docker-compose.yml")
+    if mode == "compose":
+        if not (bundle_root / "runtime" / "docker" / "docker-compose.release.yml").is_file():
+            errors.append("Compose runtime is missing docker/docker-compose.release.yml")
     if mode == "kubernetes":
         if not (bundle_root / "k8s" / "helm" / "Chart.yaml").is_file():
             errors.append("Kubernetes runtime is missing k8s/helm/Chart.yaml")
@@ -335,6 +338,12 @@ def build_compose(manifest_path: Path, output_dir: Path, site_id: str, fmt: str,
     stage_root = output_dir / f"{site_id}-compose"
     shutil.rmtree(stage_root, ignore_errors=True)
     written = _copy_runtime_tree(stage_root / "runtime", include_docs=True)
+    from scripts.render_release_compose import render_release_compose
+
+    compose_path = stage_root / "runtime" / "docker" / "docker-compose.yml"
+    release_compose_path = stage_root / "runtime" / "docker" / "docker-compose.release.yml"
+    render_release_compose(compose_path, release_compose_path)
+    written.append(release_compose_path)
     written.extend(_export_site_bundle(manifest, stage_root, site_id, layout="flat", fmt=fmt, sign=sign, signing_key_env=signing_key_env))
     written.append(_write_json(stage_root / "package-manifest.json", {
         "mode": "compose",

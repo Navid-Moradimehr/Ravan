@@ -82,6 +82,22 @@ cp .env.production.example .env
 ./scripts/ravanctl.sh status
 ```
 
+For a packaged Linux Site Server with published Ravan images, select the
+generated image-based Compose file instead of the source-build file:
+
+```bash
+export RAVAN_COMPOSE_FILE=docker/docker-compose.release.yml
+export RAVAN_IMAGE_REGISTRY=ghcr.io/navid-moradimehr
+export RAVAN_VERSION=1.0.0-beta.1
+./scripts/ravan.sh up -d
+./scripts/ravanctl.sh doctor
+```
+
+The release file is intentionally explicit about the image boundary. It does
+not build application images on the target host, and it does not make Kafka,
+TimescaleDB, Flink, object storage, credentials, or TLS disappear: those are
+still deployed and governed by the operator's selected Compose configuration.
+
 Windows PowerShell:
 
 ```powershell

@@ -23,6 +23,6 @@ py -3.13 scripts/package-release.py verify .datastream/release/demo-site-compose
 ```
 
 The verifier checks the package manifest, generated site configuration, required
-runtime files, and deployment-specific assets. It rejects development folders,
+runtime files, the image-based release Compose definition, and deployment-specific assets. It rejects development folders,
 compiled Python files, and common secret filenames. It is a content boundary
 check, not a substitute for clean-machine installation or runtime acceptance.

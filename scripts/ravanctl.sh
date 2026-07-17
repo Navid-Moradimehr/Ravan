@@ -6,20 +6,22 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! docker compose -f docker/docker-compose.yml ps api-service --status running --format '{{.Name}}' >/dev/null; then
+COMPOSE_FILE="${RAVAN_COMPOSE_FILE:-docker/docker-compose.yml}"
+
+if ! docker compose -f "${COMPOSE_FILE}" ps api-service --status running --format '{{.Name}}' >/dev/null; then
   echo "The Ravan API service is not running. Start the stack first: ./scripts/ravan.sh up" >&2
   exit 1
 fi
 
 if [ "${1:-}" = "preflight" ]; then
   shift
-  preflight_args="preflight --compose-file /workspace/docker/docker-compose.yml --site-profile /workspace/config/site-profiles/single-site.yaml --project-manifest /workspace/config/project-manifest.yaml --soak-scenario /workspace/config/benchmarks/industrial-soak.yaml"
+  preflight_args="preflight --compose-file /workspace/${COMPOSE_FILE#./} --site-profile /workspace/config/site-profiles/single-site.yaml --project-manifest /workspace/config/project-manifest.yaml --soak-scenario /workspace/config/benchmarks/industrial-soak.yaml"
   if [ -f .env ]; then
     preflight_args="$preflight_args --env-file /workspace/.env"
   fi
-  exec docker compose -f docker/docker-compose.yml run --rm --no-deps -T \
+  exec docker compose -f "${COMPOSE_FILE}" run --rm --no-deps -T \
     -v "$(pwd):/workspace:ro" -w /workspace api-service \
     sh -c "python -m services.cli.datastreamctl $preflight_args \"\$@\"" sh "$@"
 fi
 
-exec docker compose -f docker/docker-compose.yml exec -T api-service python -m services.cli.datastreamctl "$@"
+exec docker compose -f "${COMPOSE_FILE}" exec -T api-service python -m services.cli.datastreamctl "$@"

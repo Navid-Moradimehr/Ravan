@@ -10,5 +10,6 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 
 # Production starts Ravan UI and edge ingestion, but never demo protocol simulators.
-docker compose -f docker/docker-compose.yml --profile ui --profile edge @Arguments
+$composeFile = if ($env:RAVAN_COMPOSE_FILE) { $env:RAVAN_COMPOSE_FILE } else { "docker/docker-compose.yml" }
+docker compose -f $composeFile --profile ui --profile edge @Arguments
 exit $LASTEXITCODE

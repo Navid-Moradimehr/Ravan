@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$compose = "docker/docker-compose.yml"
+$compose = if ($env:RAVAN_COMPOSE_FILE) { $env:RAVAN_COMPOSE_FILE } else { "docker/docker-compose.yml" }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw "Docker Desktop (or Docker Engine) is required. Install and start Docker, then retry."
@@ -26,7 +26,8 @@ if ($Arguments.Count -gt 0 -and $Arguments[0] -eq "preflight") {
     if ($Arguments.Count -gt 1) {
         $extraArgs = $Arguments[1..($Arguments.Count - 1)]
     }
-    $preflightArgs = @("preflight", "--compose-file", "/workspace/docker/docker-compose.yml", "--site-profile", "/workspace/config/site-profiles/single-site.yaml", "--project-manifest", "/workspace/config/project-manifest.yaml", "--soak-scenario", "/workspace/config/benchmarks/industrial-soak.yaml") + $extraArgs
+    $composeInWorkspace = $compose.Replace('\\', '/')
+    $preflightArgs = @("preflight", "--compose-file", "/workspace/$composeInWorkspace", "--site-profile", "/workspace/config/site-profiles/single-site.yaml", "--project-manifest", "/workspace/config/project-manifest.yaml", "--soak-scenario", "/workspace/config/benchmarks/industrial-soak.yaml") + $extraArgs
     if (Test-Path ".env") {
         $preflightArgs += @("--env-file", "/workspace/.env")
     }

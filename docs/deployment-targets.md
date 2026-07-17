@@ -20,6 +20,26 @@ Build the staging bundle with:
 py -3.13 scripts/package-release.py --output-dir .datastream/release compose
 ```
 
+The package contains two Compose definitions. `docker/docker-compose.yml` is
+the source-build development/evaluation definition. The generated
+`docker/docker-compose.release.yml` is the Linux Site Server definition: it
+expects Ravan images in a registry and does not depend on a source checkout or
+Flink processor bind mounts. Set the image registry and release tag before
+starting it:
+
+```bash
+export RAVAN_IMAGE_REGISTRY=ghcr.io/navid-moradimehr
+export RAVAN_VERSION=1.0.0-beta.1
+export RAVAN_COMPOSE_FILE=docker/docker-compose.release.yml
+./scripts/ravan.sh up -d
+```
+
+The official image publication workflow is a separate release concern. A
+local package is not usable with the release Compose file until the selected
+Ravan images have been published to, or mirrored into, the operator's
+registry. Docker Engine is the intended Linux runtime; Docker Desktop is an
+evaluation convenience on Windows and macOS.
+
 The operator supplies host resources, persistent storage, device network access,
 source credentials, retention, backups, and optional model or object-storage
 endpoints. The package contains runtime build inputs and public documentation;
