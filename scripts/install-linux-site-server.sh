@@ -6,7 +6,13 @@ set -Eeuo pipefail
 # and distribution concerns that vary across industrial environments.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-BUNDLE_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+if [[ -f "${SCRIPT_DIR}/../docker/docker-compose.yml" ]]; then
+  # Source-tree invocation: scripts/install-linux-site-server.sh
+  BUNDLE_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+else
+  # Release invocation: install/linux/install.sh
+  BUNDLE_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+fi
 INSTALL_DIR="${RAVAN_INSTALL_DIR:-/opt/ravan}"
 SITE_ID="${RAVAN_SITE_ID:-demo-site}"
 MODE="${RAVAN_INSTALL_MODE:-source-build}"
@@ -129,6 +135,15 @@ RAVAN_COMPOSE_FILE=$(printf '%q' "$COMPOSE_FILE")
 EOF
 chmod 600 "$INSTALL_ENV" "$ENV_FILE"
 
+cat > "$INSTALL_DIR/bin/compose.sh" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+TARGET_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$TARGET_DIR/.datastream/install.env"
+exec docker compose --project-name "$RAVAN_PROJECT_NAME" --env-file "$RAVAN_ENV_FILE" --file "$RAVAN_COMPOSE_FILE" --profile ui --profile edge "$@"
+EOF
+chmod 755 "$INSTALL_DIR/bin/compose.sh"
+
 DOCKER_BIN="$(command -v docker)"
 cat > "$SERVICE_PATH" <<EOF
 [Unit]
@@ -142,9 +157,9 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${INSTALL_DIR}/runtime
-ExecStart=${DOCKER_BIN} compose --project-name ${PROJECT_NAME} --env-file ${ENV_FILE} --file ${COMPOSE_FILE} --profile ui --profile edge up -d
-ExecStop=${DOCKER_BIN} compose --project-name ${PROJECT_NAME} --env-file ${ENV_FILE} --file ${COMPOSE_FILE} --profile ui --profile edge stop
-ExecReload=${DOCKER_BIN} compose --project-name ${PROJECT_NAME} --env-file ${ENV_FILE} --file ${COMPOSE_FILE} --profile ui --profile edge up -d
+ExecStart=${INSTALL_DIR}/bin/compose.sh up -d
+ExecStop=${INSTALL_DIR}/bin/compose.sh stop
+ExecReload=${INSTALL_DIR}/bin/compose.sh up -d
 TimeoutStartSec=0
 TimeoutStopSec=120
 
@@ -162,7 +177,10 @@ case "${1:-status}" in
     exec systemctl "$1" "${RAVAN_SERVICE_NAME}.service"
     ;;
   logs)
-    exec docker compose --project-name "$RAVAN_PROJECT_NAME" --env-file "$RAVAN_ENV_FILE" --file "$RAVAN_COMPOSE_FILE" logs --tail="${2:-200}" -f
+    exec "$TARGET_DIR/bin/compose.sh" logs --tail="${2:-200}" -f
+    ;;
+  upgrade)
+    exec "$TARGET_DIR/bin/upgrade.sh" "${@:2}"
     ;;
   doctor)
     exec "$TARGET_DIR/bin/doctor.sh" "${@:2}"
@@ -171,23 +189,35 @@ case "${1:-status}" in
     exec "$TARGET_DIR/bin/uninstall.sh" "${@:2}"
     ;;
   *)
-    echo "Usage: ravan-site {start|stop|restart|status|enable|disable|logs|doctor|uninstall}" >&2
+    echo "Usage: ravan-site {start|stop|restart|status|enable|disable|logs|doctor|upgrade|uninstall}" >&2
     exit 2
     ;;
 esac
 EOF
 chmod 755 "$INSTALL_DIR/bin/ravan-site"
 
-cp "$SCRIPT_DIR/ravan-site-doctor.sh" "$INSTALL_DIR/bin/doctor.sh"
-cp "$SCRIPT_DIR/uninstall-linux-site-server.sh" "$INSTALL_DIR/bin/uninstall.sh"
+DOCTOR_SOURCE="$SCRIPT_DIR/ravan-site-doctor.sh"
+if [[ ! -f "$DOCTOR_SOURCE" ]]; then
+  DOCTOR_SOURCE="$SCRIPT_DIR/doctor.sh"
+fi
+UNINSTALL_SOURCE="$SCRIPT_DIR/uninstall-linux-site-server.sh"
+if [[ ! -f "$UNINSTALL_SOURCE" ]]; then
+  UNINSTALL_SOURCE="$SCRIPT_DIR/uninstall.sh"
+fi
+cp "$DOCTOR_SOURCE" "$INSTALL_DIR/bin/doctor.sh"
+cp "$UNINSTALL_SOURCE" "$INSTALL_DIR/bin/uninstall.sh"
+UPGRADE_SOURCE="$SCRIPT_DIR/upgrade-linux-site-server.sh"
+if [[ ! -f "$UPGRADE_SOURCE" ]]; then
+  UPGRADE_SOURCE="$SCRIPT_DIR/upgrade.sh"
+fi
+cp "$UPGRADE_SOURCE" "$INSTALL_DIR/bin/upgrade.sh"
 chmod 755 "$INSTALL_DIR/bin/doctor.sh" "$INSTALL_DIR/bin/uninstall.sh"
+chmod 755 "$INSTALL_DIR/bin/upgrade.sh"
 
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}.service" >/dev/null
 
-compose() {
-  "$DOCKER_BIN" compose --project-name "$PROJECT_NAME" --env-file "$ENV_FILE" --file "$COMPOSE_FILE" --profile ui --profile edge "$@"
-}
+compose() { "$INSTALL_DIR/bin/compose.sh" "$@"; }
 
 compose config --quiet || die "Compose configuration is invalid; inspect ${ENV_FILE}"
 if [[ "$NO_START" -eq 0 ]]; then

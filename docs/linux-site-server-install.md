@@ -133,10 +133,21 @@ sudo /opt/ravan/bin/ravan-site uninstall --purge --yes
 Named Docker volumes are still not removed by this command. Remove them only
 after a verified backup and a deliberate site-retirement decision.
 
-For an upgrade, install the new archive over the same target with `--force`.
-The installer keeps the existing `.env` and named volumes, validates the new
-Compose definition, rebuilds or pulls the selected images, and restarts the
-systemd service. Run the doctor and a backup drill after the upgrade.
+For an upgrade, extract the new archive beside the current installation and
+run the controlled upgrade command. It validates the new Compose definition,
+stages a replacement runtime, rebuilds or pulls the selected images, restarts
+the systemd service, and rolls back to the previous runtime if the doctor does
+not become healthy before the timeout:
+
+```bash
+sudo /opt/ravan/bin/ravan-site upgrade \
+  --bundle-dir /srv/releases/demo-site-site-server \
+  --mode registry
+```
+
+The upgrade keeps the existing `.env` and named volumes. It writes evidence
+under `/opt/ravan/.datastream/upgrades/<timestamp>`. Run the doctor and a
+backup drill after the upgrade.
 
 ## Current Boundary
 

@@ -291,6 +291,7 @@ def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[s
             "install/linux/install.sh",
             "install/linux/doctor.sh",
             "install/linux/uninstall.sh",
+            "install/linux/upgrade.sh",
         ):
             if not (bundle_root / relative).is_file():
                 errors.append(f"Linux Site Server installer is missing {relative}")
@@ -402,6 +403,7 @@ def build_site_server(manifest_path: Path, output_dir: Path, site_id: str, fmt: 
         "scripts/install-linux-site-server.sh": "install/linux/install.sh",
         "scripts/ravan-site-doctor.sh": "install/linux/doctor.sh",
         "scripts/uninstall-linux-site-server.sh": "install/linux/uninstall.sh",
+        "scripts/upgrade-linux-site-server.sh": "install/linux/upgrade.sh",
     }
     for source, destination in installer_files.items():
         written.extend(_copy_file(REPO_ROOT / source, stage_root / destination))
