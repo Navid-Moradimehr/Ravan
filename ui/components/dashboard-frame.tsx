@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Cable, Database, DatabaseZap, Gauge, LayoutDashboard, Workflow } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/top-bar";
@@ -13,19 +12,18 @@ import { Separator } from "@/components/ui/separator";
 type NavItem = {
   href: string;
   label: string;
-  icon: LucideIcon;
   description: string;
   badge?: string;
 };
 
 const navItems: NavItem[] = [
-  { href: "/", label: "Operations overview", icon: LayoutDashboard, description: "Live health and quick actions" },
-  { href: "/historian", label: "Historian", icon: DatabaseZap, description: "Storage, queries, backup" },
-  { href: "/observability", label: "Observability", icon: Gauge, description: "Health, metrics, latency" },
-  { href: "/integrations", label: "Integrations", icon: BarChart3, description: "CDC, webhooks, models" },
-  { href: "/ai-reporting", label: "Operational briefings", icon: Workflow, description: "AI reports and policy", badge: "Beta" },
-  { href: "/datasets", label: "Data readiness", icon: Database, description: "Manifests and trajectories" },
-  { href: "/pipeline", label: "Pipeline", icon: Cable, description: "Ingress, normalization, DLQ" },
+  { href: "/", label: "Operations overview", description: "Live health and quick actions" },
+  { href: "/historian", label: "Historian", description: "Storage, queries, backup" },
+  { href: "/observability", label: "Observability", description: "Health, metrics, latency" },
+  { href: "/integrations", label: "Integrations", description: "CDC, webhooks, models" },
+  { href: "/ai-reporting", label: "Operational briefings", description: "AI reports and policy", badge: "Beta" },
+  { href: "/datasets", label: "Data readiness", description: "Manifests and trajectories" },
+  { href: "/pipeline", label: "Pipeline", description: "Ingress, normalization, DLQ" },
 ];
 
 type DashboardFrameProps = {
@@ -59,7 +57,6 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
             <p className="label-overline mb-2 px-2">Navigate</p>
             {navItems.map((item) => {
               const active = pathname === item.href;
-              const Icon = item.icon;
               return (
                 <Link
                   key={item.href}
@@ -70,7 +67,6 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
                     active ? "nav-active border-accent/30" : "nav-muted border-transparent",
                   )}
                 >
-                  <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent" />
                   <span className="min-w-0">
                     <span className="flex items-center gap-2 text-sm font-medium">
                       <span>{item.label}</span>
@@ -89,7 +85,6 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
           <nav aria-label="Primary" className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
             {navItems.map((item) => {
               const active = pathname === item.href;
-              const Icon = item.icon;
               return (
                 <Link
                   key={item.href}
@@ -100,7 +95,6 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
                     active ? "border-accent/30 bg-accent-subtle text-accent" : "border-border-subtle bg-surface-2 text-text-secondary",
                   )}
                 >
-                  <Icon aria-hidden="true" className="size-4" />
                   <span className="inline-flex items-center gap-2">
                     <span>{item.label}</span>
                     {item.badge ? <sup className="relative -top-1 font-mono text-[0.58rem] font-semibold uppercase tracking-[0.24em] text-accent">{item.badge.toLowerCase()}</sup> : null}
