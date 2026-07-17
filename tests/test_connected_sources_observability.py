@@ -29,5 +29,5 @@ def test_connected_sources_dashboard_is_valid_and_label_driven():
 
 
 def test_grafana_provisions_all_dashboard_files():
-    provisioning = (ROOT / "docker" / "grafana" / "provisioning" / "dashboards" / "local-stream-engine.yml").read_text(encoding="utf-8")
+    provisioning = (ROOT / "docker" / "grafana" / "provisioning" / "dashboards" / "ravan.yml").read_text(encoding="utf-8")
     assert "/var/lib/grafana/dashboards" in provisioning
