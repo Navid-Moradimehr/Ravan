@@ -85,6 +85,7 @@ class LLMProviderClient:
         if provider == "disabled":
             raise LLMDisabledError("LLM provider is disabled")
 
+        temperature = 0.0
         preset = PROVIDER_PRESETS.get(provider, PROVIDER_PRESETS["openai_compat"])
         canonical = preset.get("canonical", provider)
         base_url = self._effective_base_url(preset).rstrip("/")
@@ -105,6 +106,7 @@ class LLMProviderClient:
                 "model": self.settings.llm_model_id,
                 "messages": self._messages(prompt),
                 "stream": False,
+                "temperature": temperature,
             }
             if output_schema:
                 body["format"] = output_schema
@@ -112,6 +114,7 @@ class LLMProviderClient:
             body = {
                 "model": self.settings.llm_model_id,
                 "max_tokens": max(1, int(self.settings.llm_max_output_tokens)),
+                "temperature": temperature,
                 "system": [{
                     "type": "text",
                     "text": "You are an operations analyst for a streaming industrial platform.",
@@ -125,7 +128,7 @@ class LLMProviderClient:
             body = {
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
                 "systemInstruction": {"parts": [{"text": "You are an operations analyst for a streaming industrial platform."}]},
-                "generationConfig": {"temperature": 0.2, "maxOutputTokens": max(1, int(self.settings.llm_max_output_tokens))},
+                "generationConfig": {"temperature": temperature, "maxOutputTokens": max(1, int(self.settings.llm_max_output_tokens))},
             }
             if output_schema:
                 body["generationConfig"].update({"responseMimeType": "application/json", "responseJsonSchema": output_schema})
@@ -133,7 +136,7 @@ class LLMProviderClient:
             body = {
                 "model": self.settings.llm_model_id,
                 "prompt": prompt,
-                "temperature": 0.2,
+                "temperature": temperature,
             }
             if output_schema:
                 body["response_format"] = {
@@ -144,7 +147,7 @@ class LLMProviderClient:
             body = {
                 "model": self.settings.llm_model_id,
                 "messages": self._messages(prompt),
-                "temperature": 0.2,
+                "temperature": temperature,
             }
             if output_schema:
                 body["response_format"] = {

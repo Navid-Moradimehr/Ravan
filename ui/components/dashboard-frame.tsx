@@ -8,7 +8,6 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/top-bar";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 
 type NavItem = {
   href: string;
@@ -74,7 +73,7 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
                   <span className="min-w-0">
                     <span className="flex items-center gap-2 text-sm font-medium">
                       <span>{item.label}</span>
-                      {item.badge ? <Badge variant="outline" className="border-accent/30 bg-accent-subtle px-1.5 py-0 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-accent">{item.badge}</Badge> : null}
+                      {item.badge ? <sup className="relative -top-1 font-mono text-[0.62rem] font-semibold uppercase tracking-[0.24em] text-accent">{item.badge.toLowerCase()}</sup> : null}
                     </span>
                     <span className="block text-xs leading-5 text-text-secondary">{item.description}</span>
                   </span>
@@ -112,7 +111,7 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
                   <Icon aria-hidden="true" className="size-4" />
                   <span className="inline-flex items-center gap-2">
                     <span>{item.label}</span>
-                    {item.badge ? <Badge variant="outline" className="border-accent/30 bg-accent-subtle px-1.5 py-0 text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-accent">{item.badge}</Badge> : null}
+                    {item.badge ? <sup className="relative -top-1 font-mono text-[0.58rem] font-semibold uppercase tracking-[0.24em] text-accent">{item.badge.toLowerCase()}</sup> : null}
                   </span>
                 </Link>
               );

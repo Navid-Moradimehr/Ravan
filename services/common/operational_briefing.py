@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
@@ -140,10 +141,19 @@ def compact_report_memory(reports: list[dict[str, Any]], *, limit: int = 6, max_
 
 
 def build_briefing_prompt(context: dict[str, Any]) -> str:
+    current = context.get("current", {})
+    severity_counts = current.get("severity_counts", {})
+    event_count = int(current.get("event_count", 0) or 0)
+    critical = int(severity_counts.get("critical", 0) or 0)
+    warning = int(severity_counts.get("warning", 0) or 0)
     return (
         "Create one concise operational briefing as JSON matching the supplied schema. "
         "Use only the evidence and short memory. Classify issue continuity as new, ongoing, "
-        "worsening, or resolved. Recommended checks must remain read-only.\n\n"
+        "worsening, or resolved. Recommended checks must remain read-only. "
+        "Write plain English with normal ASCII punctuation. Do not use fancy dashes, ellipses, or line breaks. "
+        "Keep the headline short and the executive summary to 1-2 short sentences.\n"
+        f"If critical and warning counts are both zero, set headline exactly 'Operations appear normal' and "
+        f"executive_summary exactly 'Observed {event_count} bounded events: {critical} critical and {warning} warning.'\n\n"
         f"CONTEXT_JSON={json.dumps(context, separators=(',', ':'), default=str)}"
     )
 
@@ -154,7 +164,7 @@ def validate_briefing(content: str | dict[str, Any]) -> tuple[bool, list[str], d
         briefing = OperationalBriefing.model_validate(payload)
     except Exception as exc:
         return False, [str(exc)], None
-    return True, [], briefing.model_dump(mode="json")
+    return True, [], _normalize_briefing(briefing.model_dump(mode="json"))
 
 
 def deterministic_briefing(context: dict[str, Any], reason: str) -> dict[str, Any]:
@@ -176,6 +186,76 @@ def deterministic_briefing(context: dict[str, Any], reason: str) -> dict[str, An
         limitations=[f"Deterministic fallback used: {reason}"],
         confidence="medium" if current.get("event_count") else "low",
     ).model_dump(mode="json")
+
+
+def _normalize_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
+    cleaned = dict(briefing)
+    cleaned["headline"] = _normalize_text(str(cleaned.get("headline") or ""))
+    cleaned["executive_summary"] = _normalize_text(str(cleaned.get("executive_summary") or ""))
+    cleaned["limitations"] = _normalize_text_list(cleaned.get("limitations", []))
+    cleaned["data_gaps"] = _normalize_text_list(cleaned.get("data_gaps", []))
+    cleaned["recommended_checks"] = _normalize_text_list(cleaned.get("recommended_checks", []))
+    cleaned["key_updates"] = _normalize_text_list(cleaned.get("key_updates", []))
+    cleaned["affected_assets"] = _normalize_text_list(cleaned.get("affected_assets", []))
+    cleaned["evidence_references"] = _normalize_identifier_list(cleaned.get("evidence_references", []))
+    cleaned["active_issues"] = [_normalize_issue(issue) for issue in cleaned.get("active_issues", []) if isinstance(issue, dict)]
+    cleaned["resolved_issues"] = [_normalize_issue(issue) for issue in cleaned.get("resolved_issues", []) if isinstance(issue, dict)]
+    return cleaned
+
+
+def _normalize_issue(issue: dict[str, Any]) -> dict[str, Any]:
+    cleaned = dict(issue)
+    cleaned["issue_id"] = _normalize_text(str(cleaned.get("issue_id") or ""))
+    cleaned["asset_id"] = _normalize_text(str(cleaned.get("asset_id") or ""))
+    cleaned["tag"] = _normalize_text(str(cleaned.get("tag") or ""))
+    cleaned["observation"] = _normalize_text(str(cleaned.get("observation") or ""))
+    cleaned["evidence_event_ids"] = [_normalize_text(str(item)) for item in cleaned.get("evidence_event_ids", []) if str(item).strip()]
+    return cleaned
+
+
+def _normalize_text(value: str) -> str:
+    value = value.replace("\u00a0", " ").replace("\u202f", " ").replace("\u2028", " ").replace("\u2029", " ")
+    value = value.replace("\u2010", "-").replace("\u2011", "-").replace("\u2013", "-").replace("\u2014", "-")
+    value = value.replace("\u2026", "...")
+    value = re.sub(r"\s+", " ", value).strip()
+    return value
+
+
+def _normalize_text_list(items: list[Any]) -> list[str]:
+    reserved = {
+        "headline",
+        "situation_status",
+        "executive_summary",
+        "recommended_checks",
+        "data_gaps",
+        "limitations",
+        "key_updates",
+        "affected_assets",
+        "active_issues",
+        "resolved_issues",
+        "report_id",
+        "generated_at",
+        "confidence",
+        "evidence_references",
+    }
+    normalized: list[str] = []
+    for item in items:
+        text = _normalize_text(str(item))
+        lower = text.lower()
+        if not text:
+            continue
+        if lower in reserved:
+            continue
+        if text in {"{", "}", "[]", "[", "]"}:
+            continue
+        if len(text) < 8 and " " not in text:
+            continue
+        normalized.append(text)
+    return normalized
+
+
+def _normalize_identifier_list(items: list[Any]) -> list[str]:
+    return [str(item).strip() for item in items if str(item).strip()]
 
 
 def _compact_event(event: dict[str, Any]) -> dict[str, Any]:

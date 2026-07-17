@@ -158,9 +158,9 @@ function AIReportingWorkspace() {
         description="Readable, evidence-linked AI broadcasts for scheduled operations, sustained anomalies, recoveries, and operator requests."
         actions={<Button variant="outline" onClick={() => reports.refetch()}>Refresh briefings</Button>}
       >
-        <Badge variant="outline" className="border-accent/30 bg-accent-subtle px-2 py-0 text-[0.64rem] font-semibold uppercase tracking-[0.24em] text-accent">
-          Beta
-        </Badge>
+        <span className="relative -top-1 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-accent">
+          beta
+        </span>
       </SectionHeader>
 
       <Tabs defaultValue="reports" className="space-y-4">

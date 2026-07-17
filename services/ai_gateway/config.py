@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     llm_max_output_tokens: int = Field(default=2048, validation_alias=AliasChoices("llm_max_output_tokens", "LLM_MAX_OUTPUT_TOKENS"))
     llm_batch_seconds: int = 5
     llm_max_batch_size: int = 100
-    llm_timeout_seconds: int = 8
+    llm_timeout_seconds: int = 30
     llm_allow_fallback: bool = True
     llm_local_only: bool = Field(default=False, validation_alias=AliasChoices("llm_local_only", "LLM_LOCAL_ONLY"))
     llm_prompt_cache_mode: str = Field(default="auto", validation_alias=AliasChoices("llm_prompt_cache_mode", "LLM_PROMPT_CACHE_MODE"))
