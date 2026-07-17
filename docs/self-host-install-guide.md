@@ -218,6 +218,12 @@ customer-managed Site Server, and select **Open Ravan**. The shell remembers
 that URL locally for the next launch. It does not store platform secrets or
 change the Site Server's authentication and authorization behavior.
 
+The release workflow publishes unsigned Windows NSIS/MSI and macOS DMG
+artifacts. Install the artifact for the operator's OS; do not install the
+operator shell on the Site Server itself. Signed builds and notarization are
+release-pipeline requirements that must be configured by the maintainer before
+an enterprise distribution.
+
 ## What operators own
 
 - broker endpoints

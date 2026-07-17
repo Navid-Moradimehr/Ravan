@@ -57,14 +57,55 @@ jobs:
             ${{ env.REGISTRY }}/${{ steps.version.outputs.owner }}/ravan-${{ matrix.name }}:${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ steps.version.outputs.owner }}/ravan-${{ matrix.name }}:${{ github.ref_name }}
 
+  operator-installers:
+    name: Build ${{ matrix.os }} operator installer
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            bundles: nsis,msi
+            artifact: windows
+          - os: macos-latest
+            bundles: dmg
+            artifact: macos
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: operator-shell/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build unsigned Tauri installer
+        working-directory: operator-shell
+        shell: bash
+        run: |
+          npm ci
+          npm run tauri -- build --bundles "${{ matrix.bundles }}" --ci
+      - name: Upload operator installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ravan-operator-${{ matrix.artifact }}
+          path: operator-shell/src-tauri/target/release/bundle/**
+          if-no-files-found: error
+
   release-artifacts:
     name: Package and publish release artifacts
+    needs: [container-images, operator-installers]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Download operator installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ravan-operator-*
+          path: dist/operator-installers
+          merge-multiple: true
       - name: Install packaging dependencies
         run: python -m pip install --upgrade pip && python -m pip install -e .[dev]
       - name: Stage release packages
@@ -80,7 +121,7 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           mkdir -p dist/evidence
-          find dist -type f \( -name '*.zip' -o -name '*source.tar.gz' \) -exec cp {} dist/evidence/ \;
+          find dist -type f \( -name '*.zip' -o -name '*source.tar.gz' -o -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o -name '*.appimage' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} dist/evidence/ \;
           python scripts/generate_release_evidence.py \
             --root . \
             --artifact-dir dist/evidence \
@@ -95,11 +136,12 @@ jobs:
           import json, os
           from pathlib import Path
           version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          suffixes = {".zip", ".exe", ".msi", ".dmg", ".appimage", ".deb", ".rpm"}
           artifacts = [
               {"name": path.name, "file": str(path.relative_to("dist"))}
-              for path in sorted(Path("dist").rglob("*.zip"))
+              for path in sorted(Path("dist").rglob("*"))
+              if path.is_file() and (path.suffix in suffixes or path.name.endswith("source.tar.gz"))
           ]
-          artifacts.append({"name": f"ravan-{version}-source.tar.gz", "file": f"ravan-{version}-source.tar.gz"})
           Path("dist/release-manifest.json").write_text(json.dumps({
               "product": "Ravan",
               "version": version,
@@ -115,5 +157,6 @@ jobs:
           files: |
             dist/**/*.zip
             dist/*source.tar.gz
+            dist/operator-installers/**
             dist/evidence/*
             dist/release-manifest.json

@@ -114,10 +114,11 @@ Flink, TimescaleDB, or connectors locally. Build the shell package with:
 py -3.13 scripts/package-release.py --output-dir .datastream/release operator
 ```
 
-The archive is a Tauri source/build input until the release pipeline adds
-platform-specific signing and notarization. The operator still needs a
-reachable Site Server URL and must configure identity, TLS, and network access
-according to the company's security boundary.
+The release workflow builds unsigned Windows NSIS/MSI and macOS DMG artifacts
+from this package on native GitHub runners. Signing and notarization are still
+maintainer-owned release credentials, not hidden defaults. The operator still
+needs a reachable Site Server URL and must configure identity, TLS, and network
+access according to the company's security boundary.
 
 ## Common Contract
 

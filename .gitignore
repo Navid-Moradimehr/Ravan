@@ -26,3 +26,5 @@ ObsidianVault/
 docs/_internal/
 data/semantic/
 rust/fastpath/target/
+operator-shell/src-tauri/target/
+operator-shell/src-tauri/gen/

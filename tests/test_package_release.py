@@ -165,6 +165,8 @@ def test_operator_target_contains_tauri_shell_without_site_runtime(tmp_path: Pat
     root = Path(result["stage_root"])
     assert (root / "operator-shell" / "src-tauri" / "tauri.conf.json").exists()
     assert (root / "operator-shell" / "dist" / "index.html").exists()
+    assert (root / "build-operator-installer.ps1").exists()
+    assert (root / "build-operator-installer.sh").exists()
     assert not (root / "site").exists()
     verification = verify_bundle(root, "operator")
     assert verification["valid"] is True

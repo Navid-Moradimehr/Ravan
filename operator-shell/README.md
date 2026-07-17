@@ -26,9 +26,19 @@ configuration; the shell does not bypass or replace them.
 ## Build targets
 
 ```bash
-npm run tauri build
+npm run build:windows       # Windows runner: NSIS and MSI
+npm run build:macos         # macOS runner: DMG
 ```
 
-The Tauri configuration declares Windows and macOS bundles. Code signing,
-notarization, update channels, icons, and clean-machine acceptance are release
-pipeline work and are intentionally not claimed by this scaffold.
+The repository also provides `scripts/build-operator-installer.ps1` for
+Windows and `scripts/build-operator-installer.sh` for macOS/Linux runners.
+They use the committed npm lockfile and copy generated bundles into
+`dist/operator-installer`.
+
+The release workflow builds unsigned Windows NSIS/MSI and macOS DMG artifacts.
+The native bundle uses a numeric prerelease version (`1.0.0-1`) because MSI
+does not accept the platform's human-readable `beta.1` prerelease label.
+Code signing, notarization, update channels, icons, and clean-machine
+acceptance require maintainer-owned release credentials and remain explicit
+release work. The operator shell is still only a client for a Site Server; it
+does not install Kafka, Flink, TimescaleDB, or connectors.

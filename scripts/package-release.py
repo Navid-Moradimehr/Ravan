@@ -286,6 +286,10 @@ def verify_bundle(bundle_root: Path, expected_mode: str | None = None) -> dict[s
         errors.append("generated site configuration directory is missing")
     if mode == "operator" and not (bundle_root / "operator-shell" / "src-tauri" / "tauri.conf.json").is_file():
         errors.append("operator shell is missing src-tauri/tauri.conf.json")
+    if mode == "operator":
+        for relative in ("build-operator-installer.ps1", "build-operator-installer.sh"):
+            if not (bundle_root / relative).is_file():
+                errors.append(f"operator build helper is missing {relative}")
     if mode == "site-server":
         for relative in (
             "install/linux/install.sh",
@@ -520,6 +524,8 @@ def build_operator(manifest_path: Path, output_dir: Path, site_id: str, fmt: str
     shutil.rmtree(stage_root, ignore_errors=True)
     written = _copy_dir(REPO_ROOT / "operator-shell", stage_root / "operator-shell")
     written.extend(_copy_dir(REPO_ROOT / "operator-shell" / "dist", stage_root / "operator-shell" / "dist"))
+    written.extend(_copy_file(REPO_ROOT / "scripts" / "build-operator-installer.ps1", stage_root / "build-operator-installer.ps1"))
+    written.extend(_copy_file(REPO_ROOT / "scripts" / "build-operator-installer.sh", stage_root / "build-operator-installer.sh"))
     for entry in PUBLIC_DOCUMENT_FILES:
         src = REPO_ROOT / entry
         if src.exists():

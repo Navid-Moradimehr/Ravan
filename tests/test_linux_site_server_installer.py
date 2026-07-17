@@ -35,3 +35,13 @@ def test_linux_doctor_and_uninstaller_preserve_data_by_default() -> None:
     assert "previous-runtime" in upgrade
     assert "Rollback started" in upgrade
     assert "runtime.next" in upgrade
+
+
+def test_operator_build_helpers_are_reproducible() -> None:
+    powershell = (ROOT / "scripts" / "build-operator-installer.ps1").read_text(encoding="utf-8")
+    shell = (ROOT / "scripts" / "build-operator-installer.sh").read_text(encoding="utf-8")
+    assert "npm ci" in powershell
+    assert "npm ci" in shell
+    assert "--bundles" in powershell
+    assert "--bundles" in shell
+    assert ".msi" in powershell and ".dmg" in powershell
