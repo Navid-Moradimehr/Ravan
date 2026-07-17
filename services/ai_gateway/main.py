@@ -35,6 +35,7 @@ from services.common.ai_reporting import (
     list_report_jobs,
 )
 from services.common.operational_briefing import (
+    attach_briefing_memory,
     briefing_json_schema,
     build_briefing_context,
     build_briefing_prompt,
@@ -526,6 +527,8 @@ async def enrich_batch(
     if not valid or briefing is None:
         briefing = deterministic_briefing(context, "final_validation_failed")
         used_fallback = True
+    else:
+        briefing = attach_briefing_memory(briefing, context)
 
     generation_record = {
         **generation_metadata,
@@ -537,6 +540,8 @@ async def enrich_batch(
         "prompt_version": prompt_version,
         "provider_response_received": provider_response_received,
         "generation_error": generation_error,
+        "short_memory": context.get("short_memory", []),
+        "short_memory_count": len(context.get("short_memory", [])),
         "kafka_acknowledged": True,
     }
     enriched_payload = build_ai_summary_event(

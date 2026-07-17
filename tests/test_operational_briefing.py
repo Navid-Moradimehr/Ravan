@@ -40,3 +40,20 @@ def test_deterministic_briefing_is_valid_and_grounded():
     assert errors == []
     assert parsed["situation_status"] == "critical"
     assert parsed["evidence_references"] == ["c1"]
+
+
+def test_deterministic_briefing_exposes_recent_short_memory():
+    context = build_briefing_context(
+        [{"event_id": "c2", "site_id": "plant-a", "asset_id": "pump-3", "tag": "temperature", "severity": "warning"}],
+        report_type="anomaly",
+        site_id="plant-a",
+        previous_reports=[
+            {"job_id": "r3", "updated_at": datetime.now(timezone.utc), "report_type": "anomaly", "result": {"briefing": {"headline": "Pump-3 warning continues", "situation_status": "attention", "active_issues": [{"issue_id": "i3"}], "affected_assets": ["pump-3"]}}},
+            {"job_id": "r2", "updated_at": datetime.now(timezone.utc) - timedelta(hours=1), "report_type": "anomaly", "result": {"briefing": {"headline": "Pump-2 warning", "situation_status": "attention", "active_issues": [{"issue_id": "i2"}], "affected_assets": ["pump-2"]}}},
+            {"job_id": "r1", "updated_at": datetime.now(timezone.utc) - timedelta(hours=2), "report_type": "scheduled", "result": {"briefing": {"headline": "All clear", "situation_status": "normal", "active_issues": [], "affected_assets": []}}},
+        ],
+    )
+    briefing = deterministic_briefing(context, "provider unavailable")
+    assert briefing["continuity"]["memory_count"] == 3
+    assert [item["report_id"] for item in briefing["continuity"]["short_memory"]] == ["r3", "r2", "r1"]
+    assert briefing["continuity"]["short_memory"][0]["headline"] == "Pump-3 warning continues"

@@ -27,7 +27,19 @@ export type OperationalBriefing = {
   evidence_references: string[];
   data_gaps: string[];
   limitations: string[];
-  continuity: Record<string, unknown>;
+  continuity: {
+    short_memory?: Array<{
+      report_id?: string;
+      generated_at?: string;
+      report_type?: string;
+      situation_status?: string;
+      headline?: string;
+      active_issue_ids?: string[];
+      affected_assets?: string[];
+    }>;
+    memory_count?: number;
+    memory_window_hours?: number;
+  } & Record<string, unknown>;
   confidence: "low" | "medium" | "high";
 };
 
@@ -71,7 +83,12 @@ function ReportSection({ title, items, tone = "default" }: { title: string; item
     <section className={cn("rounded-xl border p-4", tone === "warning" ? "border-warning/25 bg-warning/5" : "border-border-subtle bg-surface-2/55")}>
       <h3 className="font-heading text-sm font-semibold tracking-tight text-text-primary">{title}</h3>
       <ul className="mt-3 space-y-2 font-sans text-sm leading-6 text-text-secondary">
-        {items.map((item, index) => <li key={`${title}-${index}`} className="flex gap-2"><CircleDot className="mt-2 size-2.5 shrink-0 text-accent" /><span>{item}</span></li>)}
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="flex gap-2">
+            <CircleDot className="mt-2 size-2.5 shrink-0 text-accent" />
+            <span>{item}</span>
+          </li>
+        ))}
       </ul>
     </section>
   );
@@ -89,7 +106,9 @@ function IssueList({ title, issues, resolved = false }: { title: string; issues:
               {resolved ? <CheckCircle2 className="size-4 text-success" /> : <AlertTriangle className={cn("size-4", issue.severity === "critical" ? "text-error" : "text-warning")} />}
               <span className="font-heading text-sm font-semibold text-text-primary">{issue.asset_id}</span>
               <span className="font-mono text-xs text-text-muted">{issue.tag}</span>
-              <Badge variant="outline" className="ml-auto capitalize">{issue.status}</Badge>
+              <Badge variant="outline" className="ml-auto capitalize">
+                {issue.status}
+              </Badge>
             </div>
             <p className="mt-3 font-sans text-sm leading-6 text-text-secondary">{issue.observation}</p>
           </article>
@@ -106,16 +125,29 @@ export function OperationalBriefingDetail({ job }: { job: AIReportJob }) {
   }
   const generation = job.result?.generation ?? {};
   const delivery = job.delivery;
+  const shortMemory = briefing.continuity?.short_memory ?? [];
   return (
     <article className="space-y-5" aria-label={`Operational briefing: ${briefing.headline}`}>
       <header className="overflow-hidden rounded-xl border border-border bg-surface-1">
         <div className="border-b border-border-subtle bg-surface-2/65 p-5">
-          <div className="flex items-start gap-2"><h2 className="text-balance font-heading text-2xl font-semibold leading-tight tracking-tight text-text-primary">{briefing.headline}</h2><HelpTip label="Briefing detail help" content="This is a validated structured report stored in the durable job record. The sections below show model output, evidence IDs, fallback state, Kafka acknowledgement, and historian persistence separately." /></div>
+          <div className="flex items-start gap-2">
+            <h2 className="text-balance font-heading text-2xl font-semibold leading-tight tracking-tight text-text-primary">{briefing.headline}</h2>
+            <HelpTip label="Briefing detail help" content="This is a validated structured report stored in the durable job record. The sections below show model output, evidence IDs, fallback state, Kafka acknowledgement, and historian persistence separately." />
+          </div>
         </div>
         <div className="grid gap-px bg-border-subtle sm:grid-cols-3">
-          <div className="bg-surface-1 px-4 py-3"><p className="label-overline">Generated</p><p className="mt-1 font-sans text-sm text-text-primary">{formatDate(job.updated_at ?? job.created_at)}</p></div>
-          <div className="bg-surface-1 px-4 py-3"><p className="label-overline">Confidence</p><p className="mt-1 font-sans text-sm capitalize text-text-primary">{briefing.confidence}</p></div>
-          <div className="bg-surface-1 px-4 py-3"><p className="label-overline">Evidence</p><p className="mt-1 font-sans text-sm text-text-primary">{briefing.evidence_references.length} references</p></div>
+          <div className="bg-surface-1 px-4 py-3">
+            <p className="label-overline">Generated</p>
+            <p className="mt-1 font-sans text-sm text-text-primary">{formatDate(job.updated_at ?? job.created_at)}</p>
+          </div>
+          <div className="bg-surface-1 px-4 py-3">
+            <p className="label-overline">Confidence</p>
+            <p className="mt-1 font-sans text-sm capitalize text-text-primary">{briefing.confidence}</p>
+          </div>
+          <div className="bg-surface-1 px-4 py-3">
+            <p className="label-overline">Evidence</p>
+            <p className="mt-1 font-sans text-sm text-text-primary">{briefing.evidence_references.length} references</p>
+          </div>
         </div>
       </header>
 
@@ -123,8 +155,11 @@ export function OperationalBriefingDetail({ job }: { job: AIReportJob }) {
         <div className="flex items-center gap-2">
           <p className="font-heading text-sm font-semibold tracking-tight text-text-primary">LLM generated text</p>
           <HelpTip label="LLM generated text help" content="This is the brief human-readable result from the structured model response. It appears immediately below the report status block so operators can review the current situation before reading the supporting details." />
+          <span className={`rounded-full px-2 py-0.5 font-mono text-[0.62rem] font-semibold uppercase tracking-[0.22em] ${generation.used_fallback ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}`}>
+            {generation.used_fallback ? "deterministic fallback" : "live model response"}
+          </span>
         </div>
-        <p className="mt-3 max-w-4xl font-sans text-sm leading-7 text-text-secondary">{briefing.executive_summary}</p>
+        <p className="mt-3 max-w-4xl whitespace-pre-wrap text-pretty font-sans text-sm leading-7 text-text-secondary">{briefing.executive_summary}</p>
       </section>
 
       <ReportSection title="What changed" items={briefing.key_updates} />
@@ -143,14 +178,62 @@ export function OperationalBriefingDetail({ job }: { job: AIReportJob }) {
       ) : null}
 
       <section className="rounded-xl border border-border-subtle bg-surface-2/50 p-4">
-        <div className="flex items-center gap-2"><ClipboardCheck className="size-4 text-accent" /><h3 className="font-heading text-sm font-semibold text-text-primary">Evidence and generation record</h3></div>
-        <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
-          <div><p className="label-overline">Affected assets</p><p className="mt-1 font-sans leading-5 text-text-secondary">{briefing.affected_assets.join(", ") || "None identified"}</p></div>
-          <div><p className="label-overline">Model</p><p className="mt-1 font-mono leading-5 text-text-secondary">{String(generation.model ?? "Not recorded")}</p></div>
-          <div><p className="label-overline">Structured mode</p><p className="mt-1 font-mono leading-5 text-text-secondary">{String(generation.structured_mode ?? "Not recorded")}</p></div>
-          <div><p className="label-overline">Provider response</p><p className="mt-1 font-sans leading-5 text-text-secondary">{generation.provider_response_received && !generation.used_fallback ? "Received and schema-validated" : generation.provider_response_received ? "Received but rejected by schema validation; deterministic fallback shown" : generation.used_fallback ? "Unavailable; deterministic fallback shown" : "Not recorded"}</p></div>
-          <div><p className="label-overline">Delivery</p><p className="mt-1 font-sans leading-5 text-text-secondary">{delivery ? `${delivery.kafka_acknowledged ? "Kafka acknowledged" : "Kafka pending"}; ${delivery.historian_persisted ? "historian verified" : "historian pending"}` : "Awaiting delivery verification"}</p></div>
+        <div className="flex items-center gap-2">
+          <ClipboardCheck className="size-4 text-accent" />
+          <h3 className="font-heading text-sm font-semibold text-text-primary">Evidence and generation record</h3>
         </div>
+        <div className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
+          <div>
+            <p className="label-overline">Affected assets</p>
+            <p className="mt-1 font-sans leading-5 text-text-secondary">{briefing.affected_assets.join(", ") || "None identified"}</p>
+          </div>
+          <div>
+            <p className="label-overline">Model</p>
+            <p className="mt-1 font-mono leading-5 text-text-secondary">{String(generation.model ?? "Not recorded")}</p>
+          </div>
+          <div>
+            <p className="label-overline">Structured mode</p>
+            <p className="mt-1 font-mono leading-5 text-text-secondary">{String(generation.structured_mode ?? "Not recorded")}</p>
+          </div>
+          <div>
+            <p className="label-overline">Provider response</p>
+            <p className="mt-1 font-sans leading-5 text-text-secondary">
+              {generation.provider_response_received && !generation.used_fallback
+                ? "Received and schema-validated"
+                : generation.provider_response_received
+                  ? "Received but rejected by schema validation; deterministic fallback shown"
+                  : generation.used_fallback
+                    ? "Unavailable; deterministic fallback shown"
+                    : "Not recorded"}
+            </p>
+          </div>
+          <div>
+            <p className="label-overline">Delivery</p>
+            <p className="mt-1 font-sans leading-5 text-text-secondary">
+              {delivery ? `${delivery.kafka_acknowledged ? "Kafka acknowledged" : "Kafka pending"}; ${delivery.historian_persisted ? "historian verified" : "historian pending"}` : "Awaiting delivery verification"}
+            </p>
+          </div>
+        </div>
+        {shortMemory.length ? (
+          <div className="mt-4 rounded-xl border border-border-subtle bg-surface-0/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-heading text-sm font-semibold text-text-primary">Short memory used</p>
+              <span className="font-mono text-[0.62rem] uppercase tracking-[0.24em] text-text-muted">
+                {briefing.continuity.memory_count ?? shortMemory.length} reports / {briefing.continuity.memory_window_hours ?? "?"}h window
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2">
+              {shortMemory.map((item) => (
+                <div key={item.report_id ?? `${item.generated_at}-${item.headline}`} className="rounded-lg border border-border-subtle bg-surface-1 px-3 py-2">
+                  <p className="font-heading text-sm font-semibold text-text-primary">{item.headline ?? "Untitled briefing"}</p>
+                  <p className="mt-1 font-sans text-xs leading-5 text-text-secondary">
+                    {item.report_type ?? "report"} · {item.situation_status ?? "unknown"} · {item.generated_at ?? "not recorded"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <details className="mt-4 rounded-lg border border-border-subtle bg-surface-0/60 p-3">
           <summary className="cursor-pointer font-sans text-sm font-medium text-text-primary">Evidence IDs</summary>
           <p className="mt-3 break-words font-mono text-xs leading-5 text-text-muted">{briefing.evidence_references.join(" · ") || "No event IDs were available."}</p>

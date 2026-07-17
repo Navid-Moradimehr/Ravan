@@ -76,6 +76,8 @@ def build_briefing_context(
             "focus": "Broadcast the current operational situation and changes since the previous briefing.",
             "avoid": "Do not invent causes, values, trends, or plant actions. Do not perform long-term trend analysis.",
             "quiet_periods": "If evidence is normal, report that operations appear normal and identify any data gaps.",
+            "memory_window_hours": max(1, memory_hours),
+            "continuity": "When short_memory is present, summarize whether the new report is continuing, recovering, or diverging from the previous briefing. Mention only concrete changes that are supported by the stored briefings.",
         },
     }
 
@@ -151,7 +153,9 @@ def build_briefing_prompt(context: dict[str, Any]) -> str:
         "Use only the evidence and short memory. Classify issue continuity as new, ongoing, "
         "worsening, or resolved. Recommended checks must remain read-only. "
         "Write plain English with normal ASCII punctuation. Do not use fancy dashes, ellipses, or line breaks. "
-        "Keep the headline short and the executive summary to 1-2 short sentences.\n"
+        "Keep the headline short and the executive summary to 1-2 short sentences. "
+        "Do not repeat schema field names, JSON keys, or placeholder labels in the report body. "
+        "Prefer operator language over technical explanation.\n"
         f"If critical and warning counts are both zero, set headline exactly 'Operations appear normal' and "
         f"executive_summary exactly 'Observed {event_count} bounded events: {critical} critical and {warning} warning.'\n\n"
         f"CONTEXT_JSON={json.dumps(context, separators=(',', ':'), default=str)}"
@@ -175,7 +179,7 @@ def deterministic_briefing(context: dict[str, Any], reason: str) -> dict[str, An
     status = "critical" if critical else "attention" if warning else "normal"
     assets = [str(value) for value in current.get("affected_assets", [])]
     headline = "Critical conditions require attention" if critical else "Conditions require attention" if warning else "Operations appear normal"
-    return OperationalBriefing(
+    briefing = OperationalBriefing(
         headline=headline,
         situation_status=status,
         executive_summary=f"Observed {current.get('event_count', 0)} bounded events: {critical} critical and {warning} warning.",
@@ -186,6 +190,18 @@ def deterministic_briefing(context: dict[str, Any], reason: str) -> dict[str, An
         limitations=[f"Deterministic fallback used: {reason}"],
         confidence="medium" if current.get("event_count") else "low",
     ).model_dump(mode="json")
+    return attach_briefing_memory(briefing, context)
+
+
+def attach_briefing_memory(briefing: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    memory = list(context.get("short_memory") or [])
+    continuity = dict(briefing.get("continuity") or {})
+    continuity["short_memory"] = memory[:6]
+    continuity["memory_count"] = len(memory)
+    instructions = context.get("instructions") if isinstance(context.get("instructions"), dict) else {}
+    continuity["memory_window_hours"] = int(instructions.get("memory_window_hours") or 0)
+    briefing["continuity"] = continuity
+    return briefing
 
 
 def _normalize_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
