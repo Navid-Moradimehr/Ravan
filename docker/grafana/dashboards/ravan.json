@@ -1,13 +1,13 @@
 {
   "title": "Ravan",
-  "uid": "local-stream-engine",
+  "uid": "ravan",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "5s",
   "panels": [
     {
       "type": "timeseries",
-      "title": "Ravan",
+      "title": "Ingest throughput",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
@@ -18,7 +18,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Ravan",
+      "title": "AI latency",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {

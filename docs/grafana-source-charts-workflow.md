@@ -65,7 +65,7 @@ credentials or secrets into the source registry.
 
 For the current Docker Compose deployment, the default Grafana stack already has
 the Prometheus datasource provisioned and a starter dashboard in
-`docker/grafana/dashboards/local-stream-engine.json`.
+`docker/grafana/dashboards/ravan.json`.
 
 ## When to use Grafana versus platform charts
 
