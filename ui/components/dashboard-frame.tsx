@@ -46,7 +46,7 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
               <LayoutDashboard aria-hidden="true" className="size-5" />
             </span>
             <div className="leading-tight">
-              <div className="label-overline">LSE</div>
+              <div className="label-overline">Ravan</div>
               <div className="font-heading text-sm font-semibold">Industrial Control Plane</div>
             </div>
           </div>
