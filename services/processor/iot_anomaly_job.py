@@ -429,6 +429,12 @@ def main() -> None:
         .set_record_serializer(
             KafkaRecordSerializationSchema.builder()
             .set_topic(output_topic)
+            # ``iot.processed`` is created as a compacted topic.  A null key
+            # is rejected by Kafka, and would also make compaction impossible.
+            # The processed JSON is deterministic for a given input event, so
+            # using it as the record key preserves the current value-only job
+            # contract while guaranteeing a non-null key at the sink boundary.
+            .set_key_serialization_schema(SimpleStringSchema())
             .set_value_serialization_schema(SimpleStringSchema())
             .build()
         )

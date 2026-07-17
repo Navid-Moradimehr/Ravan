@@ -159,3 +159,8 @@ def test_processed_events_sink_does_not_swallow_persistent_write_failure(monkeyp
     with pytest.raises(RuntimeError, match="historian rejected 2 of 2"):
         sink.invoke(json.dumps({"event_id": "2"}))
     assert len(sink._buffer) == 2
+
+
+def test_flink_processed_topic_sink_sets_key_for_compacted_topic():
+    source = __import__("pathlib").Path("services/processor/iot_anomaly_job.py").read_text(encoding="utf-8")
+    assert ".set_key_serialization_schema(SimpleStringSchema())" in source
