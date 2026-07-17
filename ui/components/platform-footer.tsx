@@ -51,9 +51,9 @@ export function PlatformFooter() {
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Help and contact</h2>
             <p className="text-xs leading-5 text-text-secondary">For open-source support and deployment-specific questions, use the repository issue tracker first, and contact the maintainer directly only when needed.</p>
-            <a href="mailto:navidmoradimehr3@gmail.com" className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-accent">
+            <a href="mailto:ravanplatform@gmail.com" className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-accent">
               <MessageCircleQuestion aria-hidden="true" className="size-4 text-accent" />
-              navidmoradimehr3@gmail.com
+              ravanplatform@gmail.com
             </a>
             <p className="text-xs leading-5 text-text-muted">When you open an issue, include the platform version, deployment profile, and relevant service logs. Do not include credentials.</p>
           </div>
