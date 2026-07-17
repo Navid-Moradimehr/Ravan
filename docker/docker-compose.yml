@@ -342,7 +342,9 @@ services:
       TIMESCALE_HOST: timescaledb
       TIMESCALE_PORT: 5432
       KAFKA_BROKERS: kafka:9092
-      EDGE_PROTOCOLS: ${EDGE_PROTOCOLS:-mqtt,opcua,modbus}
+      # Production starts idle until enabled Source Connections exist. Demo
+      # scripts explicitly set their legacy simulator protocols.
+      EDGE_PROTOCOLS: ${EDGE_PROTOCOLS:-}
       EDGE_STORE_FORWARD_DIR: /var/lib/datastream/edge-buffer
       EDGE_SOURCE_HEALTH_HISTORY_PATH: /var/lib/datastream/source-health.json
       DATASTREAM_SOURCE_DELIVERY_HISTORY_PATH: /var/lib/datastream/source-delivery.json

@@ -28,6 +28,9 @@ for source checkout, test, benchmark, and custom-extension workflows.
 Production source endpoints are configured through Source Connections and
 operator-owned environment/configuration values.
 
+When no Source Connection is enabled, edge ingest remains healthy and idle.
+The production Compose profile never attempts bundled simulator endpoints.
+
 ```text
 Production: UI + Edge + Kafka + Flink + historian/fan-out services
 Demo:       Production services + explicit `demo` profile simulators

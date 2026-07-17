@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$env:EDGE_PROTOCOLS = "mqtt,opcua,modbus"
 
 if (-not $SiteProfile) {
   throw "SiteProfile is required"

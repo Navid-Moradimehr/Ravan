@@ -4,6 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$env:EDGE_PROTOCOLS = "mqtt,opcua,modbus"
 $env:MQTT_RATE_PER_SECOND = "$MqttRatePerSecond"
 
 docker compose -f docker/docker-compose.yml --profile demo --profile edge up -d kafka mqtt-broker mqtt-sim opcua-sim modbus-sim edge-ingest processor ai-gateway prometheus grafana
