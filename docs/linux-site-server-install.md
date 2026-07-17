@@ -152,8 +152,23 @@ backup drill after the upgrade.
 ## Current Boundary
 
 This installer is functional on Linux systems with Docker Engine, Compose v2,
-and systemd. It is not executed by the Windows development workstation because
-Windows does not provide systemd. A clean Linux host, WSL2 distribution with
-systemd enabled, or Linux VM must be used for final installation acceptance.
+and systemd. The generated unit waits for `docker info` instead of requiring a
+unit literally named `docker.service`, so it also works with compatible Docker
+endpoints when the operator exposes them to the system service. Docker Desktop
+WSL integration must be enabled and its socket must be available to the service
+account; Docker Desktop running only on the Windows side is not enough.
+
+Source-build mode needs access to the configured container registry, PyPI/npm
+or an equivalent internal mirror during image builds. For a disconnected or
+repeatable production install, publish or mirror the Ravan images and use
+registry mode. The Linux package was transaction-tested on Ubuntu 24.04 under
+systemd: extraction, install, service generation, environment creation, and
+Compose graph validation passed. Full startup requires a reachable Docker
+endpoint and build dependencies; the current Docker Desktop WSL session could
+not reach PyPI during a source build.
+
+It is not executed by the Windows development workstation because Windows does
+not provide systemd. A clean Linux host, systemd-enabled WSL2 distribution with
+Docker integration, or Linux VM remains the final first-start acceptance target.
 Windows and macOS one-click applications remain the lightweight Ravan Operator
 shell; they connect to a Site Server and do not replace this runtime.

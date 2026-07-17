@@ -42,7 +42,7 @@ The current checker validates the version and exposes the metadata. It does
 not download `artifact_url`, execute a package, mutate Compose, or migrate a
 database.
 
-## Why installation is not automatic yet
+## Why update installation remains controlled
 
 An industrial update is a controlled change, not a browser download. A safe
 future updater must stage the artifact, verify a publisher signature and
@@ -53,9 +53,11 @@ operator approval policy and an offline/manual path. Implementing only the
 download half would create a partial updater and could leave a plant with a
 mixed application/database version.
 
-The installer and update agent are intentionally postponed. Until they exist,
-operators should use the documented stop, backup, replace, migrate, verify,
-and rollback sequence in `docs/self-host-install-guide.md`.
+The Site Server installer and data-preserving upgrade helper now exist. The
+upgrade is still deliberately operator-approved rather than an unattended
+browser download. Operators should use the installer/upgrade runbook and its
+doctor and backup checks; automatic mutation remains disabled until publisher
+signing, site change-control, and rollback evidence are available.
 
 The repository now includes an operator-approved Compose transition helper:
 

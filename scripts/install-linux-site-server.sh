@@ -6,13 +6,9 @@ set -Eeuo pipefail
 # and distribution concerns that vary across industrial environments.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "${SCRIPT_DIR}/../docker/docker-compose.yml" ]]; then
-  # Source-tree invocation: scripts/install-linux-site-server.sh
-  BUNDLE_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-else
-  # Release invocation: install/linux/install.sh
-  BUNDLE_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
-fi
+# The installer consumes the staged release bundle. This repository copy is
+# placed under install/linux by scripts/package-release.py.
+BUNDLE_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 INSTALL_DIR="${RAVAN_INSTALL_DIR:-/opt/ravan}"
 SITE_ID="${RAVAN_SITE_ID:-demo-site}"
 MODE="${RAVAN_INSTALL_MODE:-source-build}"
@@ -150,8 +146,7 @@ cat > "$SERVICE_PATH" <<EOF
 Description=Ravan Industrial Data Site Server (${SITE_ID})
 Documentation=https://github.com/Navid-Moradimehr/Ravan
 Wants=network-online.target
-After=network-online.target docker.service
-Requires=docker.service
+After=network-online.target
 
 [Service]
 Type=oneshot
@@ -160,6 +155,7 @@ WorkingDirectory=${INSTALL_DIR}/runtime
 ExecStart=${INSTALL_DIR}/bin/compose.sh up -d
 ExecStop=${INSTALL_DIR}/bin/compose.sh stop
 ExecReload=${INSTALL_DIR}/bin/compose.sh up -d
+ExecStartPre=/bin/sh -c 'for attempt in \$(seq 1 30); do docker info >/dev/null 2>&1 && exit 0; sleep 2; done; echo "Docker is not ready" >&2; exit 1'
 TimeoutStartSec=0
 TimeoutStopSec=120
 

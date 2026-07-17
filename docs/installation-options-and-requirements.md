@@ -13,7 +13,7 @@ installer for every feature:
 | Package | Target | Role |
 |---|---|---|
 | Compose Site Bundle | Linux, Windows, macOS with Docker | Supported first-release complete single-site runtime |
-| Site Server | Linux x86-64 | Future host-native complete single-site runtime |
+| Site Server | Linux x86-64 | Complete Docker Compose single-site installer with systemd lifecycle |
 | Edge Collector | Linux x86-64 and ARM64 | Collection and store-and-forward near equipment |
 | Windows Full Node | Windows x64 | Future complete local runtime through a managed Linux appliance |
 | Windows Operator | Windows x64 | Desktop client for a local or remote runtime |
@@ -189,21 +189,23 @@ backups and logs outside replaceable application files. Upgrade flow:
 
 ## Current Packaging State
 
-The repository has packaging staging scripts, CLI entry points, runtime
-supervision, release manifests, offline staging foundations, and installation
-documentation. Windows/Linux/offline staging archives have been filtered and
-validated locally: tests, `ObsidianVault`, development screenshots, Playwright
-smoke files, and build targets are excluded while public guidance and demo
-data remain available in the appropriate bundle. This is still release
-staging, not a finished native installer. Final OS installer generation,
-signing, upgrade automation, dependency assembly for clean machines, and
-clean-machine acceptance tests remain packaging work.
+The repository has packaging scripts, CLI entry points, runtime supervision,
+release manifests, offline staging foundations, and installation documentation.
+The Linux Site Server archive is a functional installer with systemd
+installation, doctor, data-preserving uninstall, upgrade, and rollback
+behavior. Windows and macOS operator artifacts are native client installers;
+they connect to a Site Server and do not bundle Kafka, Flink, TimescaleDB, or
+Python. Windows/macOS signing, macOS notarization, and clean-machine/customer
+network acceptance remain release operations rather than hidden installer
+defaults.
 
-The explicit staging targets are now:
+The explicit package targets are now:
 
 ```powershell
 py -3.13 scripts/package-release.py --output-dir .datastream/release compose
+py -3.13 scripts/package-release.py --output-dir .datastream/release site-server
 py -3.13 scripts/package-release.py --output-dir .datastream/release kubernetes
+py -3.13 scripts/package-release.py --output-dir .datastream/release operator
 ```
 
 The Compose target is the first release product. The Kubernetes target contains

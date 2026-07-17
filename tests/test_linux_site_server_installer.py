@@ -12,6 +12,9 @@ def test_linux_installer_has_safe_lifecycle_contract() -> None:
     assert "registry" in script
     assert "systemctl enable" in script
     assert "docker compose" in script
+    assert "ExecStartPre=/bin/sh -c" in script
+    assert "\\$(seq 1 30)" in script
+    assert "Requires=docker.service" not in script
     assert "--profile ui --profile edge" in script
     assert "--env-file" in script
     assert "docker compose" in script
