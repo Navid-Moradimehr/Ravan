@@ -2,10 +2,10 @@ import Link from "next/link";
 import { Cable, Database, FileText, Mail, MessageCircleQuestion, Radio } from "lucide-react";
 
 const guideLinks = [
-  { href: "/integrations#source-connections", label: "Connect a source", icon: Cable },
-  { href: "/pipeline", label: "Trace the event pipeline", icon: Radio },
-  { href: "/historian", label: "Explore historian data", icon: Database },
-  { href: "/datasets", label: "Prepare datasets", icon: FileText },
+  { href: "/help-guidance#sources", label: "Connect a source", icon: Cable },
+  { href: "/help-guidance#pipeline", label: "Trace the event pipeline", icon: Radio },
+  { href: "/help-guidance#historian", label: "Explore historian data", icon: Database },
+  { href: "/help-guidance#datasets", label: "Prepare datasets", icon: FileText },
 ];
 
 export function PlatformFooter() {
@@ -31,7 +31,7 @@ export function PlatformFooter() {
 
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Start here</h2>
-            <p className="text-xs leading-5 text-text-secondary">Use these guides in order when setting up a new site.</p>
+            <p className="text-xs leading-5 text-text-secondary">Open the full handbook for detailed instructions, ownership boundaries, and troubleshooting.</p>
             <nav aria-label="Platform setup guides" className="space-y-2">
               {guideLinks.map(({ href, label, icon: Icon }) => (
                 <Link key={href} href={href} className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-accent">

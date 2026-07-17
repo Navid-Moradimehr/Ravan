@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowRight, BarChart3, Cable, Database, DatabaseZap, Gauge, LayoutDashboard, Workflow } from "lucide-react";
+import { BarChart3, BookOpen, Cable, Database, DatabaseZap, Gauge, LayoutDashboard, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { href: "/historian", label: "Historian", icon: DatabaseZap, description: "Storage, queries, backup" },
   { href: "/observability", label: "Observability", icon: Gauge, description: "Health, metrics, latency" },
   { href: "/integrations", label: "Integrations", icon: BarChart3, description: "CDC, webhooks, models" },
+  { href: "/help-guidance", label: "Help & guidance", icon: BookOpen, description: "Platform handbook" },
   { href: "/ai-reporting", label: "Operational briefings", icon: Workflow, description: "AI reports and policy", badge: "Beta" },
   { href: "/datasets", label: "Data readiness", icon: Database, description: "Manifests and trajectories" },
   { href: "/pipeline", label: "Pipeline", icon: Cable, description: "Ingress, normalization, DLQ" },
@@ -83,15 +84,6 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
             })}
           </nav>
 
-          <div className="mt-auto rounded-lg border border-border-subtle bg-surface-2 p-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
-              <ArrowRight aria-hidden="true" className="size-4 text-accent" />
-              Hardware-free mode
-            </div>
-            <p className="mt-2 text-pretty text-xs leading-5 text-text-secondary">
-              Kafka, Flink, TimescaleDB, and local simulators keep the full industrial flow repeatable without plant access.
-            </p>
-          </div>
         </aside>
 
         <div className="min-w-0 space-y-6">
