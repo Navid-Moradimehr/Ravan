@@ -33,3 +33,6 @@ jobs:
       - name: Build UI
         working-directory: ui
         run: npm ci && npm run build
+      - name: Validate operator shell manifest
+        working-directory: operator-shell
+        run: npm install --package-lock=false && cargo check --manifest-path src-tauri/Cargo.toml --locked

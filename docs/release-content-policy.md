@@ -31,3 +31,8 @@ The `operator` artifact is intentionally different from a Site Server bundle:
 it contains the Tauri shell source and public operator guidance, but no Python
 runtime, Docker Compose stack, Kafka, historian, model endpoint, credentials,
 or Obsidian vault.
+
+Release packages also include the cross-platform `ravan-upgrade` helper and
+release-evidence generator. They are operator tools, not an unattended update
+agent. A package's checksums and provenance describe what was built; they do
+not grant permission to deploy it into a customer's network.

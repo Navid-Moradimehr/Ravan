@@ -34,7 +34,16 @@ DEFAULT_MANIFEST = REPO_ROOT / "config" / "project-manifest.yaml"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "dist"
 RUNTIME_COPY_DIRS = ("services", "config", "ui", "rust", "docker")
 RUNTIME_COPY_FILES = ("README.md", "LICENSE", "NOTICE", "pyproject.toml", "requirements.txt", "uv.lock", ".env.production.example")
-RUNTIME_SCRIPT_FILES = ("ravan.ps1", "ravan.sh", "ravanctl.ps1", "ravanctl.sh", "render_release_compose.py")
+RUNTIME_SCRIPT_FILES = (
+    "ravan.ps1",
+    "ravan.sh",
+    "ravanctl.ps1",
+    "ravanctl.sh",
+    "ravan-upgrade.ps1",
+    "ravan-upgrade.sh",
+    "render_release_compose.py",
+    "generate_release_evidence.py",
+)
 OFFLINE_EXTRA_DIRS = ("data",)
 PUBLIC_DOCUMENT_FILES = (
     "docs/README.md",

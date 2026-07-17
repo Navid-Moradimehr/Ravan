@@ -57,6 +57,22 @@ The installer and update agent are intentionally postponed. Until they exist,
 operators should use the documented stop, backup, replace, migrate, verify,
 and rollback sequence in `docs/self-host-install-guide.md`.
 
+The repository now includes an operator-approved Compose transition helper:
+
+```bash
+./scripts/ravan-upgrade.sh \
+  --current-compose docker/docker-compose.yml \
+  --compose-file docker/docker-compose.release.yml
+```
+
+On Windows use `scripts/ravan-upgrade.ps1` with the same two paths. The helper
+validates both Compose files, records the rendered previous configuration and
+status under `.datastream/upgrades/<UTC timestamp>/`, stops services without
+removing volumes, starts the new configuration, and restores the previous
+rendered configuration if the API does not become running before the timeout.
+It does not run destructive `down --volumes`, does not bypass migrations, and
+does not silently download or install a release.
+
 ## GitHub release recommendations
 
 1. Publish immutable semantic-version tags such as `v1.0.0-beta.1`.
@@ -69,6 +85,17 @@ and rollback sequence in `docs/self-host-install-guide.md`.
    stop ingestion, processing, or historian writes.
 6. For plant deployments, mirror approved artifacts to the company's internal
    registry and point `DATASTREAM_UPDATE_MANIFEST_URL` there.
+
+## Offline and release evidence
+
+The `offline` package is a source/runtime bundle for air-gapped change
+control. It does not claim to contain every third-party container image or
+Python wheel. Operators must mirror approved dependencies into their internal
+registry or wheelhouse and set the corresponding endpoints before starting a
+site. Every published release should include checksums, the generated SPDX
+SBOM, and unsigned provenance evidence. Signature and attestation verification
+remain release-pipeline responsibilities until the publisher identity is
+finalized.
 
 ## Service lifecycle invariant
 
