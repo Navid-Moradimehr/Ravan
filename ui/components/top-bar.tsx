@@ -24,7 +24,6 @@ export function TopBar({ systemStatus = "online" }: { systemStatus?: "online" | 
         </Link>
 
         <div className="hidden min-w-0 items-center gap-2 md:flex">
-          <span className="label-overline">Current view</span>
           <span className="max-w-48 truncate text-sm capitalize text-text-secondary">{currentView}</span>
         </div>
 
