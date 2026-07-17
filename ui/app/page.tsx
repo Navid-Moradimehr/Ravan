@@ -182,13 +182,14 @@ export default function Home() {
             {quickRoutes.map((route) => {
               return (
                 <Link key={route.href} href={route.href} className="group">
-                  <Card className="h-full border-border bg-surface-2 transition-colors hover:border-accent/40">
-                    <CardHeader>
+                  <Card className="flex h-full flex-col border-border bg-surface-2 transition-colors hover:border-accent/40">
+                    <CardHeader className="space-y-2">
                       <CardTitle className="text-base">{route.title}</CardTitle>
                       <CardDescription>{route.description}</CardDescription>
                     </CardHeader>
-                    <CardContent className="text-sm text-text-secondary">
+                    <CardContent className="mt-auto flex items-end pt-4 text-sm text-text-secondary">
                       <span className="inline-flex items-center gap-2 font-medium text-text-primary">
+                        <ArrowRight aria-hidden="true" className="size-4 text-text-secondary transition-transform group-hover:translate-x-0.5" />
                         Open route
                       </span>
                     </CardContent>

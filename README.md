@@ -156,6 +156,7 @@ against realistic industrial batches without depending on a live model server.
 - `scripts/site-profile-soak.ps1` runs a live site-profile release gate and soak harness against the host-run runtime services.
 - `data/benchmarks/industrial_mixed_benchmark.csv` is a local replay pack for mixed-protocol benchmark and stress cases.
 - `ObsidianVault/` is the project knowledge base.
+- `docs/deployment-payload-boundaries.md` defines installer, public-repository, and development-only file boundaries.
 - `docs/` contains implementation-facing references and operational notes.
 
 ## Useful URLs

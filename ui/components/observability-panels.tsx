@@ -207,7 +207,7 @@ export function ObservabilityPanels({ snapshot }: { snapshot: ObservabilitySnaps
                     <XAxis dataKey="protocol" {...axisProps} />
                     <YAxis {...axisProps} width={32} />
                     <Tooltip content={<ChartTooltipContent indicator="dot" />} />
-                    <Bar dataKey="total" radius={[4, 4, 0, 0]} fill="var(--chart-1)" />
+                    <Bar dataKey="total" barSize={44} maxBarSize={44} radius={[5, 5, 0, 0]} fill="var(--chart-1)" />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
