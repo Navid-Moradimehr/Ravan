@@ -1,0 +1,38 @@
+name: Ravan Operator macOS Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Operator bundle version"
+        required: false
+        default: "1.0.0-1"
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: operator-shell/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build unsigned macOS Operator
+        working-directory: operator-shell
+        env:
+          RAVAN_OPERATOR_VERSION: ${{ inputs.version }}
+        run: |
+          npm ci
+          npm run tauri -- build --bundles dmg --ci --config '{"version":"'"${RAVAN_OPERATOR_VERSION}"'"}'
+      - name: Upload DMG validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ravan-operator-macos-validation
+          path: operator-shell/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error

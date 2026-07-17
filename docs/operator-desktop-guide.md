@@ -50,3 +50,8 @@ future Linux desktop Operator. The server does not need a desktop session.
 The Site Server owns the industrial data pipeline. The Operator only provides
 the desktop entry point. Closing the Operator does not stop ingestion,
 processing, storage, or alarms on the Site Server.
+
+Maintainers can run the manual **Ravan Operator macOS Validation** workflow to
+build a DMG on a native macOS runner without publishing a release. The result
+is an unsigned validation artifact until Apple Developer signing and
+notarization credentials are added.
