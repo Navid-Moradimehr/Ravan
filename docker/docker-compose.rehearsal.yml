@@ -1,0 +1,39 @@
+# Local validation overlay. Use with a separate project name so it can run
+# beside an existing Ravan deployment without reusing host ports or volumes.
+services:
+  kafka:
+    ports: !reset ["29092:29092", "29097:9997"]
+  kafka-ui:
+    ports: !reset ["28080:8080"]
+  postgres:
+    ports: !reset ["25432:5432"]
+  connect:
+    ports: !reset ["28083:8083"]
+  ai-gateway:
+    ports: !reset ["28000:8080"]
+  processor:
+    ports: !reset ["28094:8094"]
+  fanout:
+    ports: !reset ["28095:8095"]
+  processed-fanout:
+    ports: !reset ["28097:8097"]
+  ai-fanout:
+    ports: !reset ["28096:8096"]
+  edge-ingest:
+    ports: !reset ["28090:8090"]
+  dashboard:
+    ports: !reset ["23006:3006"]
+  jobmanager:
+    ports: !reset ["28088:8081"]
+  prometheus:
+    ports: !reset ["29090:9090"]
+  grafana:
+    ports: !reset ["23001:3000"]
+  grafana-proxy:
+    ports: !reset ["23000:80"]
+  minio:
+    ports: !reset ["29000:9000", "29001:9001"]
+  timescaledb:
+    ports: !reset ["25433:5432"]
+  redis:
+    ports: !reset ["26379:6379"]

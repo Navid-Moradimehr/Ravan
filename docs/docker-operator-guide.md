@@ -86,3 +86,13 @@ container is expected; inspect its exit code and logs only when it is nonzero.
 The Kafka JMX endpoint is enabled for Kafka UI broker metrics. It is intended
 for the local Compose network; expose it beyond the host only through the
 operator's secured observability design.
+
+## Isolated Local Rehearsal
+
+To validate a fresh stack beside an existing local deployment, use the
+rehearsal override. It assigns alternate host ports while preserving all
+internal service addresses:
+
+```powershell
+docker compose -p ravan-rehearsal -f docker/docker-compose.yml -f docker/docker-compose.rehearsal.yml --profile ui --profile edge up -d
+```
