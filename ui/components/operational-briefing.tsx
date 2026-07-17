@@ -111,7 +111,6 @@ export function OperationalBriefingDetail({ job }: { job: AIReportJob }) {
       <header className="overflow-hidden rounded-xl border border-border bg-surface-1">
         <div className="border-b border-border-subtle bg-surface-2/65 p-5">
           <div className="flex items-start gap-2"><h2 className="text-balance font-heading text-2xl font-semibold leading-tight tracking-tight text-text-primary">{briefing.headline}</h2><HelpTip label="Briefing detail help" content="This is a validated structured report stored in the durable job record. The sections below show model output, evidence IDs, fallback state, Kafka acknowledgement, and historian persistence separately." /></div>
-          <p className="mt-3 max-w-3xl font-sans text-sm leading-7 text-text-secondary">{briefing.executive_summary}</p>
         </div>
         <div className="grid gap-px bg-border-subtle sm:grid-cols-3">
           <div className="bg-surface-1 px-4 py-3"><p className="label-overline">Generated</p><p className="mt-1 font-sans text-sm text-text-primary">{formatDate(job.updated_at ?? job.created_at)}</p></div>
@@ -119,6 +118,14 @@ export function OperationalBriefingDetail({ job }: { job: AIReportJob }) {
           <div className="bg-surface-1 px-4 py-3"><p className="label-overline">Evidence</p><p className="mt-1 font-sans text-sm text-text-primary">{briefing.evidence_references.length} references</p></div>
         </div>
       </header>
+
+      <section className="rounded-xl border border-border bg-surface-1 p-5">
+        <div className="flex items-center gap-2">
+          <p className="font-heading text-sm font-semibold tracking-tight text-text-primary">LLM generated text</p>
+          <HelpTip label="LLM generated text help" content="This is the brief human-readable result from the structured model response. It appears immediately below the report status block so operators can review the current situation before reading the supporting details." />
+        </div>
+        <p className="mt-3 max-w-4xl font-sans text-sm leading-7 text-text-secondary">{briefing.executive_summary}</p>
+      </section>
 
       <ReportSection title="What changed" items={briefing.key_updates} />
       <IssueList title="Active issues" issues={briefing.active_issues} />

@@ -11,18 +11,21 @@ type SectionHeaderProps = {
   children?: React.ReactNode;
 };
 
-export function SectionHeader({ title, description, icon: Icon, eyebrow, actions, className }: SectionHeaderProps) {
+export function SectionHeader({ title, description, icon: Icon, eyebrow, actions, className, children }: SectionHeaderProps) {
   return (
     <div className={cn("flex flex-wrap items-end justify-between gap-x-4 gap-y-3", className)}>
       <div className="min-w-0 space-y-1">
         {eyebrow ? <p className="label-overline">{eyebrow}</p> : null}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-start gap-2.5">
           {Icon ? (
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-2 text-accent">
               <Icon aria-hidden="true" className="size-4" />
             </span>
           ) : null}
-          <h2 className="font-heading text-lg font-semibold tracking-tight text-text-primary">{title}</h2>
+          <div className="flex min-w-0 items-start gap-2">
+            <h2 className="font-heading text-lg font-semibold tracking-tight text-text-primary">{title}</h2>
+            {children ? <div className="pt-0.5">{children}</div> : null}
+          </div>
         </div>
         {description ? (
           <p className="max-w-2xl text-pretty text-sm leading-5 text-text-secondary">{description}</p>

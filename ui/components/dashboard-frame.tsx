@@ -8,12 +8,14 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/top-bar";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
   description: string;
+  badge?: string;
 };
 
 const navItems: NavItem[] = [
@@ -21,7 +23,7 @@ const navItems: NavItem[] = [
   { href: "/historian", label: "Historian", icon: DatabaseZap, description: "Storage, queries, backup" },
   { href: "/observability", label: "Observability", icon: Gauge, description: "Health, metrics, latency" },
   { href: "/integrations", label: "Integrations", icon: BarChart3, description: "CDC, webhooks, models" },
-  { href: "/ai-reporting", label: "Operational briefings", icon: Workflow, description: "AI reports and policy" },
+  { href: "/ai-reporting", label: "Operational briefings", icon: Workflow, description: "AI reports and policy", badge: "Beta" },
   { href: "/datasets", label: "Data readiness", icon: Database, description: "Manifests and trajectories" },
   { href: "/pipeline", label: "Pipeline", icon: Cable, description: "Ingress, normalization, DLQ" },
 ];
@@ -70,7 +72,10 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
                 >
                   <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-accent" />
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium">{item.label}</span>
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      <span>{item.label}</span>
+                      {item.badge ? <Badge variant="outline" className="border-accent/30 bg-accent-subtle px-1.5 py-0 text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-accent">{item.badge}</Badge> : null}
+                    </span>
                     <span className="block text-xs leading-5 text-text-secondary">{item.description}</span>
                   </span>
                 </Link>
@@ -105,7 +110,10 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
                   )}
                 >
                   <Icon aria-hidden="true" className="size-4" />
-                  {item.label}
+                  <span className="inline-flex items-center gap-2">
+                    <span>{item.label}</span>
+                    {item.badge ? <Badge variant="outline" className="border-accent/30 bg-accent-subtle px-1.5 py-0 text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-accent">{item.badge}</Badge> : null}
+                  </span>
                 </Link>
               );
             })}
