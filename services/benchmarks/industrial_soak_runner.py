@@ -164,23 +164,43 @@ def _prometheus_scalar(base_url: str, query: str) -> float | None:
         return None
 
 
+def _local_url(env_name: str, default_port: int) -> str:
+    return f"http://localhost:{os.getenv(env_name, str(default_port))}"
+
+
 def collect_snapshot(
     *,
     compose_file: Path,
-    edge_url: str = "http://localhost:8090",
-    api_url: str = "http://localhost:8020",
-    ai_url: str = "http://localhost:8080",
-    prometheus_url: str = "http://localhost:19090",
-    simulator_urls: tuple[str, ...] = ("http://localhost:18091", "http://localhost:18092", "http://localhost:18093"),
-    fanout_url: str = "http://localhost:18095",
-    processed_fanout_url: str = "http://localhost:18097",
-    ai_fanout_url: str = "http://localhost:18096",
-    flink_url: str = "http://localhost:18088",
-    prometheus_health_url: str = "http://localhost:19090/-/healthy",
-    kafka_ui_url: str = "http://localhost:18080",
-    grafana_url: str = "http://localhost:13000",
+    edge_url: str | None = None,
+    api_url: str | None = None,
+    ai_url: str | None = None,
+    prometheus_url: str | None = None,
+    simulator_urls: tuple[str, ...] | None = None,
+    fanout_url: str | None = None,
+    processed_fanout_url: str | None = None,
+    ai_fanout_url: str | None = None,
+    flink_url: str | None = None,
+    prometheus_health_url: str | None = None,
+    kafka_ui_url: str | None = None,
+    grafana_url: str | None = None,
     include_ai: bool = False,
 ) -> RuntimeSnapshot:
+    edge_url = edge_url or _local_url("EDGE_INGEST_HOST_PORT", 8090)
+    api_url = api_url or _local_url("API_SERVICE_HOST_PORT", 8020)
+    ai_url = ai_url or _local_url("AI_GATEWAY_HOST_PORT", 8080)
+    prometheus_url = prometheus_url or _local_url("PROMETHEUS_HOST_PORT", 19090)
+    simulator_urls = simulator_urls or (
+        _local_url("MQTT_SIM_HOST_PORT", 18091),
+        _local_url("OPCUA_SIM_METRICS_HOST_PORT", 18092),
+        _local_url("MODBUS_SIM_METRICS_HOST_PORT", 18093),
+    )
+    fanout_url = fanout_url or _local_url("FANOUT_HOST_PORT", 18095)
+    processed_fanout_url = processed_fanout_url or _local_url("PROCESSED_FANOUT_HOST_PORT", 18097)
+    ai_fanout_url = ai_fanout_url or _local_url("AI_FANOUT_HOST_PORT", 18096)
+    flink_url = flink_url or _local_url("FLINK_JOBMANAGER_HOST_PORT", 18088)
+    prometheus_health_url = prometheus_health_url or f"{prometheus_url}/-/healthy"
+    kafka_ui_url = kafka_ui_url or _local_url("KAFKA_UI_HOST_PORT", 18080)
+    grafana_url = grafana_url or _local_url("GRAFANA_PROXY_HOST_PORT", 13000)
     edge_metrics = _read_text(edge_url)
     api_metrics = _read_text(f"{api_url}/metrics")
     fanout_metrics = _read_text(fanout_url)
@@ -268,7 +288,20 @@ def _taskmanager_replicas_from_env() -> int | None:
 
 
 def _compose(compose_file: Path, *args: str, env: dict[str, str] | None = None, taskmanager_replicas: int | None = None) -> None:
-    command = ["docker", "compose", "-f", str(compose_file), "--profile", "edge", "--profile", "api", "--profile", "ui"]
+    command = [
+        "docker",
+        "compose",
+        "-f",
+        str(compose_file),
+        "--profile",
+        "edge",
+        "--profile",
+        "api",
+        "--profile",
+        "ui",
+        "--profile",
+        "demo",
+    ]
     if args and args[0] == "up" and taskmanager_replicas:
         command.extend(["up", "--scale", f"taskmanager={taskmanager_replicas}"])
         extra_args = list(args[1:])
@@ -337,6 +370,9 @@ def run_live(
         return report
 
     env = os.environ.copy()
+    scenario_protocols = sorted({source.protocol for source in scenario.sources})
+    if scenario_protocols:
+        env["EDGE_PROTOCOLS"] = ",".join(scenario_protocols)
     # Preserve the chosen TaskManager scale across the benchmark's own
     # compose refreshes so the soak actually measures the scaled layout.
     _compose(compose_path, "up", "-d", *("--build",) if build else (), env=env, taskmanager_replicas=taskmanager_replicas)

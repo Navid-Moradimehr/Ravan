@@ -93,6 +93,8 @@ def test_compose_up_preserves_requested_taskmanager_scale(monkeypatch, tmp_path:
     assert "taskmanager=3" in captured["command"]
     assert captured["check"] is True
     assert captured["env"] == {"A": "B"}
+    assert captured["command"].count("--profile") == 4
+    assert "demo" in captured["command"]
 
 
 def test_compose_up_keeps_scaled_services_in_service_list(monkeypatch, tmp_path: Path):
