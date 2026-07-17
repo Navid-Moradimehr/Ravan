@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 import time
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -16,6 +17,8 @@ from pydantic import BaseModel, Field, field_validator
 
 MIN_INTERVAL_SECONDS = 600
 MAX_INTERVAL_SECONDS = 86400
+_AI_REPORTING_TABLES_READY = False
+_AI_REPORTING_TABLES_LOCK = threading.Lock()
 
 
 class AIReportingPolicy(BaseModel):
@@ -111,43 +114,50 @@ def _db():
 
 
 def ensure_ai_reporting_tables() -> None:
-    with _db()() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS metadata_ai_reporting_policy (
-                    policy_id TEXT PRIMARY KEY,
-                    site_id TEXT NOT NULL UNIQUE,
-                    policy JSONB NOT NULL,
-                    version INTEGER NOT NULL DEFAULT 1,
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                );
-                CREATE TABLE IF NOT EXISTS ai_report_jobs (
-                    job_id UUID PRIMARY KEY,
-                    site_id TEXT NOT NULL,
-                    report_type TEXT NOT NULL,
-                    trigger_reason TEXT NOT NULL,
-                    window_start TIMESTAMPTZ,
-                    window_end TIMESTAMPTZ,
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    attempts INTEGER NOT NULL DEFAULT 0,
-                    next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    policy_snapshot JSONB NOT NULL,
-                    evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
-                    result JSONB,
-                    last_error TEXT,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                );
-                CREATE INDEX IF NOT EXISTS ai_report_jobs_status_idx
-                    ON ai_report_jobs (status, next_attempt_at);
-                CREATE UNIQUE INDEX IF NOT EXISTS ai_report_jobs_window_uniq
-                    ON ai_report_jobs (site_id, report_type, trigger_reason, window_start, window_end);
-                ALTER TABLE ai_report_jobs ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
-                ALTER TABLE ai_report_jobs ADD COLUMN IF NOT EXISTS worker_id TEXT;
-                """
-            )
-        conn.commit()
+    global _AI_REPORTING_TABLES_READY
+    if _AI_REPORTING_TABLES_READY:
+        return
+    with _AI_REPORTING_TABLES_LOCK:
+        if _AI_REPORTING_TABLES_READY:
+            return
+        with _db()() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS metadata_ai_reporting_policy (
+                        policy_id TEXT PRIMARY KEY,
+                        site_id TEXT NOT NULL UNIQUE,
+                        policy JSONB NOT NULL,
+                        version INTEGER NOT NULL DEFAULT 1,
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    );
+                    CREATE TABLE IF NOT EXISTS ai_report_jobs (
+                        job_id UUID PRIMARY KEY,
+                        site_id TEXT NOT NULL,
+                        report_type TEXT NOT NULL,
+                        trigger_reason TEXT NOT NULL,
+                        window_start TIMESTAMPTZ,
+                        window_end TIMESTAMPTZ,
+                        status TEXT NOT NULL DEFAULT 'pending',
+                        attempts INTEGER NOT NULL DEFAULT 0,
+                        next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        policy_snapshot JSONB NOT NULL,
+                        evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
+                        result JSONB,
+                        last_error TEXT,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    );
+                    CREATE INDEX IF NOT EXISTS ai_report_jobs_status_idx
+                        ON ai_report_jobs (status, next_attempt_at);
+                    CREATE UNIQUE INDEX IF NOT EXISTS ai_report_jobs_window_uniq
+                        ON ai_report_jobs (site_id, report_type, trigger_reason, window_start, window_end);
+                    ALTER TABLE ai_report_jobs ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+                    ALTER TABLE ai_report_jobs ADD COLUMN IF NOT EXISTS worker_id TEXT;
+                    """
+                )
+            conn.commit()
+        _AI_REPORTING_TABLES_READY = True
 
 
 def get_policy(site_id: str = "*") -> AIReportingPolicy:
