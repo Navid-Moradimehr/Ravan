@@ -47,7 +47,7 @@ docker compose -f docker/docker-compose.yml --profile ui --profile edge --profil
 
 ## Required Operator Configuration
 
-1. Copy `.env.example` to `.env`.
+1. Copy `.env.production.example` to `.env`.
 2. Replace demo database, MinIO, Grafana, and model credentials.
 3. Configure real broker and protocol endpoints through Source Connections or
    deployment configuration. The production `edge` profile has no dependency
@@ -56,6 +56,23 @@ docker compose -f docker/docker-compose.yml --profile ui --profile edge --profil
    the company network policy.
 5. Run `ravanctl preflight --strict`, then a backup drill, before production
    traffic is enabled.
+
+## Browser And API Routing
+
+The UI proxies AI telemetry through its own `/api/telemetry` route, so browser
+clients do not need direct access to the AI gateway port. WebSocket telemetry
+derives its host from the browser URL and uses port `8020`; expose or reverse
+proxy that endpoint when operators use a remote browser. Set
+`DATASTREAM_CORS_ALLOW_ORIGINS` to the exact UI origins served by the company.
+The default only permits local Ravan UI on port `3006`.
+
+## Kubernetes Preview
+
+The Helm chart is a self-hosted deployment contract, not a hosted control
+plane. It defaults to the Flink production runtime and versioned Ravan image
+names. Operators must set their own image registry, secrets, Kafka,
+TimescaleDB, object storage, ingress, TLS, and identity integration before
+applying it to a real cluster.
 
 ## Operational Notes
 

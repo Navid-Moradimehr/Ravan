@@ -21,7 +21,7 @@ flinkJob:
   enabled: true
   operator:
     enabled: true
-    image: "registry.example.internal/data-stream/flink-job:REPLACE_ME"
+    image: "registry.example.internal/ravan/flink-job:REPLACE_ME"
 
 autoScaling:
   apiService:

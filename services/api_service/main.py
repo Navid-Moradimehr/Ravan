@@ -168,7 +168,10 @@ WS_HEARTBEAT_INTERVAL = 15.0  # seconds
 
 def _parse_cors_origins(raw: str | None) -> list[str]:
     if raw is None:
-        raw = os.getenv("DATASTREAM_CORS_ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+        raw = os.getenv(
+            "DATASTREAM_CORS_ALLOW_ORIGINS",
+            "http://localhost:3006,http://127.0.0.1:3006",
+        )
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
     return origins
 

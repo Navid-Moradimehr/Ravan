@@ -133,7 +133,14 @@ export type ThresholdPolicySyncState = {
   policy_count: number;
 };
 
-export const DEFAULT_API_WS_BASE_URL = process.env.NEXT_PUBLIC_API_WS_BASE_URL ?? "ws://localhost:8020";
+function defaultApiWebSocketBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_WS_BASE_URL) return process.env.NEXT_PUBLIC_API_WS_BASE_URL;
+  if (typeof window === "undefined") return "ws://localhost:8020";
+  const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${scheme}://${window.location.hostname}:8020`;
+}
+
+export const DEFAULT_API_WS_BASE_URL = defaultApiWebSocketBaseUrl();
 
 export async function getAssetTagCatalog(): Promise<{ items: AssetTagCatalogItem[] }> {
   return requestJson("/api/metadata/asset-tags");
@@ -462,8 +469,7 @@ export function createObservabilityFallback(): ObservabilitySnapshot {
 }
 
 export async function getTelemetry(): Promise<Telemetry> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-  return requestJson(`${baseUrl}/telemetry`);
+  return requestJson("/api/telemetry");
 }
 
 export async function getObservability(): Promise<ObservabilitySnapshot> {

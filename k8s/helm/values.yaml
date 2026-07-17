@@ -2,13 +2,13 @@
 # Ravan — Helm values
 # ---------------------------------------------------------------------------
 # Each service can be enabled/disabled independently. Dependencies
-# (TimescaleDB, Redpanda) are expected to be installed separately or via
+# (TimescaleDB, Kafka) are expected to be installed separately or via
 # subcharts.
 # ---------------------------------------------------------------------------
 
 image:
-  repository: data-stream
-  tag: latest
+  repository: ghcr.io/navid-moradimehr/ravan
+  tag: 1.0.0-beta.1
   pullPolicy: IfNotPresent
 
 fullnameOverride: ""
@@ -22,7 +22,7 @@ apiService:
   enabled: true
   replicaCount: 1
   image:
-    repository: "data-stream-api"
+    repository: "ghcr.io/navid-moradimehr/ravan-api"
     tag: ""
     pullPolicy: ""
   command: ["python", "-m", "uvicorn", "services.api_service.main:app", "--host", "0.0.0.0", "--port", "8020", "--no-access-log"]
@@ -40,7 +40,7 @@ aiGateway:
   enabled: true
   replicaCount: 1
   image:
-    repository: "data-stream-ai-gateway"
+    repository: "ghcr.io/navid-moradimehr/ravan-ai-gateway"
     tag: ""
     pullPolicy: ""
   command: ["uvicorn", "services.ai_gateway.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
@@ -58,7 +58,7 @@ processor:
   enabled: true
   replicaCount: 1
   image:
-    repository: "data-stream-processor"
+    repository: "ghcr.io/navid-moradimehr/ravan-processor"
     tag: ""
     pullPolicy: ""
   command: ["python", "-m", "services.processor.runtime_processor"]
@@ -74,7 +74,7 @@ flinkJob:
   enabled: false
   replicaCount: 1
   image:
-    repository: "data-stream-flink-job"
+    repository: "ghcr.io/navid-moradimehr/ravan-flink-job"
     tag: ""
     pullPolicy: ""
   command: ["bash", "/opt/stream/flink-job-entrypoint.sh"]
@@ -87,8 +87,8 @@ flinkJob:
     taskmanagerReplicas: 1
   operator:
     enabled: false
-    serviceAccount: data-stream-flink
-    image: "data-stream-flink-job:latest"
+    serviceAccount: ravan-flink
+    image: "ghcr.io/navid-moradimehr/ravan-flink-job:1.0.0-beta.1"
     flinkVersion: v1_20
     jobManager:
       cpu: 1
@@ -117,7 +117,7 @@ edgeIngest:
   enabled: true
   replicaCount: 1
   image:
-    repository: "data-stream-edge-ingest"
+    repository: "ghcr.io/navid-moradimehr/ravan-edge-ingest"
     tag: ""
     pullPolicy: ""
   command: ["python", "-m", "services.edge_ingest.main"]
@@ -175,7 +175,7 @@ env:
   DEPLOYMENT_MODE: "single-site"
   REGION: "local-lab"
   NETWORK_ZONE: "zone-a"
-  RUNTIME_MODE: "python-fallback"
+  RUNTIME_MODE: "flink-production"
   KAFKA_BROKERS: "kafka:9092"
   TIMESCALE_HOST: "timescaledb"
   TIMESCALE_PORT: "5432"
@@ -210,7 +210,7 @@ env:
 
 secrets:
   create: false
-  existingSecret: data-stream-secrets
+  existingSecret: ravan-secrets
   data:
     TIMESCALE_PASSWORD: ""
     JWT_SECRET: ""
@@ -229,6 +229,6 @@ affinity: {}
 # timescaledb:
 #   enabled: false
 #   # Use TimescaleDB Helm chart: https://github.com/timescale/helm-charts
-# redpanda:
+# kafka:
 #   enabled: false
 #   # Use Redpanda Helm chart: https://github.com/redpanda-data/helm-charts

@@ -33,7 +33,7 @@ On Windows, use a matching `C:\Datastream\<project>\<site>\` layout.
 ## Install flow
 
 1. Install Docker Engine or Docker Desktop.
-2. Copy `.env.example` to `.env`, replace demo credentials, and set real broker, historian, and model endpoints.
+2. Copy `.env.production.example` to `.env`, replace every `CHANGE_ME` value, and set real broker, historian, and model endpoints.
 3. Copy the project manifest and site profile into the site root.
 4. Start Ravan with `./scripts/ravan.sh up -d` or `./scripts/ravan.ps1 up -d`.
 5. Run `./scripts/ravanctl.sh doctor` or `./scripts/ravanctl.ps1 doctor`.
@@ -74,7 +74,7 @@ does **not** need Python, `pip`, or a project-local virtual environment.
 Linux/macOS:
 
 ```bash
-cp .env.example .env
+cp .env.production.example .env
 # Replace development credentials and configure real endpoints in .env.
 ./scripts/ravan.sh up -d
 ./scripts/ravanctl.sh doctor
@@ -85,7 +85,7 @@ cp .env.example .env
 Windows PowerShell:
 
 ```powershell
-Copy-Item .env.example .env
+Copy-Item .env.production.example .env
 # Replace development credentials and configure real endpoints in .env.
 .\scripts\ravan.ps1 up -d
 .\scripts\ravanctl.ps1 doctor

@@ -383,8 +383,7 @@ services:
         condition: service_healthy
     environment:
       API_SERVICE_BASE: http://api-service:8020
-      NEXT_PUBLIC_API_WS_BASE_URL: ws://localhost:8020
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      AI_GATEWAY_BASE: http://ai-gateway:8080
       PROMETHEUS_BASE_URL: http://prometheus:9090
       GRAFANA_BASE_URL: http://grafana:3000
       GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-http://localhost:13000}
@@ -760,10 +759,11 @@ services:
       KAFKA_BROKERS: kafka:9092
       TIMESCALE_HOST: timescaledb
       TIMESCALE_PORT: 5432
-      TIMESCALE_DB: stream_engine
-      TIMESCALE_USER: stream
-      TIMESCALE_PASSWORD: stream
+      TIMESCALE_DB: ${TIMESCALE_DB:-stream_engine}
+      TIMESCALE_USER: ${TIMESCALE_USER:-stream}
+      TIMESCALE_PASSWORD: ${TIMESCALE_PASSWORD:-stream}
       API_SERVICE_PORT: 8020
+      DATASTREAM_CORS_ALLOW_ORIGINS: ${DATASTREAM_CORS_ALLOW_ORIGINS:-http://localhost:3006,http://127.0.0.1:3006}
       DATASTREAM_AI_BASE: http://ai-gateway:8080
       DATASTREAM_CONNECTION_REGISTRY_PATH: /data/connection-registry.json
       DATASTREAM_WEBHOOK_REGISTRY_PATH: /data/webhooks.json

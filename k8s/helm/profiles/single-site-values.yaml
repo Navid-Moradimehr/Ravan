@@ -2,7 +2,7 @@ env:
   SITE_ID: "demo-site"
   SITE_NAME: "Demo Site"
   DEPLOYMENT_MODE: "single-site"
-  RUNTIME_MODE: "python-fallback"
+  RUNTIME_MODE: "flink-production"
   REGION: "local-lab"
   NETWORK_ZONE: "zone-a"
   KAFKA_BROKERS: "kafka:9092"

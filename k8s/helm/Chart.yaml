@@ -1,7 +1,7 @@
 apiVersion: v2
-name: data-stream
-version: 1.0.0
-appVersion: "1.0.0"
+name: ravan
+version: 1.0.0-beta.1
+appVersion: "1.0.0-beta.1"
 description: Ravan industrial data platform - edge ingestion, stream processing, historian, AI gateway
 keywords:
   - industrial-iot
@@ -10,6 +10,6 @@ keywords:
   - kafka
   - opcua
   - modbus
-home: https://github.com/your-org/ravan
+home: https://github.com/Navid-Moradimehr/Ravan
 sources:
-  - https://github.com/your-org/ravan
+  - https://github.com/Navid-Moradimehr/Ravan
