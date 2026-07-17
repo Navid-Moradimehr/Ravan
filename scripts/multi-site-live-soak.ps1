@@ -3,7 +3,11 @@ param(
   [int]$Sites = 3,
   [int]$RatePerSecond = 100,
   [int]$DeviceCount = 50,
-  [string]$Topic = "industrial.normalized"
+  [string]$Topic = "industrial.normalized",
+  [string]$KafkaBrokers = "",
+  [string]$ComposeProject = "",
+  [string]$ComposeEnvFile = "",
+  [string]$ComposeFile = "docker/docker-compose.yml"
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,6 +21,55 @@ $root = (Resolve-Path ".").Path
 $logRoot = Join-Path $root ".datastream\logs\multi-site-live-soak"
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 $runId = "multi-{0}" -f ([guid]::NewGuid().ToString("N").Substring(0, 12))
+$composeProjectValue = if ($ComposeProject) { $ComposeProject } elseif ($env:RAVAN_COMPOSE_PROJECT) { $env:RAVAN_COMPOSE_PROJECT } else { "local-stream-engine" }
+$composeEnvFileValue = if ($ComposeEnvFile) { $ComposeEnvFile } elseif ($env:RAVAN_COMPOSE_ENV_FILE) { $env:RAVAN_COMPOSE_ENV_FILE } else { "" }
+if ($composeEnvFileValue -and (Test-Path -LiteralPath $composeEnvFileValue)) {
+  foreach ($line in Get-Content -LiteralPath $composeEnvFileValue) {
+    if ($line -match '^\s*([^#=][^=]*)=(.*)$') {
+      [Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim(), "Process")
+    }
+  }
+}
+$kafkaBrokersValue = if ($KafkaBrokers) { $KafkaBrokers } elseif ($env:KAFKA_BROKERS) { $env:KAFKA_BROKERS } else { "localhost:19092" }
+$env:KAFKA_BROKERS = $kafkaBrokersValue
+
+function Get-HostPort {
+  param(
+    [string]$Name,
+    [int]$Default
+  )
+
+  $value = [Environment]::GetEnvironmentVariable($Name)
+  if ($value) {
+    return [int]$value
+  }
+  return $Default
+}
+
+$processorPort = Get-HostPort -Name "PROCESSOR_HOST_PORT" -Default 8094
+$fanoutPort = Get-HostPort -Name "FANOUT_HOST_PORT" -Default 18095
+$processedFanoutPort = Get-HostPort -Name "PROCESSED_FANOUT_HOST_PORT" -Default 18097
+$aiFanoutPort = Get-HostPort -Name "AI_FANOUT_HOST_PORT" -Default 18096
+$apiPort = Get-HostPort -Name "API_SERVICE_HOST_PORT" -Default 8020
+$aiGatewayPort = Get-HostPort -Name "AI_GATEWAY_HOST_PORT" -Default 8080
+$flinkPort = Get-HostPort -Name "FLINK_JOBMANAGER_HOST_PORT" -Default 8081
+$kafkaUiPort = Get-HostPort -Name "KAFKA_UI_HOST_PORT" -Default 18080
+$grafanaPort = Get-HostPort -Name "GRAFANA_PROXY_HOST_PORT" -Default 3000
+
+function Invoke-Compose {
+  param([string[]]$Arguments)
+
+  $composeArgs = @("-p", $composeProjectValue)
+  if ($composeEnvFileValue) {
+    $composeArgs += @("--env-file", $composeEnvFileValue)
+  }
+  $composeArgs += @("-f", $ComposeFile)
+  $composeArgs += $Arguments
+  & docker compose @composeArgs
+  if ($LASTEXITCODE -ne 0) {
+    throw "docker compose failed with exit code $LASTEXITCODE"
+  }
+}
 
 function Start-Generator {
   param(
@@ -32,19 +85,33 @@ function Start-Generator {
   $env:MOCK_MAX_EVENTS = "0"
   $env:MOCK_DURATION_SECONDS = "$Seconds"
   $env:IOT_TOPIC = $Topic
-  $env:MOCK_REPORT_PATH = (Join-Path $logRoot "$SiteId.report.json")
-  Start-Process -WindowStyle Hidden -FilePath "py" -ArgumentList @(
-    "-3.13",
-    "-m",
-    "services.ingestion.mock_generator"
+  $reportPath = Join-Path $logRoot "$SiteId.report.json"
+  $launcher = @"
+`$env:KAFKA_BROKERS = '$kafkaBrokersValue'
+`$env:MOCK_SITE_ID = '$SiteId'
+`$env:MOCK_RATE_PER_SECOND = '$Rate'
+`$env:MOCK_DEVICE_COUNT = '$DeviceCount'
+`$env:MOCK_MAX_EVENTS = '0'
+`$env:MOCK_DURATION_SECONDS = '$Seconds'
+`$env:IOT_TOPIC = '$Topic'
+`$env:MOCK_REPORT_PATH = '$reportPath'
+py -3.13 -m services.ingestion.mock_generator
+"@
+  Start-Process -WindowStyle Hidden -FilePath "powershell.exe" -ArgumentList @(
+    "-NoProfile",
+    "-ExecutionPolicy", "Bypass",
+    "-Command", $launcher
   ) -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 }
 
 Write-Host "Starting multisite live soak..."
 Write-Host "seconds=$Seconds sites=$Sites rate_per_second=$RatePerSecond device_count=$DeviceCount topic=$Topic"
+Write-Host "compose_project=$composeProjectValue compose_file=$ComposeFile"
+Write-Host "kafka_brokers=$kafkaBrokersValue"
+Write-Host "ports=processor:$processorPort fanout:$fanoutPort processed_fanout:$processedFanoutPort ai_fanout:$aiFanoutPort api:$apiPort ai_gateway:$aiGatewayPort flink:$flinkPort kafka_ui:$kafkaUiPort grafana:$grafanaPort"
 
 Write-Host "Stopping baseline compose source simulators so the soak is isolated..."
-docker compose -f docker/docker-compose.yml stop mqtt-sim opcua-sim modbus-sim edge-ingest | Out-Null
+Invoke-Compose -Arguments @("stop", "mqtt-sim", "opcua-sim", "modbus-sim", "edge-ingest") | Out-Null
 
   $processes = @()
   for ($index = 1; $index -le $Sites; $index++) {
@@ -53,9 +120,12 @@ docker compose -f docker/docker-compose.yml stop mqtt-sim opcua-sim modbus-sim e
     $processes += Start-Generator -SiteId $siteId -Rate $siteRate
   }
 
-Start-Sleep -Seconds ($Seconds + 2)
+Start-Sleep -Seconds ($Seconds + 15)
 
 foreach ($process in $processes) {
+  if (!$process.HasExited) {
+    Wait-Process -Id $process.Id -Timeout 30 -ErrorAction SilentlyContinue
+  }
   if (!$process.HasExited) {
     Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
   }
@@ -104,7 +174,7 @@ for ($index = 1; $index -le $Sites; $index++) {
 try {
   $processorMetrics = $null
   try {
-    $processorMetrics = (Invoke-WebRequest -UseBasicParsing http://localhost:8094/metrics -TimeoutSec 10).Content
+    $processorMetrics = (Invoke-WebRequest -UseBasicParsing "http://localhost:$processorPort/metrics" -TimeoutSec 10).Content
   }
   catch {
     Write-Host "processor_metrics=unavailable"
@@ -116,11 +186,26 @@ try {
   function Get-OptionalJson([string]$Url) {
     try { return Invoke-RestMethod $Url -TimeoutSec 5 } catch { return $null }
   }
-  $fanoutMetrics = Get-OptionalContent "http://localhost:18095"
-  $processedFanoutMetrics = Get-OptionalContent "http://localhost:18097"
-  $aiFanoutMetrics = Get-OptionalContent "http://localhost:18096"
-  $apiHealth = Get-OptionalJson "http://localhost:8020/health"
-  $aiHealth = Get-OptionalJson "http://localhost:8080/health"
+  function Get-EndpointProbe([string]$Url) {
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+      Invoke-WebRequest -UseBasicParsing $Url -TimeoutSec 5 | Out-Null
+      $timer.Stop()
+      return [math]::Round($timer.Elapsed.TotalMilliseconds, 2)
+    }
+    catch {
+      $timer.Stop()
+      return $null
+    }
+  }
+  $fanoutMetrics = Get-OptionalContent "http://localhost:$fanoutPort"
+  $processedFanoutMetrics = Get-OptionalContent "http://localhost:$processedFanoutPort"
+  $aiFanoutMetrics = Get-OptionalContent "http://localhost:$aiFanoutPort"
+  $apiHealth = Get-OptionalJson "http://localhost:$apiPort/health"
+  $aiHealth = Get-OptionalJson "http://localhost:$aiGatewayPort/health"
+  $flinkJobs = Get-OptionalJson "http://localhost:$flinkPort/jobs/overview"
+  $kafkaUiLatency = Get-EndpointProbe "http://localhost:$kafkaUiPort"
+  $grafanaLatency = Get-EndpointProbe "http://localhost:$grafanaPort"
 
   if ($processorMetrics) {
     Write-Host ("processor_consumer_lag={0}" -f (Get-MetricValue -MetricsText $processorMetrics -MetricName "datastream_broker_consumer_lag_messages"))
@@ -132,6 +217,9 @@ try {
   Write-Host ("ai_status={0}" -f $(if ($aiHealth) { $aiHealth.status } else { "unavailable" }))
   Write-Host ("ai_provider={0}" -f $(if ($aiHealth) { $aiHealth.provider } else { "unavailable" }))
   Write-Host ("ai_model={0}" -f $(if ($aiHealth) { $aiHealth.model } else { "unavailable" }))
+  Write-Host ("flink_running_jobs={0}" -f $(if ($flinkJobs) { @($flinkJobs.jobs | Where-Object { $_.state -eq "RUNNING" }).Count } else { "unavailable" }))
+  Write-Host ("kafka_ui_probe_ms={0}" -f $(if ($null -ne $kafkaUiLatency) { $kafkaUiLatency } else { "unavailable" }))
+  Write-Host ("grafana_probe_ms={0}" -f $(if ($null -ne $grafanaLatency) { $grafanaLatency } else { "unavailable" }))
 }
 catch {
   Write-Host "Could not collect all runtime counters: $($_.Exception.Message)"

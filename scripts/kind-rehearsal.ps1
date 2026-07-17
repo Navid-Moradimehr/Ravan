@@ -14,6 +14,7 @@ param(
   [string]$PythonPath = "",
   [switch]$SkipClusterCreate,
   [switch]$SkipOperatorInstall,
+  [switch]$EnableOperatorWebhook,
   [switch]$ApplyFlinkDeployment,
   [switch]$DeleteClusterAfter
 )
@@ -111,11 +112,13 @@ function Ensure-Namespace {
 function Update-FlinkDeploymentImage {
   param(
     [string]$ManifestPath,
-    [string]$Image
+    [string]$Image,
+    [string]$Namespace
   )
 
   $content = Get-Content -LiteralPath $ManifestPath -Raw
   $updated = $content -replace '(?m)^(\s*image:\s*).+$', "`$1$Image"
+  $updated = $updated -replace '(?m)^(\s*namespace:\s*).+$', "`$1$Namespace"
   $tempPath = Join-Path $env:TEMP ("datastream-flinkdeployment-{0}.yaml" -f [Guid]::NewGuid().ToString("N"))
   Set-Content -LiteralPath $tempPath -Value $updated -Encoding utf8
   return $tempPath
@@ -165,6 +168,12 @@ try {
       if ($OperatorChartVersion) {
         $installArgs += @("--version", $OperatorChartVersion)
       }
+      if (-not $EnableOperatorWebhook) {
+        # The Apache chart's webhook requires cert-manager. Keep the local
+        # rehearsal self-contained; production clusters can opt in when
+        # cert-manager is already installed and trusted.
+        $installArgs += @("--set", "webhook.create=false")
+      }
       Invoke-Checked $helm $installArgs
     }
   }
@@ -206,7 +215,15 @@ try {
     }
 
     Ensure-Namespace $Namespace
-    $tempManifest = Update-FlinkDeploymentImage -ManifestPath "k8s/flink-operator/flinkdeployment.yaml" -Image $PlatformImage
+    $serviceAccountYaml = & $kubectl create serviceaccount data-stream-flink --namespace $Namespace --dry-run=client -o yaml
+    if ($LASTEXITCODE -ne 0) {
+      throw "Could not generate Flink service account manifest"
+    }
+    $serviceAccountYaml | & $kubectl apply -f -
+    if ($LASTEXITCODE -ne 0) {
+      throw "Could not apply Flink service account manifest"
+    }
+    $tempManifest = Update-FlinkDeploymentImage -ManifestPath "k8s/flink-operator/flinkdeployment.yaml" -Image $PlatformImage -Namespace $Namespace
     Invoke-Checked $kubectl @("apply", "-f", $tempManifest)
     try {
       Invoke-Checked $kubectl @("wait", "--for=condition=Ready", "flinkdeployment/data-stream-flink-job", "-n", $Namespace, "--timeout=180s")

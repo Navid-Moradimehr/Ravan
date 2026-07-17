@@ -62,14 +62,20 @@ PUBLIC_DOCUMENT_FILES = (
 )
 IGNORE_NAMES = {
     "__pycache__", ".git", ".venv", "node_modules", ".next", "dist", "build", "coverage",
-    "benchmarks", "tests", "ObsidianVault",
+    "benchmarks", "tests", "ObsidianVault", "target",
+    "playwright-smoke.cjs", "next-dev.log",
 }
 
 
-def _ignore_generated(_: str, names: list[str]) -> set[str]:
+def _ignore_generated(root: str, names: list[str]) -> set[str]:
     ignored: set[str] = set()
+    source_name = Path(root).name.lower()
     for name in names:
         if name in IGNORE_NAMES:
+            ignored.add(name)
+        elif source_name == "ui" and name == "docs":
+            # UI screenshots and browser-smoke artifacts are development-only;
+            # public operator documentation is copied explicitly below.
             ignored.add(name)
         elif name.endswith((".pyc", ".pyo")):
             ignored.add(name)

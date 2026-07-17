@@ -7,14 +7,17 @@ services:
     # Compose service aliases are reliably available to the process.
     hostname: kafka
     restart: unless-stopped
+    environment:
+      KAFKA_HOST_PORT: ${KAFKA_HOST_PORT:-19092}
     command:
       - bash
       - -lc
       - |
+        sed "s|localhost:19092|localhost:$${KAFKA_HOST_PORT:-19092}|g" /opt/kafka/config/server.properties > /tmp/server.properties
         if [ ! -f /var/lib/kafka/data/meta.properties ]; then
-          /opt/kafka/bin/kafka-storage.sh format -t "$(/opt/kafka/bin/kafka-storage.sh random-uuid)" -c /opt/kafka/config/server.properties
+          /opt/kafka/bin/kafka-storage.sh format -t "$(/opt/kafka/bin/kafka-storage.sh random-uuid)" -c /tmp/server.properties
         fi
-        exec /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties
+        exec /opt/kafka/bin/kafka-server-start.sh /tmp/server.properties
     ports:
       - "${KAFKA_HOST_PORT:-19092}:29092"
     volumes:
@@ -700,6 +703,10 @@ services:
         psql -h timescaledb -U "$${TIMESCALE_USER}" -d "$${TIMESCALE_DB}" -v ON_ERROR_STOP=1
         -c "CREATE UNIQUE INDEX IF NOT EXISTS industrial_events_event_id_uniq ON industrial_events (time, event_id);"
         -c "CREATE UNIQUE INDEX IF NOT EXISTS processed_events_event_id_uniq ON processed_events (time, event_id);"
+        -c "CREATE TABLE IF NOT EXISTS dead_letter_events (time TIMESTAMPTZ NOT NULL, event_id UUID NOT NULL, source_protocol TEXT NOT NULL, source_id TEXT NOT NULL, error TEXT NOT NULL, payload JSONB NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1, origin TEXT NOT NULL DEFAULT 'unknown');"
+        -c "SELECT create_hypertable('dead_letter_events', 'time', if_not_exists => TRUE, migrate_data => TRUE);"
+        -c "CREATE INDEX IF NOT EXISTS dead_letter_events_origin_ts_idx ON dead_letter_events (origin, time DESC);"
+        -c "CREATE UNIQUE INDEX IF NOT EXISTS dead_letter_events_event_id_uniq ON dead_letter_events (time, event_id);"
         -c "CREATE TABLE IF NOT EXISTS metadata_asset_tags (site_id TEXT NOT NULL, asset_id TEXT NOT NULL, tag TEXT NOT NULL, unit TEXT, source TEXT NOT NULL DEFAULT 'observed', first_seen TIMESTAMPTZ, last_seen TIMESTAMPTZ, active BOOLEAN NOT NULL DEFAULT TRUE, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (site_id, asset_id, tag));"
         -c "CREATE INDEX IF NOT EXISTS metadata_asset_tags_lookup_idx ON metadata_asset_tags (site_id, asset_id, tag);"
         -c "CREATE INDEX IF NOT EXISTS metadata_asset_tags_updated_idx ON metadata_asset_tags (updated_at DESC);"

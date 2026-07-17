@@ -189,7 +189,10 @@ backups and logs outside replaceable application files. Upgrade flow:
 
 The repository has packaging staging scripts, CLI entry points, runtime
 supervision, release manifests, offline staging foundations, and installation
-documentation. Final OS installer generation, signing, upgrade automation,
-offline dependency assembly, and clean-machine acceptance tests remain packaging
-work.
-
+documentation. Windows/Linux/offline staging archives have been filtered and
+validated locally: tests, `ObsidianVault`, development screenshots, Playwright
+smoke files, and build targets are excluded while public guidance and demo
+data remain available in the appropriate bundle. This is still release
+staging, not a finished native installer. Final OS installer generation,
+signing, upgrade automation, dependency assembly for clean machines, and
+clean-machine acceptance tests remain packaging work.

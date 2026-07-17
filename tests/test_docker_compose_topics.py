@@ -87,6 +87,9 @@ def test_kafka_ui_keeps_broker_jmx_optional_until_validated():
     ui = services["kafka-ui"]
 
     assert "${KAFKA_HOST_PORT:-19092}:29092" in kafka["ports"]
+    assert kafka["environment"]["KAFKA_HOST_PORT"] == "${KAFKA_HOST_PORT:-19092}"
+    kafka_command = "\n".join(kafka["command"])
+    assert "localhost:$${KAFKA_HOST_PORT:-19092}" in kafka_command
     assert "KAFKA_JMX_PORT" not in kafka.get("environment", {})
     assert "KAFKA_JMX_OPTS" not in kafka.get("environment", {})
     assert "KAFKA_CLUSTERS_0_METRICS_TYPE" not in ui["environment"]
@@ -102,6 +105,9 @@ def test_timescaledb_migrate_repairs_historian_uniqueness():
     assert "DELETE FROM dead_letter_events" in command_blob
     assert "industrial_events_event_id_uniq" in command_blob
     assert "processed_events_event_id_uniq" in command_blob
+    assert "CREATE TABLE IF NOT EXISTS dead_letter_events" in command_blob
+    assert "dead_letter_events_origin_ts_idx" in command_blob
+    assert "dead_letter_events_event_id_uniq" in command_blob
     assert migrate["environment"]["RUN_HISTORIAN_DEDUPE"] == "${RUN_HISTORIAN_DEDUPE:-false}"
     assert "RUN_HISTORIAN_DEDUPE" in command_blob
 
