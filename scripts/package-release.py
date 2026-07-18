@@ -66,7 +66,6 @@ PUBLIC_DOCUMENT_FILES = (
     "docs/prometheus-guide.md",
     "docs/flink-operator-runbook.md",
     "docs/local-kubernetes-rehearsal.md",
-    "docs/local-validation-guide.md",
     "docs/deployment-targets.md",
     "docs/ai-provider-configuration.md",
     "docs/ai-reporting-policy-and-jobs.md",
@@ -104,6 +103,21 @@ IGNORE_NAMES = {
     "__pycache__", ".git", ".venv", "node_modules", ".next", "dist", "build", "coverage",
     "benchmarks", "tests", "ObsidianVault", "target",
     "playwright-smoke.cjs", "next-dev.log",
+    # Maintainer-only local validation assets. They remain available in a
+    # private checkout but are never copied into a release payload.
+    "ai-warning-soak.py", "benchmark_real_world_simulator.py", "benchmark_site_profile_matrix.py",
+    "edge-soak.ps1", "full-stack-soak.ps1", "multi-site-live-soak.ps1", "single-site-live-soak.ps1",
+    "site-profile-soak.ps1", "start-industrial-sim.ps1", "world-model-soak.py",
+    "industrial-soak.yaml", "industrial_mixed_benchmark.csv",
+    "modbus_simulator.py", "opcua_simulator.py", "mqtt_publisher.py", "mock_generator.py",
+    "real_world_simulator.py", "multi_site_simulator.py", "simulator_metrics.py",
+    "industrial_soak_runner.py", "site_profile_matrix.py", "site_profile_calibration.py",
+    "multi_site_failure.py", "cgr_gap.py", "cgr_stream_slice.py",
+    "test_ai_warning_soak_script.py", "test_ingestion_mock_generator.py", "test_mock_generator.py",
+    "test_multi_site_failure_benchmark.py", "test_multi_site_simulator.py",
+    "test_real_world_simulator_benchmark.py", "test_site_profile_calibration_benchmark.py",
+    "test_site_profile_matrix_benchmark.py", "test_industrial_soak_runner.py", "test_world_model_soak.py",
+    "local-validation-guide.md",
 }
 
 

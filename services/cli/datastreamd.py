@@ -1,7 +1,7 @@
 """datastreamd - runtime supervisor for Ravan.
 
 Launches the platform services (api_service, ai_gateway, edge_ingest,
-processor, mock generator) as managed subprocesses and tracks their
+processor) as managed subprocesses and tracks their
 lifecycle. Does NOT manage Docker infrastructure (Kafka, Postgres,
 Grafana) - that stays with docker compose for now.
 
@@ -79,13 +79,6 @@ SERVICE_SPECS: tuple[ServiceSpec, ...] = (
         depends_on=(),
     ),
     ServiceSpec(
-        name="mock",
-        module="services.datasets.mock_generator",
-        description="Mock industrial data generator",
-        health_url="",
-        depends_on=(),
-    ),
-    ServiceSpec(
         name="fanout",
         module="services.processor.normalized_fanout",
         description="Normalized fan-out consumer (industrial.normalized -> sinks)",
@@ -110,8 +103,8 @@ def _services_for_runtime_mode(runtime_mode: str | None) -> list[str]:
     if mode == "flink-production":
         return ["api", "ai", "edge", "fanout", "ai-fanout", "flink-job"]
     if mode == "flink-local":
-        return ["api", "ai", "edge", "fanout", "ai-fanout", "flink-job", "mock"]
-    return ["api", "ai", "edge", "processor", "fanout", "ai-fanout", "mock"]
+        return ["api", "ai", "edge", "fanout", "ai-fanout", "flink-job"]
+    return ["api", "ai", "edge", "processor", "fanout", "ai-fanout"]
 
 
 @dataclass

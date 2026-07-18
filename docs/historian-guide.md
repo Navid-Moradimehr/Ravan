@@ -8,7 +8,7 @@ The two live event panels stay compact by default. `Alarms & Events` and `Raw Ev
 
 The SQL panel also remembers the last query text, saved query snippets, and timeout value in the browser. The cancel button stays transient because it only applies to the currently running statement.
 
-If you are new to the page, start with the dashboard and trend views. Those are the easiest way to see what the stored data looks like. If you need a custom question, use the SQL panel. That panel is read-only and is meant for analysis, not for changing data. If you need to repeat a simulation or validate a change, use replay. If you want historian output to trigger another system, use webhooks or notifications.
+If you are new to the page, start with the dashboard and trend views. Those are the easiest way to see what the stored data looks like. If you need a custom question, use the SQL panel. That panel is read-only and is meant for analysis, not for changing data. If you need to validate a change against a known dataset, use replay. If you want historian output to trigger another system, use webhooks or notifications.
 
 When the platform sees live source traffic but no mapping match yet, the historian page also shows a short warning above the raw event table. That is a semantic-setup signal, not a historian failure: the ingest path can still be healthy while the mapping contract is not aligned with the incoming fields yet.
 

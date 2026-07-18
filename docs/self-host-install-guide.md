@@ -114,9 +114,9 @@ Copy-Item .env.production.example .env
 .\scripts\ravanctl.ps1 status
 ```
 
-`ravan` starts the UI and edge-ingest profiles but deliberately does not start
-the OPC UA, MQTT, or Modbus simulators. Start a demo explicitly with
-`docker compose -f docker/docker-compose.yml --profile demo --profile edge --profile ui up -d`.
+`ravan` starts the UI and edge-ingest profiles. It does not start bundled device
+producers or a broker; configure operator-managed OPC UA, MQTT, Modbus, or API
+endpoints before enabling ingestion.
 
 ## Python source-developer path
 

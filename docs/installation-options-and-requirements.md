@@ -25,6 +25,26 @@ single-site runtime. It is also the reference implementation for the other
 deployment targets. Air-gapped releases are offline copies of the Compose or
 Kubernetes bundles with images and dependencies included.
 
+## Host Port Conflicts
+
+Compose publishes the dashboard, API, Kafka UI, Grafana, Prometheus, Flink,
+databases, and connector endpoints on host ports. If another application is
+already using one of those ports, Docker will fail that service with a port
+allocation or bind error; the existing application is not replaced and the
+Ravan container remains stopped or unhealthy. This does not change the internal
+container ports.
+
+Change the corresponding `*_HOST_PORT` value in `.env` and restart the stack.
+For example, set `DASHBOARD_HOST_PORT=3106` when port `3006` is occupied. Use
+the resulting host port in the browser and update any reverse proxy or firewall
+rule that points to it. Do not change `API_SERVICE_PORT`, `AI_GATEWAY_PORT`, or
+other container-side values just to resolve a host collision.
+
+On Windows, inspect a port with `Get-NetTCPConnection -LocalPort 3006`; on
+Linux/macOS, use `ss -ltnp 'sport = :3006'` or `lsof -nP -iTCP:3006 -sTCP:LISTEN`.
+Stop the conflicting application or choose a free host port before running
+`ravanctl preflight` and `docker compose up`.
+
 ## What Runs Where
 
 The complete runtime is:

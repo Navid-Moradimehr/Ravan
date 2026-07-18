@@ -41,7 +41,7 @@ How to read it:
 Inputs:
 
 - edge protocol payloads
-- simulator endpoints in the local development stack
+- operator-managed device and service endpoints
 
 Outputs:
 

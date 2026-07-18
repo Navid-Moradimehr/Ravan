@@ -28,3 +28,34 @@ data/semantic/
 rust/fastpath/target/
 operator-shell/src-tauri/target/
 operator-shell/src-tauri/gen/
+
+# Local industrial simulation and soak harnesses are retained for maintainers'
+# private validation but are not part of the public repository or packages.
+scripts/*sim*.ps1
+scripts/*sim*.py
+scripts/*soak*.ps1
+scripts/*soak*.py
+config/benchmarks/industrial-soak.yaml
+services/edge_ingest/*simulator.py
+services/edge_ingest/mqtt_publisher.py
+services/ingestion/mock_generator.py
+services/datasets/mock_generator.py
+services/benchmarks/*simulator.py
+services/benchmarks/simulator_metrics.py
+services/benchmarks/industrial_soak_runner.py
+services/benchmarks/site_profile_matrix.py
+services/benchmarks/site_profile_calibration.py
+services/benchmarks/multi_site_failure.py
+services/benchmarks/cgr_gap.py
+services/benchmarks/cgr_stream_slice.py
+tests/*simulator*.py
+tests/test_mock_generator.py
+tests/test_ingestion_mock_generator.py
+tests/test_industrial_soak_runner.py
+tests/test_multi_site_failure_benchmark.py
+tests/test_site_profile_matrix_benchmark.py
+tests/test_site_profile_calibration_benchmark.py
+tests/test_world_model_soak.py
+tests/test_datastreamctl.py
+tests/test_ai_warning_soak_script.py
+docs/local-validation-guide.md

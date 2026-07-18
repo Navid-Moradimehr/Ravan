@@ -304,12 +304,12 @@ It sits between Kafka and the historian or AI outputs and is useful for:
 
 ## 13. What To Do If You Do Not Have Real PLCs Yet
 
-Use the built-in simulators and replay packs first.
+Use a staging PLC, an externally managed protocol test endpoint, or an operator-provided replay pack first.
 
 Good starting cases:
 
-- OPC UA simulator
-- Modbus simulator
+- OPC UA staging endpoint
+- Modbus staging endpoint
 - MQTT publisher
 - mixed industrial replay CSVs
 

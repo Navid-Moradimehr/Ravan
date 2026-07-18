@@ -11,5 +11,5 @@ user-owned training code; the platform does not guess business or safety
 objectives.
 
 Train offline on held-out time periods and sites first. Keep the resulting
-policy recommendation-only until the company has a validated simulator,
+policy recommendation-only until the company has a validated environment,
 safety envelope, approval process, and independent operational evaluation.

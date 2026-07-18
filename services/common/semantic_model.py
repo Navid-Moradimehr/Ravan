@@ -202,7 +202,7 @@ def _default_model_dict() -> dict[str, Any]:
                 "table": "scenarios",
                 "ontology_pack": "platform.core",
                 "kind": "dimension",
-                "aliases": ["simulation", "test cases", "benchmarks"],
+                "aliases": ["replay", "test cases", "benchmarks"],
                 "fields": [
                     {"name": "scenario_id", "expression": "scenario_id", "kind": "dimension"},
                     {"name": "name", "expression": "name", "kind": "dimension"},

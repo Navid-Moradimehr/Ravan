@@ -31,7 +31,6 @@ Write-Host "Generating certificates..." -ForegroundColor Green
 mkcert -cert-file localhost.pem -key-file localhost-key.pem `
     localhost 127.0.0.1 ::1 `
     *.local `
-    opcua-sim mqtt-sim modbus-sim `
     172.17.0.1 172.18.0.1
 
 Write-Host ""

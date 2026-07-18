@@ -70,7 +70,7 @@ export default function Home() {
                 <HardDrive aria-hidden="true" className="size-4 text-accent" />
                 Current Stack
               </CardTitle>
-              <CardDescription className="text-text-secondary">Kafka-native, simulator-first, single-tenant safe</CardDescription>
+              <CardDescription className="text-text-secondary">Kafka-native, connector-first, single-tenant safe</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2.5 p-4 text-sm">
               <div className="flex items-center justify-between gap-3">

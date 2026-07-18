@@ -27,7 +27,7 @@ if ($Arguments.Count -gt 0 -and $Arguments[0] -eq "preflight") {
         $extraArgs = $Arguments[1..($Arguments.Count - 1)]
     }
     $composeInWorkspace = $compose.Replace('\\', '/')
-    $preflightArgs = @("preflight", "--compose-file", "/workspace/$composeInWorkspace", "--site-profile", "/workspace/config/site-profiles/single-site.yaml", "--project-manifest", "/workspace/config/project-manifest.yaml", "--soak-scenario", "/workspace/config/benchmarks/industrial-soak.yaml") + $extraArgs
+    $preflightArgs = @("preflight", "--compose-file", "/workspace/$composeInWorkspace", "--site-profile", "/workspace/config/site-profiles/single-site.yaml", "--project-manifest", "/workspace/config/project-manifest.yaml") + $extraArgs
     if (Test-Path ".env") {
         $preflightArgs += @("--env-file", "/workspace/.env")
     }

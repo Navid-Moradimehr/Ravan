@@ -30,10 +30,6 @@ from services.benchmarks.deployment_pack import format_result as format_deployme
 from services.benchmarks.deployment_pack import format_matrix_result as format_deployment_pack_matrix_result
 from services.benchmarks.deployment_pack import run_benchmark as run_deployment_pack_benchmark
 from services.benchmarks.deployment_pack import run_matrix as run_deployment_pack_matrix
-from services.benchmarks.cgr_gap import format_result as format_cgr_gap_result
-from services.benchmarks.cgr_gap import run_report as run_cgr_gap_report
-from services.benchmarks.cgr_stream_slice import format_result as format_cgr_stream_slice_result
-from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
 from services.benchmarks.end_to_end_pipeline import format_result as format_end_to_end_pipeline_result
 from services.benchmarks.end_to_end_pipeline import run_benchmark as run_end_to_end_pipeline_benchmark
 from services.benchmarks.metadata_artifacts import format_result as format_metadata_artifacts_result
@@ -44,28 +40,15 @@ from services.benchmarks.production_pipeline import format_result as format_prod
 from services.benchmarks.production_pipeline import format_repeatability_result as format_production_pipeline_repeatability_result
 from services.benchmarks.production_pipeline import run_benchmark as run_production_pipeline_benchmark
 from services.benchmarks.production_pipeline import run_repeatability as run_production_pipeline_repeatability
-from services.benchmarks.real_world_simulator import format_result as format_real_world_simulator_result
-from services.benchmarks.real_world_simulator import run_suite as run_real_world_simulator_suite
 from services.benchmarks.semantic_graph_slice import format_result as format_semantic_graph_slice_result
 from services.benchmarks.semantic_graph_slice import run_benchmark as run_semantic_graph_slice_benchmark
 from services.benchmarks.semantic_graph_query import format_result as format_semantic_graph_query_result
 from services.benchmarks.semantic_graph_query import run_benchmark as run_semantic_graph_query_benchmark
 from services.benchmarks.semantic_store_write import format_result as format_semantic_store_write_result
 from services.benchmarks.semantic_store_write import run_benchmark as run_semantic_store_write_benchmark
-from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
-from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
-from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
-from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
-from services.benchmarks.multi_site_failure import format_result as format_multi_site_failure_result
-from services.benchmarks.multi_site_failure import run_benchmark as run_multi_site_failure_benchmark
 from services.benchmarks.resilience import format_report as format_resilience_report
 from services.benchmarks.resilience import run_campaign as run_resilience_campaign
 from services.benchmarks.resilience import write_report as write_resilience_report
-from services.benchmarks.multi_site_simulator import format_report as format_multi_site_simulation_report
-from services.benchmarks.multi_site_simulator import run_simulation as run_multi_site_simulation
-from services.benchmarks.multi_site_simulator import write_report as write_multi_site_simulation_report
-from services.benchmarks.industrial_soak_runner import format_report as format_industrial_soak_report
-from services.benchmarks.industrial_soak_runner import run_live as run_industrial_soak
 from services.historian.backup import (
     collect_historian_snapshot,
     compare_historian_snapshots,
@@ -610,17 +593,11 @@ def _run_rollout_acceptance_for_manifest(
     manifest_errors = validate_project_manifest(manifest)
     selected_ids = site_ids if site_ids is not None else [site.site_id for site in manifest.sites]
 
-    benchmark_matrix = run_site_profile_matrix(
-        Path(manifest_path),
-        Path(csv_path),
-        site_ids=selected_ids,
-        events=events,
-        batch_size=batch_size,
-        warmup_events=warmup_events,
-        min_average_events_per_second=min_average_events_per_second,
-        repeat_count=repeat_count,
-    )
-    benchmark_by_site = {run.site_id: run for run in benchmark_matrix.runs}
+    # Synthetic capacity campaigns are maintainer-only and are not part of the
+    # public runtime checkout. Release acceptance validates contracts and
+    # backup/recovery here; operators run their own traffic validation.
+    benchmark_matrix = None
+    benchmark_by_site: dict[str, Any] = {}
 
     sites: list[dict[str, Any]] = []
     for site in manifest.sites:
@@ -654,30 +631,17 @@ def _run_rollout_acceptance_for_manifest(
                 "profile_path": site.profile_path,
                 "release_gate": release_gate,
                 "benchmark": benchmark_payload,
-                "passed": release_gate["passed"] and benchmark_passed,
+                "passed": release_gate["passed"],
             }
         )
 
-    passed = not manifest_errors and benchmark_matrix.passed and all(item["passed"] for item in sites)
+    passed = not manifest_errors and all(item["passed"] for item in sites)
     return {
         "project_id": manifest.project_id,
         "name": manifest.name,
         "manifest_errors": manifest_errors,
         "baseline_csv": csv_path,
-        "benchmark_matrix": {
-            "passed": benchmark_matrix.passed,
-            "runs": [
-                {
-                    "site_id": run.site_id,
-                    "deployment_mode": run.deployment_mode,
-                    "profile_path": run.profile_path,
-                    "average_events_per_second": run.average_events_per_second,
-                    "passed": run.passed,
-                    "detail": run.detail,
-                }
-                for run in benchmark_matrix.runs
-            ],
-        },
+        "benchmark_matrix": {"passed": None, "runs": [], "note": "operator-owned traffic validation"},
         "sites": sites,
         "passed": passed,
         "report_dir": report_dir,
@@ -1817,21 +1781,6 @@ def cmd_project_manifest(args: argparse.Namespace) -> int:
 
 
 def cmd_benchmark(args: argparse.Namespace) -> int:
-    if args.action == "multi-site-simulation":
-        result = run_multi_site_simulation(
-            sites=args.sites,
-            events_per_site=args.events_per_site,
-            outage_events_per_site=args.outage_events_per_site,
-            spool_root=args.spool_root,
-        )
-        if args.report_dir:
-            write_multi_site_simulation_report(result, args.report_dir)
-        payload = asdict(result)
-        if args.json:
-            print(json.dumps(payload, indent=2))
-        else:
-            print(format_multi_site_simulation_report(result))
-        return 0 if result.passed else 2
     if args.action == "resilience":
         result = run_resilience_campaign(
             events=args.events,
@@ -1849,21 +1798,6 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         else:
             print(format_resilience_report(result))
         return 0 if result.passed else 2
-    if args.action == "industrial-soak":
-        report = run_industrial_soak(
-            Path(args.scenario),
-            compose_file=Path(args.compose_file),
-            duration=args.duration,
-            smoke=args.smoke,
-            dry_run=args.dry_run,
-            build=not args.no_build,
-            report_dir=args.report_dir,
-        )
-        if args.json:
-            print(json.dumps(asdict(report), indent=2))
-        else:
-            print(format_industrial_soak_report(report))
-        return 0 if report.passed else 2
     if args.action == "deployment-pack":
         result = run_deployment_pack_benchmark(
             Path(args.manifest),
@@ -1912,41 +1846,6 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print("deployment pack benchmark matrix")
             print("=" * 40)
             print(format_deployment_pack_matrix_result(result))
-        return 0
-    if args.action == "real-world-simulator":
-        case_ids = [part.strip() for part in args.cases.split(",") if part.strip()] if args.cases else None
-        result = run_real_world_simulator_suite(
-            baseline_csv=Path(args.csv),
-            events=args.events,
-            batch_size=args.batch_size,
-            warmup_events=args.warmup_events,
-            cases=case_ids,
-        )
-        if args.json:
-            print(json.dumps(
-                {
-                    "cases": [
-                        {
-                            "case_id": item.case_id,
-                            "source": item.source,
-                            "scenario": item.scenario,
-                            "events": item.events,
-                            "invalid_events": item.invalid_events,
-                            "batches": item.batches,
-                            "elapsed_seconds": item.elapsed_seconds,
-                            "events_per_second": item.events_per_second,
-                            "serialized_bytes": item.serialized_bytes,
-                        }
-                        for item in result.cases
-                    ],
-                    "average_events_per_second": result.average_events_per_second,
-                },
-                indent=2,
-            ))
-        else:
-            print("real-world simulator benchmark")
-            print("=" * 40)
-            print(format_real_world_simulator_result(result))
         return 0
     if args.action == "site-profile-matrix":
         site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
@@ -2170,23 +2069,6 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                         "payload_bytes": result.end_to_end_msgpack.payload_bytes,
                         "roundtrip_bytes": result.end_to_end_msgpack.roundtrip_bytes,
                         "latency_p99_ms": result.end_to_end_msgpack.latency_p99_ms,
-                    },
-                    "real_world_simulator": {
-                        "average_events_per_second": result.real_world_simulator.average_events_per_second,
-                        "cases": [
-                            {
-                                "case_id": case.case_id,
-                                "source": case.source,
-                                "scenario": case.scenario,
-                                "events": case.events,
-                                "invalid_events": case.invalid_events,
-                                "batches": case.batches,
-                                "elapsed_seconds": case.elapsed_seconds,
-                                "events_per_second": case.events_per_second,
-                                "serialized_bytes": case.serialized_bytes,
-                            }
-                            for case in result.real_world_simulator.cases
-                        ],
                     },
                     "site_profile_matrix": {
                         "passed": result.site_profile_matrix.passed,
@@ -2650,7 +2532,7 @@ def build_parser() -> argparse.ArgumentParser:
     preflight = sub.add_parser("preflight", help="Validate deployment files and contracts before startup")
     preflight.add_argument("--site-profile", default="config/site-profiles/single-site.yaml")
     preflight.add_argument("--project-manifest", default="config/project-manifest.yaml")
-    preflight.add_argument("--soak-scenario", default="config/benchmarks/industrial-soak.yaml")
+    preflight.add_argument("--soak-scenario", default=None, help="Optional maintainer-only validation scenario path")
     preflight.add_argument("--compose-file", default="docker/docker-compose.yml")
     preflight.add_argument("--env-file", default=None, help="Optional operator environment file used for strict checks")
     preflight.add_argument("--json", action="store_true")
@@ -2884,24 +2766,6 @@ def build_parser() -> argparse.ArgumentParser:
     deployment_pack_matrix.add_argument("--warmup-events", type=int, default=0)
     deployment_pack_matrix.add_argument("--json", action="store_true")
     deployment_pack_matrix.set_defaults(func=cmd_benchmark)
-    real_world_simulator = benchmark_sub.add_parser("real-world-simulator", help="Benchmark simulated real-world industrial scenarios")
-    real_world_simulator.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
-    real_world_simulator.add_argument("--events", type=int, default=10_000)
-    real_world_simulator.add_argument("--batch-size", type=int, default=256)
-    real_world_simulator.add_argument("--warmup-events", type=int, default=0)
-    real_world_simulator.add_argument("--cases", default=None, help="Comma-separated cases: mock-normal,mock-drift,mock-spike,industrial-benchmark")
-    real_world_simulator.add_argument("--json", action="store_true")
-    real_world_simulator.set_defaults(func=cmd_benchmark)
-    industrial_soak = benchmark_sub.add_parser("industrial-soak", help="Run a live Docker-backed industrial soak campaign")
-    industrial_soak.add_argument("--scenario", default="config/benchmarks/industrial-soak.yaml")
-    industrial_soak.add_argument("--compose-file", default="docker/docker-compose.yml")
-    industrial_soak.add_argument("--duration", type=int, default=None, help="Override scenario duration in seconds")
-    industrial_soak.add_argument("--smoke", action="store_true", help="Scale the campaign to a 30-second smoke run")
-    industrial_soak.add_argument("--dry-run", action="store_true", help="Validate and print the campaign without starting Docker")
-    industrial_soak.add_argument("--no-build", action="store_true", help="Use the existing Docker images and start the stack without rebuilding")
-    industrial_soak.add_argument("--report-dir", default=None)
-    industrial_soak.add_argument("--json", action="store_true")
-    industrial_soak.set_defaults(func=cmd_benchmark)
     resilience = benchmark_sub.add_parser("resilience", help="Run a deterministic local fault-injection and recovery campaign")
     resilience.add_argument("--events", type=int, default=10_000)
     resilience.add_argument("--outage-events", type=int, default=2_000)
@@ -2912,65 +2776,6 @@ def build_parser() -> argparse.ArgumentParser:
     resilience.add_argument("--report-dir", default=None)
     resilience.add_argument("--json", action="store_true")
     resilience.set_defaults(func=cmd_benchmark)
-    multi_site_simulation = benchmark_sub.add_parser("multi-site-simulation", help="Run a multi-site event, outage, replay, and isolation simulation")
-    multi_site_simulation.add_argument("--sites", type=int, default=3)
-    multi_site_simulation.add_argument("--events-per-site", type=int, default=1000)
-    multi_site_simulation.add_argument("--outage-events-per-site", type=int, default=250)
-    multi_site_simulation.add_argument("--spool-root", default=None)
-    multi_site_simulation.add_argument("--report-dir", default=None)
-    multi_site_simulation.add_argument("--json", action="store_true")
-    multi_site_simulation.set_defaults(func=cmd_benchmark)
-    site_profile_matrix = benchmark_sub.add_parser("site-profile-matrix", help="Benchmark real-world simulator runs per site profile")
-    site_profile_matrix.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
-    site_profile_matrix.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
-    site_profile_matrix.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites in the manifest")
-    site_profile_matrix.add_argument("--events", type=int, default=10_000)
-    site_profile_matrix.add_argument("--batch-size", type=int, default=256)
-    site_profile_matrix.add_argument("--warmup-events", type=int, default=0)
-    site_profile_matrix.add_argument("--min-average-events-per-second", type=float, default=1000.0)
-    site_profile_matrix.add_argument("--repeat-count", type=int, default=3, help="Number of repeated benchmark runs per site")
-    site_profile_matrix.add_argument("--report-dir", default=None, help="Optional directory to write JSON benchmark reports")
-    site_profile_matrix.add_argument("--json", action="store_true")
-    site_profile_matrix.set_defaults(func=cmd_benchmark)
-    multi_site_failure = benchmark_sub.add_parser("multi-site-failure", help="Simulate site-local operation during central outage and recovery")
-    multi_site_failure.add_argument("--sites", type=int, default=3)
-    multi_site_failure.add_argument("--events-per-site", type=int, default=10_000)
-    multi_site_failure.add_argument("--outage-events-per-site", type=int, default=2_000)
-    multi_site_failure.add_argument("--json", action="store_true")
-    multi_site_failure.set_defaults(func=cmd_benchmark)
-    site_profile_calibration = benchmark_sub.add_parser("site-profile-calibration", help="Calibrate per-site benchmark thresholds from the mixed replay pack")
-    site_profile_calibration.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
-    site_profile_calibration.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
-    site_profile_calibration.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites in the manifest")
-    site_profile_calibration.add_argument("--events", type=int, default=10_000)
-    site_profile_calibration.add_argument("--batch-size", type=int, default=256)
-    site_profile_calibration.add_argument("--warmup-events", type=int, default=0)
-    site_profile_calibration.add_argument("--min-average-events-per-second", type=float, default=1000.0)
-    site_profile_calibration.add_argument("--repeat-count", type=int, default=3, help="Number of repeated benchmark runs per site")
-    site_profile_calibration.add_argument("--report-dir", default=None, help="Optional directory to write JSON benchmark reports")
-    site_profile_calibration.add_argument("--json", action="store_true")
-    site_profile_calibration.set_defaults(func=cmd_benchmark)
-    cgr_gap_report = benchmark_sub.add_parser("cgr-gap-report", help="Compare local benchmark results against the public CGR streaming claims")
-    cgr_gap_report.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
-    cgr_gap_report.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
-    cgr_gap_report.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites in the manifest")
-    cgr_gap_report.add_argument("--events", type=int, default=10_000)
-    cgr_gap_report.add_argument("--batch-size", type=int, default=256)
-    cgr_gap_report.add_argument("--warmup-events", type=int, default=0)
-    cgr_gap_report.add_argument("--min-average-events-per-second", type=float, default=1000.0)
-    cgr_gap_report.add_argument("--cgr-events-per-second", type=float, default=2_000_000.0)
-    cgr_gap_report.add_argument("--cgr-p99-ms", type=float, default=80.0)
-    cgr_gap_report.add_argument("--documented-full-pipeline-events-per-second", type=float, default=125_830.0)
-    cgr_gap_report.add_argument("--json", action="store_true")
-    cgr_gap_report.set_defaults(func=cmd_benchmark)
-    cgr_stream_slice = benchmark_sub.add_parser("cgr-stream-slice", help="Benchmark the isolated stream-processing slice used for CGR-style comparisons")
-    cgr_stream_slice.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
-    cgr_stream_slice.add_argument("--events", type=int, default=10_000)
-    cgr_stream_slice.add_argument("--batch-size", type=int, default=256)
-    cgr_stream_slice.add_argument("--warmup-events", type=int, default=0)
-    cgr_stream_slice.add_argument("--window-limit", type=int, default=25)
-    cgr_stream_slice.add_argument("--json", action="store_true")
-    cgr_stream_slice.set_defaults(func=cmd_benchmark)
     flink_runtime_slice = benchmark_sub.add_parser("flink-runtime-slice", help="Benchmark the keyed-state Flink runtime contract")
     flink_runtime_slice.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
     flink_runtime_slice.add_argument("--events", type=int, default=10_000)

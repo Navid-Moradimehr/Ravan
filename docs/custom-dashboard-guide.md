@@ -21,7 +21,7 @@ pipeline or read Kafka directly from the browser.
 
 ## First-Time Setup
 
-1. Start the platform and simulator stack:
+1. Start the platform and ensure the configured source or replay path is publishing data:
 
    ```powershell
    docker compose -f docker/docker-compose.yml --profile edge --profile api --profile ui up -d

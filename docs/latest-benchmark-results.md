@@ -31,18 +31,9 @@ malformed, duplicate, out-of-order, and outage cases:
 - Unaccounted events: `0`
 - Pending spool after recovery: `0`
 
-A five-site logical simulation processed 25,000 generated events:
-
-- Central unique events: `25,000`
-- Normalized events: `25,000`
-- Scored events: `25,000`
-- Central duplicate IDs: `0`
-- Site isolation errors: `0`
-- Measured local simulation rate: `15,132.13 events/sec`
-
-These results validate deterministic accounting and site-qualified identity in
-local simulation. They do not certify real PLCs, industrial networks, Kafka
-federation, or production Kubernetes capacity.
+These results validate deterministic accounting for the supplied event
+fixtures. They do not certify real PLCs, industrial networks, Kafka federation,
+or production Kubernetes capacity.
 
 ## Interpretation
 

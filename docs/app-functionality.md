@@ -13,7 +13,7 @@ In plain language, it acts like a small digital factory lab:
 
 ## End-to-End Flow
 
-1. A device, simulator, replay job, or external system sends telemetry.
+1. A device, replay job, or external system sends telemetry.
 2. The edge layer converts it into a canonical industrial event.
 3. The streaming layer publishes the event to Kafka-compatible topics.
 4. Analytics enrich the event with severity, anomaly signals, and fault context.
@@ -29,13 +29,13 @@ This is the front door of the platform.
 **What it does**
 
 - accepts industrial data from OPC UA, MQTT, Modbus TCP, and Modbus RTU
-- supports local simulators and real connector configurations
+- supports externally managed device endpoints and real connector configurations
 - validates payloads and routes bad records to a dead-letter queue
 - publishes standardized events for downstream processing
 
 **Main inputs**
 
-- protocol messages from simulators or real endpoints
+- protocol messages from real endpoints or operator-provided replay data
 - replayed datasets from CSV and predictive-maintenance datasets
 - external events posted to the REST ingest API
 
@@ -54,7 +54,7 @@ This is the front door of the platform.
 
 **How users interact with it**
 
-- operators start simulators and soak scripts
+- operators start externally managed sources and validation checks
 - engineers configure assets, tags, limits, and connector settings
 - external systems can push events through the API
 

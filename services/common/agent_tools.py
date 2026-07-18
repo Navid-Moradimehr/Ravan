@@ -105,11 +105,11 @@ class ToolRegistry:
         self.register(
             ToolSpec(
                 name="scenarios.list",
-                description="Read available simulation scenarios.",
+                description="Read available replay scenarios.",
                 read_only=True,
                 input_schema={"type": "object", "properties": {}},
                 output_schema={"type": "array", "items": {"type": "object"}},
-                tags=("simulation", "read_only"),
+                tags=("replay", "read_only"),
             )
         )
         self.register(

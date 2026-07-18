@@ -21,7 +21,7 @@ the remaining application surface without changing the public API.
 ## Stack
 
 - Streaming: Apache Kafka, Kafka UI, internal schema registry contract
-- Industrial edge: local OPC UA, MQTT, and Modbus TCP simulators plus normalized edge ingest
+- Industrial edge: OPC UA, MQTT, and Modbus TCP connectors plus normalized edge ingest
 - Processing: Apache Flink / PyFlink plus the runtime Python processor fallback
 - Processing internals: shared enrichment contract used by both processing paths
 - CDC: PostgreSQL plus Debezium Kafka Connect
@@ -40,9 +40,9 @@ Error handling is intentionally platform-neutral: the UI uses in-app banners, in
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and adjust ports/model settings.
-2. Start the production-shaped local stack without simulators: `./scripts/ravan.sh up -d` on Linux/macOS or `.\scripts\ravan.ps1 up -d` on Windows.
+2. Start the production-shaped local stack: `./scripts/ravan.sh up -d` on Linux/macOS or `.\scripts\ravan.ps1 up -d` on Windows.
 3. Topics are auto-created by the `kafka-init` service on first `up`. To create them manually (non-compose broker), run `powershell -ExecutionPolicy Bypass -File scripts/create-topics.ps1`.
-4. For a hardware-free demo, explicitly add `--profile demo` to the Compose command or run `powershell -ExecutionPolicy Bypass -File scripts/start-industrial-sim.ps1`.
+4. Configure at least one real or externally managed source in `.env` or through the Source Connections page. The repository expects broker and device endpoints to be managed by the operator.
 5. Open the dashboard: `http://localhost:3006`.
 
 ## Control CLI
@@ -91,20 +91,7 @@ See `docs/self-host-install-guide.md` for deployment and
 `docs/update-and-release-operations.md` for the opt-in release check and
 operator-controlled upgrade procedure.
 
-## Industrial Simulation
-
-Run the hardware-free industrial pipeline:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/start-industrial-sim.ps1
-```
-
-Run a mixed-protocol soak:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/edge-soak.ps1 -Seconds 300 -MqttRatePerSecond 100
-powershell -ExecutionPolicy Bypass -File scripts/site-profile-soak.ps1 -SiteProfile config/site-profiles/single-site.yaml -Seconds 60 -MqttRatePerSecond 100 -RecoveryService processor
-```
+## Data Flow
 
 The edge path publishes raw protocol payloads to `industrial.raw`, validated envelopes to `industrial.normalized`, compatibility events to `iot.raw`, and invalid records to `industrial.dlq`.
 
@@ -119,9 +106,8 @@ Run the mixed replay benchmark pack:
 python scripts/benchmark_mixed_replay.py --events 100000 --batch-size 256
 ```
 
-This replays `data/benchmarks/industrial_mixed_benchmark.csv` through the
-validation, normalization, scoring, and serialization path used by the
-industrial pipeline.
+This replays an operator-provided CSV through the validation, normalization,
+scoring, and serialization path used by the industrial pipeline.
 
 Run the AI gateway mock benchmark pack:
 
@@ -146,12 +132,11 @@ against realistic industrial batches without depending on a live model server.
 - `services/api_service/routers/modeling.py` exposes the read-only model, prompt, tool, and context contract surface.
 - `services/api_service/routers/retrieval.py` exposes deterministic retrieval/search over historian, alarms, assets, reports, and scenarios.
 - `config/site-profiles/` contains example site profile contracts for `single-site`, `plant-local`, and `federated` rollout shapes.
-- `docs/local-validation-guide.md` explains the local validation and simulator datasets.
+- `docs/deployment-targets.md` explains local validation and deployment boundaries.
 - `services/api_service/routers/historian.py` and `services/api_service/runtime.py` hold the split historian routing and shared API runtime helpers.
 - `scripts/benchmark_mixed_replay.py` runs the mixed replay benchmark against the local industrial replay pack.
 - `scripts/benchmark_ai_gateway_mock.py` benchmarks the provider-neutral AI gateway against realistic mock industrial batches.
 - `scripts/site-profile-soak.ps1` runs a live site-profile release gate and soak harness against the host-run runtime services.
-- `data/benchmarks/industrial_mixed_benchmark.csv` is a local replay pack for mixed-protocol benchmark and stress cases.
 - `docs/` contains curated user-facing operator references.
 
 ## Useful URLs

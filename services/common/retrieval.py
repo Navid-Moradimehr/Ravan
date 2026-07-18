@@ -271,7 +271,7 @@ def _build_retrieval_documents_cached(
                 title=str(scenario.get("name", scenario.get("scenario_id", "scenario"))),
                 text=text,
                 payload=scenario,
-                tags=("simulation", "scenario"),
+                tags=("replay", "scenario"),
             )
         )
 
@@ -428,8 +428,8 @@ def build_retrieval_catalog(*, asset_config: Path | str = Path("config/assets.ya
             },
             {
                 "name": "scenarios",
-                "kind": "simulation",
-                "description": "Available industrial simulation scenarios",
+                "kind": "replay",
+                "description": "Available replay scenarios",
                 "read_only": True,
             },
             {

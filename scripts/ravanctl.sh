@@ -15,7 +15,7 @@ fi
 
 if [ "${1:-}" = "preflight" ]; then
   shift
-  preflight_args="preflight --compose-file /workspace/${COMPOSE_FILE#./} --site-profile /workspace/config/site-profiles/single-site.yaml --project-manifest /workspace/config/project-manifest.yaml --soak-scenario /workspace/config/benchmarks/industrial-soak.yaml"
+  preflight_args="preflight --compose-file /workspace/${COMPOSE_FILE#./} --site-profile /workspace/config/site-profiles/single-site.yaml --project-manifest /workspace/config/project-manifest.yaml"
   if [ -f .env ]; then
     preflight_args="$preflight_args --env-file /workspace/.env"
   fi

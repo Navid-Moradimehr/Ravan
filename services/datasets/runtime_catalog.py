@@ -20,14 +20,6 @@ class DatasetSource:
 
 DATASET_SOURCES: tuple[DatasetSource, ...] = (
     DatasetSource(
-        dataset_id="mock",
-        name="Built-in mock generator",
-        category="mock",
-        signals="Configurable pump/motor/turbine tags with scenario labels",
-        best_use="Smoke tests, UI validation, repeatable CI",
-        licensed=False,
-    ),
-    DatasetSource(
         dataset_id="ai4i",
         name="AI4I 2020 Predictive Maintenance",
         category="synthetic",

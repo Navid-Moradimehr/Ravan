@@ -13,10 +13,8 @@ from typing import Any
 
 from services.common.brokers import resolve_kafka_brokers
 from services.common.stream_scope import stream_partition_key
-from services.datasets.mock_generator import ALL_PRESETS, generate_event
 from services.datasets.replayer import map_row_to_event, read_csv_rows
 from services.edge_ingest.model import to_json_bytes
-from services.scenarios.engine import ScenarioState, ScenarioType, advance_scenario
 from services.datasets.runtime_catalog import get_dataset_source
 from services.scenarios.engine import list_scenarios
 
@@ -24,7 +22,7 @@ from services.scenarios.engine import list_scenarios
 @dataclass
 class ReplayStatus:
     running: bool = False
-    dataset: str = "mock"
+    dataset: str = ""
     scenario: str = "normal"
     progress_percent: int = 0
     events_emitted: int = 0
@@ -80,7 +78,7 @@ def start_replay(dataset: str, scenario: str) -> dict[str, Any]:
         raise ValueError(f"Unknown scenario: {scenario}")
 
     source_path = _configured_dataset_path(dataset)
-    if dataset != "mock" and source_path is None:
+    if source_path is None:
         raise ValueError(
             f"No replay source configured for {dataset}; set DATASET_REPLAY_PATHS to a JSON mapping of dataset IDs to CSV files"
         )
@@ -122,7 +120,7 @@ def reset_replay_state() -> None:
     with _LOCK:
         _STOP_EVENT.set()
         _STATE.running = False
-        _STATE.dataset = "mock"
+        _STATE.dataset = ""
         _STATE.scenario = "normal"
         _STATE.progress_percent = 0
         _STATE.events_emitted = 0
@@ -178,31 +176,21 @@ def _run_replay(dataset: str, scenario: str, source_path: Path | None) -> None:
         })
         topic = os.getenv("REPLAY_TOPIC", "industrial.normalized")
         rate = max(1, int(os.getenv("REPLAY_RATE_PER_SECOND", "100")))
-        target = _estimate_event_count(dataset) if source_path is None else _estimate_csv_count(source_path)
+        if source_path is None:
+            raise ValueError("Replay requires an operator-provided CSV source")
+        target = _estimate_csv_count(source_path)
         emitted = 0
-        scenario_state = ScenarioState(scenario_type=ScenarioType(scenario), scenario_id=f"replay-{dataset}")
-        assets = ALL_PRESETS["pump"]
-        rows = iter(read_csv_rows(source_path)) if source_path is not None else None
+        rows = iter(read_csv_rows(source_path))
         mapping = {"asset_id": "asset_id", "tag": "tag", "value": "value", "source_protocol": "source_protocol", "source_id": "source_id", "quality": "quality", "unit": "unit", "site": "site", "line": "line", "ts_source": "ts_source"}
         while not _STOP_EVENT.is_set() and emitted < target:
-            if rows is None:
-                for asset in assets:
-                    if _STOP_EVENT.is_set() or emitted >= target:
-                        break
-                    event = generate_event(asset, scenario_state)
-                    advance_scenario(scenario_state)
-                    _publish_replay_event(producer, topic, event)
-                    emitted += 1
-                    _set_progress(emitted, target)
-            else:
-                try:
-                    row = next(rows)
-                except StopIteration:
-                    break
-                event = map_row_to_event(row, mapping)
-                _publish_replay_event(producer, topic, event)
-                emitted += 1
-                _set_progress(emitted, target)
+            try:
+                row = next(rows)
+            except StopIteration:
+                break
+            event = map_row_to_event(row, mapping)
+            _publish_replay_event(producer, topic, event)
+            emitted += 1
+            _set_progress(emitted, target)
             time.sleep(1 / rate)
         remaining = producer.flush(10)
         if remaining:

@@ -6,6 +6,6 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-# Production starts Ravan UI and edge ingestion, but never demo protocol simulators.
+# Production starts Ravan UI and edge ingestion; source endpoints are operator-managed.
 COMPOSE_FILE="${RAVAN_COMPOSE_FILE:-docker/docker-compose.yml}"
 exec docker compose -f "${COMPOSE_FILE}" --profile ui --profile edge "$@"

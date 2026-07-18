@@ -10,4 +10,4 @@ actual command and result; it does not decide whether continuous-control
 MuZero adaptations are appropriate for a site.
 
 Evaluate planning against replayed historical episodes or a user-provided
-simulator. Do not connect a newly trained planner directly to PLC writes.
+validated control environment. Do not connect a newly trained planner directly to PLC writes.
