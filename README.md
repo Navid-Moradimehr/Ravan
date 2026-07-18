@@ -58,9 +58,10 @@ the telemetry, state, and orchestration data backbone around those systems.
 It is a good fit for collecting robot observations, positions, mission
 events, battery and fault telemetry, task assignments, and fleet-level
 status, then exposing that data to dashboards, replay, analytics, and AI
-workflows. It is not a hard real-time motion controller, so low-latency
-trajectory execution and safety-critical control should remain in the robot or
-fleet control system that owns the actuators.
+workflows. Users can take those streams, historian records, and event
+contracts and integrate them into the robot or fleet control system that owns
+the actuators, while low-latency motion and safety-critical control remain in
+that controller layer.
 
 Teams preparing world-model or latent-space systems can use Ravan to collect
 replayable telemetry together with asset relationships, topology, temporal
