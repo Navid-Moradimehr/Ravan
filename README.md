@@ -25,7 +25,7 @@ the remaining application surface without changing the public API.
 - Processing: Apache Flink / PyFlink plus the runtime Python processor fallback
 - Processing internals: shared enrichment contract used by both processing paths
 - CDC: PostgreSQL plus Debezium Kafka Connect
-- AI: provider-neutral FastAPI gateway for OpenAI-compatible and open-weight model backends
+- AI: provider-neutral FastAPI gateway with native Anthropic and Gemini adapters, OpenAI-compatible endpoints for OpenAI, DeepSeek, Qwen, Kimi, GLM, vLLM, LM Studio, and other compatible servers, plus Ollama and open-weight model support
 - AI contracts: model registry, prompt registry, structured output validation, and read-only tool/context packages for future diagnostic agents
 - Observability: Prometheus and Grafana
 - UI: Next.js, TypeScript, Tailwind CSS, shadcn/ui
