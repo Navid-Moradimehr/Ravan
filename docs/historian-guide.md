@@ -22,6 +22,15 @@ or clicking a tag in Asset Hierarchy drives the same historian query. If the
 selector is empty, start normalized fan-out or run the bounded catalog
 reconciliation endpoint described in the threshold policy guide.
 
+The hierarchy distinguishes configured topology from discovery. Equipment such
+as pumps and motors is treated as an asset when it has tag children, even when
+its type is not literally named `asset`. The `demo` marker identifies the
+bundled example site. An `observed` branch contains asset/tag pairs found in
+historian traffic that are not yet part of the configured registry. Observed
+data is useful for discovery, but it does not invent a line, area, or cell
+relationship. Add the source and topology to the asset registry when the
+observed signal is ready to become part of the operational model.
+
 The selector is searchable: type a site, asset ID, asset name, tag, or source
 to narrow the candidates. The **Time span** selector controls the historian
 window independently of the live refresh setting and supports the last hour,
@@ -29,7 +38,18 @@ window independently of the live refresh setting and supports the last hour,
 The rendered trend is a responsive line chart with a
 `Time` x-axis, the selected tag and unit on the y-axis, gridlines, and a hover
 tooltip. If the catalog has no unit, the tag name is used as the value-axis
-label.
+label. The query includes the selected site when one is available, so two
+sites can use the same asset ID without their readings being mixed. A chart's
+maximize button opens a centered, non-fullscreen view with a blurred backdrop;
+the transition returns to the original chart position when minimized. Escape
+and the close button provide the same behavior, and reduced-motion preferences
+are respected.
+
+The default one-hour window is intentionally current-data oriented. Bundled
+demo and replay samples may be older than that window, so use `Last 7 days`
+when reviewing those samples. A blank chart in that case means that no rows
+matched the selected site, asset, tag, and time range; it is not proof that the
+historian is empty.
 
 The Raw Events table also has a searchable selector for the supported historian
 projections: `industrial_events`, `processed_events`, and `ai_enriched`. This

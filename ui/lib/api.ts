@@ -71,6 +71,9 @@ export type AssetHierarchyNode = {
   id: string;
   name: string;
   type?: string;
+  origin?: "configured" | "demo" | "observed";
+  site_id?: string;
+  last_seen?: string | null;
   children?: AssetHierarchyNode[];
   tags?: Array<{
     id: string;
@@ -99,6 +102,8 @@ export type AssetTagCatalogItem = {
   critical_high?: number | null;
   source: "registry" | "observed";
   active: boolean;
+  first_seen?: string | null;
+  last_seen?: string | null;
 };
 
 export type ThresholdPolicy = {
@@ -214,9 +219,10 @@ export async function getHistorianTrend(
   assetId: string,
   tag: string,
   hours: number = 1,
+  siteId?: string,
 ): Promise<HistorianTrendPoint[]> {
   return requestJson(
-    `/api/historian?action=trend&asset_id=${encodeURIComponent(assetId)}&tag=${encodeURIComponent(tag)}&hours=${hours}`,
+    `/api/historian?action=trend&asset_id=${encodeURIComponent(assetId)}&tag=${encodeURIComponent(tag)}&hours=${hours}${siteId ? `&site_id=${encodeURIComponent(siteId)}` : ""}`,
   );
 }
 

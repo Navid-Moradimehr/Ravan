@@ -676,6 +676,7 @@ def query_trend(
     tag: str,
     hours: int = 1,
     *,
+    site_id: str | None = None,
     start: Any | None = None,
     end: Any | None = None,
     max_points: int = 2000,
@@ -695,24 +696,29 @@ def query_trend(
     if end is None:
         end = datetime.now(timezone.utc)
     if aggregation == "raw":
+        site_filter = " AND site = %s" if site_id else ""
+        params: tuple[Any, ...] = (asset_id, tag, site_id, start, end, max_points) if site_id else (asset_id, tag, start, end, max_points)
         return _fetch_rows(
             "industrial_events", "trend",
-            """SELECT time, value, quality, fault_type, ground_truth_severity
+            f"""SELECT time, value, quality, fault_type, ground_truth_severity
                FROM industrial_events WHERE asset_id = %s AND tag = %s
-                 AND time >= %s AND time <= %s ORDER BY time ASC LIMIT %s""",
-            (asset_id, tag, start, end, max_points),
+                 {site_filter} AND time >= %s AND time <= %s ORDER BY time ASC LIMIT %s""",
+            params,
         )
     seconds = max(1.0, (end - start).total_seconds() / max_points)
     bucket = f"{seconds} seconds"
     aggregate = {"min": "MIN(value)", "max": "MAX(value)"}.get(aggregation, "AVG(value)")
+    site_filter = " AND site = %s" if site_id else ""
+    params = (bucket, asset_id, tag, site_id, start, end, max_points) if site_id else (bucket, asset_id, tag, start, end, max_points)
     return _fetch_rows(
         "industrial_events", "trend",
         f"""SELECT time_bucket(%s::interval, time) AS time, {aggregate} AS value,
                   'good' AS quality, NULL AS fault_type, NULL AS ground_truth_severity
                FROM industrial_events WHERE asset_id = %s AND tag = %s
+                 {site_filter}
                  AND time >= %s AND time <= %s
                GROUP BY 1 ORDER BY 1 ASC LIMIT %s""",
-        (bucket, asset_id, tag, start, end, max_points),
+        params,
     )
 def query_alarms(limit: int = 50) -> list[dict[str, Any]]:
     rows = _fetch_rows(

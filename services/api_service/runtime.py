@@ -24,9 +24,14 @@ except ImportError:
 def build_asset_hierarchy() -> list[dict[str, Any]]:
     config_path = os.getenv("ASSETS_CONFIG_PATH", os.path.join(os.path.dirname(__file__), "..", "..", "config", "assets.yaml"))
     try:
-        return hierarchy_to_tree(load_hierarchy(config_path))
+        from services.common.asset_hierarchy_projection import build_asset_hierarchy_projection
+
+        return build_asset_hierarchy_projection(asset_config=config_path, include_observed=True)
     except Exception:
-        return []
+        try:
+            return hierarchy_to_tree(load_hierarchy(config_path))
+        except Exception:
+            return []
 
 
 def _do_ingest_event(event: dict[str, Any]) -> dict[str, str]:

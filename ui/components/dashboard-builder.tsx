@@ -46,6 +46,7 @@ import {
 } from "@/lib/api";
 import { formatErrorMessage } from "@/lib/http";
 import { SearchableSelect } from "@/components/searchable-select";
+import { ExpandableChart } from "@/components/expandable-chart";
 
 export type PanelType = "trend" | "alarms" | "events" | "stats" | "observability";
 
@@ -54,6 +55,7 @@ export interface DashboardPanel {
   type: PanelType;
   title: string;
   config: {
+    site_id: string;
     asset_id: string;
     tag: string;
     table: string;
@@ -79,6 +81,7 @@ const PANEL_TYPES: { type: PanelType; label: string; description: string }[] = [
 ];
 
 const defaultConfig = (): DashboardPanel["config"] => ({
+  site_id: "",
   asset_id: "",
   tag: "",
   table: "industrial_events",
@@ -122,8 +125,8 @@ function formatValue(value: unknown): string {
   return Number.isFinite(number) ? number.toFixed(2) : "n/a";
 }
 
-function flattenTags(items: Awaited<ReturnType<typeof getAssetTagCatalog>>["items"]): Array<{ asset_id: string; tag: string; label: string }> {
-  return items.map((item) => ({ asset_id: item.asset_id, tag: item.tag, label: `${item.site_id} / ${item.asset_name} / ${item.tag}` }));
+function flattenTags(items: Awaited<ReturnType<typeof getAssetTagCatalog>>["items"]): Array<{ site_id: string; asset_id: string; tag: string; label: string }> {
+  return items.map((item) => ({ site_id: item.site_id, asset_id: item.asset_id, tag: item.tag, label: `${item.site_id} / ${item.asset_name} / ${item.tag}` }));
 }
 
 function EmptyState({ children }: { children: React.ReactNode }) {
@@ -136,8 +139,8 @@ function QueryError({ error }: { error: unknown }) {
 
 function TrendPanel({ panel }: { panel: DashboardPanel }) {
   const query = useQuery<HistorianTrendPoint[]>({
-    queryKey: ["custom-dashboard", panel.id, "trend", panel.config.asset_id, panel.config.tag, panel.config.hours],
-    queryFn: () => getHistorianTrend(panel.config.asset_id, panel.config.tag, panel.config.hours),
+    queryKey: ["custom-dashboard", panel.id, "trend", panel.config.site_id, panel.config.asset_id, panel.config.tag, panel.config.hours],
+    queryFn: () => getHistorianTrend(panel.config.asset_id, panel.config.tag, panel.config.hours, panel.config.site_id || undefined),
     enabled: Boolean(panel.config.asset_id && panel.config.tag),
     refetchInterval: panel.config.refresh_seconds > 0 ? panel.config.refresh_seconds * 1000 : false,
   });
@@ -146,17 +149,19 @@ function TrendPanel({ panel }: { panel: DashboardPanel }) {
   if (query.isLoading) return <EmptyState>Loading historian trend...</EmptyState>;
   if (!query.data?.length) return <EmptyState>No historian samples match this asset, tag, and time window.</EmptyState>;
   return (
-    <ChartContainer config={{ value: { label: panel.config.tag, color: "var(--chart-1)" } }} className="h-[230px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={query.data}>
-          <CartesianGrid stroke="var(--color-border-subtle)" strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="time" tickFormatter={formatTime} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
-          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} width={42} />
-          <Tooltip content={<ChartTooltipContent indicator="line" labelFormatter={(value) => formatTime(value)} />} />
-          <Line type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
-        </LineChart>
-      </ResponsiveContainer>
-    </ChartContainer>
+    <ExpandableChart label={`${panel.config.site_id ? `${panel.config.site_id} / ` : ""}${panel.config.asset_id}.${panel.config.tag}`}>
+      <ChartContainer config={{ value: { label: panel.config.tag, color: "var(--chart-1)" } }} className="h-[230px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={query.data}>
+            <CartesianGrid stroke="var(--color-border-subtle)" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="time" tickFormatter={formatTime} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} />
+            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }} width={42} />
+            <Tooltip content={<ChartTooltipContent indicator="line" labelFormatter={(value) => formatTime(value)} />} />
+            <Line type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={1.5} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartContainer>
+    </ExpandableChart>
   );
 }
 
@@ -233,11 +238,11 @@ function PanelBody({ panel }: { panel: DashboardPanel }) {
   return <StatsPanel panel={panel} />;
 }
 
-function PanelSettings({ panel, assets, onConfigChange, onTitleChange }: { panel: DashboardPanel; assets: Array<{ asset_id: string; tag: string; label: string }>; onConfigChange: (config: DashboardPanel["config"]) => void; onTitleChange: (title: string) => void }) {
+function PanelSettings({ panel, assets, onConfigChange, onTitleChange }: { panel: DashboardPanel; assets: Array<{ site_id: string; asset_id: string; tag: string; label: string }>; onConfigChange: (config: DashboardPanel["config"]) => void; onTitleChange: (title: string) => void }) {
   const update = (patch: Partial<DashboardPanel["config"]>) => onConfigChange({ ...panel.config, ...patch });
   return <div className="grid gap-3 rounded-lg border border-border-subtle bg-surface-2 p-3 sm:grid-cols-2">
     <label className="space-y-1 text-xs text-text-secondary"><span>Panel title</span><Input value={panel.title} onChange={(event) => onTitleChange(event.target.value)} /></label>
-    {panel.type === "trend" ? <div className="space-y-2"><label className="space-y-1 text-xs text-text-secondary"><span>Asset tag</span><select value={`${panel.config.asset_id}::${panel.config.tag}`} onChange={(event) => { const [asset_id, tag] = event.target.value.split("::"); update({ asset_id, tag }); }} className="app-select"><option value="::">Select a configured asset tag</option>{assets.map((item) => <option key={`${item.asset_id}::${item.tag}`} value={`${item.asset_id}::${item.tag}`}>{item.label}</option>)}</select></label><div className="grid gap-2 sm:grid-cols-2"><Input aria-label="Manual asset id" placeholder="Asset ID" value={panel.config.asset_id} onChange={(event) => update({ asset_id: event.target.value })} /><Input aria-label="Manual tag" placeholder="Tag" value={panel.config.tag} onChange={(event) => update({ tag: event.target.value })} /></div><p className="text-[11px] leading-4 text-text-secondary">Use manual values when the observed catalog is not populated yet. They must match historian rows.</p></div> : null}
+    {panel.type === "trend" ? <div className="space-y-2"><label className="space-y-1 text-xs text-text-secondary"><span>Asset tag</span><select value={`${panel.config.site_id}::${panel.config.asset_id}::${panel.config.tag}`} onChange={(event) => { const [site_id, asset_id, tag] = event.target.value.split("::"); update({ site_id, asset_id, tag }); }} className="app-select"><option value=":::">Select a configured asset tag</option>{assets.map((item) => <option key={`${item.site_id}::${item.asset_id}::${item.tag}`} value={`${item.site_id}::${item.asset_id}::${item.tag}`}>{item.label}</option>)}</select></label><div className="grid gap-2 sm:grid-cols-3"><Input aria-label="Manual site id" placeholder="Site ID" value={panel.config.site_id} onChange={(event) => update({ site_id: event.target.value })} /><Input aria-label="Manual asset id" placeholder="Asset ID" value={panel.config.asset_id} onChange={(event) => update({ asset_id: event.target.value })} /><Input aria-label="Manual tag" placeholder="Tag" value={panel.config.tag} onChange={(event) => update({ tag: event.target.value })} /></div><p className="text-[11px] leading-4 text-text-secondary">Use manual values when the observed catalog is not populated yet. Site ID is optional for legacy single-site rows, but recommended when multiple sites share asset IDs.</p></div> : null}
     {panel.type === "events" || panel.type === "stats" ? <label className="space-y-1 text-xs text-text-secondary"><span>Historian table</span><SearchableSelect value={panel.config.table} options={HISTORIAN_TABLE_OPTIONS} onChange={(table) => update({ table })} placeholder="Select historian table" searchPlaceholder="Search historian tables..." /><p className="text-[11px] leading-4 text-text-secondary">Choose the historian table sampled by this panel. Panel title remains editable text because it is your operator label.</p></label> : null}
     {panel.type === "trend" ? <label className="space-y-1 text-xs text-text-secondary"><span>Hours</span><Input type="number" min={1} max={168} value={panel.config.hours} onChange={(event) => update({ hours: Math.max(1, Number(event.target.value) || 1) })} /></label> : null}
     <label className="space-y-1 text-xs text-text-secondary"><span>Refresh seconds, 0 pauses</span><Input type="number" min={0} max={3600} value={panel.config.refresh_seconds} onChange={(event) => update({ refresh_seconds: Math.max(0, Number(event.target.value) || 0) })} /></label>

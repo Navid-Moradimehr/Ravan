@@ -79,13 +79,14 @@ async def get_trend(
     asset_id: str,
     tag: str,
     hours: int = 1,
+    site_id: str | None = None,
     start: datetime | None = None,
     end: datetime | None = None,
     max_points: int = 2000,
     aggregation: str = "auto",
 ) -> list[dict[str, Any]]:
     try:
-        return query_trend(asset_id, tag, hours, start=start, end=end, max_points=max_points, aggregation=aggregation)
+        return query_trend(asset_id, tag, hours, site_id=site_id, start=start, end=end, max_points=max_points, aggregation=aggregation)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 

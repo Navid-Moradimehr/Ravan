@@ -16,6 +16,7 @@ import { showToast } from "@/components/toaster";
 import { HelpTip } from "@/components/help-tip";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { SearchableSelect } from "@/components/searchable-select";
+import { ExpandableChart } from "@/components/expandable-chart";
 
 type RefreshOption = {
   label: string;
@@ -133,10 +134,11 @@ function RefreshMenu({
   );
 }
 
-function TrendChart({ data, tag, unit }: { data: { time: string; value: number }[]; tag: string; unit?: string }) {
+function TrendChart({ data, tag, unit, label }: { data: { time: string; value: number }[]; tag: string; unit?: string; label?: string }) {
   if (!data.length) return <p className="text-sm text-text-secondary">No data</p>;
-  return (
-    <ChartContainer config={{ value: { label: unit ? `${tag} (${unit})` : tag, color: "var(--chart-1)" } }} className="h-[280px] w-full">
+  const valueLabel = unit ? `${tag} (${unit})` : tag;
+  return <ExpandableChart label={label ?? valueLabel}>
+    <ChartContainer config={{ value: { label: valueLabel, color: "var(--chart-1)" } }} className="h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 10, right: 16, left: 10, bottom: 26 }}>
           <CartesianGrid stroke="var(--color-border-subtle)" strokeDasharray="3 3" vertical={false} />
@@ -144,32 +146,39 @@ function TrendChart({ data, tag, unit }: { data: { time: string; value: number }
             <Label value="Time" position="insideBottom" offset={-18} fill="var(--color-text-secondary)" fontSize={11} />
           </XAxis>
           <YAxis tickLine={false} axisLine={false} width={52} tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}>
-            <Label value={unit ? `${tag} (${unit})` : tag} angle={-90} position="insideLeft" offset={-2} fill="var(--color-text-secondary)" fontSize={11} />
+            <Label value={valueLabel} angle={-90} position="insideLeft" offset={-2} fill="var(--color-text-secondary)" fontSize={11} />
           </YAxis>
           <Tooltip content={<ChartTooltipContent indicator="line" labelFormatter={(value) => formatEventTime(value)} />} />
-          <Line type="monotone" dataKey="value" name={unit ? `${tag} (${unit})` : tag} stroke="var(--chart-1)" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} connectNulls={false} />
+          <Line type="monotone" dataKey="value" name={valueLabel} stroke="var(--chart-1)" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} connectNulls={false} />
         </LineChart>
       </ResponsiveContainer>
     </ChartContainer>
-  );
+  </ExpandableChart>;
 }
 
-function AssetTree({ nodes, onSelect, selected }: { nodes: any[]; onSelect: (assetId: string, tag: string) => void; selected: { assetId: string; tag: string } | null }) {
+function AssetTree({ nodes, onSelect, selected, siteId = "" }: { nodes: any[]; onSelect: (siteId: string, assetId: string, tag: string) => void; selected: { siteId: string; assetId: string; tag: string } | null; siteId?: string }) {
   return (
     <ul className="space-y-1 text-sm">
       {nodes.map((node) => (
         <li key={node.id}>
+          {(() => {
+            const currentSiteId = node.type === "site" ? String(node.id) : siteId || String(node.site_id ?? "");
+            const children = Array.isArray(node.children) ? node.children : [];
+            const isAsset = children.some((child: any) => child.type === "tag");
+            return <>
           <div className="flex items-center gap-2 py-1">
             <FolderTree className="size-3.5 text-text-secondary" />
             <span className="font-medium">{node.name}</span>
             <Badge variant="outline" className="text-[10px] px-1.5 py-0">{node.type}</Badge>
+            {node.origin === "demo" ? <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-warning">demo</Badge> : null}
+            {node.origin === "observed" ? <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-info">observed</Badge> : null}
         </div>
           {node.children?.length ? (
             <div className="ml-4 border-l border-border-subtle pl-2">
-              {node.type === "asset" ? (
+              {isAsset ? (
                 <div className="grid gap-1">
-                  {node.children.map((tag: any) => (
-                    <button key={tag.id} onClick={() => onSelect(node.id, tag.name)} className={`flex items-center gap-2 rounded-md px-2 py-1 text-left transition-colors ${selected?.assetId === node.id && selected?.tag === tag.name ? "bg-accent-subtle text-accent" : "hover:bg-surface-2"}`}>
+                  {children.map((tag: any) => (
+                    <button key={tag.id} onClick={() => onSelect(currentSiteId, node.id, tag.name)} className={`flex items-center gap-2 rounded-md px-2 py-1 text-left transition-colors ${selected?.siteId === currentSiteId && selected?.assetId === node.id && selected?.tag === tag.name ? "bg-accent-subtle text-accent" : "hover:bg-surface-2"}`}>
                       <Activity className="size-3 text-text-secondary" />
                       <span className="text-xs">{tag.name}</span>
                       <span className="ml-auto text-[10px] text-text-secondary">{tag.unit}</span>
@@ -177,10 +186,12 @@ function AssetTree({ nodes, onSelect, selected }: { nodes: any[]; onSelect: (ass
                   ))}
             </div>
               ) : (
-                <AssetTree nodes={node.children} onSelect={onSelect} selected={selected} />
+                <AssetTree nodes={children} onSelect={onSelect} selected={selected} siteId={currentSiteId} />
               )}
         </div>
           ) : null}
+            </>;
+          })()}
         </li>
       ))}
     </ul>
@@ -189,7 +200,7 @@ function AssetTree({ nodes, onSelect, selected }: { nodes: any[]; onSelect: (ass
 
 export function HistorianDashboard() {
   const [selectedTable, setSelectedTable] = useState("industrial_events");
-  const [selectedAsset, setSelectedAsset] = useState<{ assetId: string; tag: string } | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<{ siteId: string; assetId: string; tag: string } | null>(null);
   const [selectedScenario, setSelectedScenario] = useState("normal");
   const [selectedDataset, setSelectedDataset] = useState("ai4i");
   const [alarmsRefreshMs, setAlarmsRefreshMs] = useState<number | null>(2000);
@@ -200,7 +211,7 @@ export function HistorianDashboard() {
   const [refreshPreferencesReady, setRefreshPreferencesReady] = useState(false);
   const queryClient = useQueryClient();
 
-  const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.assetId, selectedAsset?.tag, trendHours], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, trendHours) : Promise.resolve([]), enabled: !!selectedAsset });
+  const trendQuery = useQuery({ queryKey: ["historian", "trend", selectedAsset?.siteId, selectedAsset?.assetId, selectedAsset?.tag, trendHours], queryFn: () => selectedAsset ? getHistorianTrend(selectedAsset.assetId, selectedAsset.tag, trendHours, selectedAsset.siteId) : Promise.resolve([]), enabled: !!selectedAsset });
   const assetsQuery = useQuery({ queryKey: ["historian", "assets"], queryFn: getAssetHierarchy });
   const catalogQuery = useQuery({ queryKey: ["historian", "asset-tag-catalog"], queryFn: getAssetTagCatalog });
   const scenariosQuery = useQuery({ queryKey: ["historian", "scenarios"], queryFn: getScenarios });
@@ -433,8 +444,10 @@ export function HistorianDashboard() {
           <CardContent className="max-h-96 overflow-y-auto p-4">
             {assetsQuery.isLoading ? (
               <div className="space-y-2"><Skeleton className="h-5 w-full bg-surface-2" /><Skeleton className="h-5 w-3/4 bg-surface-2" /></div>
+            ) : (assetsQuery.data ?? []).length ? (
+              <AssetTree nodes={assetsQuery.data ?? []} onSelect={(siteId, assetId, tag) => setSelectedAsset({ siteId, assetId, tag })} selected={selectedAsset} />
             ) : (
-              <AssetTree nodes={assetsQuery.data ?? []} onSelect={(assetId, tag) => setSelectedAsset({ assetId, tag })} selected={selectedAsset} />
+              <p className="text-sm text-text-secondary">No configured or observed assets are available yet.</p>
             )}
       </CardContent>
 </Card>
@@ -449,24 +462,24 @@ export function HistorianDashboard() {
                 content="Trend charts show historian readings for a single selected tag. Use this view to inspect time windows, detect drift, and compare against replay data."
               />
             </CardTitle>
-            <CardDescription className="text-text-secondary">{selectedAsset ? `${selectedAsset.assetId}.${selectedAsset.tag}` : "Select an asset tag"}</CardDescription>
+            <CardDescription className="text-text-secondary">{selectedAsset ? `${selectedAsset.siteId} / ${selectedAsset.assetId}.${selectedAsset.tag}` : "Select an asset tag"}</CardDescription>
           </CardHeader>
           <CardContent className="p-4">
             <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
               <label className="block space-y-1.5 text-xs font-medium text-text-secondary">
                 <span>Asset tag</span>
               <SearchableSelect
-                value={selectedAsset ? `${selectedAsset.assetId}::${selectedAsset.tag}` : ""}
+                value={selectedAsset ? `${selectedAsset.siteId}::${selectedAsset.assetId}::${selectedAsset.tag}` : ""}
                 onChange={(value) => {
-                  const [assetId, tag] = value.split("::");
-                  setSelectedAsset(assetId && tag ? { assetId, tag } : null);
+                  const [siteId, assetId, tag] = value.split("::");
+                  setSelectedAsset(siteId && assetId && tag ? { siteId, assetId, tag } : null);
                 }}
                 placeholder="Select an asset tag"
                 searchPlaceholder="Search assets and tags..."
                 disabled={catalogQuery.isLoading}
                 options={(catalogQuery.data?.items ?? []).map((item) => ({
-                  value: `${item.asset_id}::${item.tag}`,
-                  label: `${item.site_id} / ${item.asset_name} / ${item.tag} (${item.source})`,
+                  value: `${item.site_id}::${item.asset_id}::${item.tag}`,
+                  label: `${item.site_id === "demo-site" ? "Demo · " : ""}${item.site_id} / ${item.asset_name} / ${item.tag} (${item.source}${item.last_seen ? ` · last ${formatEventTime(item.last_seen)}` : " · no samples yet"})`,
                   searchText: `${item.site_id} ${item.asset_id} ${item.asset_name} ${item.tag} ${item.source}`,
                 }))}
                 />
@@ -478,8 +491,8 @@ export function HistorianDashboard() {
                 </select>
               </label>
             </div>
-            {selectedAsset ? (trendQuery.isLoading ? <Skeleton className="h-64 w-full bg-surface-2" /> : <TrendChart data={trendQuery.data?.map((d: any) => ({ time: d.time, value: d.value })) ?? []} tag={selectedAsset.tag} unit={catalogQuery.data?.items.find((item) => item.asset_id === selectedAsset.assetId && item.tag === selectedAsset.tag)?.unit} />) : (
-              <p className="py-8 text-center text-sm text-text-secondary">Select a tag above or click one in the asset hierarchy to view its trend.</p>
+            {selectedAsset ? (trendQuery.isLoading ? <Skeleton className="h-64 w-full bg-surface-2" /> : trendQuery.data?.length ? <TrendChart data={trendQuery.data.map((d: any) => ({ time: d.time, value: d.value }))} tag={selectedAsset.tag} unit={catalogQuery.data?.items.find((item) => item.site_id === selectedAsset.siteId && item.asset_id === selectedAsset.assetId && item.tag === selectedAsset.tag)?.unit} label={`${selectedAsset.siteId} / ${selectedAsset.assetId}.${selectedAsset.tag}`} /> : <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-4 text-sm text-text-primary"><p>No samples match this asset tag in the selected time span.</p><p className="mt-1 text-xs text-text-secondary">Try Last 7 days for demo or replay data, or confirm that the source has completed the historian path.</p></div>) : (
+              <p className="py-8 text-center text-sm text-text-secondary">Select one tag above or click one in the asset hierarchy to view its trend. To compare several tags, add one trend panel per tag in Custom Dashboard.</p>
             )}
           </CardContent>
 </Card>

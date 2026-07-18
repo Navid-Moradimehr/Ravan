@@ -46,9 +46,17 @@ For a trend panel, search the configured asset-tag selector by site, asset, tag,
 or source and choose a time window in hours. The Historian page's main trend
 view offers 1 hour, 6 hours, 24 hours, and 7 days; the Custom Dashboard trend
 panel keeps its own numeric hours setting. If the asset registry has no tags,
-the manual asset ID and tag fields remain available as a deployment fallback.
-The values must match the historian data; the dashboard does not guess a tag
-from arbitrary rows.
+the manual site ID, asset ID, and tag fields remain available as a deployment
+fallback. Site ID is recommended for multi-site deployments and is included in
+the historian query when set. The values must match the historian data; the
+dashboard does not guess a tag from arbitrary rows. Existing saved dashboards
+without a site ID remain valid and retain the previous site-unscoped behavior.
+
+Trend charts expose the same maximize interaction as the main historian trend:
+use the button in the chart's upper-right corner to open a centered view with a
+blurred backdrop, then minimize, close, or press Escape to return. This changes
+only the presentation; it does not create another query or duplicate the
+panel's refresh loop.
 
 For an events or statistics panel, choose a historian table from the searchable
 catalog. The current supported projections are `industrial_events`,

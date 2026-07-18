@@ -138,7 +138,15 @@ def _registry_items(asset_config: Path | str, site_id: str | None) -> list[dict[
         for node in nodes:
             node_type = str(node.get("type", ""))
             node_site = str(node.get("id", "")) if node_type == "site" else current_site
-            if node_type == "asset":
+            children = node.get("children", [])
+            # Asset types are domain-specific (pump, motor, tank, ...), so
+            # identify assets by their tag children instead of one literal
+            # type name.
+            is_asset = node_type not in {"site", "area", "line", "cell", "tag"} and any(
+                isinstance(child, dict) and str(child.get("type", "")) == "tag"
+                for child in children
+            )
+            if is_asset:
                 for tag in node.get("children", []):
                     if not isinstance(tag, dict):
                         continue
@@ -158,8 +166,7 @@ def _registry_items(asset_config: Path | str, site_id: str | None) -> list[dict[
                             "active": True,
                         }
                     )
-            children = node.get("children", [])
-            if node_type != "asset" and isinstance(children, list):
+            if not is_asset and isinstance(children, list):
                 visit(children, node_site)
 
     visit(snapshot.get("tree", []))
@@ -227,6 +234,11 @@ def list_asset_tags(
                     "last_seen": row[6].isoformat() if row[6] else None,
                     "active": bool(row[7]),
                 }
+            else:
+                # Registry ownership remains authoritative, but the UI can
+                # still show when the signal was last observed.
+                items_by_key[key]["first_seen"] = row[5].isoformat() if row[5] else None
+                items_by_key[key]["last_seen"] = row[6].isoformat() if row[6] else None
 
     result = {
         "catalog_version": version,

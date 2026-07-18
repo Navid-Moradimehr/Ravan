@@ -29,10 +29,11 @@ export async function handleRead(action: string, request: Request) {
     case "trend": {
       const assetId = searchParams.get("asset_id");
       const tag = searchParams.get("tag");
+      const siteId = searchParams.get("site_id");
       const hours = Number(searchParams.get("hours") ?? 1);
       if (!assetId || !tag) return NextResponse.json({ error: "asset_id and tag are required" }, { status: 400 });
       return NextResponse.json(await fetchJson<unknown[]>(
-        `${API_SERVICE_BASE}/api/v1/historian/trend?asset_id=${encodeURIComponent(assetId)}&tag=${encodeURIComponent(tag)}&hours=${hours}`,
+        `${API_SERVICE_BASE}/api/v1/historian/trend?asset_id=${encodeURIComponent(assetId)}&tag=${encodeURIComponent(tag)}&hours=${hours}${siteId ? `&site_id=${encodeURIComponent(siteId)}` : ""}`,
         { headers },
       ));
     }
