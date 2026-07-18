@@ -10,6 +10,39 @@ OPC UA, MQTT, Modbus, REST, and CDC sources --> Edge Ingest --> Kafka --> Flink 
 Prometheus scrapes edge and AI metrics; Grafana and the web dashboard expose operational views.
 ```
 
+## Real-World Applications
+
+Ravan can serve as the data foundation for manufacturing plants that collect
+telemetry from production lines, PLCs, machine controllers, and sensor
+gateways. Operators can normalize measurements, evaluate deterministic rules,
+store historian data, track alarms, and expose the resulting streams to
+dashboards, Grafana, AI services, or downstream systems.
+
+Utilities and energy operators can use the same pipeline for substations,
+power-generation equipment, renewable-energy assets, and distributed field
+sites. Site-qualified events, Kafka topics, Flink processing, replayable
+history, and optional object-storage sinks support local operation as well as
+centralized analysis across multiple sites.
+
+Water and wastewater facilities can connect treatment stages, pumps, tanks,
+valves, and quality instruments through supported protocol adapters. The
+platform can preserve raw and normalized events, route invalid records to the
+DLQ, generate alarms from configured rules, and provide historical trend and
+operational views.
+
+Food, pharmaceutical, chemical, and mining operations can use Ravan for
+condition monitoring, batch or process telemetry, environmental measurements,
+equipment health, and maintenance-oriented analytics. Company-specific
+topology, retention, security, credentials, MES/ERP integrations, and model
+workflows remain operator-owned configuration rather than assumptions in the
+platform core.
+
+System integrators can deploy Ravan at individual sites, near edge networks, or
+as a central data service receiving events from several site installations.
+External lakehouse, object storage, BI, workflow, identity, and model-serving
+systems can consume the platform's contracts when those capabilities are
+required.
+
 The ingest path now batches historian writes and the runtime processor and
 distributed Flink job share the same enrichment contract, which reduces
 duplicate logic and keeps severity output aligned across runtimes.
