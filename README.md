@@ -43,6 +43,28 @@ External lakehouse, object storage, BI, workflow, identity, and model-serving
 systems can consume the platform's contracts when those capabilities are
 required.
 
+Teams preparing world-model or latent-space systems can use Ravan to collect
+replayable telemetry together with asset relationships, topology, temporal
+context, alarms, actions, and lineage. These datasets can be exported or
+archived for user-owned JEPA-, Dreamer-, MuZero-, digital-twin, and simulation
+training workflows without making a specific model architecture part of the
+platform.
+
+Teams building predictive-maintenance or tabular decision systems can use the
+validated, normalized, and versioned dataset contracts as inputs for
+user-owned gradient-boosting models such as XGBoost, LightGBM, and related
+algorithms. Ravan provides the data and model-integration boundaries; feature
+engineering, training, evaluation, and production serving remain selectable
+by the deploying organization.
+
+Ravan can also operate as the data backend for a customer-built website,
+operator portal, or specialized industrial application. Those applications
+can read historian and metadata through the API, subscribe to live streams
+through WebSockets or Kafka, and use the platform's canonical event contracts
+instead of implementing separate connector, buffering, normalization, and
+historian pipelines. Ravan is not a general-purpose website host, so the
+customer's frontend remains separately deployed and consumes these interfaces.
+
 The ingest path now batches historian writes and the runtime processor and
 distributed Flink job share the same enrichment contract, which reduces
 duplicate logic and keeps severity output aligned across runtimes.
