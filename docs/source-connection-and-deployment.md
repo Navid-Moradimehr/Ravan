@@ -52,6 +52,23 @@ REST Pull is a runtime source. Configure an HTTP(S) endpoint, GET or POST, bound
 
 HTTP Push is a runtime ingress for gateways and applications that already own the outbound connection. After an `http_push` connection is enabled, post one event to `/api/v1/connections/<connection_id>/events` or up to 1,000 events to `/events/batch`. The route requires a registered enabled connection, stamps source/site lineage, uses the canonical ingest path, and deduplicates repeated `Idempotency-Key` or `event_id` values in the TimescaleDB-backed idempotency ledger. If durable storage is unavailable, the route fails closed instead of silently weakening deduplication. Authentication is deliberately left to the operator's reverse proxy or API boundary.
 
+## WebSocket subscriptions
+
+Ravan provides WebSocket endpoints for applications that need live updates from
+the platform. Use `/ws/telemetry` for live telemetry, `/ws/events` for
+historian event updates, and `/ws/alarms` for alarm updates. The built-in
+dashboard uses these same subscriptions, and a customer-built website or
+operator portal can connect with a browser WebSocket client. Use `wss://` when
+the deployment is protected by TLS.
+
+These endpoints are downstream read interfaces, not a generic upstream
+WebSocket source connector. Ravan currently ingests upstream data through OPC
+UA, MQTT, Modbus, REST Pull, HTTP Push, Kafka, or replay datasets. If an
+external API exposes only WebSockets, the operator must provide an adapter that
+converts its messages into HTTP Push, Kafka, MQTT, or the canonical event
+contract. WebSockets are appropriate for live UI delivery; Kafka remains the
+durable stream interface and REST/historian APIs remain the query interfaces.
+
 ## Multi-site deployment options
 
 For a plant-local deployment, run the edge service near the PLCs and write to a local Kafka and historian. For a centralized deployment, run one edge instance per site and forward selected Kafka topics or sink outputs to central Kafka, MinIO, S3, or Iceberg. Keep site IDs and source IDs in every event so central storage does not merge unrelated equipment.
