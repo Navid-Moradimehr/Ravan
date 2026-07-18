@@ -12,6 +12,16 @@ Prometheus scrapes edge and AI metrics; Grafana and the web dashboard expose ope
 
 ## Real-World Applications
 
+Ravan is built to be more than a streaming or historian tool. Its purpose is
+to give industrial teams a reusable data foundation that can collect events
+once, validate and route them through a deterministic pipeline, store them
+for operational use, and preserve the semantic and temporal context needed
+for future AI systems. That means the same platform can support live
+monitoring, historian access, replay, reporting, and model-ready data
+preparation for world models, latent-space learning, predictive maintenance,
+and other industrial AI workloads without forcing each company to build that
+infrastructure from scratch.
+
 Ravan can serve as the data foundation for manufacturing plants that collect
 telemetry from production lines, PLCs, machine controllers, and sensor
 gateways. Operators can normalize measurements, evaluate deterministic rules,
@@ -42,6 +52,15 @@ as a central data service receiving events from several site installations.
 External lakehouse, object storage, BI, workflow, identity, and model-serving
 systems can consume the platform's contracts when those capabilities are
 required.
+
+Ravan can also support coordinated robot fleets or swarms when it is used as
+the telemetry, state, and orchestration data backbone around those systems.
+It is a good fit for collecting robot observations, positions, mission
+events, battery and fault telemetry, task assignments, and fleet-level
+status, then exposing that data to dashboards, replay, analytics, and AI
+workflows. It is not a hard real-time motion controller, so low-latency
+trajectory execution and safety-critical control should remain in the robot or
+fleet control system that owns the actuators.
 
 Teams preparing world-model or latent-space systems can use Ravan to collect
 replayable telemetry together with asset relationships, topology, temporal
