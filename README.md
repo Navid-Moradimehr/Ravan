@@ -238,7 +238,6 @@ against realistic industrial batches without depending on a live model server.
 - Dashboard: `http://localhost:3006`
 - Kafka UI: `http://localhost:18080`
 - Edge metrics: `http://localhost:8090`
-- Kafka UI: `http://localhost:18080`
 - Flink UI: `http://localhost:18088`
 - AI Gateway: `http://localhost:8080/health`
 - Grafana: `http://localhost:13000`
