@@ -1,6 +1,6 @@
 # Ravan
 
-Ravan is a self-hosted real-time data platform inspired by CGR/GITA Streaming and BI product capabilities: industrial edge ingestion, low-latency streaming, stateful processing, operational analytics, and AI-assisted insight generation.
+Ravan is a self-hosted real-time industrial data platform for edge ingestion, low-latency streaming, stateful processing, operational analytics, and AI-assisted insight generation.
 
 ## Architecture
 
