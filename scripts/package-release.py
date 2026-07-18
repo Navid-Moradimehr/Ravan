@@ -38,6 +38,7 @@ RUNTIME_COPY_FILES = ("README.md", "LICENSE", "NOTICE", "pyproject.toml", "requi
 RUNTIME_SCRIPT_FILES = (
     "ravan.ps1",
     "ravan.sh",
+    "ravan-windows-site.ps1",
     "ravanctl.ps1",
     "ravanctl.sh",
     "ravan-upgrade.ps1",

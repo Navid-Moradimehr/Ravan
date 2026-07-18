@@ -139,6 +139,13 @@ production.
 - A Windows workstation can instead run the Operator package against a Linux
   Site Server.
 
+The complete stack currently runs through Docker Compose. The repository also
+includes `scripts/ravan-windows-site.ps1` as a local Docker Desktop bootstrap,
+so a Windows evaluator can start the same full Site Server without manually
+assembling each service. This is not yet a native Windows runtime installer:
+production Windows deployments should use a managed Linux appliance or a
+Linux Site Server, with the Windows Operator as the desktop entry point.
+
 Network OPC UA, MQTT, Modbus TCP and REST connections can pass through the
 appliance. Serial Modbus is better handled through a serial-to-Ethernet gateway
 or a native Edge Collector because physical serial passthrough into a VM is
@@ -156,6 +163,11 @@ The Helm package requires Kubernetes/K3s/RKE2, storage classes, ingress/TLS,
 secret references, Flink Kubernetes Operator, and either bundled or external
 Kafka and TimescaleDB. Companies own cluster capacity, identity, network policy,
 backups, and GPU nodes.
+
+Kubernetes is the advanced multi-node deployment path, not a one-click desktop
+installation. The install operator must provide the cluster, persistent
+storage, ingress, TLS, secret references, Kafka, TimescaleDB, and Flink
+Operator before Ravan workloads can be reconciled.
 
 ## Operator Installation Flow
 

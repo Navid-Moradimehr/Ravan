@@ -49,6 +49,7 @@ def test_compose_target_contains_runtime_and_public_docs(tmp_path: Path) -> None
     assert "build:" not in release_text
     assert "../services/processor:/opt/processor:ro" not in release_text
     assert (root / "runtime" / "docs" / "self-host-install-guide.md").exists()
+    assert (root / "runtime" / "scripts" / "ravan-windows-site.ps1").exists()
     assert (root / "site" / "demo-site.env").exists()
     assert not (root / "runtime" / "tests").exists()
     assert not (root / "runtime" / "ObsidianVault").exists()
@@ -85,6 +86,7 @@ def test_site_server_target_contains_functional_linux_installer(tmp_path: Path) 
     root = Path(result["stage_root"])
     assert (root / "runtime" / "docker" / "docker-compose.yml").exists()
     assert (root / "runtime" / "docker" / "docker-compose.release.yml").exists()
+    assert (root / "runtime" / "scripts" / "ravan-windows-site.ps1").exists()
     assert (root / "install" / "linux" / "install.sh").exists()
     assert (root / "install" / "linux" / "doctor.sh").exists()
     assert (root / "install" / "linux" / "uninstall.sh").exists()

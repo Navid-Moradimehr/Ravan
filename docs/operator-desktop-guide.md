@@ -26,6 +26,22 @@ browser tab open for the main Ravan interface. The Operator remembers the last
 Site Server address locally, but it does not store platform passwords, API
 keys, or customer secrets.
 
+### Windows local Site Server shortcut
+
+Windows users who want the complete local runtime can use the repository's
+managed Compose bootstrap after installing Docker Desktop:
+
+```powershell
+.\scripts\ravan-windows-site.ps1 -Action start
+.\scripts\ravan-windows-site.ps1 -Action status
+.\scripts\ravan-windows-site.ps1 -Action open
+```
+
+This is a convenience launcher, not a native replacement for Docker Desktop.
+It starts the complete Site Server through Compose and leaves source endpoints,
+credentials, ports, storage, and security under operator control. The Windows
+Operator remains the dedicated application window for the running Site Server.
+
 ## Remote Site Server
 
 The Operator can connect to a Site Server on another Linux server or Kubernetes
@@ -44,6 +60,14 @@ on the operating system. They are not duplicated inside the Ravan runtime.
 Linux industrial servers should normally run the Linux Site Server installer
 as a background systemd service. Users may access it through a browser or a
 future Linux desktop Operator. The server does not need a desktop session.
+
+## macOS boundary
+
+The macOS package is an Operator client. It is intentionally not presented as
+an industrial Site Server because the production runtime needs Kafka, Flink,
+the historian, connectors, and persistent storage to run on a Linux server or
+an approved Kubernetes environment. A macOS user can use Docker Desktop for
+local evaluation, or connect the Operator to a remote Site Server.
 
 ## Runtime ownership
 
