@@ -100,6 +100,25 @@ Error handling is intentionally platform-neutral: the UI uses in-app banners, in
 4. Configure at least one real or externally managed source in `.env` or through the Source Connections page. The repository expects broker and device endpoints to be managed by the operator.
 5. Open the dashboard: `http://localhost:3006`.
 
+## How Installation Works
+
+Ravan is installed in one of three practical ways:
+
+1. Linux Site Server install for the full self-hosted runtime.
+2. Docker Compose evaluation on Windows, Linux, or macOS.
+3. Windows or macOS Operator shell for a dedicated desktop window that connects to an existing Site Server.
+
+The normal user flow is:
+
+1. Install the package that matches the deployment target.
+2. Start the runtime or connect the operator shell to a running Site Server.
+3. Open the dashboard and complete the first-time setup.
+4. Add source connections for PLCs, sensors, or APIs.
+5. Confirm data appears in Kafka UI, historian, Grafana, and the platform UI.
+6. Add optional lakehouse, AI, reporting, or federated-site configuration only if the site needs it.
+
+For a simple workstation evaluation, Docker Compose is the fastest path. For a production Linux deployment, use the Site Server installer. For Windows and macOS users, the Operator shell is the intended desktop entry point and should connect to a running Site Server rather than try to replace it.
+
 ## Control CLI
 
 Source installs provide the Python CLI. Docker operators use `scripts/ravanctl`
