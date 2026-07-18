@@ -14,6 +14,7 @@ logs, and the maintainer Obsidian vault.
 - [Connect industrial sources](source-connection-walkthrough.md)
 - [Historian and dashboards](historian-guide.md)
 - [Observability](observability-walkthrough.md)
+- [Latest benchmark results](latest-benchmark-results.md)
 
 ## Optional Capabilities
 

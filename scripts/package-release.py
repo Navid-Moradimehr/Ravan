@@ -61,6 +61,7 @@ PUBLIC_DOCUMENT_FILES = (
     "docs/historian-guide.md",
     "docs/custom-dashboard-guide.md",
     "docs/observability-walkthrough.md",
+    "docs/latest-benchmark-results.md",
     "docs/kafka-ui-guide.md",
     "docs/prometheus-guide.md",
     "docs/flink-operator-runbook.md",
