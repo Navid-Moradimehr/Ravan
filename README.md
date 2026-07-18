@@ -27,6 +27,8 @@ the remaining application surface without changing the public API.
 - CDC: PostgreSQL plus Debezium Kafka Connect
 - AI: provider-neutral FastAPI gateway with native Anthropic and Gemini adapters, OpenAI-compatible endpoints for OpenAI, DeepSeek, Qwen, Kimi, GLM, vLLM, LM Studio, and other compatible servers, plus Ollama and open-weight model support
 - AI contracts: model registry, prompt registry, structured output validation, and read-only tool/context packages for future diagnostic agents
+- AI data foundation: canonical replayable events, semantic asset relationships, temporal and operational context, lineage, versioned dataset manifests, and optional Iceberg/MinIO or S3-compatible archival for JEPA-, Dreamer-, and MuZero-style preparation
+- Tabular ML integration: feature/label-ready dataset contracts and model-registry hooks for user-owned gradient-boosting models such as XGBoost; training and model serving remain selectable user integrations rather than hidden platform dependencies
 - Observability: Prometheus and Grafana
 - UI: Next.js, TypeScript, Tailwind CSS, shadcn/ui
 - UI observability: live charts for throughput, AI latency, protocol mix, severity mix, and Grafana health
@@ -133,11 +135,10 @@ against realistic industrial batches without depending on a live model server.
 
 ## Documentation
 
-- `Guide.md` contains the original product brief.
 - `docs/app-functionality.md` explains the platform in plain language: what each part does, its inputs and outputs, and how users interact with it.
 - `docs/first-time-plc-ingest-guide.md` explains how a new user connects PLCs and sensors, how protocol differences are handled, and how multiple sources stay separate while still being correlatable.
 - `docs/deployment-targets.md` summarizes site-local, Compose, Kubernetes, and operator deployment models.
-- `docs/app-functionality.md` lists the implemented feature set and current completion status.
+- `docs/latest-benchmark-results.md` reports the latest successful neutral Ravan benchmark measurements and their limitations.
 - `docs/self-host-install-guide.md` gives the operator-facing local install and upgrade flow.
 - `docs/release-content-policy.md` defines installer and public-repository content boundaries.
 - `docs/multi-site-rollout.md` defines the production-hardening plan for multi-site industrial deployment.
@@ -173,8 +174,14 @@ and, when enabled, Apache Iceberg over MinIO or external S3-compatible storage.
 For world-model data preparation, see:
 
 - `docs/lakehouse-and-s3-guide.md`
-- `docs/operational-event-guide.md`
-- `docs/training-dataset-guide.md`
+- `docs/world-model-data-foundation.md`
 - `docs/jepa-training-guide.md`
 - `docs/dreamer-training-guide.md`
 - `docs/muzero-training-guide.md`
+
+For tabular models such as gradient boosting or XGBoost, Ravan provides the
+event, feature/label, dataset-manifest, lineage, replay, and model-registry
+contracts needed to make training reproducible. The actual model training,
+feature engineering choices, and serving runtime remain user-owned so a site
+can use its preferred Python library, MLflow integration, GPU/CPU runtime, or
+external model service.
