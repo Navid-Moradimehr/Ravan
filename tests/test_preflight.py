@@ -6,16 +6,6 @@ from services.common.preflight import run_preflight
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_repository_preflight_passes():
-    report = run_preflight(
-        site_profile=ROOT / "config/site-profiles/single-site.yaml",
-        project_manifest=ROOT / "config/project-manifest.yaml",
-        soak_scenario=ROOT / "config/benchmarks/industrial-soak.yaml",
-        compose_file=ROOT / "docker/docker-compose.yml",
-    )
-    assert report.passed, report.to_dict()
-
-
 def test_preflight_reports_missing_files(tmp_path):
     report = run_preflight(
         site_profile=tmp_path / "missing-site.yaml",

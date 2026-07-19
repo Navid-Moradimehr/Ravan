@@ -15,7 +15,7 @@ from services.cli import datastreamd as d
 class TestSupervisorSpecs:
     def test_specs_cover_core_services(self):
         names = {s.name for s in d.SERVICE_SPECS}
-        assert {"api", "ai", "edge", "processor", "flink-job", "mock"} <= names
+        assert {"api", "ai", "edge", "processor", "flink-job"} <= names
 
     def test_each_spec_has_module_and_description(self):
         for spec in d.SERVICE_SPECS:
@@ -37,8 +37,8 @@ class TestSupervisorSpecs:
             d.SPEC_BY_NAME.pop("testdep", None)
 
     def test_runtime_mode_service_selection(self):
-        assert d._services_for_runtime_mode("python-fallback") == ["api", "ai", "edge", "processor", "fanout", "ai-fanout", "mock"]
-        assert d._services_for_runtime_mode("flink-local") == ["api", "ai", "edge", "fanout", "ai-fanout", "flink-job", "mock"]
+        assert d._services_for_runtime_mode("python-fallback") == ["api", "ai", "edge", "processor", "fanout", "ai-fanout"]
+        assert d._services_for_runtime_mode("flink-local") == ["api", "ai", "edge", "fanout", "ai-fanout", "flink-job"]
         assert d._services_for_runtime_mode("flink-production") == ["api", "ai", "edge", "fanout", "ai-fanout", "flink-job"]
 
     def test_resolve_order_dedupes(self):
@@ -70,7 +70,7 @@ class TestSupervisorLifecycle:
         out = buf.getvalue()
         assert rc == 0
         assert "datastreamd managed services" in out
-        for name in ("api", "ai", "edge", "processor", "flink-job", "mock"):
+        for name in ("api", "ai", "edge", "processor", "flink-job"):
             assert name in out
 
     def test_status_reports_runtime_mode_for_site_profile(self, tmp_path):
