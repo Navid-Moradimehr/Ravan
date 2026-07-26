@@ -65,7 +65,9 @@ function Invoke-Compose {
   }
   $composeArgs += @("-f", $ComposeFile)
   $composeArgs += $Arguments
-  & docker compose @composeArgs 2>&1 | ForEach-Object { Write-Host $_ }
+  # Compose writes progress records to stderr on Windows. Suppress that
+  # presentation noise and retain the process exit code for the caller.
+  & docker compose @composeArgs *> $null
   if ($LASTEXITCODE -ne 0) {
     throw "docker compose failed with exit code $LASTEXITCODE"
   }
