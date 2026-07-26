@@ -31,6 +31,8 @@ def test_split_domain_routes_registered():
         "/api/v1/modeling/agent-runtime",
         "/api/v1/metadata",
         "/api/v1/metadata/federation",
+        "/api/v1/federation/contracts",
+        "/api/v1/federation/status",
         "/api/v1/metadata/assets",
         "/api/v1/metadata/asset-tags",
         "/api/v1/metadata/asset-tags/reconcile",

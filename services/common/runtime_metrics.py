@@ -52,6 +52,11 @@ if Counter is not None and Gauge is not None and Histogram is not None:
         "Federation transport lag in messages",
         ["topic"],
     )
+    federation_delivery_events = Counter(
+        "datastream_federation_delivery_events_total",
+        "Federation events by validation, duplicate, and sink outcome",
+        ["topic", "status"],
+    )
     fanout_batches = Counter(
         "datastream_fanout_batches_total",
         "Sink batches completed by fan-out worker",
@@ -73,6 +78,7 @@ else:  # pragma: no cover - fallback path
     broker_consumer_lag = _noop_metric()
     websocket_delivery_lag = _noop_metric()
     federation_lag = _noop_metric()
+    federation_delivery_events = _noop_metric()
     fanout_batches = _noop_metric()
     fanout_events = _noop_metric()
     fanout_write_latency = _noop_metric()
@@ -109,6 +115,10 @@ def observe_websocket_batch_delivery(channel: str, events: list[dict[str, Any]])
 
 def set_federation_lag(topic: str, lag_messages: int) -> None:
     federation_lag.labels(topic=topic).set(max(int(lag_messages), 0))
+
+
+def observe_federation_delivery(topic: str, status: str, count: int = 1) -> None:
+    federation_delivery_events.labels(topic=topic, status=status).inc(max(int(count), 0))
 
 
 def observe_fanout_write(

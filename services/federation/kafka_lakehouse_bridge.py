@@ -18,7 +18,7 @@ from confluent_kafka import Consumer, TopicPartition
 
 from services.common.brokers import resolve_kafka_brokers
 from services.common.federation_contract import FederationContractError, deduplication_key, unwrap_event
-from services.common.runtime_metrics import set_federation_lag
+from services.common.runtime_metrics import observe_federation_delivery, set_federation_lag
 from services.federation.delivery_ledger import DeliveryLedger
 from services.federation.policy import allowed_topics, topic_allowed
 from services.sinks.lakehouse import LakehouseSink
@@ -82,9 +82,11 @@ def main() -> None:
         except Exception as exc:
             for key in batch_keys:
                 ledger.record(key, status="failed", metadata={"error": str(exc)[:500]})
+            observe_federation_delivery(topic, "sink_failed", len(batch_keys))
             raise
         for key in batch_keys:
             ledger.record(key, status="succeeded")
+        observe_federation_delivery(topic, "sink_succeeded", len(batch_keys))
         batch.clear()
         batch_keys.clear()
         consumer.commit(asynchronous=False)
@@ -109,6 +111,7 @@ def main() -> None:
                 )
                 if not ledger.claim(key):
                     duplicate_count += 1
+                    observe_federation_delivery(message.topic(), "duplicate")
                     logger.info("central federation skipped duplicate event key=%s", key)
                     consumer.commit(asynchronous=False)
                     continue
@@ -133,6 +136,7 @@ def main() -> None:
                     )
             except (UnicodeDecodeError, json.JSONDecodeError, TypeError, FederationContractError) as exc:
                 invalid_count += 1
+                observe_federation_delivery(message.topic(), "invalid")
                 logger.warning("central federation skipped invalid event: %s", exc)
     finally:
         flush()

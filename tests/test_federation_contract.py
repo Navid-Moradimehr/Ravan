@@ -50,3 +50,9 @@ def test_bridge_decoder_accepts_legacy_and_marks_it():
     event, metadata, _ = decode_forwarded_message(json.dumps(_event()).encode(), topic="local.industrial.normalized")
     assert metadata["legacy"] is True
     assert event["federation_legacy"] is True
+
+
+def test_federation_delivery_metric_helper_is_safe():
+    from services.common.runtime_metrics import observe_federation_delivery
+
+    observe_federation_delivery("industrial.normalized", "duplicate", 2)

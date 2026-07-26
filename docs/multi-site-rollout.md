@@ -60,6 +60,11 @@ delivery ledger is bounded by `FEDERATION_LEDGER_MAX_RECORDS` and is suitable
 for one-node deployments. Multi-replica consumers must replace it with a
 shared database-backed ledger before scaling the bridge horizontally.
 
+Federation validation, duplicate delivery, sink success, and sink failure are
+also exported as `datastream_federation_delivery_events_total` with topic and
+status labels. This lets Prometheus/Grafana show whether central ingestion is
+healthy without reading the ledger file directly.
+
 ### 1. Single Site
 
 Use for a pilot line or first plant.
