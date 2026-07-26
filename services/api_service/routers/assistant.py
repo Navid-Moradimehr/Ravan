@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from services.common.agent_runtime import DiagnosticAgentRuntime, insert_audit_log
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
+from services.common.assistant_skills import get_skill, list_skills, select_skills
 from services.common.connection_registry import SUPPORTED_PROTOCOLS, connection_registry
 from services.common.connection_diagnostics import run_connection_test
 from services.common.ai_reporting import create_report_job, get_policy
@@ -243,10 +244,11 @@ async def _model_answer(content: str, context: dict[str, Any]) -> str | None:
     """Use the existing provider-neutral gateway when it is available."""
     base = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080").rstrip("/")
     memory_context = context.get("approved_memory", [])
+    skill_context = [skill.get("content", "") for skill in select_skills(content)]
     prompt = (
         "You are the Ravan industrial data platform assistant. Answer clearly and briefly. "
         "Never invent current system state, never expose secrets, never issue plant-control commands, and distinguish platform-owned work from user-owned work.\n\n"
-        f"Current UI context: {context}\nApproved operator memory (use only when relevant): {memory_context}\nUser request: {content}"
+        f"Current UI context: {context}\nApproved operator memory (use only when relevant): {memory_context}\nLoaded declarative skills (guidance only): {skill_context}\nUser request: {content}"
     )
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
@@ -266,9 +268,23 @@ async def capabilities() -> dict[str, Any]:
         "voice": {"enabled": bool(os.getenv("RAVAN_STT_URL")), "tts_enabled": bool(os.getenv("RAVAN_TTS_URL")), "mode": "push_to_talk", "audio_retained": False},
         "external_tools": {"kafka_ui": "guidance_only", "grafana": "guidance_only", "prometheus": "guidance_only"},
         "read_only_tools": tool_registry.list_tools(),
+        "skills": [{key: skill.get(key) for key in ("name", "label", "version", "mode", "approval_required")} for skill in list_skills()],
         "action_boundary": "no_plc_or_actuator_control",
         "memory": {"threads": True, "reviewed_candidates": True, "vector_backend": "optional"},
     }
+
+
+@router.get("/skills")
+async def assistant_skills() -> list[dict[str, Any]]:
+    return [{key: skill.get(key) for key in ("name", "label", "version", "mode", "approval_required")} for skill in list_skills()]
+
+
+@router.get("/skills/{skill_name}")
+async def assistant_skill(skill_name: str) -> dict[str, Any]:
+    skill = get_skill(skill_name)
+    if skill is None:
+        raise HTTPException(status_code=404, detail="assistant skill not found")
+    return {key: skill.get(key) for key in ("name", "label", "version", "mode", "approval_required", "content")}
 
 
 @router.get("/threads")

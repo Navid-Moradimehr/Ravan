@@ -95,6 +95,12 @@ endpoint. The default implementation is lexical and file-backed; a future
 deployment may replace it with a vector adapter without changing the chat
 contract. No vector database is required for the single-node release.
 
+Ravan also loads declarative Markdown skill packs from `config/assistant-skills`.
+The baseline source-onboarding and operator-guidance skills are read-only
+instructions. They cannot execute code, bypass confirmation, or access secret
+values. Deployments can point `RAVAN_ASSISTANT_SKILLS_PATH` at a reviewed skill
+directory for company-specific guidance.
+
 The current single-node implementation uses an atomic file-backed store at
 `.datastream/assistant-store.json`. This is deliberately compatible with
 Docker Compose and air-gapped installs. A PostgreSQL-backed adapter can be

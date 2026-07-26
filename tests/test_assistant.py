@@ -7,6 +7,7 @@ from services.api_service.routers.assistant import MessageRequest, QuestionAnswe
 from services.common.agent_runtime import build_agent_runtime_contract
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
+from services.common.assistant_skills import get_skill, list_skills
 
 
 def test_assistant_store_persists_threads_and_reviewable_memory(tmp_path):
@@ -85,6 +86,14 @@ def test_approved_memory_search_excludes_pending_candidates(tmp_path):
     store.update_memory_candidate(approved["candidate_id"], actor_id="operator-1", status="approved")
     results = store.search_approved_memories(actor_id="operator-1", query="legacy line")
     assert [item["content"] for item in results] == ["Use imperial units for legacy line"]
+
+
+def test_declarative_assistant_skills_are_loaded_without_executable_code():
+    names = {skill["name"] for skill in list_skills()}
+    assert {"ravan-source-onboarding", "ravan-operator-guidance"}.issubset(names)
+    source = get_skill("ravan-source-onboarding")
+    assert source["approval_required"] is True
+    assert "Never send or display secret values" in source["content"]
 
 
 def test_source_questionnaire_persists_resumes_and_is_idempotent(monkeypatch, tmp_path):

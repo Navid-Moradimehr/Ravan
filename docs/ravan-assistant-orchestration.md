@@ -43,8 +43,11 @@ the runtime.
 
 The bundled `config/assistant-skills` files are safe baseline guidance. Users
 may add company-specific skills in their deployment or adapt these files, but
-skills do not bypass API policy, source validation, confirmation, audit, or
-user-owned authentication.
+the assistant loads them through the read-only skill registry and includes only
+relevant content in model context. Skills do not execute code and do not bypass
+API policy, source validation, confirmation, audit, or user-owned
+authentication. `GET /api/v1/assistant/skills` lists available skill metadata;
+the item route returns the declarative content.
 
 ## Current limits
 
