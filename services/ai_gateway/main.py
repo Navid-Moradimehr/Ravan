@@ -258,7 +258,11 @@ async def providers() -> dict[str, Any]:
 async def models() -> dict[str, Any]:
     """List models exposed by the configured backend without exposing credentials."""
     configured = settings.llm_model_id
-    models: list[dict[str, Any]] = [{"id": configured, "label": configured, "configured": True}]
+    models: list[dict[str, Any]] = (
+        [{"id": configured, "label": configured, "configured": True}]
+        if configured and settings.llm_provider != "disabled"
+        else []
+    )
     if settings.llm_provider in {"openai", "openai_compat", "deepseek", "qwen", "dashscope", "kimi", "moonshot", "glm", "zhipu"}:
         base_url = settings.llm_endpoint_url.rstrip("/")
         headers = {"Authorization": f"Bearer {settings.llm_api_key}"} if settings.llm_api_key else {}

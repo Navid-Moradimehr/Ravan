@@ -112,6 +112,52 @@ The recommended production install is native on Windows Server / industrial PCs 
 
 Error handling is intentionally platform-neutral: the UI uses in-app banners, inline validation, route error boundaries, and dismissible toasts that work the same on Windows, Linux, and macOS packaged builds. No OS-specific notification API is required for the first release; native notifications can be added later behind an optional adapter if an installer shell needs them.
 
+## AI Assistant Setup
+
+The optional Ravan Assistant uses the same provider-neutral AI gateway as AI
+Reporting. It can answer platform questions, inspect bounded read-only Ravan
+context, guide source setup, and prepare actions for explicit approval. It does
+not control PLCs or actuators. If no model is configured, the assistant shows a
+clear warning in its header and continues to provide deterministic platform
+guidance; it does not silently pretend that an LLM is available.
+
+After installation, configure the deployment environment rather than entering
+secrets into source metadata or chat. For Docker Compose, copy `.env.example`
+to `.env`, set `LLM_PROVIDER`, `LLM_ENDPOINT_URL`, `LLM_API_KEY` when required,
+and `LLM_MODEL_ID`, then restart the AI gateway and API/UI services:
+
+```dotenv
+# LM Studio, vLLM, or another OpenAI-compatible local server
+LLM_PROVIDER=openai_compat
+LLM_ENDPOINT_URL=http://host.docker.internal:1234/v1
+LLM_API_KEY=local-development-key
+LLM_MODEL_ID=openai/gpt-oss-20b
+```
+
+For a hosted provider, use its named provider or an OpenAI-compatible endpoint:
+
+```dotenv
+LLM_PROVIDER=anthropic       # or openai, gemini, deepseek, qwen, kimi, glm
+LLM_ENDPOINT_URL=<provider-base-url>
+LLM_API_KEY=<operator-managed-secret>
+LLM_MODEL_ID=<provider-model-id>
+```
+
+Then run:
+
+```powershell
+docker compose -f docker/docker-compose.yml up -d --build ai-gateway api-service dashboard
+```
+
+Open the assistant from the Ravan UI and
+select a discovered model in the assistant header. The gateway's
+`http://localhost:8080/providers` and `/models` endpoints expose provider and
+model status without returning credentials. Kubernetes operators should put
+`LLM_API_KEY` in a Secret and inject the non-secret settings through the site
+profile or ConfigMap. See
+[`docs/ai-provider-configuration.md`](docs/ai-provider-configuration.md) for
+provider defaults, local-only operation, and failure behavior.
+
 ## Quick Start
 
 1. Copy `.env.example` to `.env` and adjust ports/model settings.

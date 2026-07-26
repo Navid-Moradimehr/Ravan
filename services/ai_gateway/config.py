@@ -19,17 +19,17 @@ class Settings(BaseSettings):
     )
     processed_topic: str = "iot.processed"
     ai_enriched_topic: str = "iot.ai_enriched"
-    llm_provider: str = Field(default="openai_compat", validation_alias=AliasChoices("llm_provider", "LLM_PROVIDER"))
+    llm_provider: str = Field(default="disabled", validation_alias=AliasChoices("llm_provider", "LLM_PROVIDER"))
     llm_endpoint_url: str = Field(
-        default="http://172.17.0.1:1234/v1",
+        default="",
         validation_alias=AliasChoices("llm_endpoint_url", "LLM_ENDPOINT_URL", "OPENAI_BASE_URL"),
     )
     llm_api_key: str = Field(
-        default="lm-studio",
+        default="",
         validation_alias=AliasChoices("llm_api_key", "LLM_API_KEY", "OPENAI_API_KEY"),
     )
     llm_model_id: str = Field(
-        default="openai/gpt-oss-20b",
+        default="",
         validation_alias=AliasChoices("llm_model_id", "LLM_MODEL_ID", "OPENAI_MODEL"),
     )
     llm_request_path: str | None = Field(default=None, validation_alias=AliasChoices("llm_request_path", "LLM_REQUEST_PATH"))

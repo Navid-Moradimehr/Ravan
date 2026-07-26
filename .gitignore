@@ -21,6 +21,12 @@ docker/prometheus/data/
 .DS_Store
 Thumbs.db
 .datastream/
+# Local assistant threads, memory, and personal chat test captures are never release artifacts.
+.datastream/assistant-store.json
+.datastream/assistant-store*.json
+reports/assistant-chat/
+reports/*assistant-chat*.json
+reports/*assistant-chat*.md
 .refs/
 ObsidianVault/
 docs/_internal/

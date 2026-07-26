@@ -87,11 +87,12 @@ persists the final user and assistant messages through the same durable store
 used by non-streaming operations. Raw provider reasoning is not forwarded;
 only safe progress status and answer text are exposed.
 
-Ravan does not yet provide a distributed workflow queue or partial-output
-replay after a disconnected browser. It does provide database-backed assistant
-state for multi-replica conversation history and live SSE output for the active
-browser connection. Queue-based long-running jobs and resumable partial output
-remain later additions triggered by measured workload needs.
+Ravan does not provide a distributed workflow queue or partial-output replay
+after a disconnected browser. It provides database-backed assistant state for
+multi-replica conversation history and live SSE output for the active browser
+connection. Queue-based long-running jobs and resumable partial output are
+outside this assistant contract; deployments that require them should place an
+external workflow or queue service behind the existing assistant API boundary.
 
 The multi-node deployment path must set the assistant store backend to the
 shared PostgreSQL adapter and must not use the Compose JSON file from multiple

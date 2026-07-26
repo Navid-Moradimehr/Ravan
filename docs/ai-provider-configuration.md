@@ -43,6 +43,13 @@ Use `openai_compat` for vLLM, LM Studio, and any other server implementing
 for a safe provider catalog and current non-secret status; it never returns an
 API key.
 
+The Ravan Assistant consumes the same configured gateway. Open the assistant
+drawer after restarting the gateway and API/UI services; its model selector is
+populated from `/models`. If `LLM_MODEL_ID` is empty or the gateway cannot
+discover a model, the UI displays a no-model warning and keeps deterministic
+guidance available. This is an intentional safe state, not a failed source or
+historian connection.
+
 ## Reports And Outputs
 
 The **AI Reporting** page at `/ai-reporting` saves policies and shows queued,

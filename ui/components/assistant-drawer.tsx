@@ -57,6 +57,7 @@ function AssistantDrawerInner() {
   const [expandedQuestionHelp, setExpandedQuestionHelp] = useState<Record<string, boolean>>({});
   const [models, setModels] = useState<AssistantModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
+  const [modelWarning, setModelWarning] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AssistantThread | null>(null);
   const draftTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -113,16 +114,21 @@ function AssistantDrawerInner() {
       .catch((reason) => setError(formatErrorMessage(reason, "Memory review is unavailable")));
     requestJson<{ models: AssistantModel[]; configured_model?: string }>("/api/assistant/models")
       .then((catalog) => {
-        const available = Array.isArray(catalog.models) ? catalog.models : [];
+        const available = Array.isArray(catalog.models) ? catalog.models.filter((model) => Boolean(model?.id?.trim())) : [];
         setModels(available);
         const stored = window.localStorage.getItem("ravan.assistant.model");
+        const configuredModel = (catalog.configured_model || "").trim();
         const next = stored && available.some((model) => model.id === stored)
           ? stored
-          : catalog.configured_model || available[0]?.id || "";
+          : configuredModel || available[0]?.id || "";
         setSelectedModel(next);
         if (next) window.localStorage.setItem("ravan.assistant.model", next);
+        setModelWarning(next ? null : "No AI model is configured. Configure an LLM provider and model to enable model-backed chat; Ravan guidance remains available.");
       })
-      .catch((reason) => setError(formatErrorMessage(reason, "AI model discovery is unavailable; the configured model will be used")));
+      .catch((reason) => {
+        setModelWarning("AI model discovery is unavailable. Check the AI gateway provider and model settings; Ravan guidance remains available.");
+        setError(formatErrorMessage(reason, "AI model discovery is unavailable"));
+      });
   }, [open]);
 
   async function createNewThread() {
@@ -388,7 +394,7 @@ function AssistantDrawerInner() {
       {open ? <div className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px]" onClick={() => setOpen(false)} aria-hidden="true" /> : null}
       {open ? <aside className="fixed inset-y-0 right-0 z-[51] flex w-full max-w-[min(30rem,100vw)] flex-col border-l border-border-subtle bg-surface-1 shadow-2xl" aria-label="Ravan Assistant">
         <header className="flex items-center justify-between border-b border-border-subtle px-4 py-4">
-          <div className="flex min-w-0 items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/40 bg-accent-subtle text-accent"><Bot className="size-4" aria-hidden="true" /></span><div className="min-w-0"><h2 className="font-heading text-sm font-semibold text-text-primary">Ravan Assistant</h2><div className="mt-1 flex items-center gap-2"><label htmlFor="assistant-model" className="text-[0.68rem] text-text-muted">Model</label><select id="assistant-model" aria-label="Assistant model" value={selectedModel} onChange={(event) => { setSelectedModel(event.target.value); window.localStorage.setItem("ravan.assistant.model", event.target.value); }} className="max-w-[13rem] truncate rounded-md border border-border-subtle bg-surface-2 px-1.5 py-0.5 text-[0.68rem] text-text-secondary outline-none focus:border-accent/60" disabled={!selectedModel && models.length === 0}><option value="">Configured model</option>{models.map((model) => <option key={model.id} value={model.id}>{model.label || model.id}</option>)}</select></div></div></div>
+          <div className="flex min-w-0 items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/40 bg-accent-subtle text-accent"><Bot className="size-4" aria-hidden="true" /></span><div className="min-w-0"><h2 className="font-heading text-sm font-semibold text-text-primary">Ravan Assistant</h2><div className="mt-1 flex items-center gap-2"><label htmlFor="assistant-model" className="text-[0.68rem] text-text-muted">Model</label><select id="assistant-model" aria-label="Assistant model" value={selectedModel} onChange={(event) => { setSelectedModel(event.target.value); window.localStorage.setItem("ravan.assistant.model", event.target.value); }} className="max-w-[13rem] truncate rounded-md border border-border-subtle bg-surface-2 px-1.5 py-0.5 text-[0.68rem] text-text-secondary outline-none focus:border-accent/60" disabled={!selectedModel && models.length === 0}><option value="">{modelWarning ? "No model configured" : "Configured model"}</option>{models.map((model) => <option key={model.id} value={model.id}>{model.label || model.id}</option>)}</select></div>{modelWarning ? <p role="status" className="mt-1 max-w-[31rem] text-[0.68rem] leading-4 text-warning">{modelWarning}</p> : null}</div></div>
           <div className="flex items-center gap-1"><Button size="sm" variant="outline" onClick={() => void createNewThread()} disabled={busy}><Plus className="mr-1.5 size-3.5" />New chat</Button><HelpTip label="Assistant boundary" content="The assistant can inspect Ravan and prepare approved platform changes. It does not control PLCs or actuators. Kafka UI, Grafana, and Prometheus remain guidance-only." side="left" /><Button variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close assistant"><X className="size-4" /></Button></div>
         </header>
         <nav aria-label="Assistant sections" className="flex gap-1 border-b border-border-subtle bg-surface-2/60 px-3 py-2">
