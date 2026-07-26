@@ -723,6 +723,7 @@ services:
       MODEL_REGISTRY_PATH: /data/model-registry.json
       MODEL_LIFECYCLE_PATH: /data/model-lifecycle.json
       AGENT_ACTION_LEDGER_PATH: /data/agent-actions.json
+      RAVAN_ASSISTANT_STORE_PATH: /data/assistant-store.json
       PROMPT_REGISTRY_PATH: /data/prompt-registry.json
       SCHEMA_REGISTRY_PATH: /data/schema-registry.json
       DATASET_CATALOG_PATH: /data/dataset-catalog.json

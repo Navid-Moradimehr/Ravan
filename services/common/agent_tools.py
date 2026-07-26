@@ -34,6 +34,29 @@ class ToolRegistry:
     def _register_defaults(self) -> None:
         self.register(
             ToolSpec(
+                name="sources.list",
+                description="Read configured source connections without exposing credential values.",
+                read_only=True,
+                input_schema={
+                    "type": "object",
+                    "properties": {"site_id": {"type": "string"}},
+                },
+                output_schema={"type": "array", "items": {"type": "object"}},
+                tags=("sources", "read_only", "connections"),
+            )
+        )
+        self.register(
+            ToolSpec(
+                name="governance.snapshot",
+                description="Read the active assistant and action governance contract.",
+                read_only=True,
+                input_schema={"type": "object", "properties": {}},
+                output_schema={"type": "object"},
+                tags=("governance", "read_only"),
+            )
+        )
+        self.register(
+            ToolSpec(
                 name="historian.recent_events",
                 description="Read recent historian events for a table.",
                 read_only=True,
@@ -194,6 +217,26 @@ def _validate_tool_arguments(spec: ToolSpec, arguments: dict[str, Any]) -> dict[
 
 
 def _execute_tool(name: str, arguments: dict[str, Any]) -> Any:
+    if name == "sources.list":
+        from services.common.connection_registry import connection_registry
+
+        return [
+            {
+                "connection_id": item.connection_id,
+                "name": item.name,
+                "protocol": item.source_protocol,
+                "site_id": item.site_id,
+                "state": item.state,
+                "enabled": item.enabled,
+                "runtime_supported": item.runtime_supported,
+                "credential_refs": sorted(item.credential_refs),
+            }
+            for item in connection_registry.list(site_id=arguments.get("site_id"), include_retired=False)
+        ]
+    if name == "governance.snapshot":
+        from services.common.governance_plane import build_governance_snapshot
+
+        return build_governance_snapshot()
     if name == "historian.recent_events":
         return query_recent_events(arguments["table"], arguments["limit"])
     if name == "historian.trend":

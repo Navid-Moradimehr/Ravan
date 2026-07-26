@@ -192,7 +192,7 @@ def test_agent_runtime_contract_is_read_only():
     action_policy = contract["action_policy"]
     assert diagnostic_policy["read_only"] is True
     assert diagnostic_policy["allowed_tools"]
-    assert all(tool.startswith(("historian.", "assets.", "reports.", "scenarios.", "semantic.")) for tool in diagnostic_policy["allowed_tools"])
+    assert all(tool.startswith(("historian.", "assets.", "reports.", "scenarios.", "semantic.", "sources.", "governance.")) for tool in diagnostic_policy["allowed_tools"])
     assert action_policy["approval_required"] is True
     assert action_policy["read_only"] is False
 

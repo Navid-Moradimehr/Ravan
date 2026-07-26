@@ -150,6 +150,20 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Ravan AI Gateway", version=VERSION, lifespan=lifespan)
 
 
+@app.post("/assistant/chat")
+async def assistant_chat(request: dict[str, Any]) -> dict[str, Any]:
+    """Small text-assistant bridge over the existing provider-neutral client."""
+    prompt = str(request.get("prompt", "")).strip()
+    if not prompt:
+        return {"content": "", "provider": settings.llm_provider, "model": settings.llm_model_id}
+    try:
+        content = await llm_client.summarize(prompt, timeout_seconds=min(settings.llm_timeout_seconds, 20))
+        return {"content": content, "provider": settings.llm_provider, "model": settings.llm_model_id}
+    except Exception as exc:
+        service_state.mark_degraded("assistant request failed", str(exc))
+        return {"content": "", "provider": settings.llm_provider, "model": settings.llm_model_id, "error": str(exc)}
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
     status = "starting"

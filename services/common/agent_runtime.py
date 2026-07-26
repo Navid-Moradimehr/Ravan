@@ -12,7 +12,7 @@ from services.common.modeling import ModelRegistry
 from services.common.prompt_registry import prompt_registry
 
 
-READ_ONLY_PREFIXES = ("historian.", "assets.", "reports.", "scenarios.", "semantic.")
+READ_ONLY_PREFIXES = ("historian.", "assets.", "reports.", "scenarios.", "semantic.", "sources.", "governance.")
 READ_ONLY_TOOL_NAMES = (
     "historian.recent_events",
     "historian.trend",
@@ -22,6 +22,8 @@ READ_ONLY_TOOL_NAMES = (
     "scenarios.list",
     "semantic.graph_search",
     "semantic.lineage",
+    "sources.list",
+    "governance.snapshot",
 )
 
 

@@ -277,6 +277,7 @@ from services.api_service.routers.datasets import router as datasets_router
 from services.api_service.routers.support import router as support_router
 from services.api_service.routers.admin import router as admin_router
 from services.api_service.routers.updates import router as updates_router
+from services.api_service.routers.assistant import router as assistant_router
 from services.api_service.routers.historian import ingest_batch, ingest_event
 
 app.include_router(historian_router)
@@ -304,6 +305,7 @@ app.include_router(datasets_router)
 app.include_router(support_router)
 app.include_router(admin_router)
 app.include_router(updates_router)
+app.include_router(assistant_router)
 app.include_router(realtime_router)
 from services.api_service.ops_runtime import _render_topic
 

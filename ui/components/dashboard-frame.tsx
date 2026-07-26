@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/top-bar";
 import { PlatformFooter } from "@/components/platform-footer";
 import { Separator } from "@/components/ui/separator";
+import { AssistantDrawer } from "@/components/assistant-drawer";
 
 type NavItem = {
   href: string;
@@ -110,6 +111,7 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
         <aside className="space-y-4">{rightRail}</aside>
       </main>
       <PlatformFooter />
+      <AssistantDrawer />
     </div>
   );
 }
