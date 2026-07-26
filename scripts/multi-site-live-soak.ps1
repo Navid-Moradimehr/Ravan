@@ -65,7 +65,7 @@ function Invoke-Compose {
   }
   $composeArgs += @("-f", $ComposeFile)
   $composeArgs += $Arguments
-  & docker compose @composeArgs
+  & docker compose @composeArgs 2>&1 | ForEach-Object { Write-Host $_ }
   if ($LASTEXITCODE -ne 0) {
     throw "docker compose failed with exit code $LASTEXITCODE"
   }
