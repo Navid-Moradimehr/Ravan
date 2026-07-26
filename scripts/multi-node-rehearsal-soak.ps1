@@ -53,8 +53,11 @@ $arguments = @(
   "-ComposeFile", $ComposeFile
 )
 $startedAt = [DateTime]::UtcNow
+$previousErrorAction = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 & powershell.exe @arguments 2>&1 | Tee-Object -FilePath $logPath
 $exitCode = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorAction
 $finishedAt = [DateTime]::UtcNow
 
 $result = [ordered]@{
