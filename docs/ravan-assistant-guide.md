@@ -47,6 +47,14 @@ MuZero, XGBoost, Flink, Kafka, and historian operation. Ravan provides the
 events, metadata, lineage, and dataset contracts; company-specific training,
 feature design, model experiments, and actuator control remain user-owned.
 
+If AI Reporting is enabled for the selected site scope, asking the assistant to
+generate a scheduled or anomaly report creates a reviewable ten-minute preview.
+The report is only queued after confirmation and then appears in the AI
+Reporting job history and report detail views. Source creation and editing stay
+in the typed Integrations editor because protocol-specific mappings, endpoint
+details, and credential references must be complete before a safe preview can
+be generated.
+
 ## Safety boundary
 
 The assistant never controls PLCs, robots, actuators, safety interlocks, or
@@ -69,6 +77,15 @@ approve, or reject pending candidates. Candidates retain their source thread
 for audit. Secrets, raw
 telemetry, and raw audio are never assistant memory.
 
+Approved memory is supplied as bounded context to future chat requests. It is
+not used for plant control, is not a replacement for historian data, and is not
+sent to the model until an operator has approved the candidate.
+
+Approved memory can also be queried through the bounded `/api/v1/assistant/memory/search`
+endpoint. The default implementation is lexical and file-backed; a future
+deployment may replace it with a vector adapter without changing the chat
+contract. No vector database is required for the single-node release.
+
 The current single-node implementation uses an atomic file-backed store at
 `.datastream/assistant-store.json`. This is deliberately compatible with
 Docker Compose and air-gapped installs. A PostgreSQL-backed adapter can be
@@ -83,7 +100,9 @@ reports a clear configuration message and text chat remains available.
 
 The intended local adapter contract is compatible with faster-whisper or an
 OpenAI-compatible speech service. TTS is optional and does not affect text
-assistant operation.
+assistant operation. Configure `RAVAN_TTS_URL` to enable the optional
+`/api/v1/assistant/voice/synthesize` proxy; the returned audio is streamed to
+the caller and is not retained by Ravan.
 
 ## User-owned configuration
 

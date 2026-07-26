@@ -128,6 +128,18 @@ class AssistantStore:
     def list_memory_candidates(self, *, actor_id: str) -> list[dict[str, Any]]:
         return [item for item in self._state["memories"] if item.get("actor_id") == actor_id]
 
+    def search_approved_memories(self, *, actor_id: str, query: str, limit: int = 20) -> list[dict[str, Any]]:
+        tokens = {part.lower() for part in query.split() if len(part.strip()) > 2}
+        approved = [item for item in self._state["memories"] if item.get("actor_id") == actor_id and item.get("status") == "approved"]
+        ranked = []
+        for item in approved:
+            content = str(item.get("content", ""))
+            score = sum(1 for token in tokens if token in content.lower())
+            if not tokens or score:
+                ranked.append((score, item.get("created_at", ""), item))
+        ranked.sort(key=lambda value: (value[0], value[1]), reverse=True)
+        return [dict(item) for _, _, item in ranked[: max(1, min(limit, 100))]]
+
     def save_action_intent(self, payload: dict[str, Any]) -> dict[str, Any]:
         created_at = payload.get("created_at") or _now()
         record = {**payload, "intent_id": payload.get("intent_id") or f"intent-{uuid.uuid4().hex[:16]}", "created_at": created_at, "expires_at": payload.get("expires_at") or (datetime.fromisoformat(created_at) + timedelta(minutes=10)).isoformat(), "status": "pending_confirmation"}

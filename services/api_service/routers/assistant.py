@@ -6,7 +6,7 @@ import secrets
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from services.common.agent_runtime import DiagnosticAgentRuntime, insert_audit_log
@@ -14,6 +14,7 @@ from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
 from services.common.connection_registry import connection_registry
 from services.common.connection_diagnostics import run_connection_test
+from services.common.ai_reporting import create_report_job, get_policy
 
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
@@ -51,6 +52,10 @@ class ActionDecisionRequest(BaseModel):
     actor_id: str = "local-operator"
 
 
+class VoiceSynthesisRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=12000)
+
+
 def _store() -> AssistantStore:
     return AssistantStore()
 
@@ -77,6 +82,7 @@ ALLOWED_ACTIONS = {
     "source.disable",
     "source.retire",
     "source.restore",
+    "report.generate",
 }
 
 
@@ -152,6 +158,16 @@ def _source_action_request(content: str) -> tuple[str, Any] | None:
     return "missing", sources
 
 
+def _report_action_request(content: str) -> dict[str, Any] | None:
+    lowered = content.lower()
+    if "report" not in lowered or not re.search(r"\b(generate|create|run|queue)\b", lowered):
+        return None
+    site_match = re.search(r"\bsite(?:\s+id)?\s*[:=/-]?\s*([a-z0-9_.-]+)", lowered)
+    site_id = site_match.group(1) if site_match else "*"
+    report_type = "anomaly" if "anomaly" in lowered else "scheduled"
+    return {"site_id": site_id, "report_type": report_type}
+
+
 def _make_action_preview(*, actor_id: str, action_name: str, source: Any) -> dict[str, Any]:
     intent = _store().save_action_intent({
         "actor_id": actor_id,
@@ -173,10 +189,11 @@ def _make_action_preview(*, actor_id: str, action_name: str, source: Any) -> dic
 async def _model_answer(content: str, context: dict[str, Any]) -> str | None:
     """Use the existing provider-neutral gateway when it is available."""
     base = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080").rstrip("/")
+    memory_context = context.get("approved_memory", [])
     prompt = (
         "You are the Ravan industrial data platform assistant. Answer clearly and briefly. "
         "Never invent current system state, never expose secrets, never issue plant-control commands, and distinguish platform-owned work from user-owned work.\n\n"
-        f"Current UI context: {context}\nUser request: {content}"
+        f"Current UI context: {context}\nApproved operator memory (use only when relevant): {memory_context}\nUser request: {content}"
     )
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
@@ -193,7 +210,7 @@ async def _model_answer(content: str, context: dict[str, Any]) -> str | None:
 @router.get("/capabilities")
 async def capabilities() -> dict[str, Any]:
     return {
-        "voice": {"enabled": bool(os.getenv("RAVAN_STT_URL")), "mode": "push_to_talk", "audio_retained": False},
+        "voice": {"enabled": bool(os.getenv("RAVAN_STT_URL")), "tts_enabled": bool(os.getenv("RAVAN_TTS_URL")), "mode": "push_to_talk", "audio_retained": False},
         "external_tools": {"kafka_ui": "guidance_only", "grafana": "guidance_only", "prometheus": "guidance_only"},
         "read_only_tools": tool_registry.list_tools(),
         "action_boundary": "no_plc_or_actuator_control",
@@ -245,6 +262,24 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
             action_clarification = "I could not resolve that source from the registry. Include its exact connection ID, or create/save it in Source connections first."
         else:
             action_preview = _make_action_preview(actor_id=actor_id, action_name=action_kind, source=source_match)
+    report_request = None if action_preview or action_clarification else _report_action_request(request.content)
+    if report_request:
+        try:
+            policy = get_policy(report_request["site_id"])
+            if not policy.enabled:
+                action_clarification = f"AI reporting is disabled for site scope {report_request['site_id']}. Enable the policy in AI Reporting before requesting a report."
+            else:
+                action_preview = store.save_action_intent({
+                    "actor_id": actor_id,
+                    "action_name": "report.generate",
+                    "target_resource": report_request["site_id"],
+                    "details": {**report_request, "window_hours": 1},
+                    "confirmation_token": secrets.token_urlsafe(24),
+                    "preview": f"Confirm {report_request['report_type']} report for site {report_request['site_id']}",
+                })
+                _safe_audit({"time": action_preview["created_at"], "user_id": actor_id, "action": "assistant_action_previewed", "resource": report_request["site_id"], "details": action_preview})
+        except Exception as exc:
+            action_clarification = f"I could not prepare the report preview: {exc}"
     tool_result = None
     requested_tool = _requested_read_tool(request.content)
     if requested_tool is not None:
@@ -256,11 +291,16 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
             tool_result = {"status": "failed", "error": str(exc)}
     links: list[dict[str, Any]] = []
     if action_preview:
-        answer = f"I prepared a reviewable preview for {action_preview['details']['source_name']} at site {action_preview['details']['site_id']}. Nothing has changed yet. Confirm it below to continue."
+        if action_preview["action_name"].startswith("source."):
+            answer = f"I prepared a reviewable preview for {action_preview['details']['source_name']} at site {action_preview['details']['site_id']}. Nothing has changed yet. Confirm it below to continue."
+        else:
+            answer = f"I prepared a reviewable preview for {action_preview['preview']}. Nothing has been queued yet. Confirm it below to continue."
     elif action_clarification:
         answer = action_clarification
     else:
-        answer = await _model_answer(request.content, request.context)
+        approved_memory = [item["content"] for item in store.list_memory_candidates(actor_id=actor_id) if item.get("status") == "approved"]
+        model_context = {**request.context, "approved_memory": approved_memory[-20:]}
+        answer = await _model_answer(request.content, model_context)
         if not answer:
             answer, links = _deterministic_answer(request.content, request.context)
     if tool_result and tool_result.get("status") == "succeeded":
@@ -277,6 +317,12 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
 @router.get("/memory/candidates")
 async def list_memory_candidates(actor_id: str = "local-operator") -> list[dict[str, Any]]:
     return _store().list_memory_candidates(actor_id=_actor(actor_id))
+
+
+@router.get("/memory/search")
+async def search_memory(query: str = "", actor_id: str = "local-operator", limit: int = 20) -> list[dict[str, Any]]:
+    """Return only operator-approved memory; this is the local fallback for semantic recall."""
+    return _store().search_approved_memories(actor_id=_actor(actor_id), query=query, limit=limit)
 
 
 @router.post("/memory/candidates")
@@ -346,8 +392,19 @@ async def confirm_action(intent_id: str, request: ActionConfirmRequest) -> dict[
             result = connection_registry.set_enabled(connection_id, False).to_dict()
         elif action == "source.retire":
             result = connection_registry.retire(connection_id).to_dict()
-        else:
+        elif action == "source.restore":
             result = connection_registry.restore(connection_id).to_dict()
+        elif action == "report.generate":
+            from datetime import timedelta
+            site_id = str(details.get("site_id") or "*")
+            policy = get_policy(site_id)
+            if not policy.enabled:
+                raise ValueError(f"AI reporting is disabled for site scope {site_id}")
+            end = datetime.now(timezone.utc)
+            start = end - timedelta(hours=float(details.get("window_hours", 1)))
+            result = create_report_job(site_id=site_id, report_type=str(details.get("report_type", "scheduled")), trigger_reason="assistant_confirmed", window_start=start, window_end=end, policy=policy)
+        else:
+            raise ValueError(f"unsupported assistant action: {action}")
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     completed = store.update_action_intent(intent_id, status="completed", result=result) or intent
@@ -387,6 +444,20 @@ async def transcribe_voice(request: Request) -> dict[str, Any]:
     if not text:
         raise HTTPException(status_code=502, detail="speech-to-text provider returned no transcript")
     return {"text": text, "audio_retained": False}
+
+
+@router.post("/voice/synthesize")
+async def synthesize_voice(request: VoiceSynthesisRequest) -> dict[str, Any]:
+    tts_url = os.getenv("RAVAN_TTS_URL", "").strip()
+    if not tts_url:
+        raise HTTPException(status_code=503, detail="voice synthesis is not configured; set RAVAN_TTS_URL")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(tts_url, json={"text": request.text})
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"text-to-speech provider failed: {exc}") from exc
+    return Response(content=response.content, media_type=response.headers.get("content-type", "audio/mpeg"), headers={"X-Ravan-Audio-Retained": "false"})
 
 
 @router.post("/diagnostic")

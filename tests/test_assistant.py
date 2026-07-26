@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from services.api_service.routers.assistant import _source_action_request
+from services.api_service.routers.assistant import _report_action_request, _source_action_request
 from services.common.agent_runtime import build_agent_runtime_contract
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
@@ -64,3 +64,23 @@ def test_natural_language_source_action_stops_on_ambiguous_match(monkeypatch):
     action, selected = _source_action_request("enable source Pump")
     assert action == "ambiguous"
     assert len(selected) == 2
+
+
+def test_report_request_resolves_safe_defaults_and_site_scope():
+    assert _report_action_request("generate an anomaly report for site plant-7") == {
+        "site_id": "plant-7",
+        "report_type": "anomaly",
+    }
+    assert _report_action_request("please create a report") == {
+        "site_id": "*",
+        "report_type": "scheduled",
+    }
+
+
+def test_approved_memory_search_excludes_pending_candidates(tmp_path):
+    store = AssistantStore(tmp_path / "assistant.json")
+    store.add_memory_candidate(actor_id="operator-1", content="Use metric units", source_thread_id="thread-1")
+    approved = store.add_memory_candidate(actor_id="operator-1", content="Use imperial units for legacy line", source_thread_id="thread-1")
+    store.update_memory_candidate(approved["candidate_id"], actor_id="operator-1", status="approved")
+    results = store.search_approved_memories(actor_id="operator-1", query="legacy line")
+    assert [item["content"] for item in results] == ["Use imperial units for legacy line"]
