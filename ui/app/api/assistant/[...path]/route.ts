@@ -48,3 +48,7 @@ export async function POST(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
   return forward(request, (await context.params).path.join("/"));
 }
+
+export async function PATCH(request: Request, context: RouteContext) {
+  return forward(request, (await context.params).path.join("/"));
+}

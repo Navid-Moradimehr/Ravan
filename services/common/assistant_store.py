@@ -48,9 +48,9 @@ class AssistantStore:
             if os.path.exists(temporary_name):
                 os.unlink(temporary_name)
 
-    def list_threads(self, *, actor_id: str = "local-operator") -> list[dict[str, Any]]:
+    def list_threads(self, *, actor_id: str = "local-operator", include_archived: bool = False) -> list[dict[str, Any]]:
         return sorted(
-            [item for item in self._state["threads"].values() if item.get("actor_id") == actor_id and not item.get("archived")],
+            [item for item in self._state["threads"].values() if item.get("actor_id") == actor_id and (include_archived or not item.get("archived"))],
             key=lambda item: item.get("updated_at", ""),
             reverse=True,
         )
@@ -169,6 +169,24 @@ class AssistantStore:
         self._state["threads"][thread_id]["updated_at"] = _now()
         self._persist()
         return True
+
+    def restore_thread(self, thread_id: str, *, actor_id: str) -> bool:
+        record = self._state["threads"].get(thread_id)
+        if not record or record.get("actor_id") != actor_id:
+            return False
+        record["archived"] = False
+        record["updated_at"] = _now()
+        self._persist()
+        return True
+
+    def rename_thread(self, thread_id: str, *, actor_id: str, title: str) -> dict[str, Any] | None:
+        record = self._state["threads"].get(thread_id)
+        if not record or record.get("actor_id") != actor_id or record.get("archived"):
+            return None
+        record["title"] = title.strip()[:120] or "New conversation"
+        record["updated_at"] = _now()
+        self._persist()
+        return dict(record)
 
     def add_memory_candidate(self, *, actor_id: str, content: str, source_thread_id: str, scope: str = "user") -> dict[str, Any]:
         candidate = {

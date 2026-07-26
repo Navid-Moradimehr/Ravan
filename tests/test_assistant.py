@@ -40,6 +40,10 @@ def test_assistant_store_archives_threads(tmp_path):
     thread = store.create_thread(actor_id="operator-1")
     assert store.archive_thread(thread["thread_id"], actor_id="operator-1") is True
     assert store.list_threads(actor_id="operator-1") == []
+    assert store.list_threads(actor_id="operator-1", include_archived=True)[0]["archived"] is True
+    assert store.restore_thread(thread["thread_id"], actor_id="operator-1") is True
+    renamed = store.rename_thread(thread["thread_id"], actor_id="operator-1", title="Recovered operations")
+    assert renamed and renamed["title"] == "Recovered operations"
 
 
 def test_action_preview_has_expiry(tmp_path):

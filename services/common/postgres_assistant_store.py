@@ -77,10 +77,14 @@ class PostgresAssistantStore:
             conn.commit()
         return dict(payload)
 
-    def list_threads(self, *, actor_id: str = "local-operator") -> list[dict[str, Any]]:
+    def list_threads(self, *, actor_id: str = "local-operator", include_archived: bool = False) -> list[dict[str, Any]]:
         with get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT payload FROM ravan_assistant_records WHERE record_type='thread' AND actor_id=%s AND COALESCE((payload->>'archived')::boolean, false)=false ORDER BY updated_at DESC", (actor_id,))
+                query = "SELECT payload FROM ravan_assistant_records WHERE record_type='thread' AND actor_id=%s"
+                if not include_archived:
+                    query += " AND COALESCE((payload->>'archived')::boolean, false)=false"
+                query += " ORDER BY updated_at DESC"
+                cur.execute(query, (actor_id,))
                 return [dict(row["payload"]) for row in cur.fetchall()]
 
     def create_thread(self, *, actor_id: str, title: str = "New conversation") -> dict[str, Any]:
@@ -172,6 +176,23 @@ class PostgresAssistantStore:
         record["updated_at"] = _now()
         self._upsert(record_id=thread_id, record_type="thread", actor_id=actor_id, payload=record)
         return True
+
+    def restore_thread(self, thread_id: str, *, actor_id: str) -> bool:
+        record = self._fetch_one("thread", thread_id, actor_id=actor_id)
+        if not record:
+            return False
+        record["archived"] = False
+        record["updated_at"] = _now()
+        self._upsert(record_id=thread_id, record_type="thread", actor_id=actor_id, payload=record)
+        return True
+
+    def rename_thread(self, thread_id: str, *, actor_id: str, title: str) -> dict[str, Any] | None:
+        record = self._fetch_one("thread", thread_id, actor_id=actor_id)
+        if not record or record.get("archived"):
+            return None
+        record["title"] = title.strip()[:120] or "New conversation"
+        record["updated_at"] = _now()
+        return self._upsert(record_id=thread_id, record_type="thread", actor_id=actor_id, payload=record)
 
     def add_memory_candidate(self, *, actor_id: str, content: str, source_thread_id: str, scope: str = "user") -> dict[str, Any]:
         record = {"candidate_id": f"memory-{uuid.uuid4().hex[:16]}", "actor_id": actor_id, "scope": scope, "content": content[:1000], "source_thread_id": source_thread_id, "status": "pending", "created_at": _now()}

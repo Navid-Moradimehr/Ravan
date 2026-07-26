@@ -100,6 +100,10 @@ def test_split_domain_routes_registered():
         "/api/v1/ai/reports/{report_id}",
         "/api/v1/ai/report-activity",
         "/api/v1/ai/provider-status",
+        "/api/v1/assistant/threads",
+        "/api/v1/assistant/threads/{thread_id}",
+        "/api/v1/assistant/threads/{thread_id}/restore",
+        "/api/v1/assistant/threads/{thread_id}/messages",
     }
     missing = expected - routes
     assert not missing, f"missing routes: {sorted(missing)}"

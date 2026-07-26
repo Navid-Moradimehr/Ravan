@@ -27,6 +27,11 @@ class ThreadRequest(BaseModel):
     title: str = "New conversation"
 
 
+class ThreadRenameRequest(BaseModel):
+    actor_id: str = "local-operator"
+    title: str = Field(..., min_length=1, max_length=120)
+
+
 class MessageRequest(BaseModel):
     actor_id: str = "local-operator"
     content: str = Field(..., min_length=1, max_length=12000)
@@ -304,8 +309,8 @@ async def assistant_skill(skill_name: str) -> dict[str, Any]:
 
 
 @router.get("/threads")
-async def list_threads(actor_id: str = "local-operator") -> list[dict[str, Any]]:
-    return _store().list_threads(actor_id=_actor(actor_id))
+async def list_threads(actor_id: str = "local-operator", include_archived: bool = False) -> list[dict[str, Any]]:
+    return _store().list_threads(actor_id=_actor(actor_id), include_archived=include_archived)
 
 
 @router.post("/threads")
@@ -326,6 +331,21 @@ async def archive_thread(thread_id: str, actor_id: str = "local-operator") -> di
     if not _store().archive_thread(thread_id, actor_id=_actor(actor_id)):
         raise HTTPException(status_code=404, detail="Assistant thread not found")
     return {"ok": True, "thread_id": thread_id, "status": "archived"}
+
+
+@router.post("/threads/{thread_id}/restore")
+async def restore_thread(thread_id: str, actor_id: str = "local-operator") -> dict[str, Any]:
+    if not _store().restore_thread(thread_id, actor_id=_actor(actor_id)):
+        raise HTTPException(status_code=404, detail="Archived assistant thread not found")
+    return {"ok": True, "thread_id": thread_id, "status": "active"}
+
+
+@router.patch("/threads/{thread_id}")
+async def rename_thread(thread_id: str, request: ThreadRenameRequest) -> dict[str, Any]:
+    thread = _store().rename_thread(thread_id, actor_id=_actor(request.actor_id), title=request.title)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="Active assistant thread not found")
+    return thread
 
 
 @router.post("/threads/{thread_id}/messages")

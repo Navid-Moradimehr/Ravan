@@ -56,12 +56,11 @@ the item route returns the declarative content.
 
 ## Current limits
 
-Ravan does not yet provide a distributed workflow queue, database-backed
-multi-replica assistant store, or full CRM-style streaming resume protocol.
-Ravan is now comparable at the single-node orchestration boundary, but not at
-CRM's distributed streaming scale. PostgreSQL-backed state, stream claims,
-partial-output replay, and queue-based long-running jobs should be added only
-when multi-replica assistant usage becomes a measured requirement.
+Ravan does not yet provide a distributed workflow queue or full CRM-style
+streaming resume protocol. It now provides database-backed assistant state for
+multi-replica conversation history, while queue-based long-running jobs and
+partial-output replay remain later additions triggered by measured workload
+needs.
 
 The multi-node deployment path must set the assistant store backend to the
 shared PostgreSQL adapter and must not use the Compose JSON file from multiple
@@ -74,3 +73,8 @@ stores threads, turns, tool calls, memory candidates, and action intents as
 version-neutral JSON records. This is shared operational state, not historian
 telemetry. The database, backups, retention, TLS, and identity boundary remain
 operator-owned.
+
+The drawer mirrors this boundary with active conversation management, new chat,
+rename, archive, restore, and archived history. The last active thread ID is
+remembered locally only as a selection pointer; message contents remain in the
+assistant repository.
