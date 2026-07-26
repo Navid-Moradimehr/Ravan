@@ -74,3 +74,8 @@ For a full local traffic campaign using the same profile checks, run
 It defaults to a real 900-second, three-site campaign and writes a report under
 `.datastream/reports/`. Docker remains a single-node execution; only the Helm
 rendering portion validates the multi-replica contract.
+
+The July 26, 2026 rehearsal accepted 54,000/54,000 simulated Kafka events,
+produced 54,000 processed historian rows, reported zero fan-out lag, and kept
+the Flink anomaly job running. Kafka UI and Grafana returned HTTP 200. This is
+evidence for the local path, not Kubernetes replica or real-device certification.

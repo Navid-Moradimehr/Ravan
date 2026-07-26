@@ -52,9 +52,9 @@ $processedFanoutPort = Get-HostPort -Name "PROCESSED_FANOUT_HOST_PORT" -Default 
 $aiFanoutPort = Get-HostPort -Name "AI_FANOUT_HOST_PORT" -Default 18096
 $apiPort = Get-HostPort -Name "API_SERVICE_HOST_PORT" -Default 8020
 $aiGatewayPort = Get-HostPort -Name "AI_GATEWAY_HOST_PORT" -Default 8080
-$flinkPort = Get-HostPort -Name "FLINK_JOBMANAGER_HOST_PORT" -Default 8081
+$flinkPort = Get-HostPort -Name "FLINK_JOBMANAGER_HOST_PORT" -Default 18088
 $kafkaUiPort = Get-HostPort -Name "KAFKA_UI_HOST_PORT" -Default 18080
-$grafanaPort = Get-HostPort -Name "GRAFANA_PROXY_HOST_PORT" -Default 3000
+$grafanaPort = Get-HostPort -Name "GRAFANA_PROXY_HOST_PORT" -Default 13000
 
 function Invoke-Compose {
   param([string[]]$Arguments)
