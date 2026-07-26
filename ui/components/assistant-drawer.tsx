@@ -82,7 +82,8 @@ function AssistantDrawerInner() {
       setQuestionnaire(null);
       setQuestionAnswers({});
       window.localStorage.setItem("ravan.assistant.thread", created.thread_id);
-      setHistoryOpen(false);
+      // Keep the conversation list open so the newly created session is visibly selected.
+      setHistoryOpen(true);
     } catch (reason) {
       setError(formatErrorMessage(reason, "Could not create a new conversation"));
     }
