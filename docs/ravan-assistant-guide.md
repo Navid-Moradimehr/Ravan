@@ -11,6 +11,27 @@ provider, or assistant store. When the model gateway is unavailable, the
 assistant falls back to deterministic guidance for common source, pipeline,
 historian, and help requests.
 
+The drawer has three compact views: Chat for the current conversation, History
+for creating, renaming, archiving, restoring, and switching conversations, and
+Memory for reviewing pending operator-memory candidates. The message composer
+is shown only in Chat so history and memory remain focused.
+
+The Chat header shows the models exposed by the configured AI gateway. The
+operator can select a model for subsequent turns; the selection is remembered
+in this browser and the selected model ID is sent with each request. The
+configured deployment model remains the fallback when discovery is unavailable.
+Model selection changes inference routing only. It does not change the
+provider endpoint, credentials, safety boundary, or deployment configuration.
+
+Chat requests use a server-sent event stream when the provider supports it.
+The drawer shows a bounded working indicator first, then appends response text
+as tokens arrive, and finally reconciles the temporary display with the durable
+stored message. Provider reasoning traces are not exposed as raw chain of
+thought; Ravan shows safe progress status instead. If the stream times out or
+returns no content, the assistant records a retryable error and uses
+deterministic guidance unless the operator explicitly requested a strict
+model-backed turn.
+
 Each chat turn has a durable lifecycle record. Normal provider failures are
 reported as degraded model calls while deterministic guidance keeps the
 operator moving. If an operator explicitly retries a model-backed turn, Ravan

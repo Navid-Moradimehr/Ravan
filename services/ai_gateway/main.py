@@ -156,12 +156,72 @@ async def assistant_chat(request: dict[str, Any]) -> dict[str, Any]:
     prompt = str(request.get("prompt", "")).strip()
     if not prompt:
         return {"content": "", "provider": settings.llm_provider, "model": settings.llm_model_id}
+    model_id = str(request.get("model") or settings.llm_model_id).strip()[:200]
     try:
-        content = await llm_client.summarize(prompt, timeout_seconds=min(settings.llm_timeout_seconds, 20))
-        return {"content": content, "provider": settings.llm_provider, "model": settings.llm_model_id}
+        content = await llm_client.summarize(prompt, timeout_seconds=min(settings.llm_timeout_seconds, 20), model_id=model_id)
+        return {"content": content, "provider": settings.llm_provider, "model": model_id}
     except Exception as exc:
         service_state.mark_degraded("assistant request failed", str(exc))
-        return {"content": "", "provider": settings.llm_provider, "model": settings.llm_model_id, "error": str(exc)}
+        return {"content": "", "provider": settings.llm_provider, "model": model_id, "error": str(exc)}
+
+
+def _sse(event: str, payload: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=True)}\n\n"
+
+
+async def _stream_provider(prompt: str, model_id: str):
+    """Stream safe response parts from OpenAI-compatible chat backends.
+
+    Reasoning tokens are deliberately not exposed. The UI receives lifecycle
+    status plus answer text, while any provider reasoning remains private.
+    """
+    spec = llm_client.request_spec(prompt, model_id=model_id)
+    body = dict(spec.body)
+    body["stream"] = True
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        async with client.stream("POST", spec.url, headers=spec.headers, json=body) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                raw = line[5:].strip()
+                if not raw or raw == "[DONE]":
+                    continue
+                try:
+                    payload = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                choices = payload.get("choices") if isinstance(payload, dict) else None
+                if not isinstance(choices, list) or not choices:
+                    continue
+                delta = choices[0].get("delta") if isinstance(choices[0], dict) else None
+                text = delta.get("content") if isinstance(delta, dict) else None
+                if text:
+                    yield str(text)
+
+
+@app.post("/assistant/chat/stream")
+async def assistant_chat_stream(request: dict[str, Any]) -> StreamingResponse:
+    """Stream model output as SSE for the interactive assistant drawer."""
+    prompt = str(request.get("prompt", "")).strip()
+    model_id = str(request.get("model") or settings.llm_model_id).strip()[:200]
+
+    async def events():
+        yield _sse("status", {"status": "thinking"})
+        try:
+            if settings.llm_provider in {"openai", "openai_compat", "deepseek", "qwen", "dashscope", "kimi", "moonshot", "glm", "zhipu"}:
+                async for text in _stream_provider(prompt, model_id):
+                    yield _sse("token", {"text": text})
+            else:
+                content = await llm_client.summarize(prompt, timeout_seconds=min(settings.llm_timeout_seconds, 60), model_id=model_id)
+                for word in content.split(" "):
+                    yield _sse("token", {"text": f"{word} "})
+            yield _sse("done", {"provider": settings.llm_provider, "model": model_id})
+        except Exception as exc:
+            service_state.mark_degraded("assistant stream failed", str(exc))
+            yield _sse("error", {"message": str(exc), "retryable": True})
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.get("/health")
@@ -192,6 +252,29 @@ async def providers() -> dict[str, Any]:
         "credential_configured": bool(settings.llm_api_key),
         "local_only": bool(settings.llm_local_only),
     }
+
+
+@app.get("/models")
+async def models() -> dict[str, Any]:
+    """List models exposed by the configured backend without exposing credentials."""
+    configured = settings.llm_model_id
+    models: list[dict[str, Any]] = [{"id": configured, "label": configured, "configured": True}]
+    if settings.llm_provider in {"openai", "openai_compat", "deepseek", "qwen", "dashscope", "kimi", "moonshot", "glm", "zhipu"}:
+        base_url = settings.llm_endpoint_url.rstrip("/")
+        headers = {"Authorization": f"Bearer {settings.llm_api_key}"} if settings.llm_api_key else {}
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{base_url}/models", headers=headers)
+                response.raise_for_status()
+                payload = response.json()
+            discovered = payload.get("data", []) if isinstance(payload, dict) else []
+            if isinstance(discovered, list):
+                models = [{"id": str(item.get("id")), "label": str(item.get("id")), "configured": str(item.get("id")) == configured} for item in discovered if isinstance(item, dict) and item.get("id")]
+                if not any(item["id"] == configured for item in models):
+                    models.insert(0, {"id": configured, "label": configured, "configured": True})
+        except Exception as exc:
+            return {"models": models, "configured_model": configured, "provider": settings.llm_provider, "discovery_error": str(exc)}
+    return {"models": models, "configured_model": configured, "provider": settings.llm_provider}
 
 
 @app.get("/telemetry")

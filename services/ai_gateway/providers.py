@@ -80,17 +80,18 @@ class LLMProviderClient:
     def provider(self) -> str:
         return str(self.settings.llm_provider).lower().strip()
 
-    def request_spec(self, prompt: str, *, output_schema: dict[str, Any] | None = None, cache_mode: str = "auto") -> LLMRequestSpec:
+    def request_spec(self, prompt: str, *, output_schema: dict[str, Any] | None = None, cache_mode: str = "auto", model_id: str | None = None) -> LLMRequestSpec:
         provider = self.provider
         if provider == "disabled":
             raise LLMDisabledError("LLM provider is disabled")
 
         temperature = 0.0
+        selected_model = str(model_id or self.settings.llm_model_id).strip() or self.settings.llm_model_id
         preset = PROVIDER_PRESETS.get(provider, PROVIDER_PRESETS["openai_compat"])
         canonical = preset.get("canonical", provider)
         base_url = self._effective_base_url(preset).rstrip("/")
         self._validate_endpoint(base_url)
-        path = self._request_path(canonical)
+        path = self._request_path(canonical, model_id=selected_model)
         url = f"{base_url}{path}"
         headers = {"Content-Type": "application/json"}
         if self.settings.llm_api_key and preset.get("auth") == "bearer":
@@ -103,7 +104,7 @@ class LLMProviderClient:
 
         if canonical == "ollama":
             body = {
-                "model": self.settings.llm_model_id,
+                "model": selected_model,
                 "messages": self._messages(prompt),
                 "stream": False,
                 "temperature": temperature,
@@ -112,7 +113,7 @@ class LLMProviderClient:
                 body["format"] = output_schema
         elif canonical == "anthropic":
             body = {
-                "model": self.settings.llm_model_id,
+                "model": selected_model,
                 "max_tokens": max(1, int(self.settings.llm_max_output_tokens)),
                 "temperature": temperature,
                 "system": [{
@@ -134,7 +135,7 @@ class LLMProviderClient:
                 body["generationConfig"].update({"responseMimeType": "application/json", "responseJsonSchema": output_schema})
         elif self.settings.llm_request_format == "completion":
             body = {
-                "model": self.settings.llm_model_id,
+                "model": selected_model,
                 "prompt": prompt,
                 "temperature": temperature,
             }
@@ -145,7 +146,7 @@ class LLMProviderClient:
                 }
         else:
             body = {
-                "model": self.settings.llm_model_id,
+                "model": selected_model,
                 "messages": self._messages(prompt),
                 "temperature": temperature,
             }
@@ -164,8 +165,9 @@ class LLMProviderClient:
         output_schema: dict[str, Any],
         timeout_seconds: int,
         cache_mode: str = "auto",
+        model_id: str | None = None,
     ) -> tuple[str, dict[str, Any]]:
-        spec = self.request_spec(prompt, output_schema=output_schema, cache_mode=cache_mode)
+        spec = self.request_spec(prompt, output_schema=output_schema, cache_mode=cache_mode, model_id=model_id)
         structured_mode = "guided"
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             try:
@@ -174,7 +176,7 @@ class LLMProviderClient:
                 if exc.response.status_code not in {400, 404, 422}:
                     raise
                 structured_mode = "validation_fallback"
-                payload = await self._post(client, self.request_spec(prompt, cache_mode=cache_mode))
+                payload = await self._post(client, self.request_spec(prompt, cache_mode=cache_mode, model_id=model_id))
         usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
         cached_tokens = (
             ((usage.get("prompt_tokens_details") or {}).get("cached_tokens"))
@@ -190,8 +192,8 @@ class LLMProviderClient:
             "output_tokens": usage.get("completion_tokens") or usage.get("output_tokens"),
         }
 
-    async def summarize(self, prompt: str, timeout_seconds: int, client: httpx.AsyncClient | None = None) -> str:
-        spec = self.request_spec(prompt)
+    async def summarize(self, prompt: str, timeout_seconds: int, client: httpx.AsyncClient | None = None, model_id: str | None = None) -> str:
+        spec = self.request_spec(prompt, model_id=model_id)
         response_json: dict[str, Any]
 
         if client is None:
@@ -242,7 +244,7 @@ class LLMProviderClient:
 
         return json.dumps(response_json, separators=(",", ":"))
 
-    def _request_path(self, canonical: str | None = None) -> str:
+    def _request_path(self, canonical: str | None = None, *, model_id: str | None = None) -> str:
         if self.settings.llm_request_path:
             return self._normalize_path(self.settings.llm_request_path)
         canonical = canonical or PROVIDER_PRESETS.get(self.provider, {}).get("canonical", self.provider)
@@ -251,7 +253,7 @@ class LLMProviderClient:
         if canonical == "anthropic":
             return "/v1/messages"
         if canonical == "gemini":
-            model = quote(str(self.settings.llm_model_id).removeprefix("models/"), safe="._-~")
+            model = quote(str(model_id or self.settings.llm_model_id).removeprefix("models/"), safe="._-~")
             return f"/v1beta/models/{model}:generateContent"
         return "/chat/completions"
 

@@ -36,6 +36,16 @@ def test_openai_compat_request_spec_uses_chat_completions():
     assert "messages" in spec.body
 
 
+def test_request_spec_accepts_per_request_model_override():
+    settings = Settings(
+        llm_provider="openai_compat",
+        llm_endpoint_url="http://localhost:1234/v1",
+        llm_model_id="configured-model",
+    )
+    spec = LLMProviderClient(settings).request_spec("Inspect pump", model_id="selected-model")
+    assert spec.body["model"] == "selected-model"
+
+
 def test_ollama_request_spec_uses_api_chat():
     settings = Settings(
         llm_provider="ollama",

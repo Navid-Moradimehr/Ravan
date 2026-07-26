@@ -56,11 +56,40 @@ the item route returns the declarative content.
 
 ## Current limits
 
-Ravan does not yet provide a distributed workflow queue or full CRM-style
-streaming resume protocol. It now provides database-backed assistant state for
-multi-replica conversation history, while queue-based long-running jobs and
-partial-output replay remain later additions triggered by measured workload
-needs.
+## Model routing
+
+The AI gateway exposes `GET /models` as a credential-free catalog. For an
+OpenAI-compatible backend such as LM Studio, it discovers the model IDs from
+the backend's `/v1/models` endpoint and always retains the configured model as
+a fallback. The API exposes the same catalog at
+`GET /api/v1/assistant/models`, and the dashboard proxies it at
+`GET /api/assistant/models`.
+
+Chat turns may include `context.model_id`. The API forwards that ID to the
+provider-neutral gateway, and the gateway uses it in the provider request
+without changing the configured provider or endpoint. This supports local
+LM Studio, Ollama, and compatible cloud providers while keeping credentials
+deployment-owned. If model discovery fails, the UI displays the configured
+model and the assistant remains usable with that model.
+
+For the local LM Studio setup, configure the AI gateway endpoint and model in
+the deployment environment, for example `http://host.docker.internal:1234/v1`
+and `openai/gpt-oss-20b`. Start the gateway, open the assistant, and select the
+model from the Chat header. A model request still follows the normal assistant
+error handling and retry lifecycle.
+
+Interactive chat uses `POST /api/v1/assistant/threads/{thread_id}/messages/stream`
+and the dashboard proxy at `/api/assistant/threads/{thread_id}/messages/stream`.
+The stream emits `status`, `token`, `complete`, and `error` events. The API
+persists the final user and assistant messages through the same durable store
+used by non-streaming operations. Raw provider reasoning is not forwarded;
+only safe progress status and answer text are exposed.
+
+Ravan does not yet provide a distributed workflow queue or partial-output
+replay after a disconnected browser. It does provide database-backed assistant
+state for multi-replica conversation history and live SSE output for the active
+browser connection. Queue-based long-running jobs and resumable partial output
+remain later additions triggered by measured workload needs.
 
 The multi-node deployment path must set the assistant store backend to the
 shared PostgreSQL adapter and must not use the Compose JSON file from multiple

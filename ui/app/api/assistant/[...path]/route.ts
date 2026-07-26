@@ -28,6 +28,15 @@ async function forward(request: Request, path: string) {
       body: body || undefined,
     });
     if (!response.ok) throw await readResponseError(response);
+    if (path.endsWith("/stream")) {
+      return new Response(response.body, {
+        status: response.status,
+        headers: {
+          "Content-Type": response.headers.get("content-type") ?? "text/event-stream",
+          "Cache-Control": "no-cache",
+        },
+      });
+    }
     return NextResponse.json(await response.json());
   } catch (error) {
     if (error instanceof HttpError) return NextResponse.json({ error: error.message, details: error.details }, { status: error.status });

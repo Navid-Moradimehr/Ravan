@@ -3,11 +3,14 @@ from __future__ import annotations
 import os
 import re
 import secrets
+import asyncio
+import json
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from services.common.agent_runtime import DiagnosticAgentRuntime, insert_audit_log
@@ -71,6 +74,7 @@ class QuestionAnswerRequest(BaseModel):
 class RetryRequest(BaseModel):
     actor_id: str = "local-operator"
     turn_id: str | None = None
+    model_id: str | None = Field(default=None, max_length=200)
 
 
 def _store():
@@ -250,7 +254,7 @@ def _make_action_preview(*, actor_id: str, action_name: str, source: Any) -> dic
     return intent
 
 
-async def _model_answer(content: str, context: dict[str, Any], *, allow_fallback: bool = True) -> tuple[str | None, dict[str, Any] | None]:
+async def _model_answer(content: str, context: dict[str, Any], *, allow_fallback: bool = True, on_token: Callable[[str], Awaitable[None]] | None = None) -> tuple[str | None, dict[str, Any] | None]:
     """Use the existing provider-neutral gateway when it is available."""
     base = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080").rstrip("/")
     memory_context = context.get("approved_memory", [])
@@ -264,9 +268,36 @@ async def _model_answer(content: str, context: dict[str, Any], *, allow_fallback
         "If a tool or provider fails, state what failed, whether retrying is safe, and what the operator should check.\n\n"
         f"Current UI context: {context}\nApproved operator memory (use only when relevant): {memory_context}\nLoaded declarative skills (guidance only): {skill_context}\nUser request: {content}"
     )
+    requested_model = str(context.get("model_id") or "").strip()[:200]
     try:
-        async with httpx.AsyncClient(timeout=12.0) as client:
-            response = await client.post(f"{base}/assistant/chat", json={"prompt": prompt})
+        request_timeout = 180.0 if on_token is not None else 12.0
+        async with httpx.AsyncClient(timeout=request_timeout) as client:
+            payload: dict[str, Any] = {"prompt": prompt}
+            if requested_model:
+                payload["model"] = requested_model
+            if on_token is not None:
+                chunks: list[str] = []
+                async with client.stream("POST", f"{base}/assistant/chat/stream", json=payload) as response:
+                    if response.status_code != 200:
+                        return None, {"code": "AI_GATEWAY_HTTP_ERROR", "message": f"AI gateway returned HTTP {response.status_code}", "phase": "model_call", "retryable": response.status_code >= 500 or response.status_code == 429}
+                    event_name = ""
+                    async for line in response.aiter_lines():
+                        if line.startswith("event:"):
+                            event_name = line[6:].strip()
+                        elif line.startswith("data:"):
+                            try:
+                                event = json.loads(line[5:].strip())
+                            except json.JSONDecodeError:
+                                continue
+                            if event_name == "token" and event.get("text"):
+                                text = str(event["text"])
+                                chunks.append(text)
+                                await on_token(text)
+                            elif event_name == "error":
+                                return None, {"code": "AI_GATEWAY_STREAM_ERROR", "message": str(event.get("message") or "AI stream failed"), "phase": "model_call", "retryable": bool(event.get("retryable", True))}
+                answer = "".join(chunks).strip()
+                return (answer, None) if answer else (None, {"code": "AI_GATEWAY_EMPTY_RESPONSE", "message": "AI gateway returned no streamed assistant content", "phase": "model_call", "retryable": True})
+            response = await client.post(f"{base}/assistant/chat", json=payload)
             if response.status_code != 200:
                 error = {"code": "AI_GATEWAY_HTTP_ERROR", "message": f"AI gateway returned HTTP {response.status_code}", "phase": "model_call", "retryable": response.status_code >= 500 or response.status_code == 429}
                 return (None, error) if not allow_fallback else (None, error)
@@ -293,6 +324,22 @@ async def capabilities() -> dict[str, Any]:
         "action_boundary": "no_plc_or_actuator_control",
         "memory": {"threads": True, "reviewed_candidates": True, "vector_backend": "optional"},
     }
+
+
+@router.get("/models")
+async def assistant_models() -> dict[str, Any]:
+    """Return models exposed by the configured AI gateway without credentials."""
+    base = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080").rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(f"{base}/models")
+            response.raise_for_status()
+            payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("AI gateway returned an invalid model catalog")
+        return payload
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail=f"AI model discovery unavailable: {exc}") from exc
 
 
 @router.get("/skills")
@@ -349,7 +396,7 @@ async def rename_thread(thread_id: str, request: ThreadRenameRequest) -> dict[st
 
 
 @router.post("/threads/{thread_id}/messages")
-async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any]:
+async def send_message(thread_id: str, request: MessageRequest, _on_token: Callable[[str], Awaitable[None]] | None = None) -> dict[str, Any]:
     actor_id = _actor(request.actor_id)
     store = _store()
     if store.get_thread(thread_id, actor_id=actor_id) is None:
@@ -419,7 +466,7 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
     else:
         approved_memory = [item["content"] for item in store.list_memory_candidates(actor_id=actor_id) if item.get("status") == "approved"]
         model_context = {**request.context, "approved_memory": approved_memory[-20:]}
-        answer, model_error = await _model_answer(request.content, model_context, allow_fallback=not force_gateway)
+        answer, model_error = await _model_answer(request.content, model_context, allow_fallback=not force_gateway, on_token=_on_token)
         if not answer:
             if force_gateway:
                 answer = "I could not complete this model-backed turn. The failure is recorded below; you can retry it after checking the AI gateway."
@@ -434,7 +481,8 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
     tool_error = tool_result.get("error") if tool_result and tool_result.get("status") == "failed" else None
     failed = bool((force_gateway and model_error or tool_error) and not action_preview and not action_clarification and not questionnaire)
     turn_status = "failed" if failed else "completed"
-    assistant_message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=answer, metadata={"links": links, "provider": "gateway" if not action_preview and not action_clarification and not questionnaire and not failed else "deterministic", "tool_result": tool_result, "action_preview": action_preview, "questionnaire": questionnaire, "turn_id": turn["turn_id"], "status": turn_status, "error": model_error, "skills": [skill.get("name") for skill in select_skills(request.content)]})
+    selected_model = str(request.context.get("model_id") or "").strip()[:200] or None
+    assistant_message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=answer, metadata={"links": links, "provider": "gateway" if not action_preview and not action_clarification and not questionnaire and not failed else "deterministic", "model": selected_model, "tool_result": tool_result, "action_preview": action_preview, "questionnaire": questionnaire, "turn_id": turn["turn_id"], "status": turn_status, "error": model_error, "skills": [skill.get("name") for skill in select_skills(request.content)]})
     if questionnaire:
         questionnaire = {**questionnaire, "message_id": assistant_message["message_id"]}
         assistant_message = store.update_message_metadata(thread_id, assistant_message["message_id"], actor_id=actor_id, metadata={"questionnaire": questionnaire}) or assistant_message
@@ -445,6 +493,36 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
     retry_error = model_error or tool_error
     store.update_turn(turn["turn_id"], actor_id=actor_id, status=turn_status, retryable=bool(retry_error and retry_error.get("retryable")), error=retry_error, response_message_id=assistant_message["message_id"])
     return {"user_message": user_message, "assistant_message": assistant_message, "links": links, "tool_result": tool_result, "memory_candidate": candidate, "action_preview": action_preview, "questionnaire": questionnaire, "turn": store.get_turn(turn["turn_id"], actor_id=actor_id)}
+
+
+@router.post("/threads/{thread_id}/messages/stream")
+async def stream_message(thread_id: str, request: MessageRequest) -> StreamingResponse:
+    """Stream a normal chat turn while persisting the same durable result."""
+    queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
+
+    async def on_token(text: str) -> None:
+        await queue.put(("token", {"text": text}))
+
+    async def run_turn() -> None:
+        try:
+            result = await send_message(thread_id, request, _on_token=on_token)
+            await queue.put(("complete", result))
+        except Exception as exc:
+            await queue.put(("error", {"message": str(exc), "retryable": True}))
+        finally:
+            await queue.put(("end", None))
+
+    asyncio.create_task(run_turn())
+
+    async def events():
+        yield "event: status\ndata: {\"status\": \"working\"}\n\n"
+        while True:
+            event_name, payload = await queue.get()
+            if event_name == "end":
+                break
+            yield f"event: {event_name}\ndata: {json.dumps(payload, ensure_ascii=True)}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.post("/threads/{thread_id}/retry")
@@ -458,7 +536,10 @@ async def retry_failed_turn(thread_id: str, request: RetryRequest) -> dict[str, 
         turn = None
     if turn is None:
         raise HTTPException(status_code=409, detail="no retryable assistant turn exists")
-    return await send_message(thread_id, MessageRequest(actor_id=actor_id, content=str(turn["content"]), context={**dict(turn.get("context") or {}), "retry_turn_id": turn["turn_id"], "force_gateway": True}))
+    context = {**dict(turn.get("context") or {}), "retry_turn_id": turn["turn_id"], "force_gateway": True}
+    if request.model_id:
+        context["model_id"] = request.model_id.strip()[:200]
+    return await send_message(thread_id, MessageRequest(actor_id=actor_id, content=str(turn["content"]), context=context))
 
 
 @router.post("/threads/{thread_id}/questions/{question_id}/answer")
