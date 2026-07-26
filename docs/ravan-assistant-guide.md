@@ -115,6 +115,20 @@ approve, or reject pending candidates. Candidates retain their source thread
 for audit. Secrets, raw
 telemetry, and raw audio are never assistant memory.
 
+The chat UI follows the same separation used by mature assistant interfaces:
+the final answer is rendered as safe Markdown, while bounded tool/evidence
+status is shown in a faint **Working context** block above it. This is not raw
+model chain-of-thought. It is an auditable summary such as the diagnostic tool
+that ran and its result count. The rendering and boundary guidance lives in
+`config/assistant-skills/assistant-response-rendering.md` and
+`config/assistant-skills/assistant-thinking-boundary.md`.
+
+In **History**, the pencil action opens an inline rename editor with Save and
+Cancel. Archive is reversible through Restore. Archived conversations also
+have **Delete permanently**, which requires a browser confirmation and removes
+the archived thread and its assistant records; active conversations cannot be
+permanently deleted through this control.
+
 Approved memory is supplied as bounded context to future chat requests. It is
 not used for plant control, is not a replacement for historian data, and is not
 sent to the model until an operator has approved the candidate.

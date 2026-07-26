@@ -104,6 +104,7 @@ def test_split_domain_routes_registered():
         "/api/v1/assistant/models",
         "/api/v1/assistant/threads/{thread_id}",
         "/api/v1/assistant/threads/{thread_id}/restore",
+        "/api/v1/assistant/threads/{thread_id}/permanent",
         "/api/v1/assistant/threads/{thread_id}/messages",
         "/api/v1/assistant/threads/{thread_id}/messages/stream",
     }

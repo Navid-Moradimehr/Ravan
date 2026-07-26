@@ -186,6 +186,21 @@ class PostgresAssistantStore:
         self._upsert(record_id=thread_id, record_type="thread", actor_id=actor_id, payload=record)
         return True
 
+    def delete_thread_permanently(self, thread_id: str, *, actor_id: str) -> bool:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM ravan_assistant_records WHERE record_type='thread' AND record_id=%s AND actor_id=%s AND COALESCE((payload->>'archived')::boolean, false)=true",
+                    (thread_id, actor_id),
+                )
+                if cur.fetchone() is None:
+                    conn.rollback()
+                    return False
+                cur.execute("DELETE FROM ravan_assistant_records WHERE record_type='thread' AND record_id=%s AND actor_id=%s", (thread_id, actor_id))
+                cur.execute("DELETE FROM ravan_assistant_records WHERE thread_id=%s AND actor_id=%s", (thread_id, actor_id))
+            conn.commit()
+        return True
+
     def rename_thread(self, thread_id: str, *, actor_id: str, title: str) -> dict[str, Any] | None:
         record = self._fetch_one("thread", thread_id, actor_id=actor_id)
         if not record or record.get("archived"):

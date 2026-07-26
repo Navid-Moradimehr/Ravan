@@ -46,6 +46,16 @@ def test_assistant_store_archives_threads(tmp_path):
     assert renamed and renamed["title"] == "Recovered operations"
 
 
+def test_assistant_store_permanently_deletes_only_archived_threads(tmp_path):
+    store = AssistantStore(tmp_path / "assistant.json")
+    archived = store.create_thread(actor_id="operator-1", title="Remove me")
+    store.append_message(archived["thread_id"], actor_id="operator-1", role="user", content="temporary")
+    assert store.delete_thread_permanently(archived["thread_id"], actor_id="operator-1") is False
+    assert store.archive_thread(archived["thread_id"], actor_id="operator-1") is True
+    assert store.delete_thread_permanently(archived["thread_id"], actor_id="operator-1") is True
+    assert store.list_threads(actor_id="operator-1", include_archived=True) == []
+
+
 def test_action_preview_has_expiry(tmp_path):
     store = AssistantStore(tmp_path / "assistant.json")
     intent = store.save_action_intent({"actor_id": "operator-1", "action_name": "source.test", "target_resource": "conn-1", "confirmation_token": "token"})
@@ -100,6 +110,24 @@ def test_approved_memory_search_excludes_pending_candidates(tmp_path):
     store.update_memory_candidate(approved["candidate_id"], actor_id="operator-1", status="approved")
     results = store.search_approved_memories(actor_id="operator-1", query="legacy line")
     assert [item["content"] for item in results] == ["Use imperial units for legacy line"]
+
+
+def test_diagnostic_progress_is_separate_from_final_answer(monkeypatch, tmp_path):
+    monkeypatch.setenv("RAVAN_ASSISTANT_STORE_PATH", str(tmp_path / "assistant.json"))
+
+    async def model_answer(*args, **kwargs):
+        return ("**Final answer**\n\nUse the source editor to continue.", None)
+
+    monkeypatch.setattr("services.api_service.routers.assistant._model_answer", model_answer)
+    monkeypatch.setattr(
+        "services.api_service.routers.assistant.DiagnosticAgentRuntime.dispatch_tool",
+        lambda self, **kwargs: {"status": "succeeded", "result": []},
+    )
+    thread = asyncio.run(create_thread(ThreadRequest(actor_id="operator-1")))
+    result = asyncio.run(send_message(thread["thread_id"], MessageRequest(actor_id="operator-1", content="Show my sources", context={})))
+    assistant = result["assistant_message"]
+    assert assistant["content"].startswith("**Final answer**")
+    assert assistant["metadata"]["progress"] == ["Checked sources.list and found 0 result(s)."]
 
 
 def test_declarative_assistant_skills_are_loaded_without_executable_code():

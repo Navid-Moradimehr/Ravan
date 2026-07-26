@@ -179,6 +179,26 @@ class AssistantStore:
         self._persist()
         return True
 
+    def delete_thread_permanently(self, thread_id: str, *, actor_id: str) -> bool:
+        record = self._state["threads"].get(thread_id)
+        if not record or record.get("actor_id") != actor_id or not record.get("archived"):
+            return False
+        del self._state["threads"][thread_id]
+        deleted_turn_ids = {
+            value.get("turn_id") for value in self._state.get("turns", {}).values()
+            if value.get("thread_id") == thread_id
+        }
+        self._state["turns"] = {
+            key: value for key, value in self._state.get("turns", {}).items()
+            if value.get("thread_id") != thread_id
+        }
+        self._state["tool_calls"] = [
+            value for value in self._state.get("tool_calls", [])
+            if value.get("thread_id") != thread_id and value.get("turn_id") not in deleted_turn_ids
+        ]
+        self._persist()
+        return True
+
     def rename_thread(self, thread_id: str, *, actor_id: str, title: str) -> dict[str, Any] | None:
         record = self._state["threads"].get(thread_id)
         if not record or record.get("actor_id") != actor_id or record.get("archived"):

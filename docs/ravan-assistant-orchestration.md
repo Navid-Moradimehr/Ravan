@@ -107,3 +107,15 @@ The drawer mirrors this boundary with active conversation management, new chat,
 rename, archive, restore, and archived history. The last active thread ID is
 remembered locally only as a selection pointer; message contents remain in the
 assistant repository.
+
+The assistant keeps tool progress separate from the final response. Successful
+diagnostic work is persisted as bounded `metadata.progress` and rendered as a
+faint evidence block; the final response remains Markdown-rendered content.
+The UI intentionally does not expose private provider chain-of-thought.
+
+Conversation lifecycle endpoints are:
+
+- `DELETE /api/v1/assistant/threads/{thread_id}` to archive a conversation.
+- `POST /api/v1/assistant/threads/{thread_id}/restore` to restore it.
+- `DELETE /api/v1/assistant/threads/{thread_id}/permanent` to permanently
+  delete an already archived conversation and its assistant records.

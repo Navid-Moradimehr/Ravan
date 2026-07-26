@@ -395,6 +395,14 @@ async def restore_thread(thread_id: str, actor_id: str = "local-operator") -> di
     return {"ok": True, "thread_id": thread_id, "status": "active"}
 
 
+@router.delete("/threads/{thread_id}/permanent")
+async def permanently_delete_thread(thread_id: str, actor_id: str = "local-operator") -> dict[str, Any]:
+    """Permanently remove an already archived conversation and its assistant records."""
+    if not _store().delete_thread_permanently(thread_id, actor_id=_actor(actor_id)):
+        raise HTTPException(status_code=404, detail="Archived assistant thread not found")
+    return {"ok": True, "thread_id": thread_id, "status": "deleted"}
+
+
 @router.patch("/threads/{thread_id}")
 async def rename_thread(thread_id: str, request: ThreadRenameRequest) -> dict[str, Any]:
     thread = _store().rename_thread(thread_id, actor_id=_actor(request.actor_id), title=request.title)
@@ -480,9 +488,10 @@ async def send_message(thread_id: str, request: MessageRequest, _on_token: Calla
                 answer = "I could not complete this model-backed turn. The failure is recorded below; you can retry it after checking the AI gateway."
             else:
                 answer, links = _deterministic_answer(request.content, request.context)
+    progress: list[str] = []
     if tool_result and tool_result.get("status") == "succeeded":
         count = len(tool_result.get("result", [])) if isinstance(tool_result.get("result"), list) else 1
-        answer = f"I checked {requested_tool[0] if requested_tool else 'the requested data'} and found {count} result(s). The detailed result is available in the assistant context.\n\n{answer}"
+        progress.append(f"Checked {requested_tool[0] if requested_tool else 'the requested data'} and found {count} result(s).")
     elif tool_result and tool_result.get("status") == "failed":
         error = tool_result.get("error") or {}
         answer = f"I could not complete {requested_tool[0] if requested_tool else 'the diagnostic request'}. {error.get('message', 'The tool failed.')} " + ("You can retry it." if error.get("retryable") else "Check the source, historian, or service configuration before trying again.")
@@ -491,7 +500,7 @@ async def send_message(thread_id: str, request: MessageRequest, _on_token: Calla
     turn_status = "failed" if failed else "completed"
     selected_model = str(request.context.get("model_id") or "").strip()[:200] or None
     assistant_provider = "gateway" if model_error is None and not action_preview and not action_clarification and not questionnaire and not failed else "deterministic"
-    assistant_message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=answer, metadata={"links": links, "provider": assistant_provider, "model": selected_model, "tool_result": tool_result, "action_preview": action_preview, "questionnaire": questionnaire, "turn_id": turn["turn_id"], "status": turn_status, "error": model_error, "skills": [skill.get("name") for skill in select_skills(request.content)]})
+    assistant_message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=answer, metadata={"links": links, "provider": assistant_provider, "model": selected_model, "tool_result": tool_result, "progress": progress, "action_preview": action_preview, "questionnaire": questionnaire, "turn_id": turn["turn_id"], "status": turn_status, "error": model_error, "skills": [skill.get("name") for skill in select_skills(request.content)]})
     if questionnaire:
         questionnaire = {**questionnaire, "message_id": assistant_message["message_id"]}
         assistant_message = store.update_message_metadata(thread_id, assistant_message["message_id"], actor_id=actor_id, metadata={"questionnaire": questionnaire}) or assistant_message
