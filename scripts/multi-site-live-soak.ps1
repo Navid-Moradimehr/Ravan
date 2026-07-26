@@ -65,11 +65,16 @@ function Invoke-Compose {
   }
   $composeArgs += @("-f", $ComposeFile)
   $composeArgs += $Arguments
-  # Compose writes progress records to stderr on Windows. Suppress that
-  # presentation noise and retain the process exit code for the caller.
+  # Compose writes lifecycle progress as PowerShell error records on Windows.
+  # Do not convert those records into a script exception; retain the process
+  # exit code so actual Compose failures still stop the campaign.
+  $previousErrorAction = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
   & docker compose @composeArgs *> $null
-  if ($LASTEXITCODE -ne 0) {
-    throw "docker compose failed with exit code $LASTEXITCODE"
+  $composeExitCode = $LASTEXITCODE
+  $ErrorActionPreference = $previousErrorAction
+  if ($composeExitCode -ne 0) {
+    throw "docker compose failed with exit code $composeExitCode"
   }
 }
 
