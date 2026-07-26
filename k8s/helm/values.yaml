@@ -223,6 +223,17 @@ nodeSelector: {}
 tolerations: []
 affinity: {}
 
+# Voluntary disruption protection is disabled for the one-node default. Enable
+# it only when the selected profile has enough replicas to remain available.
+disruptionBudgets:
+  enabled: false
+  apiService:
+    minAvailable: 1
+  aiGateway:
+    minAvailable: 1
+  edgeIngest:
+    minAvailable: 1
+
 # ---------------------------------------------------------------------------
 # Dependencies (install separately or use subcharts)
 # ---------------------------------------------------------------------------

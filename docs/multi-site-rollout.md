@@ -31,6 +31,13 @@ The platform should not force users to outsource:
 - identity provider choice
 - plant-specific retention policy
 
+For a local Kubernetes rehearsal, use the non-default
+`k8s/helm/profiles/multi-node-values.yaml` profile. It enables multiple API,
+AI, and edge replicas, shared PostgreSQL assistant state, Flink operator mode,
+HPA, and disruption budgets. Rendering the profile does not certify a
+production cluster; operators still own cluster capacity, registries,
+storage, ingress, secrets, TLS, network policy, and checkpoint locations.
+
 ## Recommended Deployment Topologies
 
 ### Federated Event Contract

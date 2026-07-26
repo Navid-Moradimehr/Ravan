@@ -40,6 +40,22 @@ spec:
           ports:
             - containerPort: {{ .Values.apiService.targetPort }}
               name: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
           envFrom:
             - configMapRef:
                 name: {{ $fullname }}-env
@@ -89,6 +105,22 @@ spec:
           ports:
             - containerPort: {{ .Values.aiGateway.targetPort }}
               name: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
           envFrom:
             - configMapRef:
                 name: {{ $fullname }}-env
@@ -230,6 +262,14 @@ spec:
           ports:
             - containerPort: {{ .Values.edgeIngest.targetPort }}
               name: metrics
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
           envFrom:
             - configMapRef:
                 name: {{ $fullname }}-env

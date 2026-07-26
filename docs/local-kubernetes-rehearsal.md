@@ -49,3 +49,22 @@ complete industrial job because the rehearsal cluster did not include the
 full Kafka/TimescaleDB/MinIO runtime dependencies. This rehearsal does not
 validate production capacity, site networking, identity, storage durability,
 or multi-node failure behavior.
+## Multi-node rehearsal profile
+
+Use `k8s/helm/profiles/multi-node-values.yaml` only when Kafka and
+PostgreSQL/TimescaleDB are already reachable from the cluster. It enables
+multiple API, AI gateway, and edge replicas, shared PostgreSQL assistant state,
+Flink operator mode, HPA, and disruption budgets. The default Helm values and
+Docker Compose deployment remain single-node and do not require these
+dependencies.
+
+Render it before applying it:
+
+```powershell
+helm template ravan k8s/helm -f k8s/helm/profiles/multi-node-values.yaml
+```
+
+The profile is a local control-plane rehearsal, not evidence of production
+capacity. Operators still provide the image registry, broker and database
+endpoints, TLS/secrets, ingress, storage classes, Flink checkpoint/savepoint
+locations, and site/network policy.

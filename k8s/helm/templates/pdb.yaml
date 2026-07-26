@@ -1,0 +1,54 @@
+{{- if .Values.disruptionBudgets.enabled }}
+{{- $fullname := include "data-stream.fullname" . -}}
+{{- $name := include "data-stream.name" . -}}
+{{- if and .Values.apiService.enabled (gt (int .Values.apiService.replicaCount) 1) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-api
+  namespace: {{ include "data-stream.namespace" . }}
+  labels:
+    app: {{ $name }}
+    component: api-service
+spec:
+  minAvailable: {{ .Values.disruptionBudgets.apiService.minAvailable }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+      component: api-service
+{{- end }}
+{{- if and .Values.aiGateway.enabled (gt (int .Values.aiGateway.replicaCount) 1) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-ai-gateway
+  namespace: {{ include "data-stream.namespace" . }}
+  labels:
+    app: {{ $name }}
+    component: ai-gateway
+spec:
+  minAvailable: {{ .Values.disruptionBudgets.aiGateway.minAvailable }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+      component: ai-gateway
+{{- end }}
+{{- if and .Values.edgeIngest.enabled (gt (int .Values.edgeIngest.replicaCount) 1) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-edge-ingest
+  namespace: {{ include "data-stream.namespace" . }}
+  labels:
+    app: {{ $name }}
+    component: edge-ingest
+spec:
+  minAvailable: {{ .Values.disruptionBudgets.edgeIngest.minAvailable }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+      component: edge-ingest
+{{- end }}
+{{- end }}

@@ -1,0 +1,67 @@
+# Non-default multi-node rehearsal profile. Kafka and PostgreSQL/TimescaleDB
+# are operator-managed dependencies in this profile.
+env:
+  SITE_ID: "central-control"
+  SITE_NAME: "Ravan Central Control Plane"
+  DEPLOYMENT_MODE: "federated"
+  RUNTIME_MODE: "flink-production"
+  DATASTREAM_FEDERATION_ENABLED: "true"
+  DATASTREAM_FEDERATION_EXPORT_MODE: "rollup"
+  RAVAN_ASSISTANT_STORE_BACKEND: "postgres"
+
+apiService:
+  replicaCount: 3
+
+aiGateway:
+  replicaCount: 2
+
+edgeIngest:
+  replicaCount: 2
+
+processor:
+  enabled: false
+
+flinkJob:
+  enabled: true
+  replicaCount: 1
+  operator:
+    enabled: true
+    image: "registry.example.internal/ravan/flink-job:REPLACE_ME"
+  capacity:
+    parallelism: 3
+    maxParallelism: 120
+    taskmanagerSlots: 2
+    taskmanagerReplicas: 2
+
+autoScaling:
+  apiService:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+  aiGateway:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+  edgeIngest:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 12
+
+disruptionBudgets:
+  enabled: true
+  apiService:
+    minAvailable: 2
+  aiGateway:
+    minAvailable: 1
+  edgeIngest:
+    minAvailable: 1
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app: ravan
