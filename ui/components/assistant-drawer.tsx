@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Archive, Bot, Brain, ChevronRight, History, LoaderCircle, MessageCircle, Mic, Pencil, Plus, RotateCcw, Send, Square, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HelpTip } from "@/components/help-tip";
@@ -13,7 +13,7 @@ type AssistantThread = { thread_id: string; title: string; messages: AssistantMe
 type ActionPreview = { intent_id: string; action_name: string; target_resource: string; expires_at: string; preview: string; confirmation_token: string; details?: Record<string, unknown> };
 type MemoryCandidate = { candidate_id: string; content: string; status: string; created_at: string };
 type AssistantModel = { id: string; label?: string; configured?: boolean };
-type Questionnaire = { question_id: string; status: string; questions: Array<{ key: string; question: string; type: string; options?: string[]; required?: boolean }>; answers: Record<string, string>; draft?: Record<string, string> };
+type Questionnaire = { question_id: string; status: string; questions: Array<{ key: string; question: string; type: string; options?: string[]; required?: boolean }>; answers: Record<string, string>; draft?: Record<string, string>; validation_errors?: string[] };
 
 const AssistantDrawer = dynamic(() => Promise.resolve(AssistantDrawerInner), { ssr: false });
 
@@ -35,9 +35,25 @@ function AssistantDrawerInner() {
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [questionnaire, setQuestionnaire] = useState<Questionnaire | null>(null);
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
+  const [questionnaireErrors, setQuestionnaireErrors] = useState<string[]>([]);
   const [models, setModels] = useState<AssistantModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [pendingDelete, setPendingDelete] = useState<AssistantThread | null>(null);
+  const draftTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  function resizeDraftTextarea() {
+    const textarea = draftTextareaRef.current;
+    if (!textarea) return;
+    const maxHeight = 96;
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(Math.max(textarea.scrollHeight, 48), maxHeight);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+  }
+
+  useEffect(() => {
+    resizeDraftTextarea();
+  }, [draft]);
 
   async function loadThread(threadId: string) {
     const loaded = await requestJson<AssistantThread>(`/api/assistant/threads/${threadId}`);
@@ -46,6 +62,7 @@ function AssistantDrawerInner() {
     const pending = [...loaded.messages].reverse().find((message) => (message.metadata?.questionnaire as Questionnaire | undefined)?.status === "pending")?.metadata?.questionnaire as Questionnaire | undefined;
     setQuestionnaire(pending || null);
     setQuestionAnswers(pending?.answers || {});
+    setQuestionnaireErrors(pending?.validation_errors || []);
   }
 
   async function refreshThreads(selectId?: string) {
@@ -97,6 +114,7 @@ function AssistantDrawerInner() {
       setThread(created);
       setQuestionnaire(null);
       setQuestionAnswers({});
+      setQuestionnaireErrors([]);
       window.localStorage.setItem("ravan.assistant.thread", created.thread_id);
       setAssistantView("chat");
     } catch (reason) {
@@ -224,7 +242,7 @@ function AssistantDrawerInner() {
     setBusy(true);
     setError(null);
     try {
-      const response = await requestJson<{ assistant_message: AssistantMessage; questionnaire: Questionnaire; source_draft?: Record<string, string> }>(`/api/assistant/threads/${thread.thread_id}/questions/${questionnaire.question_id}/answer`, {
+      const response = await requestJson<{ assistant_message: AssistantMessage; questionnaire: Questionnaire; source_draft?: Record<string, string>; validation_errors?: string[] }>(`/api/assistant/threads/${thread.thread_id}/questions/${questionnaire.question_id}/answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers: questionAnswers }),
@@ -232,6 +250,7 @@ function AssistantDrawerInner() {
       setThread((current) => current ? { ...current, messages: [...current.messages, response.assistant_message] } : current);
       setQuestionnaire(response.questionnaire.status === "pending" ? response.questionnaire : null);
       setQuestionAnswers(response.questionnaire.answers || {});
+      setQuestionnaireErrors(response.validation_errors || []);
     } catch (reason) {
       setError(formatErrorMessage(reason, "Could not submit source details"));
     } finally {
@@ -355,12 +374,12 @@ function AssistantDrawerInner() {
         <div className={`flex-1 space-y-3 overflow-y-auto p-4 ${assistantView !== "chat" ? "hidden" : ""}`}>
           {!thread || thread.messages.length === 0 ? <div className="rounded-xl border border-dashed border-border-subtle bg-surface-2 p-5"><p className="font-heading text-sm font-semibold text-text-primary">What do you need to do?</p><p className="mt-2 text-sm leading-6 text-text-secondary">Ask about a source connection, historian trend, alarm, dataset, report, pipeline state, or the external operator tools.</p><div className="mt-4 flex flex-wrap gap-2">{["Show my sources", "How do I connect an OPC UA PLC?", "Explain the current pipeline"].map((prompt) => <button key={prompt} type="button" onClick={() => setDraft(prompt)} className="rounded-full border border-border-subtle px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-accent/50 hover:text-accent">{prompt}</button>)}</div></div> : thread.messages.map((message) => <div key={message.message_id} className={message.role === "user" ? "ml-8 rounded-xl bg-accent-subtle p-3 text-sm text-text-primary" : "mr-4 rounded-xl border border-border-subtle bg-surface-2 p-3 text-sm leading-6 text-text-secondary"}>{message.role === "assistant" && Array.isArray(message.metadata?.progress) ? <div className="mb-3 flex items-start gap-2 border-b border-border-subtle/70 pb-2 text-xs italic text-text-muted"><span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-accent/60" aria-hidden="true" /> <div><span className="font-semibold not-italic text-text-secondary">Working context</span>{(message.metadata.progress as string[]).map((entry) => <p key={entry} className="mt-0.5">{entry}</p>)}</div></div> : null}{message.role === "assistant" ? <AssistantMarkdown content={message.content} /> : <p className="whitespace-pre-wrap">{message.content}</p>}{message.role === "assistant" && Array.isArray(message.metadata?.links) ? <div className="mt-3 space-y-1">{(message.metadata?.links as Array<{ href: string; label: string }>).map((link) => <a key={link.href} href={link.href} className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline">{link.label}<ChevronRight className="size-3" /></a>)}</div> : null}{message.role === "assistant" && message.metadata?.status === "failed" && message.metadata?.error ? <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive"><p>{String((message.metadata.error as { message?: string }).message || "The assistant turn failed.")}</p><Button className="mt-2" size="sm" variant="outline" onClick={() => void retryTurn(message)} disabled={busy}>Retry turn</Button></div> : null}</div>)}
           {pendingAction ? <div className="rounded-xl border border-warning/40 bg-warning/10 p-4"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-warning">Approval required</p><p className="mt-2 font-heading text-sm font-semibold text-text-primary">{pendingAction.preview}</p><p className="mt-2 text-xs leading-5 text-text-secondary">No change has been made. This preview expires at {new Date(pendingAction.expires_at).toLocaleTimeString()}.</p><div className="mt-3 flex gap-2"><Button size="sm" onClick={() => void decideAction("confirm")} disabled={busy}>Confirm change</Button><Button size="sm" variant="outline" onClick={() => void decideAction("reject")} disabled={busy}>Reject</Button></div></div> : null}
-          {questionnaire ? <div className="rounded-xl border border-accent/30 bg-accent-subtle/40 p-4"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Source setup</p><p className="mt-2 text-xs leading-5 text-text-secondary">Answer the missing fields. Ravan will prepare a draft, but will not save credentials or activate ingestion.</p><div className="mt-3 space-y-3">{questionnaire.questions.map((question) => <label key={question.key} className="block"><span className="mb-1 block text-xs font-medium text-text-primary">{question.question}{question.required ? " *" : ""}</span>{question.type === "choice" ? <select value={questionAnswers[question.key] || ""} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [question.key]: event.target.value }))} className="w-full rounded-lg border border-border-subtle bg-surface-1 px-2 py-2 text-xs text-text-primary"><option value="">Select an option</option>{question.options?.map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input value={questionAnswers[question.key] || ""} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [question.key]: event.target.value }))} className="w-full rounded-lg border border-border-subtle bg-surface-1 px-2 py-2 text-xs text-text-primary" />}</label>)}</div><Button className="mt-4 w-full" size="sm" onClick={() => void answerQuestion()} disabled={busy}>Prepare source draft</Button></div> : null}
+          {questionnaire ? <div className="rounded-xl border border-accent/30 bg-accent-subtle/40 p-4"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Source setup</p><p className="mt-2 text-xs leading-5 text-text-secondary">Answer the missing fields. Ravan will prepare a draft, but will not save credentials or activate ingestion.</p><div className="mt-3 space-y-3">{questionnaire.questions.map((question) => <label key={question.key} className="block"><span className="mb-1 block text-xs font-medium text-text-primary">{question.question}{question.required ? " *" : ""}</span>{question.type === "choice" ? <select value={questionAnswers[question.key] || ""} onChange={(event) => { setQuestionAnswers((current) => ({ ...current, [question.key]: event.target.value })); setQuestionnaireErrors([]); }} className="w-full rounded-lg border border-border-subtle bg-surface-1 px-2 py-2 text-xs text-text-primary"><option value="">Select an option</option>{question.options?.map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input value={questionAnswers[question.key] || ""} onChange={(event) => { setQuestionAnswers((current) => ({ ...current, [question.key]: event.target.value })); setQuestionnaireErrors([]); }} className="w-full rounded-lg border border-border-subtle bg-surface-1 px-2 py-2 text-xs text-text-primary" />}</label>)}</div><Button className="mt-4 w-full" size="sm" onClick={() => void answerQuestion()} disabled={busy}>{busy ? "Validating source details…" : "Prepare source draft"}</Button>{questionnaireErrors.length > 0 ? <div role="alert" className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs leading-5 text-destructive"><p className="font-semibold">Source details need correction</p><ul className="mt-1 list-disc space-y-1 pl-4">{questionnaireErrors.map((message) => <li key={message}>{message}</li>)}</ul></div> : null}</div> : null}
           {busy ? <div className="flex items-start gap-2 rounded-lg border border-border-subtle/70 bg-surface-2/60 px-3 py-2 text-xs text-text-muted"><LoaderCircle className="mt-0.5 size-3.5 shrink-0 animate-spin text-accent" /><div><p className="font-semibold text-text-secondary">Working context</p><p className="mt-0.5">Inspecting the request and streaming the answer. Private model reasoning is not exposed.</p></div></div> : null}
           {error ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs leading-5 text-destructive">{error}</div> : null}
         </div>
         {pendingDelete ? <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30 p-5 backdrop-blur-[2px]"><div role="dialog" aria-modal="true" aria-labelledby="delete-chat-title" className="w-full max-w-sm rounded-xl border border-border-subtle bg-surface-1 p-5 shadow-2xl"><p id="delete-chat-title" className="font-heading text-sm font-semibold text-text-primary">Delete archived chat?</p><p className="mt-2 text-sm leading-6 text-text-secondary"><strong className="text-text-primary">{pendingDelete.title || "Archived conversation"}</strong> and all its messages will be permanently removed.</p><div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setPendingDelete(null)}>Cancel</Button><Button variant="destructive" onClick={() => void permanentlyDeleteThread(pendingDelete)} disabled={busy}>Delete permanently</Button></div></div></div> : null}
-        <div className="border-t border-border-subtle p-3"><div className="flex items-end gap-2 rounded-xl border border-border-subtle bg-surface-2 p-2"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} rows={2} placeholder="Ask Ravan…" className="min-h-12 flex-1 resize-none bg-transparent px-2 py-1 text-sm text-text-primary outline-none placeholder:text-text-muted" aria-label="Message Ravan Assistant" /><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={recording ? () => recorder?.stop() : () => void startRecording()} aria-label={recording ? "Stop recording" : "Start push-to-talk recording"}>{recording ? <Square className="size-4 text-destructive" /> : <Mic className="size-4" />}</Button><Button size="icon" onClick={() => void send()} disabled={!draft.trim() || busy} aria-label="Send message"><Send className="size-4" /></Button></div></div><p className="mt-2 px-1 text-[0.68rem] leading-4 text-text-muted"><MessageCircle className="mr-1 inline size-3" />Enter sends. Shift+Enter adds a line. Voice is push-to-talk and does not retain audio.</p></div>
+        <div className="border-t border-border-subtle p-3"><div className="flex items-end gap-2 rounded-xl border border-border-subtle bg-surface-2 p-2"><textarea ref={draftTextareaRef} value={draft} onChange={(event) => { setDraft(event.target.value); resizeDraftTextarea(); }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} rows={2} placeholder="Ask Ravan…" className="min-h-12 max-h-24 flex-1 resize-none overflow-y-hidden bg-transparent px-2 py-1 text-sm text-text-primary outline-none placeholder:text-text-muted" aria-label="Message Ravan Assistant" /><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={recording ? () => recorder?.stop() : () => void startRecording()} aria-label={recording ? "Stop recording" : "Start push-to-talk recording"}>{recording ? <Square className="size-4 text-destructive" /> : <Mic className="size-4" />}</Button><Button size="icon" onClick={() => void send()} disabled={!draft.trim() || busy} aria-label="Send message"><Send className="size-4" /></Button></div></div><p className="mt-2 px-1 text-[0.68rem] leading-4 text-text-muted"><MessageCircle className="mr-1 inline size-3" />Enter sends. Shift+Enter adds a line. Voice is push-to-talk and does not retain audio.</p></div>
       </aside> : null}
     </>
   );

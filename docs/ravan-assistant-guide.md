@@ -130,9 +130,15 @@ trimmed to protect model context limits. Pending source questionnaires are
 stored as structured message metadata and are resumed when the operator asks
 to answer the earlier questions.
 
+When submitted source details fail validation, the specific errors appear
+inside the Source setup panel directly below **Prepare source draft**. Correcting
+any field clears the stale error list before the next submission. The chat
+composer grows as multiline text is entered up to twice its default height;
+longer drafts scroll inside the composer, and sending resets it.
+
 In **History**, the pencil action opens an inline rename editor with Save and
 Cancel. Archive is reversible through Restore. Archived conversations also
-have **Delete permanently**, which requires a browser confirmation and removes
+have **Delete permanently**, which requires an in-app confirmation dialog and removes
 the archived thread and its assistant records; active conversations cannot be
 permanently deleted through this control.
 

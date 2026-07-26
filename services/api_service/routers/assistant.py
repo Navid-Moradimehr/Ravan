@@ -668,6 +668,7 @@ async def answer_question(thread_id: str, question_id: str, request: QuestionAns
     missing = [item["key"] for item in pending["questions"] if item.get("required") and not answers.get(item["key"])]
     updated = {**pending, "answers": answers}
     if missing or validation_errors:
+        updated["validation_errors"] = validation_errors
         updated["questions"] = [item for item in pending["questions"] if item["key"] in missing]
         if validation_errors:
             updated["questions"] = pending["questions"]
@@ -679,6 +680,7 @@ async def answer_question(thread_id: str, question_id: str, request: QuestionAns
         store.update_message_metadata(thread_id, str(pending["message_id"]), actor_id=actor_id, metadata={"questionnaire": {**pending, "status": "completed"}})
     draft = {key: answers.get(key, "") for key in ("name", "source_protocol", "site_id", "endpoint", "credential_ref")}
     updated["status"] = "completed"
+    updated["validation_errors"] = []
     updated["draft"] = draft
     message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content="The source draft is complete. Review it in Source connections, add protocol-specific mappings, then Validate and Test before enabling it. Ravan has not saved or activated this draft.", metadata={"questionnaire": updated, "source_draft": draft, "links": [{"type": "navigate", "href": "/integrations", "label": "Open source connections"}], "provider": "deterministic"})
     updated["message_id"] = message["message_id"]

@@ -179,6 +179,7 @@ def test_source_questionnaire_persists_resumes_and_is_idempotent(monkeypatch, tm
         "endpoint": "not-an-opcua-endpoint",
     })))
     assert invalid["validation_errors"]
+    assert invalid["questionnaire"]["validation_errors"] == invalid["validation_errors"]
     result = asyncio.run(answer_question(thread["thread_id"], questionnaire["question_id"], QuestionAnswerRequest(actor_id="operator-1", answers={
         "source_protocol": "opcua",
         "name": "Line 1 PLC",
