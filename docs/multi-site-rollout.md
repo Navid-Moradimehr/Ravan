@@ -33,6 +33,26 @@ The platform should not force users to outsource:
 
 ## Recommended Deployment Topologies
 
+### Federated Event Contract
+
+Ravan forwards selected site events using a versioned envelope. The envelope
+preserves `site_id`, `deployment_id`, `source_id`, `event_id`, schema version,
+processing version, and forwarding metadata around the original canonical
+payload. Central consumers must reject forwarded records that do not have
+origin identity. Legacy unwrapped events remain readable for compatibility,
+but new federation producers should use the envelope.
+
+Forwarding is allowlisted by topic. The default export set is normalized
+industrial data and approved operational/AI outputs; raw telemetry remains
+site-local unless the operator explicitly enables it. Duplicate delivery is
+identified by origin site, source, topic, and event ID.
+
+Operators can inspect the active contract at `GET /api/v1/federation/contracts`
+and transport/ledger state at `GET /api/v1/federation/status`. The local
+delivery ledger is bounded by `FEDERATION_LEDGER_MAX_RECORDS` and is suitable
+for one-node deployments. Multi-replica consumers must replace it with a
+shared database-backed ledger before scaling the bridge horizontally.
+
 ### 1. Single Site
 
 Use for a pilot line or first plant.

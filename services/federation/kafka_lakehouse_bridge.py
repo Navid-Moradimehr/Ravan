@@ -17,11 +17,29 @@ import time
 from confluent_kafka import Consumer, TopicPartition
 
 from services.common.brokers import resolve_kafka_brokers
+from services.common.federation_contract import FederationContractError, deduplication_key, unwrap_event
 from services.common.runtime_metrics import set_federation_lag
+from services.federation.delivery_ledger import DeliveryLedger
 from services.federation.policy import allowed_topics, topic_allowed
 from services.sinks.lakehouse import LakehouseSink
 
 logger = logging.getLogger(__name__)
+
+
+def decode_forwarded_message(raw: bytes, *, topic: str, allow_legacy: bool = True) -> tuple[dict[str, object], dict[str, object], str]:
+    """Decode and validate one broker record before it reaches a sink."""
+    value = json.loads(raw.decode("utf-8"))
+    if not isinstance(value, dict):
+        raise FederationContractError("forwarded event must be a JSON object")
+    event, metadata = unwrap_event(value, allow_legacy=allow_legacy)
+    key = deduplication_key(value, topic=topic)
+    event = dict(event)
+    event["federation_source_topic"] = topic
+    if metadata.get("legacy"):
+        event["federation_legacy"] = True
+    else:
+        event["federation_origin"] = metadata
+    return event, metadata, key
 
 
 def main() -> None:
@@ -49,14 +67,26 @@ def main() -> None:
     signal.signal(signal.SIGTERM, stop)
     consumer.subscribe([topic])
     batch: list[dict[str, object]] = []
+    batch_keys: list[str] = []
     batch_size = max(1, int(os.getenv("FEDERATION_LAKEHOUSE_BATCH_SIZE", "512")))
+    ledger = DeliveryLedger()
+    duplicate_count = 0
+    invalid_count = 0
 
     def flush() -> None:
         if not batch:
             return
-        sink.write_batch_strict(batch[:])
-        sink.flush_strict()
+        try:
+            sink.write_batch_strict(batch[:])
+            sink.flush_strict()
+        except Exception as exc:
+            for key in batch_keys:
+                ledger.record(key, status="failed", metadata={"error": str(exc)[:500]})
+            raise
+        for key in batch_keys:
+            ledger.record(key, status="succeeded")
         batch.clear()
+        batch_keys.clear()
         consumer.commit(asynchronous=False)
 
     try:
@@ -74,19 +104,35 @@ def main() -> None:
             except Exception:
                 pass
             try:
-                event = json.loads(message.value().decode("utf-8"))
-                event["federation_source_topic"] = message.topic()
+                event, metadata, key = decode_forwarded_message(
+                    message.value(), topic=message.topic(), allow_legacy=os.getenv("FEDERATION_ALLOW_LEGACY", "true").lower() in {"1", "true", "yes", "on"}
+                )
+                if not ledger.claim(key):
+                    duplicate_count += 1
+                    logger.info("central federation skipped duplicate event key=%s", key)
+                    consumer.commit(asynchronous=False)
+                    continue
+                ledger.record(key, status="claimed", metadata=metadata)
                 batch.append(event)
+                batch_keys.append(key)
                 if len(batch) >= batch_size:
                     flush()
                 status_path = os.getenv("FEDERATION_STATUS_PATH", "")
                 if status_path:
                     Path(status_path).parent.mkdir(parents=True, exist_ok=True)
                     Path(status_path).write_text(
-                        json_module.dumps({"status": "healthy", "topic": message.topic(), "last_message_at": time.time()}),
+                        json_module.dumps({
+                            "status": "healthy",
+                            "topic": message.topic(),
+                            "last_message_at": time.time(),
+                            "duplicates": duplicate_count,
+                            "invalid": invalid_count,
+                            "last_origin": metadata,
+                        }),
                         encoding="utf-8",
                     )
-            except (UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
+            except (UnicodeDecodeError, json.JSONDecodeError, TypeError, FederationContractError) as exc:
+                invalid_count += 1
                 logger.warning("central federation skipped invalid event: %s", exc)
     finally:
         flush()

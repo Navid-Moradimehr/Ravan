@@ -62,3 +62,7 @@ Ravan is now comparable at the single-node orchestration boundary, but not at
 CRM's distributed streaming scale. PostgreSQL-backed state, stream claims,
 partial-output replay, and queue-based long-running jobs should be added only
 when multi-replica assistant usage becomes a measured requirement.
+
+The multi-node deployment path must set the assistant store backend to the
+shared PostgreSQL adapter and must not use the Compose JSON file from multiple
+API replicas. The local JSON store remains the default for one-node installs.
