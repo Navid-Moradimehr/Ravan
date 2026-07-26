@@ -26,9 +26,21 @@ assistant.
 
 Source setup is guided through the same connection registry used by the
 Integrations page. The assistant can collect protocol configuration, validate
-required fields, explain credential references, preview supported sources, and
-prepare an activation preview. The deployment still owns actual credentials,
-network reachability, certificates, retention, and authorization.
+required fields, explain credential references, and inspect the registered
+sources. For an existing uniquely identified source, the commands `test
+source <connection-id>`, `enable source <connection-id>`, `disable source
+<connection-id>`, `retire source <connection-id>`, and `restore source
+<connection-id>` create a ten-minute preview in the drawer. Nothing changes
+until the operator clicks `Confirm change`. Ambiguous names are rejected and
+the assistant asks for the exact connection ID. The deployment still owns
+actual credentials, network reachability, certificates, retention, and
+authorization.
+
+To add or edit a source, use the Source connections editor on the Integrations
+page. The assistant can guide that workflow, but it does not invent secrets or
+silently create a protocol definition. After saving, use the source card's
+Validate, Test, and Enable controls, or ask the assistant to prepare the
+corresponding typed lifecycle action.
 
 The assistant can explain digital twins, world-model datasets, JEPA, Dreamer,
 MuZero, XGBoost, Flink, Kafka, and historian operation. Ravan provides the
@@ -52,8 +64,9 @@ operators continue to make changes there manually.
 Threads are durable per operator. Messages that look like an explicit memory
 request, such as `Remember that ...`, create a reviewable memory candidate. A
 candidate is not active assistant memory until an operator or administrator
-approves it through the candidate review endpoint. Candidates retain their
-source thread for audit. Secrets, raw
+approves it. Open the `Assistant memory` section in the drawer to inspect,
+approve, or reject pending candidates. Candidates retain their source thread
+for audit. Secrets, raw
 telemetry, and raw audio are never assistant memory.
 
 The current single-node implementation uses an atomic file-backed store at

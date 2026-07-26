@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from services.api_service.routers.assistant import _source_action_request
 from services.common.agent_runtime import build_agent_runtime_contract
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
@@ -42,3 +45,22 @@ def test_action_preview_has_expiry(tmp_path):
     intent = store.save_action_intent({"actor_id": "operator-1", "action_name": "source.test", "target_resource": "conn-1", "confirmation_token": "token"})
     assert intent["status"] == "pending_confirmation"
     assert intent["expires_at"]
+
+
+def test_natural_language_source_action_requires_unique_registry_match(monkeypatch):
+    source = SimpleNamespace(connection_id="conn-pump-1", name="Pump 1", site_id="site-a", state="disabled")
+    monkeypatch.setattr("services.api_service.routers.assistant.connection_registry.list", lambda **kwargs: [source])
+    action, selected = _source_action_request("enable source conn-pump-1")
+    assert action == "source.enable"
+    assert selected.connection_id == "conn-pump-1"
+
+
+def test_natural_language_source_action_stops_on_ambiguous_match(monkeypatch):
+    sources = [
+        SimpleNamespace(connection_id="conn-pump-1", name="Pump", site_id="site-a", state="disabled"),
+        SimpleNamespace(connection_id="conn-pump-2", name="Pump", site_id="site-b", state="disabled"),
+    ]
+    monkeypatch.setattr("services.api_service.routers.assistant.connection_registry.list", lambda **kwargs: sources)
+    action, selected = _source_action_request("enable source Pump")
+    assert action == "ambiguous"
+    assert len(selected) == 2
