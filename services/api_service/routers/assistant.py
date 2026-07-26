@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from services.common.agent_runtime import DiagnosticAgentRuntime
+from services.common.agent_runtime import DiagnosticAgentRuntime, insert_audit_log
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
 from services.common.connection_registry import connection_registry
@@ -48,6 +48,16 @@ class ActionConfirmRequest(BaseModel):
 
 def _store() -> AssistantStore:
     return AssistantStore()
+
+
+def _safe_audit(event: dict[str, Any]) -> None:
+    try:
+        insert_audit_log(event)
+    except Exception:
+        # Assistant state changes remain usable when the optional historian
+        # audit sink is temporarily unavailable; the failure is not hidden in
+        # the action response because the action result still returns.
+        return
 
 
 def _actor(request_actor: str) -> str:
@@ -207,6 +217,20 @@ async def create_memory_candidate(request: MemoryRequest, thread_id: str = "manu
     return _store().add_memory_candidate(actor_id=_actor(request.actor_id), content=request.content, source_thread_id=thread_id)
 
 
+@router.post("/memory/candidates/{candidate_id}/{decision}")
+async def decide_memory_candidate(candidate_id: str, decision: str, request: ThreadRequest) -> dict[str, Any]:
+    if decision not in {"approve", "reject"}:
+        raise HTTPException(status_code=400, detail="decision must be approve or reject")
+    try:
+        record = _store().update_memory_candidate(candidate_id, actor_id=_actor(request.actor_id), status="approved" if decision == "approve" else "rejected")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if record is None:
+        raise HTTPException(status_code=404, detail="memory candidate not found")
+    _safe_audit({"time": record["reviewed_at"], "user_id": _actor(request.actor_id), "action": f"assistant_memory_{decision}", "resource": candidate_id, "details": record})
+    return record
+
+
 @router.post("/actions/preview")
 async def preview_action(request: ActionPreviewRequest) -> dict[str, Any]:
     if request.action_name not in ALLOWED_ACTIONS:
@@ -214,7 +238,7 @@ async def preview_action(request: ActionPreviewRequest) -> dict[str, Any]:
     if request.action_name.startswith("source.") and not request.details.get("connection_id"):
         raise HTTPException(status_code=422, detail="connection_id is required for source actions")
     token = secrets.token_urlsafe(24)
-    return _store().save_action_intent({
+    intent = _store().save_action_intent({
         "actor_id": _actor(request.actor_id),
         "action_name": request.action_name,
         "target_resource": request.target_resource,
@@ -222,6 +246,8 @@ async def preview_action(request: ActionPreviewRequest) -> dict[str, Any]:
         "confirmation_token": token,
         "preview": f"Confirm {request.action_name} for {request.target_resource}",
     })
+    _safe_audit({"time": intent["created_at"], "user_id": intent["actor_id"], "action": "assistant_action_previewed", "resource": intent["target_resource"], "details": intent})
+    return intent
 
 
 @router.post("/actions/{intent_id}/confirm")
@@ -232,6 +258,10 @@ async def confirm_action(intent_id: str, request: ActionConfirmRequest) -> dict[
         raise HTTPException(status_code=404, detail="assistant action preview not found")
     if intent.get("status") != "pending_confirmation":
         raise HTTPException(status_code=409, detail=f"assistant action is already {intent.get('status')}")
+    from datetime import datetime, timezone
+    if intent.get("expires_at") and datetime.fromisoformat(str(intent["expires_at"])) <= datetime.now(timezone.utc):
+        store.update_action_intent(intent_id, status="expired")
+        raise HTTPException(status_code=409, detail="assistant action preview has expired")
     if not secrets.compare_digest(str(intent.get("confirmation_token", "")), request.confirmation_token):
         raise HTTPException(status_code=409, detail="confirmation token does not match this preview")
     details = dict(intent.get("details") or {})
@@ -253,7 +283,9 @@ async def confirm_action(intent_id: str, request: ActionConfirmRequest) -> dict[
             result = connection_registry.restore(connection_id).to_dict()
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"intent": store.update_action_intent(intent_id, status="completed", result=result) or intent, "result": result}
+    completed = store.update_action_intent(intent_id, status="completed", result=result) or intent
+    _safe_audit({"time": completed.get("updated_at"), "user_id": _actor(request.actor_id), "action": "assistant_action_completed", "resource": intent["target_resource"], "details": completed})
+    return {"intent": completed, "result": result}
 
 
 @router.post("/voice/transcribe")

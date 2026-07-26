@@ -11,6 +11,10 @@ provider, or assistant store. When the model gateway is unavailable, the
 assistant falls back to deterministic guidance for common source, pipeline,
 historian, and help requests.
 
+Configuration actions use a ten-minute confirmation window. If the source,
+scope, or values change, the operator must request a new preview. Approvals and
+completed actions are written to the platform audit boundary.
+
 ## What it can do
 
 The first assistant contract can read source registry state, historian alarms
@@ -48,7 +52,8 @@ operators continue to make changes there manually.
 Threads are durable per operator. Messages that look like an explicit memory
 request, such as `Remember that ...`, create a reviewable memory candidate. A
 candidate is not active assistant memory until an operator or administrator
-approves it. Candidates retain their source thread for audit. Secrets, raw
+approves it through the candidate review endpoint. Candidates retain their
+source thread for audit. Secrets, raw
 telemetry, and raw audio are never assistant memory.
 
 The current single-node implementation uses an atomic file-backed store at

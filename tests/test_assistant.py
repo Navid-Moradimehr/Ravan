@@ -17,6 +17,8 @@ def test_assistant_store_persists_threads_and_reviewable_memory(tmp_path):
     assert restored is not None
     assert restored["messages"][0]["content"].startswith("Remember")
     assert reloaded.list_memory_candidates(actor_id="operator-1")[0]["candidate_id"] == candidate["candidate_id"]
+    reviewed = reloaded.update_memory_candidate(candidate["candidate_id"], actor_id="operator-1", status="approved")
+    assert reviewed is not None and reviewed["status"] == "approved"
 
 
 def test_assistant_runtime_exposes_safe_source_and_governance_tools():
@@ -33,3 +35,10 @@ def test_assistant_store_archives_threads(tmp_path):
     thread = store.create_thread(actor_id="operator-1")
     assert store.archive_thread(thread["thread_id"], actor_id="operator-1") is True
     assert store.list_threads(actor_id="operator-1") == []
+
+
+def test_action_preview_has_expiry(tmp_path):
+    store = AssistantStore(tmp_path / "assistant.json")
+    intent = store.save_action_intent({"actor_id": "operator-1", "action_name": "source.test", "target_resource": "conn-1", "confirmation_token": "token"})
+    assert intent["status"] == "pending_confirmation"
+    assert intent["expires_at"]
