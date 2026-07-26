@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from services.api_service.routers.assistant import MessageRequest, QuestionAnswerRequest, RetryRequest, ThreadRequest, _report_action_request, _source_action_request, answer_question, create_thread, retry_failed_turn, send_message
+from services.api_service.routers.assistant import MessageRequest, QuestionAnswerRequest, RetryRequest, ThreadRequest, _fallback_thread_title, _report_action_request, _source_action_request, answer_question, create_thread, retry_failed_turn, send_message
 from services.common.agent_runtime import build_agent_runtime_contract
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
@@ -54,6 +54,11 @@ def test_assistant_store_permanently_deletes_only_archived_threads(tmp_path):
     assert store.archive_thread(archived["thread_id"], actor_id="operator-1") is True
     assert store.delete_thread_permanently(archived["thread_id"], actor_id="operator-1") is True
     assert store.list_threads(actor_id="operator-1", include_archived=True) == []
+
+
+def test_thread_title_fallback_matches_crm_style():
+    assert _fallback_thread_title("  Connect   the OPC UA PLC  ") == "Connect the OPC UA PLC"
+    assert _fallback_thread_title("x" * 60) == f"{'x' * 50}..."
 
 
 def test_action_preview_has_expiry(tmp_path):

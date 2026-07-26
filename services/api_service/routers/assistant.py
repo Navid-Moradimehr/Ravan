@@ -81,6 +81,48 @@ def _store():
     return build_assistant_store()
 
 
+def _fallback_thread_title(message_content: str) -> str:
+    clean_content = " ".join(message_content.strip().split())
+    if len(clean_content) <= 50:
+        return clean_content or "New conversation"
+    return f"{clean_content[:50]}..."
+
+
+async def _generate_thread_title(message_content: str, model_id: str | None = None) -> str:
+    """Generate a short CRM-style title, with a deterministic offline fallback."""
+    fallback = _fallback_thread_title(message_content)
+    base = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080").rstrip("/")
+    prompt = (
+        "Generate a concise, descriptive title for this Ravan chat thread. "
+        "Return only the title, maximum 60 characters, with no quotes or Markdown. "
+        f"Message: {message_content.strip()[:2000]}"
+    )
+    try:
+        payload: dict[str, Any] = {"prompt": prompt}
+        if model_id:
+            payload["model"] = model_id[:200]
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            response = await client.post(f"{base}/assistant/chat", json=payload)
+            if response.status_code != 200:
+                return fallback
+            generated = str(response.json().get("content") or "")
+        title = generated.strip().strip("\"'").replace("\n", " ")
+        title = " ".join(title.split())[:60].strip()
+        return title or fallback
+    except Exception:
+        return fallback
+
+
+async def _refine_thread_title(store: Any, thread_id: str, actor_id: str, message_content: str, fallback: str, model_id: str | None) -> None:
+    """Refine an immediate fallback title without delaying the chat response."""
+    generated = await _generate_thread_title(message_content, model_id)
+    if generated == fallback:
+        return
+    current = store.get_thread(thread_id, actor_id=actor_id)
+    if current and current.get("title") == fallback:
+        store.rename_thread(thread_id, actor_id=actor_id, title=generated)
+
+
 def _safe_audit(event: dict[str, Any]) -> None:
     try:
         insert_audit_log(event)
@@ -415,8 +457,10 @@ async def rename_thread(thread_id: str, request: ThreadRenameRequest) -> dict[st
 async def send_message(thread_id: str, request: MessageRequest, _on_token: Callable[[str], Awaitable[None]] | None = None) -> dict[str, Any]:
     actor_id = _actor(request.actor_id)
     store = _store()
-    if store.get_thread(thread_id, actor_id=actor_id) is None:
+    existing_thread = store.get_thread(thread_id, actor_id=actor_id)
+    if existing_thread is None:
         raise HTTPException(status_code=404, detail="Assistant thread not found")
+    should_generate_title = not existing_thread.get("messages") and existing_thread.get("title") in {"", "New conversation"}
     retry_of = str(request.context.get("retry_turn_id", "")) or None
     force_gateway = bool(request.context.get("force_gateway", False))
     turn = store.start_turn(thread_id, actor_id=actor_id, content=request.content, context=request.context, retry_of=retry_of)
@@ -508,9 +552,15 @@ async def send_message(thread_id: str, request: MessageRequest, _on_token: Calla
         candidate = store.add_memory_candidate(actor_id=actor_id, content=request.content, source_thread_id=thread_id)
     else:
         candidate = None
+    thread_title = None
+    if should_generate_title:
+        thread_title = _fallback_thread_title(request.content)
+        store.rename_thread(thread_id, actor_id=actor_id, title=thread_title)
+        if os.getenv("RAVAN_ASSISTANT_TITLE_GENERATION", "true").strip().lower() not in {"0", "false", "no", "off"}:
+            asyncio.create_task(_refine_thread_title(store, thread_id, actor_id, request.content, thread_title, selected_model))
     retry_error = model_error or tool_error
     store.update_turn(turn["turn_id"], actor_id=actor_id, status=turn_status, retryable=bool(retry_error and retry_error.get("retryable")), error=retry_error, response_message_id=assistant_message["message_id"])
-    return {"user_message": user_message, "assistant_message": assistant_message, "links": links, "tool_result": tool_result, "memory_candidate": candidate, "action_preview": action_preview, "questionnaire": questionnaire, "turn": store.get_turn(turn["turn_id"], actor_id=actor_id)}
+    return {"user_message": user_message, "assistant_message": assistant_message, "links": links, "tool_result": tool_result, "memory_candidate": candidate, "action_preview": action_preview, "questionnaire": questionnaire, "thread_title": thread_title, "turn": store.get_turn(turn["turn_id"], actor_id=actor_id)}
 
 
 @router.post("/threads/{thread_id}/messages/stream")

@@ -113,6 +113,14 @@ diagnostic work is persisted as bounded `metadata.progress` and rendered as a
 faint evidence block; the final response remains Markdown-rendered content.
 The UI intentionally does not expose private provider chain-of-thought.
 
+The Chat header exposes **New chat** directly. Untitled threads receive an
+immediate normalized first-message title. Ravan may refine that title through
+the AI gateway in the background; the normalized excerpt remains the safe
+fallback when the gateway is unavailable.
+Destructive archive deletion uses an in-app confirmation dialog rather than a
+browser-native prompt so the interaction remains consistent with Ravan's
+theme and keyboard-accessible dialog semantics.
+
 Conversation lifecycle endpoints are:
 
 - `DELETE /api/v1/assistant/threads/{thread_id}` to archive a conversation.

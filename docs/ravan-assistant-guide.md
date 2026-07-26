@@ -129,6 +129,13 @@ have **Delete permanently**, which requires a browser confirmation and removes
 the archived thread and its assistant records; active conversations cannot be
 permanently deleted through this control.
 
+Use **New chat** in the Chat header to start a separate conversation. After the
+first message, Ravan immediately names an untitled thread from a normalized
+excerpt of that message. It can then refine the title through the configured AI
+gateway in the background, without delaying the answer; if the gateway is
+unavailable, the excerpt remains the title. Titles are limited to a short
+operator-friendly label and can still be edited manually from History.
+
 Approved memory is supplied as bounded context to future chat requests. It is
 not used for plant control, is not a replacement for historian data, and is not
 sent to the model until an operator has approved the candidate.
