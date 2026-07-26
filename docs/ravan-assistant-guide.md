@@ -42,6 +42,15 @@ silently create a protocol definition. After saving, use the source card's
 Validate, Test, and Enable controls, or ask the assistant to prepare the
 corresponding typed lifecycle action.
 
+If you ask the assistant to connect or add a source, it opens a guided
+questionnaire for protocol, source name, site ID, endpoint, and credential
+reference. Answers are persisted with the thread for fifteen minutes and are
+validated before Ravan returns a draft. The draft is not saved or enabled; use
+the link to Source connections to add mappings and protocol-specific settings,
+then Validate and Test it. This is the same missing-information pattern used
+by mature agent interfaces, but the final industrial configuration remains a
+typed, auditable platform operation.
+
 The assistant can explain digital twins, world-model datasets, JEPA, Dreamer,
 MuZero, XGBoost, Flink, Kafka, and historian operation. Ravan provides the
 events, metadata, lineage, and dataset contracts; company-specific training,

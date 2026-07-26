@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
-from services.api_service.routers.assistant import _report_action_request, _source_action_request
+from services.api_service.routers.assistant import MessageRequest, QuestionAnswerRequest, ThreadRequest, _report_action_request, _source_action_request, answer_question, create_thread, send_message
 from services.common.agent_runtime import build_agent_runtime_contract
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
@@ -84,3 +85,33 @@ def test_approved_memory_search_excludes_pending_candidates(tmp_path):
     store.update_memory_candidate(approved["candidate_id"], actor_id="operator-1", status="approved")
     results = store.search_approved_memories(actor_id="operator-1", query="legacy line")
     assert [item["content"] for item in results] == ["Use imperial units for legacy line"]
+
+
+def test_source_questionnaire_persists_resumes_and_is_idempotent(monkeypatch, tmp_path):
+    monkeypatch.setenv("RAVAN_ASSISTANT_STORE_PATH", str(tmp_path / "assistant.json"))
+    monkeypatch.setattr("services.api_service.routers.assistant.DiagnosticAgentRuntime.dispatch_tool", lambda self, **kwargs: {"status": "succeeded", "result": []})
+    thread = asyncio.run(create_thread(ThreadRequest(actor_id="operator-1")))
+    first = asyncio.run(send_message(thread["thread_id"], MessageRequest(actor_id="operator-1", content="Connect an OPC UA PLC", context={})))
+    questionnaire = first["questionnaire"]
+    assert questionnaire["status"] == "pending"
+    assert questionnaire["expires_at"]
+    invalid = asyncio.run(answer_question(thread["thread_id"], questionnaire["question_id"], QuestionAnswerRequest(actor_id="operator-1", answers={
+        "source_protocol": "opcua",
+        "name": "Line 1 PLC",
+        "site_id": "plant-a",
+        "endpoint": "not-an-opcua-endpoint",
+    })))
+    assert invalid["validation_errors"]
+    result = asyncio.run(answer_question(thread["thread_id"], questionnaire["question_id"], QuestionAnswerRequest(actor_id="operator-1", answers={
+        "source_protocol": "opcua",
+        "name": "Line 1 PLC",
+        "site_id": "plant-a",
+        "endpoint": "opc.tcp://10.0.0.8:4840",
+        "credential_ref": "env://PLC_PASSWORD",
+    })))
+    assert result["source_draft"]["source_protocol"] == "opcua"
+    assert result["questionnaire"]["status"] == "completed"
+    try:
+        asyncio.run(answer_question(thread["thread_id"], questionnaire["question_id"], QuestionAnswerRequest(actor_id="operator-1", answers={})))
+    except Exception as exc:
+        assert "not found" in str(exc).lower()

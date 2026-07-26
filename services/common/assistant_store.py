@@ -92,6 +92,18 @@ class AssistantStore:
         self._persist()
         return message
 
+    def update_message_metadata(self, thread_id: str, message_id: str, *, actor_id: str, metadata: dict[str, Any]) -> dict[str, Any] | None:
+        record = self.get_thread(thread_id, actor_id=actor_id)
+        if record is None:
+            return None
+        for message in self._state["threads"][thread_id]["messages"]:
+            if message.get("message_id") == message_id:
+                message["metadata"] = {**dict(message.get("metadata") or {}), **metadata}
+                self._state["threads"][thread_id]["updated_at"] = _now()
+                self._persist()
+                return dict(message)
+        return None
+
     def archive_thread(self, thread_id: str, *, actor_id: str) -> bool:
         if self.get_thread(thread_id, actor_id=actor_id) is None:
             return False

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -12,7 +13,7 @@ from pydantic import BaseModel, Field
 from services.common.agent_runtime import DiagnosticAgentRuntime, insert_audit_log
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
-from services.common.connection_registry import connection_registry
+from services.common.connection_registry import SUPPORTED_PROTOCOLS, connection_registry
 from services.common.connection_diagnostics import run_connection_test
 from services.common.ai_reporting import create_report_job, get_policy
 
@@ -54,6 +55,11 @@ class ActionDecisionRequest(BaseModel):
 
 class VoiceSynthesisRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=12000)
+
+
+class QuestionAnswerRequest(BaseModel):
+    actor_id: str = "local-operator"
+    answers: dict[str, str] = Field(default_factory=dict)
 
 
 def _store() -> AssistantStore:
@@ -168,6 +174,53 @@ def _report_action_request(content: str) -> dict[str, Any] | None:
     return {"site_id": site_id, "report_type": report_type}
 
 
+def _source_questionnaire() -> dict[str, Any]:
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+    return {
+        "question_id": f"question-{secrets.token_hex(8)}",
+        "status": "pending",
+        "expires_at": expires_at,
+        "questions": [
+            {"key": "source_protocol", "question": "Which source protocol should Ravan use?", "type": "choice", "options": ["opcua", "mqtt", "modbus", "rest", "http_push"], "required": True},
+            {"key": "name", "question": "What name should operators see for this source?", "type": "text", "required": True},
+            {"key": "site_id", "question": "Which site ID owns this source?", "type": "text", "required": True},
+            {"key": "endpoint", "question": "What endpoint, broker address, or URL should the connector use?", "type": "text", "required": True},
+            {"key": "credential_ref", "question": "What deployment-owned credential reference should it use? Enter none for anonymous access.", "type": "text", "required": False},
+        ],
+        "answers": {},
+    }
+
+
+def _source_question_request(content: str) -> bool:
+    lowered = content.lower()
+    return bool(any(term in lowered for term in ("source", "sensor", "plc")) and any(term in lowered for term in ("connect", "add", "create", "configure", "onboard")))
+
+
+def _validate_source_answers(questions: list[dict[str, Any]], answers: dict[str, str]) -> list[str]:
+    errors: list[str] = []
+    for item in questions:
+        key = item["key"]
+        value = str(answers.get(key, "")).strip()
+        if item.get("required") and not value:
+            errors.append(f"{key} is required")
+        if item.get("type") == "choice" and value and value not in item.get("options", []):
+            errors.append(f"{key} must be one of {item.get('options', [])}")
+    protocol = str(answers.get("source_protocol", "")).lower()
+    endpoint = str(answers.get("endpoint", "")).strip()
+    if protocol not in SUPPORTED_PROTOCOLS:
+        errors.append("source_protocol is not supported")
+    elif protocol == "opcua" and not endpoint.startswith(("opc.tcp://", "opc.https://")):
+        errors.append("OPC UA endpoints must start with opc.tcp:// or opc.https://")
+    elif protocol == "mqtt" and not endpoint.startswith(("mqtt://", "mqtts://", "tcp://", "ssl://")):
+        errors.append("MQTT endpoints must use mqtt://, mqtts://, tcp://, or ssl://")
+    elif protocol in {"rest", "http_push"} and not endpoint.startswith(("http://", "https://")):
+        errors.append("REST and HTTP Push endpoints must start with http:// or https://")
+    credential_ref = str(answers.get("credential_ref", "")).strip()
+    if credential_ref.lower() not in {"", "none", "anonymous"} and not credential_ref.startswith(("env://", "file://", "path://", "secret://")):
+        errors.append("credential_ref must be a deployment reference such as env://NAME, file://NAME, path://NAME, or secret://NAME")
+    return errors
+
+
 def _make_action_preview(*, actor_id: str, action_name: str, source: Any) -> dict[str, Any]:
     intent = _store().save_action_intent({
         "actor_id": actor_id,
@@ -251,6 +304,7 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
         raise HTTPException(status_code=404, detail="Assistant thread not found")
     user_message = store.append_message(thread_id, actor_id=actor_id, role="user", content=request.content, metadata={"context": request.context})
     action_preview = None
+    questionnaire = _source_questionnaire() if _source_question_request(request.content) and not _source_action_request(request.content) else None
     action_request = _source_action_request(request.content)
     action_clarification = None
     if action_request is not None:
@@ -262,7 +316,7 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
             action_clarification = "I could not resolve that source from the registry. Include its exact connection ID, or create/save it in Source connections first."
         else:
             action_preview = _make_action_preview(actor_id=actor_id, action_name=action_kind, source=source_match)
-    report_request = None if action_preview or action_clarification else _report_action_request(request.content)
+    report_request = None if action_preview or action_clarification or questionnaire else _report_action_request(request.content)
     if report_request:
         try:
             policy = get_policy(report_request["site_id"])
@@ -290,7 +344,9 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
         except (ValueError, TimeoutError) as exc:
             tool_result = {"status": "failed", "error": str(exc)}
     links: list[dict[str, Any]] = []
-    if action_preview:
+    if questionnaire:
+        answer = "I need a few deployment-specific details before I can prepare a source draft. Nothing has been saved or enabled. Answer the questions below."
+    elif action_preview:
         if action_preview["action_name"].startswith("source."):
             answer = f"I prepared a reviewable preview for {action_preview['details']['source_name']} at site {action_preview['details']['site_id']}. Nothing has changed yet. Confirm it below to continue."
         else:
@@ -306,12 +362,55 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
     if tool_result and tool_result.get("status") == "succeeded":
         count = len(tool_result.get("result", [])) if isinstance(tool_result.get("result"), list) else 1
         answer = f"I checked {requested_tool[0] if requested_tool else 'the requested data'} and found {count} result(s). The detailed result is available in the assistant context.\n\n{answer}"
-    assistant_message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=answer, metadata={"links": links, "provider": "gateway" if not action_preview and not action_clarification else "deterministic", "tool_result": tool_result, "action_preview": action_preview})
+    assistant_message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=answer, metadata={"links": links, "provider": "gateway" if not action_preview and not action_clarification and not questionnaire else "deterministic", "tool_result": tool_result, "action_preview": action_preview, "questionnaire": questionnaire})
+    if questionnaire:
+        questionnaire = {**questionnaire, "message_id": assistant_message["message_id"]}
+        assistant_message = store.update_message_metadata(thread_id, assistant_message["message_id"], actor_id=actor_id, metadata={"questionnaire": questionnaire}) or assistant_message
     if request.content.lower().startswith(("remember that", "i prefer", "always ")):
         candidate = store.add_memory_candidate(actor_id=actor_id, content=request.content, source_thread_id=thread_id)
     else:
         candidate = None
-    return {"user_message": user_message, "assistant_message": assistant_message, "links": links, "tool_result": tool_result, "memory_candidate": candidate, "action_preview": action_preview}
+    return {"user_message": user_message, "assistant_message": assistant_message, "links": links, "tool_result": tool_result, "memory_candidate": candidate, "action_preview": action_preview, "questionnaire": questionnaire}
+
+
+@router.post("/threads/{thread_id}/questions/{question_id}/answer")
+async def answer_question(thread_id: str, question_id: str, request: QuestionAnswerRequest) -> dict[str, Any]:
+    actor_id = _actor(request.actor_id)
+    store = _store()
+    thread = store.get_thread(thread_id, actor_id=actor_id)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="Assistant thread not found")
+    pending = None
+    for message in reversed(thread.get("messages", [])):
+        candidate = message.get("metadata", {}).get("questionnaire")
+        if candidate and candidate.get("question_id") == question_id and candidate.get("status") == "pending":
+            pending = candidate
+            break
+    if pending is None:
+        raise HTTPException(status_code=404, detail="pending assistant questionnaire not found")
+    if pending.get("expires_at") and datetime.fromisoformat(str(pending["expires_at"])) <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=409, detail="assistant source questionnaire has expired; start a new source request")
+    answers = {**dict(pending.get("answers") or {}), **{key: value.strip() for key, value in request.answers.items() if value.strip()}}
+    validation_errors = _validate_source_answers(pending["questions"], answers)
+    missing = [item["key"] for item in pending["questions"] if item.get("required") and not answers.get(item["key"])]
+    updated = {**pending, "answers": answers}
+    if missing or validation_errors:
+        updated["questions"] = [item for item in pending["questions"] if item["key"] in missing]
+        if validation_errors:
+            updated["questions"] = pending["questions"]
+        message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=("I still need the highlighted fields before I can prepare the draft. " if missing else "The source details need correction. ") + " ".join(validation_errors), metadata={"questionnaire": updated, "provider": "deterministic"})
+        updated["message_id"] = message["message_id"]
+        message = store.update_message_metadata(thread_id, message["message_id"], actor_id=actor_id, metadata={"questionnaire": updated}) or message
+        return {"assistant_message": message, "questionnaire": updated, "validation_errors": validation_errors}
+    if pending.get("message_id"):
+        store.update_message_metadata(thread_id, str(pending["message_id"]), actor_id=actor_id, metadata={"questionnaire": {**pending, "status": "completed"}})
+    draft = {key: answers.get(key, "") for key in ("name", "source_protocol", "site_id", "endpoint", "credential_ref")}
+    updated["status"] = "completed"
+    updated["draft"] = draft
+    message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content="The source draft is complete. Review it in Source connections, add protocol-specific mappings, then Validate and Test before enabling it. Ravan has not saved or activated this draft.", metadata={"questionnaire": updated, "source_draft": draft, "links": [{"type": "navigate", "href": "/integrations", "label": "Open source connections"}], "provider": "deterministic"})
+    updated["message_id"] = message["message_id"]
+    message = store.update_message_metadata(thread_id, message["message_id"], actor_id=actor_id, metadata={"questionnaire": updated, "source_draft": draft}) or message
+    return {"assistant_message": message, "questionnaire": updated, "source_draft": draft}
 
 
 @router.get("/memory/candidates")
@@ -378,12 +477,12 @@ async def confirm_action(intent_id: str, request: ActionConfirmRequest) -> dict[
     if not secrets.compare_digest(str(intent.get("confirmation_token", "")), request.confirmation_token):
         raise HTTPException(status_code=409, detail="confirmation token does not match this preview")
     details = dict(intent.get("details") or {})
-    connection_id = str(details.get("connection_id", ""))
-    connection = connection_registry.get(connection_id)
-    if connection is None:
-        raise HTTPException(status_code=404, detail="source connection not found")
     action = str(intent["action_name"])
     try:
+        connection_id = str(details.get("connection_id", ""))
+        connection = connection_registry.get(connection_id) if action.startswith("source.") else None
+        if action.startswith("source.") and connection is None:
+            raise HTTPException(status_code=404, detail="source connection not found")
         if action == "source.test":
             result = run_connection_test(connection)
         elif action == "source.enable":

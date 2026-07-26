@@ -11,6 +11,7 @@ type AssistantMessage = { message_id: string; role: "user" | "assistant"; conten
 type AssistantThread = { thread_id: string; title: string; messages: AssistantMessage[] };
 type ActionPreview = { intent_id: string; action_name: string; target_resource: string; expires_at: string; preview: string; confirmation_token: string; details?: Record<string, unknown> };
 type MemoryCandidate = { candidate_id: string; content: string; status: string; created_at: string };
+type Questionnaire = { question_id: string; status: string; questions: Array<{ key: string; question: string; type: string; options?: string[]; required?: boolean }>; answers: Record<string, string>; draft?: Record<string, string> };
 
 const AssistantDrawer = dynamic(() => Promise.resolve(AssistantDrawerInner), { ssr: false });
 
@@ -26,12 +27,20 @@ function AssistantDrawerInner() {
   const [memories, setMemories] = useState<MemoryCandidate[]>([]);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [memoryBusy, setMemoryBusy] = useState(false);
+  const [questionnaire, setQuestionnaire] = useState<Questionnaire | null>(null);
+  const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open || thread) return;
     requestJson<AssistantThread[]>("/api/assistant/threads")
       .then(async (threads) => {
-        if (threads[0]) return setThread(await requestJson<AssistantThread>(`/api/assistant/threads/${threads[0].thread_id}`));
+        if (threads[0]) {
+          const loaded = await requestJson<AssistantThread>(`/api/assistant/threads/${threads[0].thread_id}`);
+          setThread(loaded);
+          const pending = [...loaded.messages].reverse().find((message) => (message.metadata?.questionnaire as Questionnaire | undefined)?.status === "pending")?.metadata?.questionnaire as Questionnaire | undefined;
+          if (pending) { setQuestionnaire(pending); setQuestionAnswers(pending.answers || {}); }
+          return;
+        }
         setThread(await requestJson<AssistantThread>("/api/assistant/threads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }));
       })
       .catch((reason) => setError(formatErrorMessage(reason, "Assistant could not start")));
@@ -51,17 +60,38 @@ function AssistantDrawerInner() {
     const content = draft.trim();
     setDraft("");
     try {
-      const response = await requestJson<{ assistant_message: AssistantMessage; action_preview?: ActionPreview | null; memory_candidate?: MemoryCandidate | null }>(`/api/assistant/threads/${thread.thread_id}/messages`, {
+      const response = await requestJson<{ assistant_message: AssistantMessage; action_preview?: ActionPreview | null; memory_candidate?: MemoryCandidate | null; questionnaire?: Questionnaire | null }>(`/api/assistant/threads/${thread.thread_id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, context: { route: window.location.pathname } }),
       });
       setThread((current) => current ? { ...current, messages: [...current.messages, { message_id: `local-${Date.now()}`, role: "user", content, created_at: new Date().toISOString() }, response.assistant_message] } : current);
       setPendingAction(response.action_preview || null);
+      if (response.questionnaire) { setQuestionnaire(response.questionnaire); setQuestionAnswers(response.questionnaire.answers || {}); }
       if (response.memory_candidate) setMemories((current) => [...current, response.memory_candidate as MemoryCandidate]);
     } catch (reason) {
       setError(formatErrorMessage(reason, "Assistant request failed"));
       setDraft(content);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function answerQuestion() {
+    if (!thread || !questionnaire || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await requestJson<{ assistant_message: AssistantMessage; questionnaire: Questionnaire; source_draft?: Record<string, string> }>(`/api/assistant/threads/${thread.thread_id}/questions/${questionnaire.question_id}/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: questionAnswers }),
+      });
+      setThread((current) => current ? { ...current, messages: [...current.messages, response.assistant_message] } : current);
+      setQuestionnaire(response.questionnaire.status === "pending" ? response.questionnaire : null);
+      setQuestionAnswers(response.questionnaire.answers || {});
+    } catch (reason) {
+      setError(formatErrorMessage(reason, "Could not submit source details"));
     } finally {
       setBusy(false);
     }
@@ -158,6 +188,7 @@ function AssistantDrawerInner() {
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {!thread || thread.messages.length === 0 ? <div className="rounded-xl border border-dashed border-border-subtle bg-surface-2 p-5"><p className="font-heading text-sm font-semibold text-text-primary">What do you need to do?</p><p className="mt-2 text-sm leading-6 text-text-secondary">Ask about a source connection, historian trend, alarm, dataset, report, pipeline state, or the external operator tools.</p><div className="mt-4 flex flex-wrap gap-2">{["Show my sources", "How do I connect an OPC UA PLC?", "Explain the current pipeline"].map((prompt) => <button key={prompt} type="button" onClick={() => setDraft(prompt)} className="rounded-full border border-border-subtle px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-accent/50 hover:text-accent">{prompt}</button>)}</div></div> : thread.messages.map((message) => <div key={message.message_id} className={message.role === "user" ? "ml-8 rounded-xl bg-accent-subtle p-3 text-sm text-text-primary" : "mr-4 rounded-xl border border-border-subtle bg-surface-2 p-3 text-sm leading-6 text-text-secondary"}><p className="whitespace-pre-wrap">{message.content}</p>{message.role === "assistant" && Array.isArray(message.metadata?.links) ? <div className="mt-3 space-y-1">{(message.metadata?.links as Array<{ href: string; label: string }>).map((link) => <a key={link.href} href={link.href} className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline">{link.label}<ChevronRight className="size-3" /></a>)}</div> : null}</div>)}
           {pendingAction ? <div className="rounded-xl border border-warning/40 bg-warning/10 p-4"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-warning">Approval required</p><p className="mt-2 font-heading text-sm font-semibold text-text-primary">{pendingAction.preview}</p><p className="mt-2 text-xs leading-5 text-text-secondary">No change has been made. This preview expires at {new Date(pendingAction.expires_at).toLocaleTimeString()}.</p><div className="mt-3 flex gap-2"><Button size="sm" onClick={() => void decideAction("confirm")} disabled={busy}>Confirm change</Button><Button size="sm" variant="outline" onClick={() => void decideAction("reject")} disabled={busy}>Reject</Button></div></div> : null}
+          {questionnaire ? <div className="rounded-xl border border-accent/30 bg-accent-subtle/40 p-4"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Source setup</p><p className="mt-2 text-xs leading-5 text-text-secondary">Answer the missing fields. Ravan will prepare a draft, but will not save credentials or activate ingestion.</p><div className="mt-3 space-y-3">{questionnaire.questions.map((question) => <label key={question.key} className="block"><span className="mb-1 block text-xs font-medium text-text-primary">{question.question}{question.required ? " *" : ""}</span>{question.type === "choice" ? <select value={questionAnswers[question.key] || ""} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [question.key]: event.target.value }))} className="w-full rounded-lg border border-border-subtle bg-surface-1 px-2 py-2 text-xs text-text-primary"><option value="">Select an option</option>{question.options?.map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input value={questionAnswers[question.key] || ""} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [question.key]: event.target.value }))} className="w-full rounded-lg border border-border-subtle bg-surface-1 px-2 py-2 text-xs text-text-primary" />}</label>)}</div><Button className="mt-4 w-full" size="sm" onClick={() => void answerQuestion()} disabled={busy}>Prepare source draft</Button></div> : null}
           <div className="rounded-xl border border-border-subtle bg-surface-2 p-3"><button type="button" onClick={() => setMemoryOpen((value) => !value)} className="flex w-full items-center justify-between text-left"><span><span className="block text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Assistant memory</span><span className="mt-1 block text-xs text-text-secondary">Review preferences before they become active context.</span></span><ChevronRight className={`size-4 text-text-muted transition-transform ${memoryOpen ? "rotate-90" : ""}`} /></button>{memoryOpen ? <div className="mt-3 space-y-2">{memories.filter((candidate) => candidate.status === "pending").length === 0 ? <p className="text-xs text-text-muted">No pending memory candidates.</p> : memories.filter((candidate) => candidate.status === "pending").map((candidate) => <div key={candidate.candidate_id} className="rounded-lg border border-border-subtle bg-surface-1 p-3"><p className="text-xs leading-5 text-text-secondary">{candidate.content}</p><div className="mt-2 flex gap-2"><Button size="sm" onClick={() => void decideMemory(candidate, "approve")} disabled={memoryBusy}>Approve</Button><Button size="sm" variant="outline" onClick={() => void decideMemory(candidate, "reject")} disabled={memoryBusy}>Reject</Button></div></div>)}</div> : null}</div>
           {busy ? <div className="flex items-center gap-2 text-xs text-text-muted"><LoaderCircle className="size-3.5 animate-spin" />Checking Ravan context…</div> : null}
           {error ? <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs leading-5 text-destructive">{error}</div> : null}
