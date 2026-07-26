@@ -22,7 +22,7 @@ def _now() -> str:
 class AssistantStore:
     def __init__(self, path: str | os.PathLike[str] | None = None):
         self.path = Path(path or os.getenv("RAVAN_ASSISTANT_STORE_PATH", ".datastream/assistant-store.json"))
-        self._state: dict[str, Any] = {"threads": {}, "memories": [], "action_intents": []}
+        self._state: dict[str, Any] = {"threads": {}, "memories": [], "action_intents": [], "turns": {}, "tool_calls": []}
         self._load()
 
     def _load(self) -> None:
@@ -91,6 +91,64 @@ class AssistantStore:
         self._state["threads"][thread_id]["updated_at"] = message["created_at"]
         self._persist()
         return message
+
+    def start_turn(self, thread_id: str, *, actor_id: str, content: str, context: dict[str, Any] | None = None, retry_of: str | None = None) -> dict[str, Any]:
+        if self.get_thread(thread_id, actor_id=actor_id) is None:
+            raise KeyError(thread_id)
+        turn_id = f"turn-{uuid.uuid4().hex[:16]}"
+        record = {
+            "turn_id": turn_id,
+            "thread_id": thread_id,
+            "actor_id": actor_id,
+            "content": content,
+            "context": context or {},
+            "retry_of": retry_of,
+            "attempt": 1,
+            "status": "running",
+            "created_at": _now(),
+            "updated_at": _now(),
+        }
+        self._state.setdefault("turns", {})[turn_id] = record
+        self._persist()
+        return dict(record)
+
+    def get_turn(self, turn_id: str, *, actor_id: str) -> dict[str, Any] | None:
+        record = self._state.setdefault("turns", {}).get(turn_id)
+        if not record or record.get("actor_id") != actor_id:
+            return None
+        return dict(record)
+
+    def update_turn(self, turn_id: str, *, actor_id: str, **updates: Any) -> dict[str, Any] | None:
+        record = self._state.setdefault("turns", {}).get(turn_id)
+        if not record or record.get("actor_id") != actor_id:
+            return None
+        record.update(updates)
+        record["updated_at"] = _now()
+        self._persist()
+        return dict(record)
+
+    def latest_retryable_turn(self, thread_id: str, *, actor_id: str) -> dict[str, Any] | None:
+        turns = [
+            item for item in self._state.setdefault("turns", {}).values()
+            if item.get("thread_id") == thread_id and item.get("actor_id") == actor_id and item.get("status") == "failed" and item.get("retryable")
+        ]
+        turns.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
+        return dict(turns[0]) if turns else None
+
+    def record_tool_call(self, payload: dict[str, Any]) -> dict[str, Any]:
+        record = {**payload, "tool_call_id": payload.get("tool_call_id") or f"tool-{uuid.uuid4().hex[:16]}", "created_at": payload.get("created_at") or _now(), "status": payload.get("status", "running")}
+        self._state.setdefault("tool_calls", []).append(record)
+        self._persist()
+        return dict(record)
+
+    def update_tool_call(self, tool_call_id: str, **updates: Any) -> dict[str, Any] | None:
+        for item in self._state.setdefault("tool_calls", []):
+            if item.get("tool_call_id") == tool_call_id:
+                item.update(updates)
+                item["updated_at"] = _now()
+                self._persist()
+                return dict(item)
+        return None
 
     def update_message_metadata(self, thread_id: str, message_id: str, *, actor_id: str, metadata: dict[str, Any]) -> dict[str, Any] | None:
         record = self.get_thread(thread_id, actor_id=actor_id)

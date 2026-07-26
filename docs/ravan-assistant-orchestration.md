@@ -21,6 +21,11 @@ the same important principles without importing CRM entities or dependencies:
 - completed questionnaires cannot be answered again;
 - action previews and approvals remain separate from read-only tool calls;
 - skill files are versioned, declarative guidance packs, not executable code;
+- every turn has a durable running, completed, or failed record;
+- retryable provider failures expose a structured error and retry endpoint;
+- diagnostic tool calls have a durable lifecycle record;
+- the model prompt includes safety, untrusted-context, skill-selection, and
+  failure-recovery instructions;
 - external operator products remain guidance-only.
 
 ## Source onboarding lifecycle
@@ -53,6 +58,7 @@ the item route returns the declarative content.
 
 Ravan does not yet provide a distributed workflow queue, database-backed
 multi-replica assistant store, or full CRM-style streaming resume protocol.
-The single-node implementation is durable and restart-safe for the current
-scope; PostgreSQL-backed state and streaming resume should be added only when
-multi-replica assistant usage becomes a measured requirement.
+Ravan is now comparable at the single-node orchestration boundary, but not at
+CRM's distributed streaming scale. PostgreSQL-backed state, stream claims,
+partial-output replay, and queue-based long-running jobs should be added only
+when multi-replica assistant usage becomes a measured requirement.

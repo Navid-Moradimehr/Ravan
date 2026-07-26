@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from services.api_service.routers.assistant import MessageRequest, QuestionAnswerRequest, ThreadRequest, _report_action_request, _source_action_request, answer_question, create_thread, send_message
+from services.api_service.routers.assistant import MessageRequest, QuestionAnswerRequest, RetryRequest, ThreadRequest, _report_action_request, _source_action_request, answer_question, create_thread, retry_failed_turn, send_message
 from services.common.agent_runtime import build_agent_runtime_contract
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
@@ -47,6 +47,16 @@ def test_action_preview_has_expiry(tmp_path):
     intent = store.save_action_intent({"actor_id": "operator-1", "action_name": "source.test", "target_resource": "conn-1", "confirmation_token": "token"})
     assert intent["status"] == "pending_confirmation"
     assert intent["expires_at"]
+
+
+def test_assistant_store_tracks_turns_and_retryable_failures(tmp_path):
+    store = AssistantStore(tmp_path / "assistant.json")
+    thread = store.create_thread(actor_id="operator-1")
+    turn = store.start_turn(thread["thread_id"], actor_id="operator-1", content="Explain the pipeline")
+    failed = store.update_turn(turn["turn_id"], actor_id="operator-1", status="failed", retryable=True, error={"code": "AI_GATEWAY_TIMEOUT"})
+    assert failed and failed["status"] == "failed"
+    retryable = store.latest_retryable_turn(thread["thread_id"], actor_id="operator-1")
+    assert retryable and retryable["turn_id"] == turn["turn_id"]
 
 
 def test_natural_language_source_action_requires_unique_registry_match(monkeypatch):
@@ -124,3 +134,20 @@ def test_source_questionnaire_persists_resumes_and_is_idempotent(monkeypatch, tm
         asyncio.run(answer_question(thread["thread_id"], questionnaire["question_id"], QuestionAnswerRequest(actor_id="operator-1", answers={})))
     except Exception as exc:
         assert "not found" in str(exc).lower()
+
+
+def test_failed_model_turn_can_be_retried(monkeypatch, tmp_path):
+    monkeypatch.setenv("RAVAN_ASSISTANT_STORE_PATH", str(tmp_path / "assistant.json"))
+    calls = {"count": 0}
+
+    async def model_answer(*args, **kwargs):
+        calls["count"] += 1
+        return (None, {"code": "AI_GATEWAY_TIMEOUT", "message": "timeout", "phase": "model_call", "retryable": True})
+
+    monkeypatch.setattr("services.api_service.routers.assistant._model_answer", model_answer)
+    thread = asyncio.run(create_thread(ThreadRequest(actor_id="operator-1")))
+    first = asyncio.run(send_message(thread["thread_id"], MessageRequest(actor_id="operator-1", content="Explain the pipeline", context={"force_gateway": True})))
+    assert first["turn"]["status"] == "failed"
+    retried = asyncio.run(retry_failed_turn(thread["thread_id"], RetryRequest(actor_id="operator-1")))
+    assert retried["turn"]["retry_of"] == first["turn"]["turn_id"]
+    assert calls["count"] == 2

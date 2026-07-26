@@ -11,6 +11,14 @@ provider, or assistant store. When the model gateway is unavailable, the
 assistant falls back to deterministic guidance for common source, pipeline,
 historian, and help requests.
 
+Each chat turn has a durable lifecycle record. Normal provider failures are
+reported as degraded model calls while deterministic guidance keeps the
+operator moving. If an operator explicitly retries a model-backed turn, Ravan
+records the failed turn, exposes its structured error, and retries the
+original request through `POST /api/v1/assistant/threads/{thread_id}/retry`.
+Retryable failures include provider timeouts and temporary gateway errors;
+source actions are never retried automatically.
+
 Configuration actions use a ten-minute confirmation window. If the source,
 scope, or values change, the operator must request a new preview. Approvals and
 completed actions are written to the platform audit boundary.
@@ -100,6 +108,11 @@ The baseline source-onboarding and operator-guidance skills are read-only
 instructions. They cannot execute code, bypass confirmation, or access secret
 values. Deployments can point `RAVAN_ASSISTANT_SKILLS_PATH` at a reviewed skill
 directory for company-specific guidance.
+
+Every model-backed turn records which skills were selected. Every diagnostic
+tool call also has a durable running, succeeded, or failed record with a stable
+error code and retryability. The assistant does not silently turn a failed
+diagnostic into a successful claim.
 
 The current single-node implementation uses an atomic file-backed store at
 `.datastream/assistant-store.json`. This is deliberately compatible with
