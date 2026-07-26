@@ -123,6 +123,13 @@ that ran and its result count. The rendering and boundary guidance lives in
 `config/assistant-skills/assistant-response-rendering.md` and
 `config/assistant-skills/assistant-thinking-boundary.md`.
 
+Conversation continuity is thread-scoped. Each model turn receives a bounded
+window of the thread's prior user and assistant messages, plus approved
+cross-session memory when relevant. Long conversations are intentionally
+trimmed to protect model context limits. Pending source questionnaires are
+stored as structured message metadata and are resumed when the operator asks
+to answer the earlier questions.
+
 In **History**, the pencil action opens an inline rename editor with Save and
 Cancel. Archive is reversible through Restore. Archived conversations also
 have **Delete permanently**, which requires a browser confirmation and removes

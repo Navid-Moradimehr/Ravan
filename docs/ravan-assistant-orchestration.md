@@ -113,6 +113,13 @@ diagnostic work is persisted as bounded `metadata.progress` and rendered as a
 faint evidence block; the final response remains Markdown-rendered content.
 The UI intentionally does not expose private provider chain-of-thought.
 
+Each model-backed turn also receives the latest bounded user/assistant message
+window from the durable thread record. This is separate from approved
+cross-session memory: thread history provides immediate conversational context,
+while approved memory provides selected facts across conversations. Structured
+pending questionnaires are resumed by the API rather than being left entirely
+to model interpretation.
+
 The Chat header exposes **New chat** directly. Untitled threads receive an
 immediate normalized first-message title. Ravan may refine that title through
 the AI gateway in the background; the normalized excerpt remains the safe

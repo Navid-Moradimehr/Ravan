@@ -135,6 +135,24 @@ def test_diagnostic_progress_is_separate_from_final_answer(monkeypatch, tmp_path
     assert assistant["metadata"]["progress"] == ["Checked sources.list and found 0 result(s)."]
 
 
+def test_model_turn_receives_bounded_prior_thread_messages(monkeypatch, tmp_path):
+    monkeypatch.setenv("RAVAN_ASSISTANT_STORE_PATH", str(tmp_path / "assistant.json"))
+    captured: dict[str, object] = {}
+
+    async def model_answer(content, context, **kwargs):
+        captured["history"] = context.get("conversation_history")
+        return ("The source setup is still the active topic.", None)
+
+    monkeypatch.setattr("services.api_service.routers.assistant._model_answer", model_answer)
+    thread = asyncio.run(create_thread(ThreadRequest(actor_id="operator-1")))
+    asyncio.run(send_message(thread["thread_id"], MessageRequest(actor_id="operator-1", content="What is Ravan?", context={})))
+    asyncio.run(send_message(thread["thread_id"], MessageRequest(actor_id="operator-1", content="Continue with the previous topic", context={})))
+    history = captured["history"]
+    assert isinstance(history, list)
+    assert any(item["content"] == "What is Ravan?" for item in history)
+    assert any(item["content"] == "The source setup is still the active topic." for item in history)
+
+
 def test_declarative_assistant_skills_are_loaded_without_executable_code():
     names = {skill["name"] for skill in list_skills()}
     assert {"ravan-source-onboarding", "ravan-operator-guidance"}.issubset(names)
@@ -151,6 +169,9 @@ def test_source_questionnaire_persists_resumes_and_is_idempotent(monkeypatch, tm
     questionnaire = first["questionnaire"]
     assert questionnaire["status"] == "pending"
     assert questionnaire["expires_at"]
+    resumed = asyncio.run(send_message(thread["thread_id"], MessageRequest(actor_id="operator-1", content="Ok, can't you ask those questions from me?", context={})))
+    assert resumed["questionnaire"]["question_id"] == questionnaire["question_id"]
+    assert "ask the source-connection questions" in resumed["assistant_message"]["content"]
     invalid = asyncio.run(answer_question(thread["thread_id"], questionnaire["question_id"], QuestionAnswerRequest(actor_id="operator-1", answers={
         "source_protocol": "opcua",
         "name": "Line 1 PLC",
