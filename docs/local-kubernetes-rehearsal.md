@@ -68,3 +68,9 @@ The profile is a local control-plane rehearsal, not evidence of production
 capacity. Operators still provide the image registry, broker and database
 endpoints, TLS/secrets, ingress, storage classes, Flink checkpoint/savepoint
 locations, and site/network policy.
+
+For a full local traffic campaign using the same profile checks, run
+`powershell -ExecutionPolicy Bypass -File scripts/multi-node-rehearsal-soak.ps1`.
+It defaults to a real 900-second, three-site campaign and writes a report under
+`.datastream/reports/`. Docker remains a single-node execution; only the Helm
+rendering portion validates the multi-replica contract.
