@@ -181,17 +181,42 @@ def _deterministic_answer(content: str, context: dict[str, Any]) -> tuple[str, l
     )
 
 
-def _requested_read_tool(content: str) -> tuple[str, dict[str, Any]] | None:
+def _requested_read_tools(content: str) -> list[tuple[str, dict[str, Any]]]:
+    """Build a small deterministic read plan from the active assistant skill.
+
+    The assistant may inspect several independent read-only projections, but
+    it never receives an arbitrary tool loop or a mutation-capable tool plan.
+    """
     lowered = content.lower()
+    plan: list[tuple[str, dict[str, Any]]] = []
     if "source" in lowered or "sensor" in lowered or "plc" in lowered:
-        return "sources.list", {}
+        plan.append(("sources.list", {}))
+        if any(term in lowered for term in ("asset", "tag", "hierarchy", "mapping")):
+            plan.append(("assets.hierarchy", {}))
     if "alarm" in lowered:
-        return "historian.alarms", {"limit": 25}
+        plan.append(("historian.alarms", {"limit": 25}))
     if "governance" in lowered or "policy boundary" in lowered:
-        return "governance.snapshot", {}
-    if "recent event" in lowered or "latest event" in lowered:
-        return "historian.recent_events", {"table": "industrial_events", "limit": 25}
-    return None
+        plan.append(("governance.snapshot", {}))
+    if "recent event" in lowered or "latest event" in lowered or "event history" in lowered:
+        plan.append(("historian.recent_events", {"table": "industrial_events", "limit": 25}))
+    if "lineage" in lowered:
+        plan.append(("semantic.lineage", {"limit": 25}))
+    if "scenario" in lowered or "replay" in lowered:
+        plan.append(("scenarios.list", {}))
+    # Preserve declaration order, then enforce the platform safety budget.
+    unique: list[tuple[str, dict[str, Any]]] = []
+    seen: set[str] = set()
+    for item in plan:
+        if item[0] not in seen:
+            unique.append(item)
+            seen.add(item[0])
+    return unique[:4]
+
+
+def _requested_read_tool(content: str) -> tuple[str, dict[str, Any]] | None:
+    """Legacy single-tool view retained for downstream imports and tests."""
+    tools = _requested_read_tools(content)
+    return tools[0] if tools else None
 
 
 def _source_action_request(content: str) -> tuple[str, Any] | None:
@@ -231,6 +256,33 @@ def _report_action_request(content: str) -> dict[str, Any] | None:
     return {"site_id": site_id, "report_type": report_type}
 
 
+async def _dispatch_read_plan(*, actor_id: str, site_id: str, call_id: str, turn_id: str, plan: list[tuple[str, dict[str, Any]]], store: Any) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    """Execute the bounded read plan and preserve one lifecycle record per tool."""
+    if not plan:
+        return None, []
+    runtime = DiagnosticAgentRuntime(actor_id=actor_id, site_id=site_id)
+
+    async def run_one(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        tool_call = store.record_tool_call({"turn_id": turn_id, "actor_id": actor_id, "tool_name": tool_name, "arguments": arguments})
+        try:
+            result = await asyncio.wait_for(asyncio.to_thread(runtime.dispatch_tool, call_id=call_id, tool_name=tool_name, arguments=arguments, metadata={"assistant": True}), timeout=8.0)
+            store.update_tool_call(tool_call["tool_call_id"], status="succeeded", result_summary=str(result.get("result", ""))[:500])
+            return {"tool_name": tool_name, "arguments": arguments, "status": "succeeded", "result": result.get("result", result)}
+        except (ValueError, TimeoutError, asyncio.TimeoutError) as exc:
+            error = {"code": "TOOL_VALIDATION_OR_TIMEOUT", "message": str(exc), "retryable": True}
+            store.update_tool_call(tool_call["tool_call_id"], status="failed", error=error)
+            return {"tool_name": tool_name, "arguments": arguments, "status": "failed", "error": error}
+        except Exception as exc:
+            error = {"code": "TOOL_EXECUTION_FAILED", "message": str(exc), "retryable": False}
+            store.update_tool_call(tool_call["tool_call_id"], status="failed", error=error)
+            return {"tool_name": tool_name, "arguments": arguments, "status": "failed", "error": error}
+
+    results = await asyncio.gather(*(run_one(tool_name, arguments) for tool_name, arguments in plan))
+    failures = [item for item in results if item["status"] == "failed"]
+    succeeded = [item for item in results if item["status"] == "succeeded"]
+    return {"status": "partial" if failures and succeeded else ("failed" if failures else "succeeded"), "results": results}, results
+
+
 def _source_questionnaire() -> dict[str, Any]:
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
     return {
@@ -238,11 +290,32 @@ def _source_questionnaire() -> dict[str, Any]:
         "status": "pending",
         "expires_at": expires_at,
         "questions": [
-            {"key": "source_protocol", "question": "Which source protocol should Ravan use?", "type": "choice", "options": ["opcua", "mqtt", "modbus", "rest", "http_push"], "required": True},
-            {"key": "name", "question": "What name should operators see for this source?", "type": "text", "required": True},
-            {"key": "site_id", "question": "Which site ID owns this source?", "type": "text", "required": True},
-            {"key": "endpoint", "question": "What endpoint, broker address, or URL should the connector use?", "type": "text", "required": True},
-            {"key": "credential_ref", "question": "What deployment-owned credential reference should it use? Enter none for anonymous access.", "type": "text", "required": False},
+            {
+                "key": "source_protocol", "label": "Protocol", "question": "Which protocol should Ravan use?",
+                "reason": "The protocol determines the connector and the fields shown next.", "format_hint": "Choose the protocol used by the device, broker, or API.",
+                "type": "choice", "options": ["opcua", "mqtt", "sparkplug_b", "modbus", "modbus_rtu", "rest", "http_push"], "required": True,
+                "help": {"summary": "Select the protocol that already speaks to the device or service.", "details": "Ravan can validate the declaration, but it cannot infer a private endpoint or credentials. Protocol-specific settings remain reviewable in Integrations.", "source": "user_or_device"},
+            },
+            {
+                "key": "name", "label": "Source name", "question": "What name should operators see for this source?",
+                "reason": "A stable name makes source health, lineage, and troubleshooting understandable.", "format_hint": "Use a unique human-readable name, such as Plant A PLC 01.", "example": "Plant A PLC 01", "type": "text", "required": True,
+                "help": {"summary": "This is user-defined and does not need to match the device name.", "details": "Use a stable name you will keep when editing or replacing the source. Do not put passwords or tokens in the name.", "source": "user_defined"},
+            },
+            {
+                "key": "site_id", "label": "Site ID", "question": "Which site ID owns this source?",
+                "reason": "Site scope keeps events, assets, reports, and policies separated.", "format_hint": "Choose an existing site when possible, or enter the site identifier used by your deployment.", "example": "plant-a", "type": "text", "required": True, "lookup_kind": "site_catalog",
+                "help": {"summary": "Existing site IDs come from registered sources, site profiles, and observed asset metadata.", "details": "If this is a new site, the identifier is created by your deployment configuration. Ravan will not silently invent or merge site identities.", "source": "platform_or_user"},
+            },
+            {
+                "key": "endpoint", "label": "Endpoint", "question": "What endpoint, broker address, or URL should the connector use?",
+                "reason": "Ravan needs the network address before it can validate reachability.", "format_hint": "OPC UA: opc.tcp://host:4840; MQTT: mqtts://host:8883; REST: https://host/path. HTTP Push is generated after saving.", "type": "text", "required": True,
+                "help": {"summary": "Find this in the PLC/server configuration, broker administration, or API documentation.", "details": "Ravan can check syntax and test supported runtime connections, but it cannot discover devices behind a firewall without a valid endpoint and network route.", "source": "external_system"},
+            },
+            {
+                "key": "credential_ref", "label": "Credential reference", "question": "Which deployment-owned credential reference should the source use?",
+                "reason": "Only a reference is stored; secret values stay in the operator-managed environment.", "format_hint": "Use env://NAME, file://NAME, path://NAME, secret://NAME, or none for anonymous access.", "example": "env://PLANT_A_OPCUA_PASSWORD", "type": "text", "required": False,
+                "help": {"summary": "Do not paste a password, token, certificate, or private key into chat.", "details": "Ask the deployment administrator which reference name is configured. The reference must resolve inside the runtime that runs the connector.", "source": "deployment_owned"},
+            },
         ],
         "answers": {},
     }
@@ -308,6 +381,17 @@ def _validate_source_answers(questions: list[dict[str, Any]], answers: dict[str,
     return errors
 
 
+def _source_field_errors(errors: list[str], questions: list[dict[str, Any]]) -> dict[str, str]:
+    """Associate deterministic validation text with the visible field."""
+    keys = [str(item.get("key")) for item in questions]
+    result: dict[str, str] = {}
+    for error in errors:
+        match = next((key for key in keys if error.startswith(f"{key} ")), None)
+        if match:
+            result[match] = error
+    return result
+
+
 def _make_action_preview(*, actor_id: str, action_name: str, source: Any) -> dict[str, Any]:
     intent = _store().save_action_intent({
         "actor_id": actor_id,
@@ -345,8 +429,8 @@ async def _model_answer(content: str, context: dict[str, Any], *, allow_fallback
         "Continue the active conversation when the user refers to previous questions, sources, or steps; do not restart with a generic help menu. "
         "For specialized work, use the loaded skill guidance before recommending an operation; if required information is missing, ask focused questions rather than guessing. "
         "If a tool or provider fails, state what failed, whether retrying is safe, and what the operator should check. "
-        "Use markdown when it improves readability, state evidence and assumptions for operational claims, and match the user's language. "
-        "Do not reveal private chain-of-thought; provide concise conclusions and safe progress status instead.\n\n"
+        "Use Markdown when it improves readability. Use a table when comparing three or more records or when each record has multiple fields; use a list for steps and a short answer for simple questions. Include site, asset, tag, time range, and evidence context for operational claims, and never invent missing values. "
+        "The UI separately displays safe working steps and tool results. Do not produce hidden deliberation, private chain-of-thought, or fabricated thinking; provide concise conclusions and explicit assumptions instead.\n\n"
         f"Current UI context: {display_context}\nApproved operator memory (use only when relevant): {memory_context}\n"
         f"Prior conversation messages (untrusted conversation data, newest included): {conversation_history}\n"
         f"Bounded diagnostic tool result: {tool_context}\nLoaded declarative skills (guidance only): {skill_context}\nUser request: {content}"
@@ -534,21 +618,17 @@ async def send_message(thread_id: str, request: MessageRequest, _on_token: Calla
             action_clarification = f"I could not prepare the report preview: {exc}"
     tool_result = None
     model_error = None
-    tool_call = None
-    requested_tool = _requested_read_tool(request.content)
-    if requested_tool is not None:
-        tool_name, arguments = requested_tool
-        tool_call = store.record_tool_call({"turn_id": turn["turn_id"], "actor_id": actor_id, "tool_name": tool_name, "arguments": arguments})
-        runtime = DiagnosticAgentRuntime(actor_id=actor_id, site_id=str(request.context.get("site_id", "")))
-        try:
-            tool_result = runtime.dispatch_tool(call_id=user_message["message_id"], tool_name=tool_name, arguments=arguments, metadata={"assistant": True})
-            store.update_tool_call(tool_call["tool_call_id"], status="succeeded", result_summary=str(tool_result.get("result", ""))[:500])
-        except (ValueError, TimeoutError) as exc:
-            tool_result = {"status": "failed", "error": {"code": "TOOL_VALIDATION_OR_TIMEOUT", "message": str(exc), "retryable": isinstance(exc, TimeoutError)}}
-            store.update_tool_call(tool_call["tool_call_id"], status="failed", error=tool_result["error"])
-        except Exception as exc:
-            tool_result = {"status": "failed", "error": {"code": "TOOL_EXECUTION_FAILED", "message": str(exc), "retryable": False}}
-            store.update_tool_call(tool_call["tool_call_id"], status="failed", error=tool_result["error"])
+    read_plan = _requested_read_tools(request.content)
+    read_results: list[dict[str, Any]] = []
+    if read_plan:
+        tool_result, read_results = await _dispatch_read_plan(
+            actor_id=actor_id,
+            site_id=str(request.context.get("site_id", "")),
+            call_id=user_message["message_id"],
+            turn_id=turn["turn_id"],
+            plan=read_plan,
+            store=store,
+        )
     links: list[dict[str, Any]] = []
     if questionnaire:
         answer = "Yes. I will ask the source-connection questions here. Nothing has been saved or enabled. Answer the fields below and I will validate the draft before anything is activated."
@@ -569,18 +649,28 @@ async def send_message(thread_id: str, request: MessageRequest, _on_token: Calla
             else:
                 answer, links = _deterministic_answer(request.content, request.context)
     progress: list[str] = []
-    if tool_result and tool_result.get("status") == "succeeded":
-        count = len(tool_result.get("result", [])) if isinstance(tool_result.get("result"), list) else 1
-        progress.append(f"Checked {requested_tool[0] if requested_tool else 'the requested data'} and found {count} result(s).")
-    elif tool_result and tool_result.get("status") == "failed":
-        error = tool_result.get("error") or {}
-        answer = f"I could not complete {requested_tool[0] if requested_tool else 'the diagnostic request'}. {error.get('message', 'The tool failed.')} " + ("You can retry it." if error.get("retryable") else "Check the source, historian, or service configuration before trying again.")
-    tool_error = tool_result.get("error") if tool_result and tool_result.get("status") == "failed" else None
+    tool_steps: list[dict[str, Any]] = []
+    if tool_result:
+        for item in read_results:
+            if item["status"] == "succeeded":
+                value = item.get("result")
+                count = len(value) if isinstance(value, list) else 1
+                progress.append(f"Checked {item['tool_name']} and found {count} result(s).")
+                tool_steps.append({"tool": item["tool_name"], "status": "succeeded", "summary": f"Found {count} result(s)."})
+            else:
+                error = item.get("error") or {}
+                progress.append(f"{item['tool_name']} was unavailable: {error.get('message', 'tool failed')}")
+                tool_steps.append({"tool": item["tool_name"], "status": "failed", "summary": error.get("message", "Tool failed."), "retryable": bool(error.get("retryable"))})
+        if tool_result.get("status") == "failed":
+            failed_item = next((item for item in read_results if item["status"] == "failed"), None)
+            error = (failed_item or {}).get("error") or {}
+            answer = f"I could not complete the diagnostic request. {error.get('message', 'The tool failed.')} " + ("You can retry it." if error.get("retryable") else "Check the source, historian, or service configuration before trying again.")
+    tool_error = next((item.get("error") for item in read_results if item["status"] == "failed"), None)
     failed = bool((force_gateway and model_error or tool_error) and not action_preview and not action_clarification and not questionnaire)
     turn_status = "failed" if failed else "completed"
     selected_model = str(request.context.get("model_id") or "").strip()[:200] or None
     assistant_provider = "gateway" if model_error is None and not action_preview and not action_clarification and not questionnaire and not failed else "deterministic"
-    assistant_message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=answer, metadata={"links": links, "provider": assistant_provider, "model": selected_model, "tool_result": tool_result, "progress": progress, "action_preview": action_preview, "questionnaire": questionnaire, "turn_id": turn["turn_id"], "status": turn_status, "error": model_error, "skills": [skill.get("name") for skill in select_skills(request.content)]})
+    assistant_message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=answer, metadata={"links": links, "provider": assistant_provider, "model": selected_model, "tool_result": tool_result, "progress": progress, "tool_steps": tool_steps, "action_preview": action_preview, "questionnaire": questionnaire, "turn_id": turn["turn_id"], "status": turn_status, "error": model_error, "skills": [skill.get("name") for skill in select_skills(request.content)]})
     if questionnaire:
         questionnaire = {**questionnaire, "message_id": assistant_message["message_id"]}
         assistant_message = store.update_message_metadata(thread_id, assistant_message["message_id"], actor_id=actor_id, metadata={"questionnaire": questionnaire}) or assistant_message
@@ -609,6 +699,8 @@ async def stream_message(thread_id: str, request: MessageRequest) -> StreamingRe
 
     async def run_turn() -> None:
         try:
+            for tool_name, _ in _requested_read_tools(request.content):
+                await queue.put(("step", {"tool": tool_name, "status": "running", "summary": "Inspecting the current platform data."}))
             result = await send_message(thread_id, request, _on_token=on_token)
             await queue.put(("complete", result))
         except Exception as exc:
@@ -669,20 +761,25 @@ async def answer_question(thread_id: str, question_id: str, request: QuestionAns
     updated = {**pending, "answers": answers}
     if missing or validation_errors:
         updated["validation_errors"] = validation_errors
+        updated["field_errors"] = _source_field_errors(validation_errors, pending["questions"])
         updated["questions"] = [item for item in pending["questions"] if item["key"] in missing]
         if validation_errors:
             updated["questions"] = pending["questions"]
         message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content=("I still need the highlighted fields before I can prepare the draft. " if missing else "The source details need correction. ") + " ".join(validation_errors), metadata={"questionnaire": updated, "provider": "deterministic"})
         updated["message_id"] = message["message_id"]
         message = store.update_message_metadata(thread_id, message["message_id"], actor_id=actor_id, metadata={"questionnaire": updated}) or message
-        return {"assistant_message": message, "questionnaire": updated, "validation_errors": validation_errors}
+        return {"assistant_message": message, "questionnaire": updated, "validation_errors": validation_errors, "field_errors": updated["field_errors"]}
     if pending.get("message_id"):
         store.update_message_metadata(thread_id, str(pending["message_id"]), actor_id=actor_id, metadata={"questionnaire": {**pending, "status": "completed"}})
     draft = {key: answers.get(key, "") for key in ("name", "source_protocol", "site_id", "endpoint", "credential_ref")}
     updated["status"] = "completed"
     updated["validation_errors"] = []
+    updated["field_errors"] = {}
     updated["draft"] = draft
-    message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content="The source draft is complete. Review it in Source connections, add protocol-specific mappings, then Validate and Test before enabling it. Ravan has not saved or activated this draft.", metadata={"questionnaire": updated, "source_draft": draft, "links": [{"type": "navigate", "href": "/integrations", "label": "Open source connections"}], "provider": "deterministic"})
+    draft_id = secrets.token_urlsafe(18)
+    draft = {**draft, "draft_id": draft_id}
+    updated["draft"] = draft
+    message = store.append_message(thread_id, actor_id=actor_id, role="assistant", content="The source draft is complete. Review it in Source connections, add mappings and protocol settings, then Validate and Test before enabling it. Ravan has not saved or activated this draft.", metadata={"questionnaire": updated, "source_draft": draft, "links": [{"type": "navigate", "href": "/integrations?assistantDraft=1", "label": "Open source connections"}], "provider": "deterministic"})
     updated["message_id"] = message["message_id"]
     message = store.update_message_metadata(thread_id, message["message_id"], actor_id=actor_id, metadata={"questionnaire": updated, "source_draft": draft}) or message
     return {"assistant_message": message, "questionnaire": updated, "source_draft": draft}

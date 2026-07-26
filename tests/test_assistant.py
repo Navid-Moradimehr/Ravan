@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from services.api_service.routers.assistant import MessageRequest, QuestionAnswerRequest, RetryRequest, ThreadRequest, _fallback_thread_title, _report_action_request, _source_action_request, answer_question, create_thread, retry_failed_turn, send_message
+from services.api_service.routers.assistant import MessageRequest, QuestionAnswerRequest, RetryRequest, ThreadRequest, _fallback_thread_title, _report_action_request, _requested_read_tools, _source_action_request, _source_questionnaire, answer_question, create_thread, retry_failed_turn, send_message
 from services.common.agent_runtime import build_agent_runtime_contract
 from services.common.agent_tools import tool_registry
 from services.common.assistant_store import AssistantStore
@@ -133,6 +133,22 @@ def test_diagnostic_progress_is_separate_from_final_answer(monkeypatch, tmp_path
     assistant = result["assistant_message"]
     assert assistant["content"].startswith("**Final answer**")
     assert assistant["metadata"]["progress"] == ["Checked sources.list and found 0 result(s)."]
+
+
+def test_source_questionnaire_contains_safe_discovery_guidance():
+    questionnaire = _source_questionnaire()
+    by_key = {item["key"]: item for item in questionnaire["questions"]}
+    assert by_key["site_id"]["lookup_kind"] == "site_catalog"
+    assert "Do not paste" in by_key["credential_ref"]["help"]["summary"]
+    assert "opc.tcp://" in by_key["endpoint"]["format_hint"]
+    assert "sparkplug_b" in by_key["source_protocol"]["options"]
+
+
+def test_read_plan_is_bounded_and_composes_independent_reads():
+    plan = _requested_read_tools("show sources, asset tags, alarms, recent events, and lineage")
+    assert len(plan) == 4
+    assert [name for name, _ in plan] == ["sources.list", "assets.hierarchy", "historian.alarms", "historian.recent_events"]
+    assert all(not name.endswith(("enable", "disable", "retire", "restore")) for name, _ in plan)
 
 
 def test_model_turn_receives_bounded_prior_thread_messages(monkeypatch, tmp_path):

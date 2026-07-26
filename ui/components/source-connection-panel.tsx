@@ -131,6 +131,7 @@ export function SourceConnectionPanel() {
   const [restMaxPages, setRestMaxPages] = useState("10");
   const editorRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const assistantDraftApplied = useRef(false);
   const queryClient = useQueryClient();
   const connections = useQuery({ queryKey: ["connections"], queryFn: getConnections });
   const sourceHealth = useQuery({ queryKey: ["source-health"], queryFn: getSourceHealth, refetchInterval: 10000 });
@@ -231,6 +232,30 @@ export function SourceConnectionPanel() {
     editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     nameInputRef.current?.focus({ preventScroll: true });
   }, [editingId]);
+
+  useEffect(() => {
+    if (assistantDraftApplied.current || new URLSearchParams(window.location.search).get("assistantDraft") !== "1") return;
+    const raw = window.sessionStorage.getItem("ravan.assistant.sourceDraft");
+    if (!raw) return;
+    try {
+      const draft = JSON.parse(raw) as Record<string, string>;
+      setName(String(draft.name ?? ""));
+      setProtocol(String(draft.source_protocol ?? "opcua"));
+      setSiteId(String(draft.site_id ?? ""));
+      setEndpoint(String(draft.endpoint ?? ""));
+      setCredentialRef(String(draft.credential_ref ?? ""));
+      setEditingId(null);
+      setInitialFormSignature(null);
+      setStep(1);
+      assistantDraftApplied.current = true;
+      window.sessionStorage.removeItem("ravan.assistant.sourceDraft");
+      showToast({ title: "Source draft loaded", description: "Review the fields, add protocol mappings, then save and validate the source.", variant: "success" });
+      window.setTimeout(() => editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    } catch {
+      window.sessionStorage.removeItem("ravan.assistant.sourceDraft");
+      showToast({ title: "Source draft unavailable", description: "The assistant draft could not be read. Enter the source details manually.", variant: "error" });
+    }
+  }, []);
 
   function resetForm() {
     setName(""); setProtocol("opcua"); setSiteId("demo-site"); setEndpoint(""); setCredentialRef(""); setCredentialRefs({ username: "", password: "", token: "", api_key: "", client_id: "", client_secret: "", certificate: "", private_key: "", ca_cert: "", client_cert: "", client_key: "" }); setSourceId(""); setConfigJson(emptyJson); setMappingsJson("[]"); setMappingRows([{ ...emptyMapping }]); setNodesText(""); setTopic(""); setMqttQos("1"); setPayloadMode("json"); setModbusAsset(""); setRegistersText(""); setRtuPort(""); setBaudrate("9600"); setSlaveId("1"); setEditingId(null); setEditingVersion(null); setInitialFormSignature(null); setStep(1); setPreviewResult(null); setRestMethod("GET"); setRestInterval("60"); setRestTimeout("15"); setRestRecordsPath(""); setRestSourcePath("source_id"); setRestAssetPath("asset_id"); setRestTagPath("tag"); setRestValuePath("value"); setRestTimestampPath("timestamp"); setRestQualityPath("quality"); setRestUnitPath("unit"); setRestAuthType("none"); setRestAuthName("X-API-Key"); setRestAuthLocation("header"); setRestPageMode("none"); setRestMaxPages("10");

@@ -2,7 +2,8 @@
 
 Ravan uses a small, durable orchestration contract rather than a second
 workflow engine. A chat turn is persisted as user and assistant messages. A
-read request may dispatch a bounded diagnostic tool. A configuration request
+read request may dispatch a bounded plan of up to four independent diagnostic
+tools. A configuration request
 becomes a typed action intent with an expiry, an exact preview, an audit record,
 and an explicit confirmation. A question request pauses as a persisted
 questionnaire and resumes through the question-answer route.
@@ -23,7 +24,8 @@ the same important principles without importing CRM entities or dependencies:
 - skill files are versioned, declarative guidance packs, not executable code;
 - every turn has a durable running, completed, or failed record;
 - retryable provider failures expose a structured error and retry endpoint;
-- diagnostic tool calls have a durable lifecycle record;
+- diagnostic tool calls have a durable lifecycle record and are presented as
+  structured, collapsible working steps;
 - the model prompt includes safety, untrusted-context, skill-selection, and
   failure-recovery instructions;
 - external operator products remain guidance-only.
@@ -109,9 +111,11 @@ remembered locally only as a selection pointer; message contents remain in the
 assistant repository.
 
 The assistant keeps tool progress separate from the final response. Successful
-diagnostic work is persisted as bounded `metadata.progress` and rendered as a
-faint evidence block; the final response remains Markdown-rendered content.
-The UI intentionally does not expose private provider chain-of-thought.
+and failed diagnostic work is persisted as bounded `metadata.tool_steps` plus
+the legacy `metadata.progress` field and rendered as a faint evidence block;
+the final response remains Markdown-rendered content. The UI intentionally
+does not expose private provider chain-of-thought; “working steps” means
+auditable tool activity and safe summaries only.
 
 Each model-backed turn also receives the latest bounded user/assistant message
 window from the durable thread record. This is separate from approved

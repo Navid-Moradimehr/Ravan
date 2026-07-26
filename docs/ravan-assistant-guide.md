@@ -26,8 +26,9 @@ provider endpoint, credentials, safety boundary, or deployment configuration.
 Chat requests use a server-sent event stream when the provider supports it.
 The drawer shows a bounded working indicator first, then appends response text
 as tokens arrive, and finally reconciles the temporary display with the durable
-stored message. Provider reasoning traces are not exposed as raw chain of
-thought; Ravan shows safe progress status instead. If the stream times out or
+stored message. Ravan exposes safe, structured working steps such as the
+diagnostic tools inspected and their result counts. It does not expose hidden
+model chain-of-thought or private deliberation. If the stream times out or
 returns no content, the assistant records a retryable error and uses
 deterministic guidance unless the operator explicitly requested a strict
 model-backed turn.
@@ -46,9 +47,10 @@ completed actions are written to the platform audit boundary.
 
 ## What it can do
 
-The first assistant contract can read source registry state, historian alarms
-and recent events, asset hierarchy, semantic relationships, lineage, report
-templates, replay scenarios, and governance policy. It can link the operator to
+The assistant can compose up to four independent, allowlisted read operations
+for one turn. It can read source registry state, historian alarms and recent
+events, asset hierarchy, semantic relationships, lineage, report templates,
+replay scenarios, and governance policy. It can link the operator to
 the correct Ravan page and explain how Kafka UI, Grafana, and Prometheus are
 used. Those external tools remain guidance-only and are not changed by the
 assistant.
@@ -73,12 +75,15 @@ corresponding typed lifecycle action.
 
 If you ask the assistant to connect or add a source, it opens a guided
 questionnaire for protocol, source name, site ID, endpoint, and credential
-reference. Answers are persisted with the thread for fifteen minutes and are
-validated before Ravan returns a draft. The draft is not saved or enabled; use
-the link to Source connections to add mappings and protocol-specific settings,
-then Validate and Test it. This is the same missing-information pattern used
-by mature agent interfaces, but the final industrial configuration remains a
-typed, auditable platform operation.
+reference. Each field has a short reason, an expected format, and expandable
+guidance explaining where the value comes from. Site and asset metadata can be
+looked up when already registered; endpoints, credentials, certificates,
+broker topics, and Modbus maps remain external-system information. Answers are
+persisted with the thread for fifteen minutes and validated before Ravan
+returns a draft. The draft can be handed directly to the Integrations editor,
+where the operator reviews mappings and protocol settings before saving,
+validating, testing, and enabling it. Nothing is saved or enabled by the chat
+questionnaire.
 
 The assistant can explain digital twins, world-model datasets, JEPA, Dreamer,
 MuZero, XGBoost, Flink, Kafka, and historian operation. Ravan provides the
@@ -117,9 +122,10 @@ telemetry, and raw audio are never assistant memory.
 
 The chat UI follows the same separation used by mature assistant interfaces:
 the final answer is rendered as safe Markdown, while bounded tool/evidence
-status is shown in a faint **Working context** block above it. This is not raw
-model chain-of-thought. It is an auditable summary such as the diagnostic tool
-that ran and its result count. The rendering and boundary guidance lives in
+status is shown in a faint, collapsible **Working steps** block above it. This
+is an auditable activity summary such as the diagnostic tool that ran, whether
+it succeeded, and its result count. It is not raw model chain-of-thought. The
+rendering and boundary guidance lives in
 `config/assistant-skills/assistant-response-rendering.md` and
 `config/assistant-skills/assistant-thinking-boundary.md`.
 
