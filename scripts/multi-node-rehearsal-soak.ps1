@@ -32,7 +32,7 @@ $profileChecks = [ordered]@{
   shared_assistant_store = [bool]($renderText -match 'RAVAN_ASSISTANT_STORE_BACKEND: "postgres"')
   readiness_probes = [bool]($renderText -match "readinessProbe:")
   disruption_budgets = [bool]($renderText -match "kind: PodDisruptionBudget")
-  flink_operator_contract = [bool]($renderText -match "FLINK_OPERATOR_ENABLED: \"true\"")
+  flink_operator_contract = [bool]($renderText -match 'FLINK_OPERATOR_ENABLED: "true"')
 }
 
 Write-Host "Checking live Docker dependencies..."
