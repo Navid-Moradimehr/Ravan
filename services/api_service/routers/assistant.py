@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from services.common.agent_runtime import DiagnosticAgentRuntime, insert_audit_log
 from services.common.agent_tools import tool_registry
-from services.common.assistant_store import AssistantStore
+from services.common.assistant_repository import build_assistant_store
 from services.common.assistant_skills import get_skill, list_skills, select_skills
 from services.common.connection_registry import SUPPORTED_PROTOCOLS, connection_registry
 from services.common.connection_diagnostics import run_connection_test
@@ -68,8 +68,8 @@ class RetryRequest(BaseModel):
     turn_id: str | None = None
 
 
-def _store() -> AssistantStore:
-    return AssistantStore()
+def _store():
+    return build_assistant_store()
 
 
 def _safe_audit(event: dict[str, Any]) -> None:

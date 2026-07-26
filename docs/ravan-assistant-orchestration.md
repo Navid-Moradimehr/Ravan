@@ -66,3 +66,11 @@ when multi-replica assistant usage becomes a measured requirement.
 The multi-node deployment path must set the assistant store backend to the
 shared PostgreSQL adapter and must not use the Compose JSON file from multiple
 API replicas. The local JSON store remains the default for one-node installs.
+
+Set `RAVAN_ASSISTANT_STORE_BACKEND=postgres` and provide the same PostgreSQL or
+TimescaleDB connection settings to every API and assistant worker replica.
+The adapter creates its small `ravan_assistant_records` table on first use and
+stores threads, turns, tool calls, memory candidates, and action intents as
+version-neutral JSON records. This is shared operational state, not historian
+telemetry. The database, backups, retention, TLS, and identity boundary remain
+operator-owned.

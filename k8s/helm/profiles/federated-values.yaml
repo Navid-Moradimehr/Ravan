@@ -10,6 +10,7 @@ env:
   DATASTREAM_FEDERATION_ENABLED: "true"
   DATASTREAM_FEDERATION_EXPORT_MODE: "rollup"
   DATASTREAM_CENTRAL_ENDPOINT: "https://central-ops.example.internal/datastream-rollup"
+  RAVAN_ASSISTANT_STORE_BACKEND: "postgres"
   LLM_PROVIDER: "vllm"
   LLM_ENDPOINT_URL: "http://vllm.plant-b.svc.cluster.local:8000/v1"
   LLM_MODEL_ID: "mistralai/Mistral-7B-Instruct-v0.3"
