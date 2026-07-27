@@ -73,8 +73,10 @@ The default only permits local Ravan UI on port `3006`.
 ## Kubernetes Preview
 
 The Helm chart is a self-hosted deployment contract, not a hosted control
-plane. It defaults to the Flink production runtime and versioned Ravan image
-names. Operators must set their own image registry, secrets, Kafka,
+plane. It defaults to the Python fallback so a minimal install has one active
+processor; set `env.RUNTIME_MODE=flink-production` (or `flink-local`) and enable
+the matching Flink deployment for checkpointed processing. Operators must set
+their own image registry, secrets, Kafka,
 TimescaleDB, object storage, ingress, TLS, and identity integration before
 applying it to a real cluster.
 

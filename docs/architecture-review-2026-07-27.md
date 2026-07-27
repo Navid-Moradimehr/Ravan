@@ -90,9 +90,10 @@ historian, reporting, and advisory workflows.
   benchmark gates.
 - `datastreamd` supervises the host-run Python surface.
 - Compose is the most complete runnable topology.
-- Helm currently deploys API, AI gateway, one processor mode, edge ingest, and
-  optional Flink resources, expecting Kafka/Timescale externally. It does not
-  express all projection workers present in Compose.
+- Helm deploys API, AI gateway, edge ingest, exactly one selected processor
+  mode, and the core normalized/processed/AI projection workers, expecting
+  Kafka/Timescale externally. Extended archive and dataset workers remain
+  opt-in.
 
 ## What is good
 
