@@ -61,14 +61,38 @@ except ModuleNotFoundError as exc:
         raise
     format_site_profile_matrix_result = None
     run_site_profile_matrix = None
-from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
-from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
-from services.benchmarks.multi_site_failure import format_result as format_multi_site_failure_result
-from services.benchmarks.multi_site_failure import run_benchmark as run_multi_site_failure_benchmark
-from services.benchmarks.cgr_gap import format_result as format_cgr_gap_result
-from services.benchmarks.cgr_gap import run_report as run_cgr_gap_report
-from services.benchmarks.cgr_stream_slice import format_result as format_cgr_stream_slice_result
-from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
+try:
+    from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
+    from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
+except ModuleNotFoundError as exc:
+    if exc.name != "services.benchmarks.site_profile_calibration":
+        raise
+    format_site_profile_calibration_result = None
+    run_site_profile_calibration = None
+try:
+    from services.benchmarks.multi_site_failure import format_result as format_multi_site_failure_result
+    from services.benchmarks.multi_site_failure import run_benchmark as run_multi_site_failure_benchmark
+except ModuleNotFoundError as exc:
+    if exc.name != "services.benchmarks.multi_site_failure":
+        raise
+    format_multi_site_failure_result = None
+    run_multi_site_failure_benchmark = None
+try:
+    from services.benchmarks.cgr_gap import format_result as format_cgr_gap_result
+    from services.benchmarks.cgr_gap import run_report as run_cgr_gap_report
+except ModuleNotFoundError as exc:
+    if exc.name != "services.benchmarks.cgr_gap":
+        raise
+    format_cgr_gap_result = None
+    run_cgr_gap_report = None
+try:
+    from services.benchmarks.cgr_stream_slice import format_result as format_cgr_stream_slice_result
+    from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
+except ModuleNotFoundError as exc:
+    if exc.name != "services.benchmarks.cgr_stream_slice":
+        raise
+    format_cgr_stream_slice_result = None
+    run_cgr_stream_slice_benchmark = None
 from services.historian.backup import (
     collect_historian_snapshot,
     compare_historian_snapshots,
@@ -92,6 +116,14 @@ def _require_site_profile_matrix() -> None:
     if run_site_profile_matrix is None or format_site_profile_matrix_result is None:
         raise RuntimeError(
             "site-profile benchmark support is not included in the public runtime; "
+            "install the maintainer benchmark bundle to use this command"
+        )
+
+
+def _require_optional_benchmark(name: str, runner: Any, formatter: Any) -> None:
+    if runner is None or formatter is None:
+        raise RuntimeError(
+            f"{name} benchmark support is not included in the public runtime; "
             "install the maintainer benchmark bundle to use this command"
         )
 
@@ -1925,6 +1957,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                     print(f"{'':6}report  {path}")
         return 0 if result.passed else 2
     if args.action == "multi-site-failure":
+        _require_optional_benchmark("multi-site-failure", run_multi_site_failure_benchmark, format_multi_site_failure_result)
         result = run_multi_site_failure_benchmark(
             sites=args.sites,
             events_per_site=args.events_per_site,
@@ -1945,6 +1978,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         print(json.dumps(payload, indent=2) if args.json else format_multi_site_failure_result(result))
         return 0 if result.recovery_complete and result.duplicate_events == 0 else 2
     if args.action == "site-profile-calibration":
+        _require_optional_benchmark("site-profile-calibration", run_site_profile_calibration, format_site_profile_calibration_result)
         site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
         result = run_site_profile_calibration(
             Path(args.manifest),
@@ -2012,6 +2046,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
                     print(f"{'':6}report  {path}")
         return 0 if result.passed else 2
     if args.action == "cgr-gap-report":
+        _require_optional_benchmark("cgr-gap", run_cgr_gap_report, format_cgr_gap_result)
         site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
         result = run_cgr_gap_report(
             Path(args.manifest),
@@ -2147,6 +2182,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print(format_cgr_gap_result(result))
         return 0
     if args.action == "cgr-stream-slice":
+        _require_optional_benchmark("cgr-stream-slice", run_cgr_stream_slice_benchmark, format_cgr_stream_slice_result)
         result = run_cgr_stream_slice_benchmark(
             Path(args.csv),
             target_events=args.events,
