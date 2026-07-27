@@ -49,8 +49,18 @@ from services.benchmarks.semantic_store_write import run_benchmark as run_semant
 from services.benchmarks.resilience import format_report as format_resilience_report
 from services.benchmarks.resilience import run_campaign as run_resilience_campaign
 from services.benchmarks.resilience import write_report as write_resilience_report
-from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
-from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
+try:
+    from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
+    from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
+except ModuleNotFoundError as exc:
+    # The site-profile matrix is a maintainer-only benchmark asset and is
+    # intentionally excluded from public/runtime packages. Keep the operator
+    # CLI importable in clean public checkouts and fail only when that optional
+    # command is requested.
+    if exc.name != "services.benchmarks.site_profile_matrix":
+        raise
+    format_site_profile_matrix_result = None
+    run_site_profile_matrix = None
 from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
 from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
 from services.benchmarks.multi_site_failure import format_result as format_multi_site_failure_result
@@ -76,6 +86,14 @@ from services.common.update_check import check_for_update
 
 DEFAULT_API_BASE = os.getenv("DATASTREAM_API_BASE", "http://localhost:8020")
 DEFAULT_AI_BASE = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080")
+
+
+def _require_site_profile_matrix() -> None:
+    if run_site_profile_matrix is None or format_site_profile_matrix_result is None:
+        raise RuntimeError(
+            "site-profile benchmark support is not included in the public runtime; "
+            "install the maintainer benchmark bundle to use this command"
+        )
 
 
 def _import_lazily(module_name: str):
@@ -1239,6 +1257,7 @@ def cmd_backup_drill_matrix(args: argparse.Namespace) -> int:
 
 
 def cmd_local_phase_one(args: argparse.Namespace) -> int:
+    _require_site_profile_matrix()
     site_profiles = [part.strip() for part in args.site_profiles.split(",") if part.strip()]
     if not site_profiles:
         raise ValueError("--site-profiles must contain at least one site profile path")
@@ -1858,6 +1877,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
             print(format_deployment_pack_matrix_result(result))
         return 0
     if args.action == "site-profile-matrix":
+        _require_site_profile_matrix()
         site_ids = [part.strip() for part in args.site_ids.split(",") if part.strip()] if args.site_ids else None
         result = run_site_profile_matrix(
             Path(args.manifest),
