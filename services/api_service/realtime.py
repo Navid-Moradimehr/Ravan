@@ -52,6 +52,10 @@ class ConnectionManager:
         except Exception:
             await self.disconnect(websocket)
 
+    async def has_connections(self) -> bool:
+        async with self._lock:
+            return bool(self.active_connections)
+
 
 alarm_manager = ConnectionManager()
 event_manager = ConnectionManager()
@@ -63,6 +67,9 @@ async def _alarm_broadcaster() -> None:
 
     last_data: list[dict[str, Any]] = []
     while True:
+        if not await alarm_manager.has_connections():
+            await asyncio.sleep(2.0)
+            continue
         try:
             data = await asyncio.to_thread(query_alarms, 50)
             if data != last_data:
@@ -81,6 +88,9 @@ async def _event_broadcaster() -> None:
     last_data: dict[str, list[dict[str, Any]]] = {}
     tables = ["industrial_events", "processed_events", "ai_enriched"]
     while True:
+        if not await event_manager.has_connections():
+            await asyncio.sleep(2.0)
+            continue
         for table in tables:
             try:
                 data = await asyncio.to_thread(query_historian_events, table, 100)
@@ -98,6 +108,9 @@ async def _telemetry_broadcaster() -> None:
     from services.ai_gateway.main import _build_telemetry
 
     while True:
+        if not await telemetry_manager.has_connections():
+            await asyncio.sleep(5.0)
+            continue
         try:
             payload = await _build_telemetry()
             service_state.mark_ok()
@@ -130,7 +143,7 @@ async def websocket_alarms(websocket: WebSocket) -> None:
     try:
         from services.historian.client import query_alarms
 
-        data = query_alarms(50)
+        data = await asyncio.to_thread(query_alarms, 50)
         observe_websocket_batch_delivery("alarms", data)
         await websocket.send_json(jsonable_encoder({"type": "init", "alarms": data}))
         while True:
@@ -140,7 +153,7 @@ async def websocket_alarms(websocket: WebSocket) -> None:
                 if parsed.get("action") == "ping":
                     await websocket.send_json({"type": "pong"})
                 elif parsed.get("action") == "subscribe":
-                    data = query_alarms(50)
+                    data = await asyncio.to_thread(query_alarms, 50)
                     await websocket.send_json(jsonable_encoder({"type": "init", "alarms": data}))
             except json.JSONDecodeError:
                 pass
@@ -155,7 +168,7 @@ async def websocket_events(websocket: WebSocket) -> None:
         from services.historian.client import query_recent_events as query_historian_events
 
         for table in ["industrial_events", "processed_events", "ai_enriched"]:
-            data = query_historian_events(table, 100)
+            data = await asyncio.to_thread(query_historian_events, table, 100)
             observe_websocket_batch_delivery(f"historian:{table}", data)
             await websocket.send_json(jsonable_encoder({"type": "init", "table": table, "events": data}))
         while True:
@@ -166,7 +179,7 @@ async def websocket_events(websocket: WebSocket) -> None:
                     await websocket.send_json({"type": "pong"})
                 elif parsed.get("action") == "subscribe":
                     table = parsed.get("table", "industrial_events")
-                    data = query_historian_events(table, 100)
+                    data = await asyncio.to_thread(query_historian_events, table, 100)
                     await websocket.send_json(jsonable_encoder({"type": "init", "table": table, "events": data}))
             except json.JSONDecodeError:
                 pass

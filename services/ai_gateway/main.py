@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from typing import Any
@@ -60,9 +61,35 @@ last_success_epoch = Gauge("ai_gateway_last_success_epoch", "Unix timestamp of l
 report_workers_active = Gauge("ai_gateway_report_workers_active", "AI report workers currently executing")
 report_jobs_completed = Counter("ai_gateway_report_jobs_completed_total", "AI report jobs completed")
 report_jobs_failed = Counter("ai_gateway_report_jobs_failed_total", "AI report jobs that failed or were rejected")
+event_loop_lag = Gauge("ai_gateway_event_loop_lag_seconds", "Observed asyncio event-loop scheduling lag")
+kafka_operation_seconds = Histogram(
+    "ai_gateway_kafka_operation_seconds",
+    "Kafka consumer operation latency",
+    ["operation"],
+)
 service_state = ServiceHealthState(name="ai-gateway")
 telemetry_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
 _policy_cache: tuple[float, AIReportingPolicy] | None = None
+_kafka_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ai-gateway-kafka")
+
+
+async def _kafka_call(operation: str, callback, *args):
+    """Run every Kafka consumer operation on one dedicated thread."""
+    started = time.monotonic()
+    loop = asyncio.get_running_loop()
+    try:
+        return await loop.run_in_executor(_kafka_executor, callback, *args)
+    finally:
+        kafka_operation_seconds.labels(operation=operation).observe(time.monotonic() - started)
+
+
+async def _event_loop_watchdog() -> None:
+    expected = time.monotonic() + 1.0
+    while service_state.running:
+        await asyncio.sleep(1.0)
+        now = time.monotonic()
+        event_loop_lag.set(max(0.0, now - expected))
+        expected = now + 1.0
 
 
 def _append_bounded_evidence(
@@ -107,13 +134,13 @@ async def durable_job_worker(producer: Producer, worker_slot: int = 0) -> None:
             batch = [(settings.processed_topic, 0, index, event) for index, event in enumerate(evidence)]
             result = await enrich_batch(batch, producer, policy=policy, job=job)
             if result:
-                complete_report_job(str(job["job_id"]), result)
+                await asyncio.to_thread(complete_report_job, str(job["job_id"]), result)
                 report_jobs_completed.inc()
             else:
-                fail_report_job(str(job["job_id"]), "AI output was not acknowledged")
+                await asyncio.to_thread(fail_report_job, str(job["job_id"]), "AI output was not acknowledged")
                 report_jobs_failed.inc()
         except Exception as exc:
-            fail_report_job(str(job["job_id"]), str(exc))
+            await asyncio.to_thread(fail_report_job, str(job["job_id"]), str(exc))
             report_jobs_failed.inc()
         finally:
             report_workers_active.dec()
@@ -137,14 +164,16 @@ async def lifespan(_app: FastAPI):
     service_state.mark_running()
     consume_task = asyncio.create_task(consume_loop())
     broadcast_task = asyncio.create_task(historian_broadcast_loop())
+    watchdog_task = asyncio.create_task(_event_loop_watchdog())
     try:
         yield
     finally:
         service_state.mark_stopped()
         consume_task.cancel()
         broadcast_task.cancel()
+        watchdog_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.gather(consume_task, broadcast_task, return_exceptions=True)
+            await asyncio.gather(consume_task, broadcast_task, watchdog_task, return_exceptions=True)
 
 
 app = FastAPI(title="Ravan AI Gateway", version=VERSION, lifespan=lifespan)
@@ -373,7 +402,11 @@ async def historian_stream() -> StreamingResponse:
         historian_subscribers.add(queue)
         try:
             # Send initial snapshot
-            yield f"data: {json.dumps({'type': 'init', 'alarms': query_alarms(20), 'events': query_recent_events('industrial_events', 20)}, default=str)}\n\n"
+            alarms, events = await asyncio.gather(
+                asyncio.to_thread(query_alarms, 20),
+                asyncio.to_thread(query_recent_events, "industrial_events", 20),
+            )
+            yield f"data: {json.dumps({'type': 'init', 'alarms': alarms, 'events': events}, default=str)}\n\n"
             while service_state.running:
                 try:
                     payload = await asyncio.wait_for(queue.get(), timeout=5.0)
@@ -402,8 +435,10 @@ async def historian_broadcast_loop() -> None:
     last_snapshot = ""
     while service_state.running:
         try:
-            alarms = query_alarms(50)
-            events = query_recent_events("industrial_events", 50)
+            alarms, events = await asyncio.gather(
+                asyncio.to_thread(query_alarms, 50),
+                asyncio.to_thread(query_recent_events, "industrial_events", 50),
+            )
             snapshot = json.dumps({"alarms": alarms[:20], "events": events[:20]}, sort_keys=True, default=str)
             if snapshot != last_snapshot:
                 last_snapshot = snapshot
@@ -430,17 +465,21 @@ async def historian_broadcast_loop() -> None:
 
 
 async def consume_loop() -> None:
-    consumer = Consumer(
-        {
-            "bootstrap.servers": settings.kafka_brokers,
-            "group.id": "ai-gateway",
-            "auto.offset.reset": "latest",
-            "enable.auto.commit": False,
-            "enable.auto.offset.store": False,
-        }
-    )
+    def create_consumer() -> Consumer:
+        consumer = Consumer(
+            {
+                "bootstrap.servers": settings.kafka_brokers,
+                "group.id": "ai-gateway",
+                "auto.offset.reset": "latest",
+                "enable.auto.commit": False,
+                "enable.auto.offset.store": False,
+            }
+        )
+        consumer.subscribe([settings.processed_topic])
+        return consumer
+
+    consumer = await _kafka_call("create", create_consumer)
     producer = Producer({"bootstrap.servers": settings.kafka_brokers, "client.id": "ai-gateway"})
-    consumer.subscribe([settings.processed_topic])
 
     durable_workers = [
         asyncio.create_task(durable_job_worker(producer, worker_slot))
@@ -453,14 +492,14 @@ async def consume_loop() -> None:
 
     try:
         while service_state.running:
-            message = consumer.poll(0.25)
+            message = await _kafka_call("poll", consumer.poll, 0.25)
             if message and not message.error():
                 consumed_events.inc()
                 event = json.loads(message.value().decode("utf-8"))
                 policy = reporting_policy()
                 if not policy.enabled:
                     batch.clear()
-                    consumer.commit(
+                    await _kafka_call("commit", consumer.commit,
                         offsets=[TopicPartition(message.topic(), message.partition(), message.offset() + 1)],
                         asynchronous=False,
                     )
@@ -480,7 +519,7 @@ async def consume_loop() -> None:
                     anomaly_evidence = list(anomaly_transition["evidence"])
                     transition_kind = str(anomaly_transition["kind"])
                     try:
-                        anomaly_job = create_report_job(
+                        anomaly_job = await asyncio.to_thread(create_report_job,
                             site_id=_batch_site(anomaly_evidence),
                             report_type="recovery" if transition_kind == "recovery" else "anomaly",
                             trigger_reason="anomaly_recovered" if transition_kind == "recovery" else "sustained_anomaly",
@@ -492,7 +531,12 @@ async def consume_loop() -> None:
                     except Exception as exc:
                         service_state.mark_degraded("anomaly report failed", str(exc))
                 try:
-                    low, high = consumer.get_watermark_offsets(TopicPartition(message.topic(), message.partition()), cached=True)
+                    low, high = await _kafka_call(
+                        "watermark",
+                        consumer.get_watermark_offsets,
+                        TopicPartition(message.topic(), message.partition()),
+                        True,
+                    )
                     if high >= 0:
                         set_consumer_lag("ai_gateway", message.topic(), message.partition(), high - (message.offset() + 1))
                 except Exception:
@@ -500,7 +544,7 @@ async def consume_loop() -> None:
                 # Report evidence is bounded separately from Kafka delivery.
                 # Never hold a stream offset for a 10-minute-to-one-day model
                 # schedule; processed events remain queryable in the historian.
-                consumer.commit(
+                await _kafka_call("commit", consumer.commit,
                     offsets=[TopicPartition(message.topic(), message.partition(), message.offset() + 1)],
                     asynchronous=False,
                 )
@@ -521,7 +565,7 @@ async def consume_loop() -> None:
                         payloads_by_site.setdefault(_batch_site([payload]), []).append(payload)
                     for site_id, site_payloads in payloads_by_site.items():
                         jobs.append(
-                            create_report_job(
+                            await asyncio.to_thread(create_report_job,
                                 site_id=site_id,
                                 report_type="scheduled",
                                 trigger_reason="interval",
@@ -546,7 +590,7 @@ async def consume_loop() -> None:
         for worker in durable_workers:
             worker.cancel()
         await asyncio.gather(*durable_workers, return_exceptions=True)
-        consumer.close()
+        await _kafka_call("close", consumer.close)
         producer.flush(5)
 
 
@@ -564,11 +608,19 @@ async def enrich_batch(
         if count:
             batch_severity_total.labels(severity=severity).inc(count)
     site_id = str(job.get("site_id") if job else _batch_site(payloads))
-    previous_reports = list_report_jobs(
-        site_id=None if site_id == "*" else site_id,
-        status="completed",
-        limit=settings.ai_report_memory_count,
-    )
+    try:
+        previous_reports = await asyncio.to_thread(
+            list_report_jobs,
+            site_id=None if site_id == "*" else site_id,
+            status="completed",
+            limit=settings.ai_report_memory_count,
+        )
+    except Exception as exc:
+        # Short-term report memory improves the briefing but is not required
+        # to produce one. Keep Kafka enrichment available during a historian
+        # outage and make the reduced context visible in health telemetry.
+        previous_reports = []
+        service_state.mark_degraded("AI report memory unavailable", str(exc))
     context = build_briefing_context(
         payloads[: settings.llm_max_batch_size],
         report_type=str(job.get("report_type") if job else "scheduled"),
@@ -666,9 +718,9 @@ async def enrich_batch(
         structured_report=briefing,
         generation_metadata=generation_record,
     )
-    # ``iot.ai_enriched`` is compacted, so every record must have a stable key.
     # Reports use their durable job id; non-job enrichments use the generated
-    # event id. Delivery callbacks are checked because confluent-kafka's
+    # event id. Stable keys aid tracing and future partitioning. Delivery
+    # callbacks are checked because confluent-kafka's
     # ``flush`` return value only reports messages still queued, not broker
     # delivery errors.
     delivery_errors: list[str] = []

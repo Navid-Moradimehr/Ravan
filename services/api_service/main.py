@@ -4,6 +4,7 @@ import os
 import ssl
 import sys
 import asyncio
+import time
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -164,6 +165,7 @@ def build_asset_hierarchy() -> list[dict[str, Any]]:
 API_PORT = int(os.getenv("API_SERVICE_PORT", "8020"))
 TIMESCALE_API_BASE = os.getenv("TIMESCALE_API_BASE", "http://localhost:8010")
 WS_HEARTBEAT_INTERVAL = 15.0  # seconds
+SERVICE_STARTED_MONOTONIC = time.monotonic()
 
 
 def _parse_cors_origins(raw: str | None) -> list[str]:
@@ -379,15 +381,12 @@ async def health() -> HealthResponse:
     hanging the endpoint. The overall status is ``degraded`` if any probed
     dependency is down or the service is in a degraded state.
     """
-    import time
-
     from services.api_service.health_probes import (
         probe_ai_gateway,
         probe_historian,
         probe_kafka,
     )
 
-    start = time.time()
     try:
         from services.api_service.auth import auth_security_status
     except ImportError:
@@ -417,7 +416,7 @@ async def health() -> HealthResponse:
     return HealthResponse(
         status=status,
         version=VERSION,
-        uptime_seconds=int(time.time() - start + 1),
+        uptime_seconds=max(0, int(time.monotonic() - SERVICE_STARTED_MONOTONIC)),
         services={
             "historian": historian_ok,
             "kafka": kafka_ok,
