@@ -61,7 +61,11 @@ jobs:
       - name: Validate Helm chart
         run: |
           helm lint k8s/helm
-          helm template ravan k8s/helm --set flinkJob.enabled=true --set flinkJob.operator.enabled=true >/dev/null
+          helm template ravan k8s/helm \
+            --set env.RUNTIME_MODE=flink-production \
+            --set processor.enabled=false \
+            --set flinkJob.enabled=true \
+            --set flinkJob.operator.enabled=true >/dev/null
       - name: Build UI
         working-directory: ui
         run: npm ci && npm run build
