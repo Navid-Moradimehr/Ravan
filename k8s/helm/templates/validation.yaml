@@ -1,0 +1,22 @@
+{{- $mode := default "python-fallback" .Values.env.RUNTIME_MODE -}}
+{{- if not (has $mode (list "python-fallback" "flink-local" "flink-production")) -}}
+{{- fail (printf "env.RUNTIME_MODE must be python-fallback, flink-local, or flink-production (got %s)" $mode) -}}
+{{- end -}}
+{{- if and (eq $mode "python-fallback") .Values.flinkJob.enabled -}}
+{{- fail "flinkJob.enabled must be false when RUNTIME_MODE=python-fallback" -}}
+{{- end -}}
+{{- if and (eq $mode "python-fallback") (not .Values.processor.enabled) -}}
+{{- fail "processor.enabled must be true when RUNTIME_MODE=python-fallback" -}}
+{{- end -}}
+{{- if and (ne $mode "python-fallback") .Values.processor.enabled -}}
+{{- fail "processor.enabled must be false when using a Flink runtime mode" -}}
+{{- end -}}
+{{- if and (ne $mode "python-fallback") (not .Values.flinkJob.enabled) -}}
+{{- fail "flinkJob.enabled must be true when using a Flink runtime mode" -}}
+{{- end -}}
+{{- if and .Values.edgeIngest.enabled (ne (int .Values.edgeIngest.replicaCount) 1) -}}
+{{- fail "edgeIngest.replicaCount must remain 1 until source leasing or sharding is configured" -}}
+{{- end -}}
+{{- if .Values.autoScaling.edgeIngest.enabled -}}
+{{- fail "autoScaling.edgeIngest is unsupported until edge source ownership is explicit" -}}
+{{- end -}}

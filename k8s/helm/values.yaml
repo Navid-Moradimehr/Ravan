@@ -131,6 +131,60 @@ edgeIngest:
       cpu: 250m
       memory: 256Mi
 
+# Projection consumers. These are deliberately separate deployments so each
+# sink can be restarted and scaled independently of stream processing.
+normalizedFanout:
+  enabled: true
+  replicaCount: 1
+  command: ["python", "-m", "services.processor.normalized_fanout"]
+  metricsPort: 8095
+  resources:
+    limits: { cpu: 500m, memory: 512Mi }
+    requests: { cpu: 250m, memory: 256Mi }
+
+processedFanout:
+  enabled: true
+  replicaCount: 1
+  command: ["python", "-m", "services.processor.processed_fanout"]
+  metricsPort: 8097
+  resources:
+    limits: { cpu: 500m, memory: 512Mi }
+    requests: { cpu: 250m, memory: 256Mi }
+
+aiFanout:
+  enabled: true
+  replicaCount: 1
+  command: ["python", "-m", "services.processor.ai_enriched_fanout"]
+  metricsPort: 8096
+  resources:
+    limits: { cpu: 500m, memory: 512Mi }
+    requests: { cpu: 250m, memory: 256Mi }
+
+operationalFanout:
+  enabled: false
+  replicaCount: 1
+  command: ["python", "-m", "services.processor.operational_fanout"]
+  metricsPort: 8098
+  resources: {}
+artifactFanout:
+  enabled: false
+  replicaCount: 1
+  command: ["python", "-m", "services.processor.artifact_fanout"]
+  metricsPort: 8099
+  resources: {}
+rawArchive:
+  enabled: false
+  replicaCount: 1
+  command: ["python", "-m", "services.processor.raw_lakehouse_archive"]
+  metricsPort: 8100
+  resources: {}
+datasetWorker:
+  enabled: false
+  replicaCount: 1
+  command: ["python", "-m", "services.datasets.dataset_worker"]
+  metricsPort: 8101
+  resources: {}
+
 # ---------------------------------------------------------------------------
 # Auto-scaling (HPA) — enabled per service for prod profiles
 # ---------------------------------------------------------------------------
@@ -175,7 +229,7 @@ env:
   DEPLOYMENT_MODE: "single-site"
   REGION: "local-lab"
   NETWORK_ZONE: "zone-a"
-  RUNTIME_MODE: "flink-production"
+  RUNTIME_MODE: "python-fallback"
   KAFKA_BROKERS: "kafka:9092"
   TIMESCALE_HOST: "timescaledb"
   TIMESCALE_PORT: "5432"

@@ -21,6 +21,36 @@ spec:
     component: api-service
 {{- end }}
 
+{{- range $component, $config := (dict
+      "normalized-fanout" .Values.normalizedFanout
+      "processed-fanout" .Values.processedFanout
+      "ai-fanout" .Values.aiFanout
+      "operational-fanout" .Values.operationalFanout
+      "artifact-fanout" .Values.artifactFanout
+      "raw-archive" .Values.rawArchive
+      "dataset-worker" .Values.datasetWorker) }}
+{{- if $config.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-{{ $component }}
+  namespace: {{ include "data-stream.namespace" $ }}
+  labels:
+    app: {{ $name }}
+    component: {{ $component }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ $config.metricsPort }}
+      targetPort: metrics
+      name: metrics
+  selector:
+    app: {{ $name }}
+    component: {{ $component }}
+{{- end }}
+{{- end }}
+
 ---
 {{- if .Values.aiGateway.enabled }}
 apiVersion: v1

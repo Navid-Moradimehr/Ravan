@@ -72,6 +72,78 @@ spec:
         {{- toYaml .Values.affinity | nindent 8 }}
 {{- end }}
 
+{{- /* Projection fan-outs */ -}}
+{{- range $component, $config := (dict
+      "normalized-fanout" .Values.normalizedFanout
+      "processed-fanout" .Values.processedFanout
+      "ai-fanout" .Values.aiFanout
+      "operational-fanout" .Values.operationalFanout
+      "artifact-fanout" .Values.artifactFanout
+      "raw-archive" .Values.rawArchive
+      "dataset-worker" .Values.datasetWorker) }}
+{{- if $config.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-{{ $component }}
+  namespace: {{ include "data-stream.namespace" $ }}
+  labels:
+    app: {{ $name }}
+    component: {{ $component }}
+    chart: {{ $chart }}
+spec:
+  replicas: {{ $config.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+      component: {{ $component }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        component: {{ $component }}
+    spec:
+      containers:
+        - name: {{ $component }}
+          image: "{{ default $.Values.image.repository $.Values.processor.image.repository }}:{{ default $.Values.image.tag $.Values.processor.image.tag }}"
+          imagePullPolicy: {{ default $.Values.image.pullPolicy $.Values.processor.image.pullPolicy }}
+          command:
+            {{- toYaml $config.command | nindent 12 }}
+          ports:
+            - containerPort: {{ $config.metricsPort }}
+              name: metrics
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+          envFrom:
+            - configMapRef:
+                name: {{ $fullname }}-env
+            - secretRef:
+                name: {{ $.Values.secrets.existingSecret }}
+                optional: true
+          resources:
+            {{- toYaml $config.resources | nindent 12 }}
+      nodeSelector:
+        {{- toYaml $.Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml $.Values.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml $.Values.affinity | nindent 8 }}
+{{- end }}
+{{- end }}
+
 ---
 {{- /* AI Gateway */ -}}
 {{- if .Values.aiGateway.enabled }}
