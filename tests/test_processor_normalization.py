@@ -248,3 +248,77 @@ def test_runtime_processor_flush_holds_when_below_threshold() -> None:
     assert committed == []
     assert buffer == [{"event_id": "e1"}]
     assert new_flush is not None
+
+
+def test_runtime_processor_confirms_kafka_before_committing_offset() -> None:
+    from services.processor import runtime_processor as rp
+
+    order: list[str] = []
+    buffer = [{"event_id": "e1"}]
+    offsets = [("iot.raw", 0, 2)]
+
+    rp._flush_processed_batch(
+        buffer,
+        offsets,
+        force=True,
+        db_batch_size=1,
+        db_flush_seconds=1.0,
+        last_db_flush=0.0,
+        persist_processed=True,
+        insert_batch=lambda _batch: order.append("historian"),
+        insert_single=lambda _event: None,
+        commit_offsets=lambda _offsets: order.append("commit"),
+        ensure_delivery=lambda: order.append("kafka") or 0,
+    )
+
+    assert order == ["kafka", "historian", "commit"]
+
+
+def test_runtime_processor_keeps_batch_when_kafka_delivery_fails() -> None:
+    from services.processor import runtime_processor as rp
+
+    buffer = [{"event_id": "e1"}]
+    offsets = [("iot.raw", 0, 2)]
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="delivery incomplete"):
+        rp._flush_processed_batch(
+            buffer,
+            offsets,
+            force=True,
+            db_batch_size=1,
+            db_flush_seconds=1.0,
+            last_db_flush=0.0,
+            persist_processed=False,
+            insert_batch=lambda _batch: None,
+            insert_single=lambda _event: None,
+            commit_offsets=lambda _offsets: None,
+            ensure_delivery=lambda: 1,
+        )
+
+    assert buffer == [{"event_id": "e1"}]
+    assert offsets == [("iot.raw", 0, 2)]
+
+
+def test_runtime_processor_prunes_window_and_threshold_state(monkeypatch) -> None:
+    from services.common.runtime_event import RollingWindowState
+    from services.processor import runtime_processor as rp
+
+    windows = {"scope-a": RollingWindowState(maxlen=2)}
+    last_seen = {"scope-a": 10.0}
+    cleared: list[str] = []
+    monkeypatch.setattr(rp, "clear_threshold_runtime_state", cleared.append)
+
+    removed = rp._prune_windows(
+        windows,
+        last_seen,
+        max_devices=0,
+        max_idle_seconds=5,
+        now_ts=20.0,
+    )
+
+    assert removed == 1
+    assert windows == {}
+    assert last_seen == {}
+    assert cleared == ["scope-a"]

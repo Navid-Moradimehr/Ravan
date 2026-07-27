@@ -72,7 +72,7 @@ def enrich_runtime_event(
     anomaly_severity = severity_for(anomaly_score)
     policy = threshold_policy or resolve_threshold_policy(event.site_id, event.asset_id, event.tag)
     threshold = threshold_result or evaluate_threshold_runtime(
-        f"{event.site_id}:{event.asset_id}:{event.tag}", event.value, policy, quality=event.quality
+        event.partition_key().decode("utf-8"), event.value, policy, quality=event.quality
     )
     severity_rank = {"normal": 0, "warning": 1, "critical": 2}
     severity = max((anomaly_severity, threshold["severity"]), key=lambda item: severity_rank[item])

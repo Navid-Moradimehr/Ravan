@@ -195,10 +195,32 @@ def _connection_pool():
 def get_connection():
     pool = _connection_pool()
     conn = pool.getconn()
+    discard = False
     try:
         yield conn
+    except Exception:
+        # A failed statement leaves psycopg connections in an aborted
+        # transaction. Reset it before returning the connection to the pool.
+        if not getattr(conn, "closed", False):
+            try:
+                conn.rollback()
+            except Exception:
+                discard = True
+        raise
     finally:
-        pool.putconn(conn)
+        if getattr(conn, "closed", False):
+            discard = True
+        elif not discard:
+            try:
+                get_status = getattr(conn, "get_transaction_status", None)
+                if get_status is not None and get_status() != 0:
+                    # Read-only SELECTs also open a transaction. Returning
+                    # these without rollback creates idle-in-transaction
+                    # sessions and can retain old snapshots/locks indefinitely.
+                    conn.rollback()
+            except Exception:
+                discard = True
+        pool.putconn(conn, close=discard)
 
 
 def _execute_values_write(table: str, statement: str, rows: list[tuple[Any, ...]]) -> None:

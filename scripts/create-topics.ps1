@@ -8,7 +8,10 @@ if (-not $broker) {
 $topics = @(
     @{ Name = "industrial.raw"; Partitions = 3; Compact = $false },
     @{ Name = "industrial.normalized"; Partitions = 3; Compact = $false },
+    @{ Name = "industrial.operational"; Partitions = 3; Compact = $false },
+    @{ Name = "industrial.observation-artifacts"; Partitions = 3; Compact = $false },
     @{ Name = "industrial.dlq"; Partitions = 3; Compact = $false },
+    @{ Name = "industrial.raw.archive.dlq"; Partitions = 3; Compact = $false },
     @{ Name = "iot.raw"; Partitions = 3; Compact = $false },
     @{ Name = "iot.processed"; Partitions = 3; Compact = $false },
     @{ Name = "iot.ai_enriched"; Partitions = 3; Compact = $false },
@@ -29,5 +32,9 @@ foreach ($topic in $topics) {
     if ($topic.Compact) {
         docker compose -f docker/docker-compose.yml exec -T kafka /opt/kafka/bin/kafka-configs.sh --alter --bootstrap-server localhost:9092 --entity-type topics --entity-name $topic.Name --add-config cleanup.policy=compact
         Write-Host "Configured compact cleanup policy: $($topic.Name)"
+    } else {
+        $retentionMs = if ($env:KAFKA_EVENT_RETENTION_MS) { $env:KAFKA_EVENT_RETENTION_MS } else { "604800000" }
+        docker compose -f docker/docker-compose.yml exec -T kafka /opt/kafka/bin/kafka-configs.sh --alter --bootstrap-server localhost:9092 --entity-type topics --entity-name $topic.Name --add-config "cleanup.policy=delete,retention.ms=$retentionMs"
+        Write-Host "Configured event retention policy: $($topic.Name)"
     }
 }

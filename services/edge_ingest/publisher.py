@@ -74,6 +74,10 @@ class EdgePublisher:
         spool_dir = __import__("os").getenv("EDGE_STORE_FORWARD_DIR", "")
         self._spool = DiskEventSpool(spool_dir) if spool_dir else None
 
+    @property
+    def flush_interval_seconds(self) -> float:
+        return max(self._flush_interval_ms / 1000.0, 0.0)
+
     def _delivery_report(
         self,
         err: Any,
@@ -266,6 +270,16 @@ class EdgePublisher:
         elapsed_ms = (now - self._last_flush) * 1000
         if len(self._buffer) >= self._batch_size or elapsed_ms >= self._flush_interval_ms:
             self._flush_buffer()
+
+    def service(self) -> None:
+        """Serve delivery callbacks and flush a low-volume partial batch.
+
+        Batch deadlines must not depend on the next source event arriving.
+        Connectors can legitimately be quiet for long periods, so the service
+        supervisor calls this method on a short cadence.
+        """
+        self._maybe_flush()
+        self.producer.poll(0)
 
     def _flush_buffer(self) -> None:
         self._replay_spool()

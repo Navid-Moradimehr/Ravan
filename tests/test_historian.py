@@ -29,6 +29,40 @@ def test_connection_string_accepts_standard_database_url(monkeypatch) -> None:
     assert _connection_string() == "postgresql://worker:secret@timescaledb:5432/ravan"
 
 
+def test_connection_pool_resets_read_transaction_before_reuse(monkeypatch) -> None:
+    from services.historian import client
+
+    class FakeConnection:
+        closed = False
+
+        def __init__(self) -> None:
+            self.rollbacks = 0
+
+        def get_transaction_status(self) -> int:
+            return 2
+
+        def rollback(self) -> None:
+            self.rollbacks += 1
+
+    connection = FakeConnection()
+    returned: list[tuple[object, bool]] = []
+
+    class FakePool:
+        def getconn(self):
+            return connection
+
+        def putconn(self, conn, close=False):
+            returned.append((conn, close))
+
+    monkeypatch.setattr(client, "_connection_pool", lambda: FakePool())
+
+    with client.get_connection() as acquired:
+        assert acquired is connection
+
+    assert connection.rollbacks == 1
+    assert returned == [(connection, False)]
+
+
 def test_historian_boundary_preserves_scalar_types_and_external_ids() -> None:
     numeric = _typed_value(12.5)
     boolean = _typed_value(True)

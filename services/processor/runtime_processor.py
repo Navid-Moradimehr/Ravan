@@ -12,7 +12,7 @@ from services.common.brokers import resolve_kafka_brokers
 from services.common.normalize import normalize_runtime_event
 from services.common.runtime_metrics import set_consumer_lag
 from services.common.runtime_event import RollingWindowState, RuntimeEventRecord
-from services.common.threshold_policy import resolve_threshold_policy
+from services.common.threshold_policy import clear_threshold_runtime_state, resolve_threshold_policy
 from services.common.threshold_policy_sync import start_policy_sync_workers
 from services.edge_ingest.model import to_json_bytes
 from services.historian.client import insert_processed_event, insert_processed_events
@@ -48,6 +48,7 @@ def _flush_processed_batch(
     insert_batch,
     insert_single,
     commit_offsets,
+    ensure_delivery=None,
 ) -> float:
     """Flush the processed-event buffer, optionally persisting to the historian.
 
@@ -64,28 +65,40 @@ def _flush_processed_batch(
 
     batch = buffer[:]
     pending_offsets = offsets[:]
-    buffer.clear()
-    offsets.clear()
-    write_failed = False
+
+    # The output event is part of the processing result. Never advance the
+    # source offset until Kafka has acknowledged it; otherwise a process crash
+    # can permanently lose the derived event.
+    if ensure_delivery is not None:
+        remaining = ensure_delivery()
+        if remaining is not None and remaining != 0:
+            raise RuntimeError(f"processed Kafka delivery incomplete: {remaining} message(s) unresolved")
+
     if persist_processed:
         try:
             insert_batch(batch)
         except Exception as exc:  # pragma: no cover - logged failure path
             logger.warning("historian processed-event batch write failed: %s", exc)
-            write_failed = True
+            failed = 0
             for event in batch:
                 try:
                     insert_single(event)
                 except Exception as inner_exc:
                     logger.warning("historian processed-event fallback write failed: %s", inner_exc)
-                    write_failed = True
-    if (not write_failed) and pending_offsets:
-        try:
-            commit_offsets(
-                [TopicPartition(topic, partition, offset + 1) for topic, partition, offset in pending_offsets]
-            )
-        except Exception as exc:  # pragma: no cover - coordinator/runtime failure path
-            logger.warning("processor offset commit failed: %s", exc)
+                    failed += 1
+            if failed:
+                raise RuntimeError(
+                    f"historian rejected {failed} of {len(batch)} processed events"
+                ) from exc
+    if pending_offsets:
+        commit_offsets(
+            [TopicPartition(topic, partition, offset + 1) for topic, partition, offset in pending_offsets]
+        )
+
+    # Clear only after both destinations and the source commit succeeded. A
+    # raised exception leaves the batch intact for shutdown diagnostics/retry.
+    buffer.clear()
+    offsets.clear()
     return time.monotonic()
 
 
@@ -105,12 +118,14 @@ def _prune_windows(
         for device_id in stale_ids:
             windows.pop(device_id, None)
             last_seen.pop(device_id, None)
+            clear_threshold_runtime_state(device_id)
             removed += 1
 
     if max_devices > 0 and len(last_seen) > max_devices:
         for device_id, _ in sorted(last_seen.items(), key=lambda item: item[1])[: len(last_seen) - max_devices]:
             windows.pop(device_id, None)
             last_seen.pop(device_id, None)
+            clear_threshold_runtime_state(device_id)
             removed += 1
 
     return removed
@@ -153,6 +168,7 @@ def main() -> None:
             insert_batch=insert_processed_events,
             insert_single=insert_processed_event,
             commit_offsets=lambda offsets: consumer.commit(offsets=offsets, asynchronous=False),
+            ensure_delivery=lambda: producer.flush(10),
         )
 
     def stop(_signum: int, _frame: object) -> None:
@@ -181,6 +197,8 @@ def main() -> None:
         while running:
             message = consumer.poll(1)
             if message is None:
+                producer.poll(0)
+                flush_processed_buffer()
                 continue
             if message.error():
                 logger.warning("consumer_error=%s", message.error())
@@ -242,9 +260,11 @@ def main() -> None:
                 print(f"processed={processed} rate={processed / elapsed:.1f}/sec topic={output_topic}")
     finally:
         policy_stop.set()
-        flush_processed_buffer(force=True)
-        consumer.close()
-        producer.flush(10)
+        try:
+            flush_processed_buffer(force=True)
+        finally:
+            consumer.close()
+            producer.flush(10)
 
 
 if __name__ == "__main__":

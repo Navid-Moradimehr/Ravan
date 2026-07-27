@@ -61,13 +61,28 @@ async def main() -> None:
                 logger.exception("connector reconciliation failed")
             await asyncio.sleep(2.0 if registry_path.exists() else 5.0)
 
+    async def service_publisher() -> None:
+        """Flush partial batches even when every configured source is idle."""
+        interval_seconds = max(0.05, min(publisher.flush_interval_seconds, 1.0))
+        while not stop_event.is_set():
+            try:
+                publisher.service()
+            except Exception:
+                logger.exception("publisher service cycle failed")
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
+            except asyncio.TimeoutError:
+                continue
+
     supervisor_task = asyncio.create_task(reconcile_connectors())
+    publisher_task = asyncio.create_task(service_publisher())
 
     try:
         await stop_event.wait()
     finally:
         supervisor_task.cancel()
-        await asyncio.gather(supervisor_task, return_exceptions=True)
+        publisher_task.cancel()
+        await asyncio.gather(supervisor_task, publisher_task, return_exceptions=True)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)

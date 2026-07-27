@@ -461,3 +461,8 @@ def evaluate_threshold_runtime(
     )
     _RUNTIME_STATE[key] = {"severity": result["severity"], "candidate": next_candidate, "since": next_since}
     return result
+
+
+def clear_threshold_runtime_state(key: str) -> None:
+    """Release local transition state when its corresponding stream expires."""
+    _RUNTIME_STATE.pop(key, None)

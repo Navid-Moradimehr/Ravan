@@ -229,6 +229,45 @@ def test_shutdown_flush_raises_when_delivery_is_unresolved_without_spool(monkeyp
         publisher.flush()
 
 
+def test_service_flushes_partial_batch_after_deadline(monkeypatch):
+    produced: list[str] = []
+
+    class FakeProducer:
+        def __init__(self, *args, **kwargs): pass
+        def produce(self, topic, key=None, value=None, on_delivery=None):
+            produced.append(topic)
+            if on_delivery is not None:
+                on_delivery(None, None)
+        def poll(self, timeout=None): return 0
+        def flush(self, timeout=None): return 0
+
+    from services.edge_ingest import publisher as publisher_mod
+
+    monkeypatch.setattr(publisher_mod, "Producer", FakeProducer)
+    publisher = publisher_mod.EdgePublisher(
+        Settings(max_message_bytes=1048576),
+        batch_size=64,
+        flush_interval_ms=1000,
+    )
+    publisher.publish_event(
+        {
+            "source_protocol": "mqtt",
+            "source_id": "source-1",
+            "asset_id": "Pump-01",
+            "tag": "Temperature",
+            "value": 51.2,
+            "quality": "good",
+            "ts_source": utc_now(),
+        }
+    )
+    assert "industrial.normalized" not in produced
+
+    publisher._last_flush -= 2
+    publisher.service()
+
+    assert "industrial.normalized" in produced
+
+
 def test_mqtt_queue_full_routes_to_dlq(monkeypatch):
     """When the MQTT decoupling queue is saturated, the message goes to the DLQ."""
     produced: list[tuple[str, bytes, bytes]] = []

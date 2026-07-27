@@ -40,14 +40,31 @@ services:
       - -lc
       - |
         set -e
-        for topic in industrial.raw industrial.normalized industrial.operational industrial.observation-artifacts industrial.dlq iot.raw iot.processed iot.ai_enriched platform.metadata.threshold-policies; do
+        for topic in industrial.raw industrial.normalized industrial.operational industrial.observation-artifacts industrial.dlq industrial.raw.archive.dlq iot.raw iot.processed iot.ai_enriched; do
           /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
             --topic "$$topic" \
             --bootstrap-server kafka:9092 \
             --partitions 3 \
             --replication-factor 1 \
-            --config cleanup.policy=compact || true
+            --config cleanup.policy=delete \
+            --config retention.ms=$${KAFKA_EVENT_RETENTION_MS:-604800000}
+          /opt/kafka/bin/kafka-configs.sh --alter \
+            --bootstrap-server kafka:9092 \
+            --entity-type topics \
+            --entity-name "$$topic" \
+            --add-config cleanup.policy=delete,retention.ms=$${KAFKA_EVENT_RETENTION_MS:-604800000}
         done
+        /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
+          --topic platform.metadata.threshold-policies \
+          --bootstrap-server kafka:9092 \
+          --partitions 3 \
+          --replication-factor 1 \
+          --config cleanup.policy=compact
+        /opt/kafka/bin/kafka-configs.sh --alter \
+          --bootstrap-server kafka:9092 \
+          --entity-type topics \
+          --entity-name platform.metadata.threshold-policies \
+          --add-config cleanup.policy=compact
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
 
   kafka-ui:

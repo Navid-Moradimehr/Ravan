@@ -59,6 +59,14 @@ def test_kafka_init_uses_if_not_exists():
     assert "--if-not-exists" in command_blob
 
 
+def test_event_topics_are_retained_as_logs_not_compacted():
+    init = _compose()["services"]["kafka-init"]
+    command_blob = " ".join(init["command"])
+    assert "--add-config cleanup.policy=delete,retention.ms=" in command_blob
+    assert "--entity-name platform.metadata.threshold-policies" in command_blob
+    assert "--add-config cleanup.policy=compact" in command_blob
+
+
 def test_kafka_init_is_one_shot():
     init = _compose()["services"]["kafka-init"]
     assert init.get("restart") == "no"
