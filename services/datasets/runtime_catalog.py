@@ -20,6 +20,14 @@ class DatasetSource:
 
 DATASET_SOURCES: tuple[DatasetSource, ...] = (
     DatasetSource(
+        dataset_id="mock",
+        name="Built-in Industrial Mock Generator",
+        category="synthetic",
+        signals="Generated temperature, vibration, pressure, quality, and fault scenarios",
+        best_use="Unlicensed local smoke tests and connector-free demonstrations",
+        licensed=False,
+    ),
+    DatasetSource(
         dataset_id="ai4i",
         name="AI4I 2020 Predictive Maintenance",
         category="synthetic",
@@ -100,7 +108,9 @@ class DatasetCatalog:
         sources: list[DatasetSource] | None = None,
         state_path: str | os.PathLike[str] | None = None,
     ) -> None:
-        self._sources: list[DatasetSource] = list(sources or DATASET_SOURCES)
+        # An explicit empty catalog is valid (for example, a deployment that
+        # has not licensed any external datasets yet).
+        self._sources = list(DATASET_SOURCES if sources is None else sources)
         self._state_path = Path(state_path) if state_path else None
         if self._state_path and self._state_path.exists():
             self._load_state()

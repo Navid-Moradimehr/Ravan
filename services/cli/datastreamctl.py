@@ -49,6 +49,16 @@ from services.benchmarks.semantic_store_write import run_benchmark as run_semant
 from services.benchmarks.resilience import format_report as format_resilience_report
 from services.benchmarks.resilience import run_campaign as run_resilience_campaign
 from services.benchmarks.resilience import write_report as write_resilience_report
+from services.benchmarks.site_profile_matrix import format_result as format_site_profile_matrix_result
+from services.benchmarks.site_profile_matrix import run_matrix as run_site_profile_matrix
+from services.benchmarks.site_profile_calibration import format_result as format_site_profile_calibration_result
+from services.benchmarks.site_profile_calibration import run_calibration as run_site_profile_calibration
+from services.benchmarks.multi_site_failure import format_result as format_multi_site_failure_result
+from services.benchmarks.multi_site_failure import run_benchmark as run_multi_site_failure_benchmark
+from services.benchmarks.cgr_gap import format_result as format_cgr_gap_result
+from services.benchmarks.cgr_gap import run_report as run_cgr_gap_report
+from services.benchmarks.cgr_stream_slice import format_result as format_cgr_stream_slice_result
+from services.benchmarks.cgr_stream_slice import run_benchmark as run_cgr_stream_slice_benchmark
 from services.historian.backup import (
     collect_historian_snapshot,
     compare_historian_snapshots,
@@ -2766,6 +2776,57 @@ def build_parser() -> argparse.ArgumentParser:
     deployment_pack_matrix.add_argument("--warmup-events", type=int, default=0)
     deployment_pack_matrix.add_argument("--json", action="store_true")
     deployment_pack_matrix.set_defaults(func=cmd_benchmark)
+    site_profile_matrix = benchmark_sub.add_parser("site-profile-matrix", help="Benchmark replay throughput for selected site profiles")
+    site_profile_matrix.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
+    site_profile_matrix.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    site_profile_matrix.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites")
+    site_profile_matrix.add_argument("--events", type=int, default=10_000)
+    site_profile_matrix.add_argument("--batch-size", type=int, default=256)
+    site_profile_matrix.add_argument("--warmup-events", type=int, default=0)
+    site_profile_matrix.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    site_profile_matrix.add_argument("--repeat-count", type=int, default=1)
+    site_profile_matrix.add_argument("--report-dir", default=None)
+    site_profile_matrix.add_argument("--json", action="store_true")
+    site_profile_matrix.set_defaults(func=cmd_benchmark)
+    site_profile_calibration = benchmark_sub.add_parser("site-profile-calibration", help="Calibrate site-profile throughput thresholds")
+    site_profile_calibration.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
+    site_profile_calibration.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    site_profile_calibration.add_argument("--site-ids", default=None, help="Comma-separated site ids; defaults to all sites")
+    site_profile_calibration.add_argument("--events", type=int, default=10_000)
+    site_profile_calibration.add_argument("--batch-size", type=int, default=256)
+    site_profile_calibration.add_argument("--warmup-events", type=int, default=0)
+    site_profile_calibration.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    site_profile_calibration.add_argument("--repeat-count", type=int, default=1)
+    site_profile_calibration.add_argument("--report-dir", default=None)
+    site_profile_calibration.add_argument("--json", action="store_true")
+    site_profile_calibration.set_defaults(func=cmd_benchmark)
+    multi_site_failure = benchmark_sub.add_parser("multi-site-failure", help="Exercise federated store-and-forward recovery")
+    multi_site_failure.add_argument("--sites", type=int, default=3)
+    multi_site_failure.add_argument("--events-per-site", type=int, default=10_000)
+    multi_site_failure.add_argument("--outage-events-per-site", type=int, default=2_000)
+    multi_site_failure.add_argument("--json", action="store_true")
+    multi_site_failure.set_defaults(func=cmd_benchmark)
+    cgr_gap = benchmark_sub.add_parser("cgr-gap-report", help="Compare measured slices with CGR throughput and latency targets")
+    cgr_gap.add_argument("--manifest", default=str(Path("config/project-manifest.yaml")))
+    cgr_gap.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    cgr_gap.add_argument("--site-ids", default=None)
+    cgr_gap.add_argument("--events", type=int, default=10_000)
+    cgr_gap.add_argument("--batch-size", type=int, default=256)
+    cgr_gap.add_argument("--warmup-events", type=int, default=0)
+    cgr_gap.add_argument("--min-average-events-per-second", type=float, default=1000.0)
+    cgr_gap.add_argument("--cgr-events-per-second", type=float, default=2_000_000.0)
+    cgr_gap.add_argument("--cgr-p99-ms", type=float, default=80.0)
+    cgr_gap.add_argument("--documented-full-pipeline-events-per-second", type=float, default=125_830.0)
+    cgr_gap.add_argument("--json", action="store_true")
+    cgr_gap.set_defaults(func=cmd_benchmark)
+    cgr_stream_slice = benchmark_sub.add_parser("cgr-stream-slice", help="Benchmark the in-process CGR streaming contract")
+    cgr_stream_slice.add_argument("--csv", default=str(Path("data/benchmarks/industrial_mixed_benchmark.csv")))
+    cgr_stream_slice.add_argument("--events", type=int, default=10_000)
+    cgr_stream_slice.add_argument("--batch-size", type=int, default=256)
+    cgr_stream_slice.add_argument("--warmup-events", type=int, default=0)
+    cgr_stream_slice.add_argument("--window-limit", type=int, default=25)
+    cgr_stream_slice.add_argument("--json", action="store_true")
+    cgr_stream_slice.set_defaults(func=cmd_benchmark)
     resilience = benchmark_sub.add_parser("resilience", help="Run a deterministic local fault-injection and recovery campaign")
     resilience.add_argument("--events", type=int, default=10_000)
     resilience.add_argument("--outage-events", type=int, default=2_000)
