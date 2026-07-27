@@ -50,7 +50,7 @@ export function PlatformFooter() {
 
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Help and contact</h2>
-            <p className="text-xs leading-5 text-text-secondary">For open-source support and deployment-specific questions, use the repository issue tracker first, and contact the maintainer directly only when needed.</p>
+            <p className="text-xs leading-5 text-text-secondary">For open-source support or deployment questions, please feel welcome to start with the repository issue tracker. If your question needs more direct guidance, you can also contact the maintainer.</p>
             <a href="mailto:ravanplatform@gmail.com" className="flex items-center gap-2 text-sm text-text-secondary transition-colors hover:text-accent">
               <MessageCircleQuestion aria-hidden="true" className="size-4 text-accent" />
               ravanplatform@gmail.com
