@@ -40,6 +40,8 @@ async def execute_job(job: dict[str, object]) -> None:
     thread_id = str(job["thread_id"])
     stream_id = str(job["stream_id"])
     request = MessageRequest.model_validate(job["request"])
+    request.context["worker_job"] = True
+    turn_store = build_assistant_store()
 
     async def publish(event_name: str, payload: dict[str, object]) -> None:
         await stream_bus.publish(stream_id, event_name, {**payload, "stream_id": stream_id})
@@ -47,6 +49,9 @@ async def execute_job(job: dict[str, object]) -> None:
     async def on_token(text: str) -> None:
         if await stream_bus.is_cancelled(stream_id):
             raise asyncio.CancelledError()
+        turn = turn_store.latest_running_turn(thread_id, actor_id=request.actor_id)
+        if turn:
+            turn_store.heartbeat_turn(turn["turn_id"], actor_id=request.actor_id)
         await publish("token", {"text": text})
 
     try:

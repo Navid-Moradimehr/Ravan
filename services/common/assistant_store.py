@@ -150,7 +150,7 @@ class AssistantStore:
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=max(30, max_age_seconds))
         changed = 0
         for record in self._state.setdefault("turns", {}).values():
-            if record.get("status") != "running":
+            if record.get("status") not in {"running", "executing"}:
                 continue
             try:
                 updated = datetime.fromisoformat(str(record.get("updated_at", "")))
@@ -168,6 +168,23 @@ class AssistantStore:
         if changed:
             self._persist()
         return changed
+
+    def claim_turn(self, turn_id: str, *, actor_id: str) -> dict[str, Any] | None:
+        record = self._state.setdefault("turns", {}).get(turn_id)
+        if not record or record.get("actor_id") != actor_id or record.get("status") != "running":
+            return None
+        record["status"] = "executing"
+        record["updated_at"] = _now()
+        self._persist()
+        return dict(record)
+
+    def heartbeat_turn(self, turn_id: str, *, actor_id: str) -> bool:
+        record = self._state.setdefault("turns", {}).get(turn_id)
+        if not record or record.get("actor_id") != actor_id or record.get("status") not in {"running", "executing"}:
+            return False
+        record["updated_at"] = _now()
+        self._persist()
+        return True
 
     def record_tool_call(self, payload: dict[str, Any]) -> dict[str, Any]:
         record = {**payload, "tool_call_id": payload.get("tool_call_id") or f"tool-{uuid.uuid4().hex[:16]}", "created_at": payload.get("created_at") or _now(), "status": payload.get("status", "running")}

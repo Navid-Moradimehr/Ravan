@@ -43,6 +43,28 @@ class PostgresAssistantStore:
                 )
                 cur.execute("CREATE INDEX IF NOT EXISTS ravan_assistant_thread_idx ON ravan_assistant_records(record_type, actor_id, updated_at DESC)")
                 cur.execute("CREATE INDEX IF NOT EXISTS ravan_assistant_turn_idx ON ravan_assistant_records(record_type, thread_id, actor_id, updated_at DESC)")
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS ravan_assistant_turns (
+                        turn_id TEXT PRIMARY KEY,
+                        thread_id TEXT NOT NULL,
+                        actor_id TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        context JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        retry_of TEXT,
+                        attempt INTEGER NOT NULL DEFAULT 1,
+                        status TEXT NOT NULL,
+                        retryable BOOLEAN NOT NULL DEFAULT FALSE,
+                        error JSONB,
+                        response_message_id TEXT,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                cur.execute("CREATE INDEX IF NOT EXISTS ravan_assistant_turns_claim_idx ON ravan_assistant_turns(status, heartbeat_at)")
+                cur.execute("CREATE INDEX IF NOT EXISTS ravan_assistant_turns_thread_idx ON ravan_assistant_turns(thread_id, actor_id, updated_at DESC)")
             conn.commit()
 
     def _fetch_one(self, record_type: str, record_id: str, *, actor_id: str | None = None, for_update: bool = False) -> dict[str, Any] | None:
@@ -117,10 +139,24 @@ class PostgresAssistantStore:
             raise KeyError(thread_id)
         now = _now()
         record = {"turn_id": f"turn-{uuid.uuid4().hex[:16]}", "thread_id": thread_id, "actor_id": actor_id, "content": content, "context": context or {}, "retry_of": retry_of, "attempt": 1, "status": "running", "created_at": now, "updated_at": now}
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO ravan_assistant_turns(turn_id, thread_id, actor_id, content, context, retry_of, status, created_at, updated_at, heartbeat_at) VALUES (%s,%s,%s,%s,%s,%s,'running',%s,%s,%s)", (record["turn_id"], thread_id, actor_id, content, Json(context or {}), retry_of, now, now, now))
+            conn.commit()
         return self._upsert(record_id=record["turn_id"], record_type="turn", actor_id=actor_id, thread_id=thread_id, status="running", payload=record)
 
     def get_turn(self, turn_id: str, *, actor_id: str) -> dict[str, Any] | None:
+        with get_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT * FROM ravan_assistant_turns WHERE turn_id=%s AND actor_id=%s", (turn_id, actor_id))
+                row = cur.fetchone()
+        if row:
+            return self._turn_record(dict(row))
         return self._fetch_one("turn", turn_id, actor_id=actor_id)
+
+    @staticmethod
+    def _turn_record(row: dict[str, Any]) -> dict[str, Any]:
+        return {"turn_id": row["turn_id"], "thread_id": row["thread_id"], "actor_id": row["actor_id"], "content": row["content"], "context": row.get("context") or {}, "retry_of": row.get("retry_of"), "attempt": row.get("attempt", 1), "status": row["status"], "retryable": row.get("retryable", False), "error": row.get("error"), "response_message_id": row.get("response_message_id"), "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else row["created_at"], "updated_at": row["updated_at"].isoformat() if hasattr(row["updated_at"], "isoformat") else row["updated_at"]}
 
     def update_turn(self, turn_id: str, *, actor_id: str, **updates: Any) -> dict[str, Any] | None:
         record = self._fetch_one("turn", turn_id, actor_id=actor_id)
@@ -128,21 +164,41 @@ class PostgresAssistantStore:
             return None
         record.update(updates)
         record["updated_at"] = _now()
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE ravan_assistant_turns SET status=%s, retryable=%s, error=%s, response_message_id=%s, context=%s, updated_at=NOW(), heartbeat_at=NOW() WHERE turn_id=%s AND actor_id=%s", (record.get("status"), bool(record.get("retryable")), Json(record.get("error")) if record.get("error") is not None else None, record.get("response_message_id"), Json(record.get("context") or {}), turn_id, actor_id))
+            conn.commit()
         return self._upsert(record_id=turn_id, record_type="turn", actor_id=actor_id, thread_id=record.get("thread_id"), status=record.get("status"), payload=record)
+
+    def claim_turn(self, turn_id: str, *, actor_id: str) -> dict[str, Any] | None:
+        with get_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("UPDATE ravan_assistant_turns SET status='executing', heartbeat_at=NOW(), updated_at=NOW() WHERE turn_id=%s AND actor_id=%s AND status='running' RETURNING *", (turn_id, actor_id))
+                row = cur.fetchone()
+            conn.commit()
+        return self._turn_record(dict(row)) if row else None
+
+    def heartbeat_turn(self, turn_id: str, *, actor_id: str) -> bool:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE ravan_assistant_turns SET heartbeat_at=NOW(), updated_at=NOW() WHERE turn_id=%s AND actor_id=%s AND status IN ('running','executing')", (turn_id, actor_id))
+                changed = cur.rowcount
+            conn.commit()
+        return bool(changed)
 
     def latest_retryable_turn(self, thread_id: str, *, actor_id: str) -> dict[str, Any] | None:
         with get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT payload FROM ravan_assistant_records WHERE record_type='turn' AND thread_id=%s AND actor_id=%s AND status='failed' AND COALESCE((payload->>'retryable')::boolean, false)=true ORDER BY updated_at DESC LIMIT 1", (thread_id, actor_id))
+                cur.execute("SELECT * FROM ravan_assistant_turns WHERE thread_id=%s AND actor_id=%s AND status='failed' AND retryable=true ORDER BY updated_at DESC LIMIT 1", (thread_id, actor_id))
                 row = cur.fetchone()
-        return dict(row["payload"]) if row else None
+        return self._turn_record(dict(row)) if row else None
 
     def latest_running_turn(self, thread_id: str, *, actor_id: str) -> dict[str, Any] | None:
         with get_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT payload FROM ravan_assistant_records WHERE record_type='turn' AND thread_id=%s AND actor_id=%s AND status='running' ORDER BY updated_at DESC LIMIT 1", (thread_id, actor_id))
+                cur.execute("SELECT * FROM ravan_assistant_turns WHERE thread_id=%s AND actor_id=%s AND status IN ('running','executing') ORDER BY updated_at DESC LIMIT 1", (thread_id, actor_id))
                 row = cur.fetchone()
-        return dict(row["payload"]) if row else None
+        return self._turn_record(dict(row)) if row else None
 
     def reap_stale_turns(self, *, max_age_seconds: int = 300) -> int:
         """Atomically fail abandoned running turns across replicas."""
@@ -150,18 +206,10 @@ class PostgresAssistantStore:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    UPDATE ravan_assistant_records
-                    SET status='failed',
-                        payload=jsonb_set(
-                            jsonb_set(
-                                jsonb_set(payload, '{status}', '"failed"'::jsonb),
-                                '{retryable}', 'true'::jsonb
-                            ),
-                            '{error}', %s::jsonb
-                        ),
-                        updated_at=NOW()
-                    WHERE record_type='turn' AND status='running'
-                      AND updated_at < NOW() - (%s * INTERVAL '1 second')
+                    UPDATE ravan_assistant_turns
+                    SET status='failed', retryable=true, error=%s, updated_at=NOW(), heartbeat_at=NOW()
+                    WHERE status IN ('running','executing')
+                      AND heartbeat_at < NOW() - (%s * INTERVAL '1 second')
                     """,
                     (Json({"code": "ASSISTANT_TURN_REAPED", "message": "The assistant turn expired before completion."}), max(30, max_age_seconds)),
                 )
