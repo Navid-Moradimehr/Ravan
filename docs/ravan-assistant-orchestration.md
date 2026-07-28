@@ -87,12 +87,11 @@ persists the final user and assistant messages through the same durable store
 used by non-streaming operations. Raw provider reasoning is not forwarded;
 only safe progress status and answer text are exposed.
 
-Ravan does not provide a distributed workflow queue or partial-output replay
-after a disconnected browser. It provides database-backed assistant state for
-multi-replica conversation history and live SSE output for the active browser
-connection. Queue-based long-running jobs and resumable partial output are
-outside this assistant contract; deployments that require them should place an
-external workflow or queue service behind the existing assistant API boundary.
+Ravan now provides a Redis-backed assistant job queue when Redis is enabled,
+plus stream replay and cancellation for interrupted browser sessions. The API
+publishes queued turn events, the assistant worker consumes jobs, and the
+browser can recover the active stream from the event bus instead of restarting
+the turn. Standalone installs still retain the local in-process fallback.
 
 The multi-node deployment path must set the assistant store backend to the
 shared PostgreSQL adapter and must not use the Compose JSON file from multiple
@@ -100,16 +99,17 @@ API replicas. The local JSON store remains the default for one-node installs.
 
 Set `RAVAN_ASSISTANT_STORE_BACKEND=postgres` and provide the same PostgreSQL or
 TimescaleDB connection settings to every API and assistant worker replica.
-The adapter creates its small `ravan_assistant_records` table on first use and
-stores threads, turns, tool calls, memory candidates, and action intents as
-version-neutral JSON records. This is shared operational state, not historian
-telemetry. The database, backups, retention, TLS, and identity boundary remain
+The adapter currently normalizes turn lifecycle state in
+`ravan_assistant_turns`, including claim, heartbeat, retryability, and
+response metadata, while the other assistant records still live in the shared
+compatibility store. This is shared operational state, not historian telemetry.
+The database, backups, retention, TLS, and identity boundary remain
 operator-owned.
 
-The drawer mirrors this boundary with active conversation management, new chat,
-rename, archive, restore, and archived history. The last active thread ID is
-remembered locally only as a selection pointer; message contents remain in the
-assistant repository.
+The drawer mirrors this boundary with active conversation management, new
+chat, rename, archive, restore, and archived history. The last active thread
+ID is remembered locally only as a selection pointer; message contents remain
+in the assistant repository.
 
 The assistant keeps tool progress separate from the final response. Successful
 and failed diagnostic work is persisted as bounded `metadata.tool_steps` plus

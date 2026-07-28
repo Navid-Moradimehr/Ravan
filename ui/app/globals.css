@@ -324,4 +324,13 @@ body {
   .responsive-sidebar.open {
     @apply translate-x-0;
   }
+
+  aside[aria-label="Ravan Assistant"] {
+    overscroll-behavior: contain;
+  }
+
+  aside[aria-label="Ravan Assistant"] > div.flex-1 {
+    min-height: 0;
+    overscroll-behavior: contain;
+  }
 }

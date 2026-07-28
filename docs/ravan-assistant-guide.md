@@ -175,10 +175,11 @@ tool call also has a durable running, succeeded, or failed record with a stable
 error code and retryability. The assistant does not silently turn a failed
 diagnostic into a successful claim.
 
-The current single-node implementation uses an atomic file-backed store at
+The default single-node implementation uses an atomic file-backed store at
 `.datastream/assistant-store.json`. This is deliberately compatible with
-Docker Compose and air-gapped installs. A PostgreSQL-backed adapter can be
-introduced later without changing the API contracts.
+Docker Compose and air-gapped installs. PostgreSQL-backed turn storage is also
+available for deployments that need shared state and worker execution, without
+changing the chat contract.
 
 ## Voice
 

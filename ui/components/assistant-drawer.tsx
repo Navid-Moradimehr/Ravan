@@ -75,6 +75,19 @@ function AssistantDrawerInner() {
     resizeDraftTextarea();
   }, [draft]);
 
+  useEffect(() => {
+    if (!open) return;
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverflow = documentElement.style.overflow;
+    body.style.overflow = "hidden";
+    documentElement.style.overflow = "hidden";
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [open]);
+
   async function loadThread(threadId: string) {
     const loaded = await requestJson<AssistantThread>(`/api/assistant/threads/${threadId}`);
     setThread(loaded);
@@ -417,7 +430,7 @@ function AssistantDrawerInner() {
         <Bot className="size-4 text-accent" aria-hidden="true" /> Ravan Assistant
       </button>
       {open ? <div className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px]" onClick={() => setOpen(false)} aria-hidden="true" /> : null}
-      {open ? <aside className="fixed inset-y-0 right-0 z-[51] flex w-full max-w-[min(30rem,100vw)] flex-col border-l border-border-subtle bg-surface-1 shadow-2xl" aria-label="Ravan Assistant">
+      {open ? <aside className="fixed inset-y-0 right-0 z-[51] flex min-h-0 w-full max-w-[min(30rem,100vw)] flex-col overscroll-contain border-l border-border-subtle bg-surface-1 shadow-2xl" aria-label="Ravan Assistant">
         <header className="flex items-center justify-between border-b border-border-subtle px-4 py-4">
           <div className="flex min-w-0 items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/40 bg-accent-subtle text-accent"><Bot className="size-4" aria-hidden="true" /></span><div className="min-w-0"><h2 className="font-heading text-sm font-semibold text-text-primary">Ravan Assistant</h2><div className="mt-1 flex items-center gap-2"><label htmlFor="assistant-model" className="text-[0.68rem] text-text-muted">Model</label><select id="assistant-model" aria-label="Assistant model" value={selectedModel} onChange={(event) => { setSelectedModel(event.target.value); window.localStorage.setItem("ravan.assistant.model", event.target.value); }} className="max-w-[13rem] truncate rounded-md border border-border-subtle bg-surface-2 px-1.5 py-0.5 text-[0.68rem] text-text-secondary outline-none focus:border-accent/60" disabled={!selectedModel && models.length === 0}><option value="">{modelWarning ? "No model configured" : "Configured model"}</option>{models.map((model) => <option key={model.id} value={model.id}>{model.label || model.id}</option>)}</select></div>{modelWarning ? <p role="status" className="mt-1 max-w-[31rem] text-[0.68rem] leading-4 text-warning">{modelWarning}</p> : null}</div></div>
           <div className="flex items-center gap-1"><Button size="sm" variant="outline" onClick={() => void createNewThread()} disabled={busy}><Plus className="mr-1.5 size-3.5" />New chat</Button><HelpTip label="Assistant boundary" content="The assistant can inspect Ravan and prepare approved platform changes. It does not control PLCs or actuators. Kafka UI, Grafana, and Prometheus remain guidance-only." side="left" /><Button variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close assistant"><X className="size-4" /></Button></div>
