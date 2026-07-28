@@ -756,6 +756,8 @@ async def stream_message(thread_id: str, request: MessageRequest) -> StreamingRe
     """Stream a normal chat turn while persisting the same durable result."""
     queue: asyncio.Queue[tuple[str, str, Any]] = asyncio.Queue()
     stream_id = f"stream-{secrets.token_urlsafe(18)}"
+    actor_id = _actor(request.actor_id)
+    await stream_bus.bind_owner(stream_id, thread_id, actor_id)
 
     async def publish(event_name: str, payload: dict[str, Any]) -> None:
         event_payload = {**payload, "stream_id": stream_id}
@@ -795,6 +797,10 @@ async def stream_message(thread_id: str, request: MessageRequest) -> StreamingRe
 
 @router.get("/threads/{thread_id}/events")
 async def stream_events(thread_id: str, stream_id: str, after_id: str = "-") -> StreamingResponse:
+    owner = await stream_bus.owner(stream_id)
+    if owner is None or owner.get("thread_id") != thread_id:
+        raise HTTPException(status_code=404, detail="assistant stream not found")
+
     async def events():
         cursor = after_id
         while True:
@@ -815,10 +821,14 @@ async def stream_events(thread_id: str, stream_id: str, after_id: str = "-") -> 
 
 @router.post("/threads/{thread_id}/streams/{stream_id}/cancel")
 async def cancel_stream(thread_id: str, stream_id: str, request: ThreadRequest) -> dict[str, Any]:
+    actor_id = _actor(request.actor_id)
+    owner = await stream_bus.owner(stream_id)
+    if owner is None or owner.get("thread_id") != thread_id or owner.get("actor_id") != actor_id:
+        raise HTTPException(status_code=404, detail="assistant stream not found")
     await stream_bus.cancel(stream_id)
-    turn = _store().latest_running_turn(thread_id, actor_id=_actor(request.actor_id))
+    turn = _store().latest_running_turn(thread_id, actor_id=actor_id)
     if turn:
-        _store().update_turn(turn["turn_id"], actor_id=_actor(request.actor_id), status="failed", retryable=False, error={"code": "ASSISTANT_CANCELLED", "message": "Assistant generation was cancelled."})
+        _store().update_turn(turn["turn_id"], actor_id=actor_id, status="failed", retryable=False, error={"code": "ASSISTANT_CANCELLED", "message": "Assistant generation was cancelled."})
     await stream_bus.publish(stream_id, "error", {"message": "Assistant generation was cancelled.", "retryable": False, "cancelled": True, "stream_id": stream_id})
     return {"ok": True, "stream_id": stream_id, "status": "cancelled"}
 

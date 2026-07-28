@@ -47,6 +47,29 @@ class AssistantStreamBus:
     def _cancel_key(stream_id: str) -> str:
         return f"ravan:assistant:cancel:{stream_id}"
 
+    @staticmethod
+    def _owner_key(stream_id: str) -> str:
+        return f"ravan:assistant:owner:{stream_id}"
+
+    async def bind_owner(self, stream_id: str, thread_id: str, actor_id: str) -> None:
+        value = json.dumps({"thread_id": thread_id, "actor_id": actor_id}, ensure_ascii=True)
+        client = await self._redis()
+        if client is not None:
+            await client.set(self._owner_key(stream_id), value, ex=self.ttl_seconds)
+            return
+        async with _LOCAL_LOCK:
+            _LOCAL_EVENTS.setdefault(self._owner_key(stream_id), [])
+            _LOCAL_EVENTS[self._owner_key(stream_id)] = [(value, {"owner": json.loads(value)})]
+
+    async def owner(self, stream_id: str) -> dict[str, str] | None:
+        client = await self._redis()
+        if client is not None:
+            raw = await client.get(self._owner_key(stream_id))
+            return json.loads(raw) if raw else None
+        async with _LOCAL_LOCK:
+            rows = _LOCAL_EVENTS.get(self._owner_key(stream_id), [])
+            return rows[-1][1].get("owner") if rows else None
+
     async def publish(self, stream_id: str, event_type: str, payload: dict[str, Any]) -> str:
         event = {"event": event_type, "data": payload, "stream_id": stream_id}
         client = await self._redis()

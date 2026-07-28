@@ -190,7 +190,8 @@ async def assistant_chat(request: dict[str, Any]) -> dict[str, Any]:
         content = await llm_client.summarize(prompt, timeout_seconds=min(settings.llm_timeout_seconds, 20), model_id=model_id)
         return {"content": content, "provider": settings.llm_provider, "model": model_id}
     except Exception as exc:
-        service_state.mark_degraded("assistant request failed", str(exc))
+        if settings.llm_provider.lower() not in {"disabled", "none", "off"}:
+            service_state.mark_degraded("assistant request failed", str(exc))
         raise HTTPException(status_code=503, detail={"code": "LLM_PROVIDER_UNAVAILABLE", "message": str(exc)}) from exc
 
 
@@ -211,7 +212,8 @@ async def assistant_chat_structured(request: dict[str, Any]) -> dict[str, Any]:
         )
         return {"content": content, "provider": settings.llm_provider, "model": model_id, "metadata": metadata}
     except Exception as exc:
-        service_state.mark_degraded("structured assistant request failed", str(exc))
+        if settings.llm_provider.lower() not in {"disabled", "none", "off"}:
+            service_state.mark_degraded("structured assistant request failed", str(exc))
         raise HTTPException(status_code=503, detail={"code": "LLM_PROVIDER_UNAVAILABLE", "message": str(exc)}) from exc
 
 
