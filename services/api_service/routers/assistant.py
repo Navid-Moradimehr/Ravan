@@ -20,6 +20,7 @@ from services.common.assistant_skills import get_skill, list_skills, select_skil
 from services.common.connection_registry import SUPPORTED_PROTOCOLS, connection_registry
 from services.common.connection_diagnostics import run_connection_test
 from services.common.ai_reporting import create_report_job, get_policy
+from services.common.assistant_streams import stream_bus
 
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
@@ -697,25 +698,35 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
 async def stream_message(thread_id: str, request: MessageRequest) -> StreamingResponse:
     """Stream a normal chat turn while persisting the same durable result."""
     queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
+    stream_id = f"stream-{secrets.token_urlsafe(18)}"
+
+    async def publish(event_name: str, payload: dict[str, Any]) -> None:
+        event_payload = {**payload, "stream_id": stream_id}
+        await stream_bus.publish(stream_id, event_name, event_payload)
+        await queue.put((event_name, event_payload))
 
     async def on_token(text: str) -> None:
-        await queue.put(("token", {"text": text}))
+        if await stream_bus.is_cancelled(stream_id):
+            raise asyncio.CancelledError()
+        await publish("token", {"text": text})
 
     async def run_turn() -> None:
         try:
             for tool_name, _ in _requested_read_tools(request.content):
-                await queue.put(("step", {"tool": tool_name, "status": "running", "summary": "Inspecting the current platform data."}))
+                await publish("step", {"tool": tool_name, "status": "running", "summary": "Inspecting the current platform data."})
             result = await _send_message_impl(thread_id, request, _on_token=on_token)
-            await queue.put(("complete", result))
+            await publish("complete", {**result, "stream_id": stream_id})
+        except asyncio.CancelledError:
+            await publish("error", {"message": "Assistant generation was cancelled.", "retryable": False, "cancelled": True})
         except Exception as exc:
-            await queue.put(("error", {"message": str(exc), "retryable": True}))
+            await publish("error", {"message": str(exc), "retryable": True})
         finally:
             await queue.put(("end", None))
 
     asyncio.create_task(run_turn())
 
     async def events():
-        yield "event: status\ndata: {\"status\": \"working\"}\n\n"
+        await publish("status", {"status": "working"})
         while True:
             event_name, payload = await queue.get()
             if event_name == "end":
@@ -723,6 +734,36 @@ async def stream_message(thread_id: str, request: MessageRequest) -> StreamingRe
             yield f"event: {event_name}\ndata: {json.dumps(payload, ensure_ascii=True)}\n\n"
 
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/threads/{thread_id}/events")
+async def stream_events(thread_id: str, stream_id: str, after_id: str = "-") -> StreamingResponse:
+    async def events():
+        cursor = after_id
+        while True:
+            batch = await stream_bus.replay(stream_id, cursor)
+            if not batch:
+                batch = await stream_bus.wait_for_events(stream_id, cursor, timeout_seconds=1.0)
+            if not batch:
+                yield ": keepalive\n\n"
+                continue
+            for event_id, event in batch:
+                cursor = event_id
+                yield f"id: {event_id}\nevent: {event['event']}\ndata: {json.dumps(event['data'], ensure_ascii=True)}\n\n"
+                if event["event"] in {"complete", "error"}:
+                    return
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.post("/threads/{thread_id}/streams/{stream_id}/cancel")
+async def cancel_stream(thread_id: str, stream_id: str, request: ThreadRequest) -> dict[str, Any]:
+    await stream_bus.cancel(stream_id)
+    turn = _store().latest_running_turn(thread_id, actor_id=_actor(request.actor_id))
+    if turn:
+        _store().update_turn(turn["turn_id"], actor_id=_actor(request.actor_id), status="failed", retryable=False, error={"code": "ASSISTANT_CANCELLED", "message": "Assistant generation was cancelled."})
+    await stream_bus.publish(stream_id, "error", {"message": "Assistant generation was cancelled.", "retryable": False, "cancelled": True, "stream_id": stream_id})
+    return {"ok": True, "stream_id": stream_id, "status": "cancelled"}
 
 
 @router.post("/threads/{thread_id}/retry")

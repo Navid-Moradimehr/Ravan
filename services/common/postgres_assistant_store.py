@@ -137,6 +137,13 @@ class PostgresAssistantStore:
                 row = cur.fetchone()
         return dict(row["payload"]) if row else None
 
+    def latest_running_turn(self, thread_id: str, *, actor_id: str) -> dict[str, Any] | None:
+        with get_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT payload FROM ravan_assistant_records WHERE record_type='turn' AND thread_id=%s AND actor_id=%s AND status='running' ORDER BY updated_at DESC LIMIT 1", (thread_id, actor_id))
+                row = cur.fetchone()
+        return dict(row["payload"]) if row else None
+
     def record_tool_call(self, payload: dict[str, Any]) -> dict[str, Any]:
         record = {**payload, "tool_call_id": payload.get("tool_call_id") or f"tool-{uuid.uuid4().hex[:16]}", "created_at": payload.get("created_at") or _now(), "status": payload.get("status", "running")}
         return self._upsert(record_id=record["tool_call_id"], record_type="tool_call", actor_id=record.get("actor_id"), thread_id=record.get("thread_id"), status=record.get("status"), payload=record)

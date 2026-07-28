@@ -135,6 +135,11 @@ class AssistantStore:
         turns.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
         return dict(turns[0]) if turns else None
 
+    def latest_running_turn(self, thread_id: str, *, actor_id: str) -> dict[str, Any] | None:
+        turns = [item for item in self._state.setdefault("turns", {}).values() if item.get("thread_id") == thread_id and item.get("actor_id") == actor_id and item.get("status") == "running"]
+        turns.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
+        return dict(turns[0]) if turns else None
+
     def record_tool_call(self, payload: dict[str, Any]) -> dict[str, Any]:
         record = {**payload, "tool_call_id": payload.get("tool_call_id") or f"tool-{uuid.uuid4().hex[:16]}", "created_at": payload.get("created_at") or _now(), "status": payload.get("status", "running")}
         self._state.setdefault("tool_calls", []).append(record)
