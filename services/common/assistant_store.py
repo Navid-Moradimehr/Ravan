@@ -261,6 +261,15 @@ class AssistantStore:
                 return dict(item)
         return None
 
+    def claim_action_intent(self, intent_id: str, *, actor_id: str) -> dict[str, Any] | None:
+        for item in self._state["action_intents"]:
+            if item.get("intent_id") == intent_id and item.get("actor_id") == actor_id and item.get("status") == "pending_confirmation":
+                item["status"] = "executing"
+                item["updated_at"] = _now()
+                self._persist()
+                return dict(item)
+        return None
+
     def update_action_intent(self, intent_id: str, **updates: Any) -> dict[str, Any] | None:
         for item in self._state["action_intents"]:
             if item.get("intent_id") == intent_id:

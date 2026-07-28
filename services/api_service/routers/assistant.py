@@ -570,8 +570,7 @@ async def rename_thread(thread_id: str, request: ThreadRenameRequest) -> dict[st
     return thread
 
 
-@router.post("/threads/{thread_id}/messages")
-async def send_message(thread_id: str, request: MessageRequest, _on_token: Callable[[str], Awaitable[None]] | None = None) -> dict[str, Any]:
+async def _send_message_impl(thread_id: str, request: MessageRequest, _on_token: Callable[[str], Awaitable[None]] | None = None) -> dict[str, Any]:
     actor_id = _actor(request.actor_id)
     store = _store()
     existing_thread = store.get_thread(thread_id, actor_id=actor_id)
@@ -689,6 +688,11 @@ async def send_message(thread_id: str, request: MessageRequest, _on_token: Calla
     return {"user_message": user_message, "assistant_message": assistant_message, "links": links, "tool_result": tool_result, "memory_candidate": candidate, "action_preview": action_preview, "questionnaire": questionnaire, "thread_title": thread_title, "turn": store.get_turn(turn["turn_id"], actor_id=actor_id)}
 
 
+@router.post("/threads/{thread_id}/messages")
+async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any]:
+    return await _send_message_impl(thread_id, request)
+
+
 @router.post("/threads/{thread_id}/messages/stream")
 async def stream_message(thread_id: str, request: MessageRequest) -> StreamingResponse:
     """Stream a normal chat turn while persisting the same durable result."""
@@ -701,7 +705,7 @@ async def stream_message(thread_id: str, request: MessageRequest) -> StreamingRe
         try:
             for tool_name, _ in _requested_read_tools(request.content):
                 await queue.put(("step", {"tool": tool_name, "status": "running", "summary": "Inspecting the current platform data."}))
-            result = await send_message(thread_id, request, _on_token=on_token)
+            result = await _send_message_impl(thread_id, request, _on_token=on_token)
             await queue.put(("complete", result))
         except Exception as exc:
             await queue.put(("error", {"message": str(exc), "retryable": True}))
@@ -735,7 +739,7 @@ async def retry_failed_turn(thread_id: str, request: RetryRequest) -> dict[str, 
     context = {**dict(turn.get("context") or {}), "retry_turn_id": turn["turn_id"], "force_gateway": True}
     if request.model_id:
         context["model_id"] = request.model_id.strip()[:200]
-    return await send_message(thread_id, MessageRequest(actor_id=actor_id, content=str(turn["content"]), context=context))
+    return await _send_message_impl(thread_id, MessageRequest(actor_id=actor_id, content=str(turn["content"]), context=context))
 
 
 @router.post("/threads/{thread_id}/questions/{question_id}/answer")
@@ -848,6 +852,10 @@ async def confirm_action(intent_id: str, request: ActionConfirmRequest) -> dict[
         raise HTTPException(status_code=409, detail="assistant action preview has expired")
     if not secrets.compare_digest(str(intent.get("confirmation_token", "")), request.confirmation_token):
         raise HTTPException(status_code=409, detail="confirmation token does not match this preview")
+    claimed = store.claim_action_intent(intent_id, actor_id=_actor(request.actor_id))
+    if claimed is None:
+        raise HTTPException(status_code=409, detail="assistant action is already being processed or completed")
+    intent = claimed
     details = dict(intent.get("details") or {})
     action = str(intent["action_name"])
     try:
@@ -877,6 +885,7 @@ async def confirm_action(intent_id: str, request: ActionConfirmRequest) -> dict[
         else:
             raise ValueError(f"unsupported assistant action: {action}")
     except (KeyError, ValueError) as exc:
+        store.update_action_intent(intent_id, status="failed", error={"message": str(exc)})
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     completed = store.update_action_intent(intent_id, status="completed", result=result) or intent
     _safe_audit({"time": completed.get("updated_at"), "user_id": _actor(request.actor_id), "action": "assistant_action_completed", "resource": intent["target_resource"], "details": completed})

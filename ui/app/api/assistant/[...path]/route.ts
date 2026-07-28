@@ -28,7 +28,7 @@ async function forward(request: Request, path: string) {
       body: body || undefined,
     });
     if (!response.ok) throw await readResponseError(response);
-    if (path.endsWith("/stream")) {
+    if (path.endsWith("/stream") || path.endsWith("/events")) {
       return new Response(response.body, {
         status: response.status,
         headers: {
@@ -37,7 +37,14 @@ async function forward(request: Request, path: string) {
         },
       });
     }
-    return NextResponse.json(await response.json());
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.startsWith("audio/") || contentType === "application/octet-stream") {
+      return new Response(response.body, {
+        status: response.status,
+        headers: { "Content-Type": contentType },
+      });
+    }
+    return NextResponse.json(await response.json(), { status: response.status });
   } catch (error) {
     if (error instanceof HttpError) return NextResponse.json({ error: error.message, details: error.details }, { status: error.status });
     return NextResponse.json({ error: error instanceof Error ? error.message : "Assistant service unavailable" }, { status: 502 });

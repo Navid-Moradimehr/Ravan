@@ -68,6 +68,14 @@ def test_action_preview_has_expiry(tmp_path):
     assert intent["expires_at"]
 
 
+def test_action_confirmation_claim_is_single_use(tmp_path):
+    store = AssistantStore(tmp_path / "assistant.json")
+    intent = store.save_action_intent({"actor_id": "operator-1", "action_name": "source.test", "target_resource": "conn-1", "confirmation_token": "token"})
+    claimed = store.claim_action_intent(intent["intent_id"], actor_id="operator-1")
+    assert claimed and claimed["status"] == "executing"
+    assert store.claim_action_intent(intent["intent_id"], actor_id="operator-1") is None
+
+
 def test_assistant_store_tracks_turns_and_retryable_failures(tmp_path):
     store = AssistantStore(tmp_path / "assistant.json")
     thread = store.create_thread(actor_id="operator-1")

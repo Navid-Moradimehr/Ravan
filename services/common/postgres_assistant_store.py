@@ -247,6 +247,22 @@ class PostgresAssistantStore:
     def get_action_intent(self, intent_id: str) -> dict[str, Any] | None:
         return self._fetch_one("action", intent_id)
 
+    def claim_action_intent(self, intent_id: str, *, actor_id: str) -> dict[str, Any] | None:
+        with get_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    UPDATE ravan_assistant_records
+                    SET status='executing', payload=jsonb_set(payload, '{status}', '"executing"'::jsonb), updated_at=NOW()
+                    WHERE record_type='action' AND record_id=%s AND actor_id=%s AND status='pending_confirmation'
+                    RETURNING payload
+                    """,
+                    (intent_id, actor_id),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return dict(row["payload"]) if row else None
+
     def update_action_intent(self, intent_id: str, **updates: Any) -> dict[str, Any] | None:
         record = self.get_action_intent(intent_id)
         if not record:
