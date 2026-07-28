@@ -37,6 +37,11 @@ class AssistantStore:
             # API from starting. The next write replaces it atomically.
             self._state = {"threads": {}, "memories": [], "action_intents": []}
 
+    def reload(self) -> None:
+        """Refresh state before a cross-process worker handles a job."""
+        self._state = {"threads": {}, "memories": [], "action_intents": [], "turns": {}, "tool_calls": []}
+        self._load()
+
     def _persist(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         handle, temporary_name = tempfile.mkstemp(prefix="assistant-", suffix=".tmp", dir=self.path.parent)

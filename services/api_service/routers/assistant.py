@@ -759,6 +759,31 @@ async def stream_message(thread_id: str, request: MessageRequest) -> StreamingRe
     actor_id = _actor(request.actor_id)
     await stream_bus.bind_owner(stream_id, thread_id, actor_id)
 
+    if stream_bus.enabled:
+        status_id = await stream_bus.publish(stream_id, "status", {"status": "queued", "stream_id": stream_id})
+        await stream_bus.enqueue_job({
+            "thread_id": thread_id,
+            "stream_id": stream_id,
+            "request": request.model_dump(),
+        })
+
+        async def queued_events():
+            cursor = "-"
+            while True:
+                batch = await stream_bus.replay(stream_id, cursor)
+                if not batch:
+                    batch = await stream_bus.wait_for_events(stream_id, cursor, timeout_seconds=1.0)
+                if not batch:
+                    yield ": keepalive\n\n"
+                    continue
+                for event_id, event in batch:
+                    cursor = event_id
+                    yield f"id: {event_id}\nevent: {event['event']}\ndata: {json.dumps(event['data'], ensure_ascii=True)}\n\n"
+                    if event["event"] in {"complete", "error"}:
+                        return
+
+        return StreamingResponse(queued_events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
     async def publish(event_name: str, payload: dict[str, Any]) -> None:
         event_payload = {**payload, "stream_id": stream_id}
         event_id = await stream_bus.publish(stream_id, event_name, event_payload)

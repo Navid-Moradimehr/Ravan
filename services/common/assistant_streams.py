@@ -9,7 +9,7 @@ import asyncio
 import json
 import os
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Any
 
 try:  # pragma: no cover - exercised in the container integration tests
@@ -21,6 +21,7 @@ except ImportError:  # pragma: no cover - local unit tests do not require Redis
 _LOCAL_EVENTS: dict[str, list[tuple[str, dict[str, Any]]]] = defaultdict(list)
 _LOCAL_SEQUENCE: dict[str, int] = defaultdict(int)
 _LOCAL_CANCELLED: set[str] = set()
+_LOCAL_JOBS: deque[dict[str, Any]] = deque()
 _LOCAL_LOCK = asyncio.Lock()
 
 
@@ -50,6 +51,27 @@ class AssistantStreamBus:
     @staticmethod
     def _owner_key(stream_id: str) -> str:
         return f"ravan:assistant:owner:{stream_id}"
+
+    @staticmethod
+    def _jobs_key() -> str:
+        return "ravan:assistant:jobs"
+
+    async def enqueue_job(self, payload: dict[str, Any]) -> None:
+        client = await self._redis()
+        encoded = json.dumps(payload, ensure_ascii=True)
+        if client is not None:
+            await client.lpush(self._jobs_key(), encoded)
+            return
+        async with _LOCAL_LOCK:
+            _LOCAL_JOBS.append(payload)
+
+    async def dequeue_job(self, timeout_seconds: int = 5) -> dict[str, Any] | None:
+        client = await self._redis()
+        if client is not None:
+            row = await client.brpop(self._jobs_key(), timeout=max(1, timeout_seconds))
+            return json.loads(row[1]) if row else None
+        async with _LOCAL_LOCK:
+            return _LOCAL_JOBS.popleft() if _LOCAL_JOBS else None
 
     async def bind_owner(self, stream_id: str, thread_id: str, actor_id: str) -> None:
         value = json.dumps({"thread_id": thread_id, "actor_id": actor_id}, ensure_ascii=True)

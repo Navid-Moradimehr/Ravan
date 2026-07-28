@@ -257,3 +257,13 @@ def test_stale_turns_are_reaped(tmp_path):
     assert reaped["status"] == "failed"
     assert reaped["retryable"] is True
     assert reaped["error"]["code"] == "ASSISTANT_TURN_REAPED"
+
+
+def test_store_reload_observes_cross_process_writes(tmp_path):
+    path = tmp_path / "assistant.json"
+    writer = AssistantStore(path)
+    reader = AssistantStore(path)
+    thread = writer.create_thread(actor_id="operator")
+    assert reader.get_thread(thread["thread_id"], actor_id="operator") is None
+    reader.reload()
+    assert reader.get_thread(thread["thread_id"], actor_id="operator") is not None

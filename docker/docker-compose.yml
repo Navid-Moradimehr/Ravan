@@ -578,6 +578,8 @@ services:
     depends_on:
       timescaledb:
         condition: service_healthy
+      assistant-redis:
+        condition: service_healthy
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://stream:stream@timescaledb:5432/stream_engine}
       DATASET_WORKER_ID: ${DATASET_WORKER_ID:-dataset-worker-1}
@@ -771,6 +773,10 @@ services:
     depends_on:
       timescaledb:
         condition: service_healthy
+      assistant-redis:
+        condition: service_healthy
+      ai-gateway:
+        condition: service_healthy
     restart: unless-stopped
     environment:
       TIMESCALE_HOST: timescaledb
@@ -780,6 +786,9 @@ services:
       TIMESCALE_PASSWORD: ${TIMESCALE_PASSWORD:-stream}
       RAVAN_ASSISTANT_STORE_PATH: /data/assistant-store.json
       RAVAN_ASSISTANT_STORE_BACKEND: ${RAVAN_ASSISTANT_STORE_BACKEND:-json}
+      RAVAN_ASSISTANT_REDIS_URL: redis://assistant-redis:6379/0
+      RAVAN_ASSISTANT_MODEL_PLANNER: ${RAVAN_ASSISTANT_MODEL_PLANNER:-true}
+      DATASTREAM_AI_BASE: http://ai-gateway:8080
       RAVAN_ASSISTANT_REAPER_INTERVAL_SECONDS: ${RAVAN_ASSISTANT_REAPER_INTERVAL_SECONDS:-30}
       RAVAN_ASSISTANT_TURN_MAX_AGE_SECONDS: ${RAVAN_ASSISTANT_TURN_MAX_AGE_SECONDS:-900}
     volumes:

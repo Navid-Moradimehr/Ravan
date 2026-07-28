@@ -26,3 +26,12 @@ def test_local_stream_bus_binds_stream_owner():
         return await bus.owner("stream-owner")
 
     assert asyncio.run(scenario()) == {"thread_id": "thread-1", "actor_id": "actor-1"}
+
+
+def test_local_stream_bus_queues_jobs():
+    async def scenario():
+        bus = AssistantStreamBus(url="")
+        await bus.enqueue_job({"stream_id": "stream-job", "thread_id": "thread-1", "request": {}})
+        return await bus.dequeue_job(timeout_seconds=1)
+
+    assert asyncio.run(scenario())["stream_id"] == "stream-job"
