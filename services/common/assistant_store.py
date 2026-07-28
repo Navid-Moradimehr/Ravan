@@ -140,6 +140,30 @@ class AssistantStore:
         turns.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
         return dict(turns[0]) if turns else None
 
+    def reap_stale_turns(self, *, max_age_seconds: int = 300) -> int:
+        """Fail abandoned running turns so retries and UI state can recover."""
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=max(30, max_age_seconds))
+        changed = 0
+        for record in self._state.setdefault("turns", {}).values():
+            if record.get("status") != "running":
+                continue
+            try:
+                updated = datetime.fromisoformat(str(record.get("updated_at", "")))
+            except ValueError:
+                continue
+            if updated >= cutoff:
+                continue
+            record.update({
+                "status": "failed",
+                "retryable": True,
+                "error": {"code": "ASSISTANT_TURN_REAPED", "message": "The assistant turn expired before completion."},
+                "updated_at": _now(),
+            })
+            changed += 1
+        if changed:
+            self._persist()
+        return changed
+
     def record_tool_call(self, payload: dict[str, Any]) -> dict[str, Any]:
         record = {**payload, "tool_call_id": payload.get("tool_call_id") or f"tool-{uuid.uuid4().hex[:16]}", "created_at": payload.get("created_at") or _now(), "status": payload.get("status", "running")}
         self._state.setdefault("tool_calls", []).append(record)

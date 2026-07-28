@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from services.api_service.routers.assistant import MessageRequest, QuestionAnswerRequest, RetryRequest, ThreadRequest, _fallback_thread_title, _report_action_request, _requested_read_tools, _source_action_request, _source_questionnaire, answer_question, create_thread, retry_failed_turn, send_message
@@ -242,3 +243,17 @@ def test_failed_model_turn_can_be_retried(monkeypatch, tmp_path):
     retried = asyncio.run(retry_failed_turn(thread["thread_id"], RetryRequest(actor_id="operator-1")))
     assert retried["turn"]["retry_of"] == first["turn"]["turn_id"]
     assert calls["count"] == 2
+
+
+def test_stale_turns_are_reaped(tmp_path):
+    store = AssistantStore(tmp_path / "assistant.json")
+    thread = store.create_thread(actor_id="operator")
+    turn = store.start_turn(thread["thread_id"], actor_id="operator", content="old")
+    store._state["turns"][turn["turn_id"]]["updated_at"] = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    store._persist()
+
+    assert store.reap_stale_turns(max_age_seconds=60) == 1
+    reaped = store.get_turn(turn["turn_id"], actor_id="operator")
+    assert reaped["status"] == "failed"
+    assert reaped["retryable"] is True
+    assert reaped["error"]["code"] == "ASSISTANT_TURN_REAPED"

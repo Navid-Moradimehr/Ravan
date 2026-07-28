@@ -1,0 +1,1 @@
+"""Background assistant lifecycle workers."""

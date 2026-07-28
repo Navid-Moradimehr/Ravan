@@ -763,6 +763,31 @@ services:
       - api
       - ui
 
+  assistant-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    command: ["python", "-m", "services.assistant_worker.main"]
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      TIMESCALE_HOST: timescaledb
+      TIMESCALE_PORT: 5432
+      TIMESCALE_DB: ${TIMESCALE_DB:-stream_engine}
+      TIMESCALE_USER: ${TIMESCALE_USER:-stream}
+      TIMESCALE_PASSWORD: ${TIMESCALE_PASSWORD:-stream}
+      RAVAN_ASSISTANT_STORE_PATH: /data/assistant-store.json
+      RAVAN_ASSISTANT_STORE_BACKEND: ${RAVAN_ASSISTANT_STORE_BACKEND:-json}
+      RAVAN_ASSISTANT_REAPER_INTERVAL_SECONDS: ${RAVAN_ASSISTANT_REAPER_INTERVAL_SECONDS:-30}
+      RAVAN_ASSISTANT_TURN_MAX_AGE_SECONDS: ${RAVAN_ASSISTANT_TURN_MAX_AGE_SECONDS:-900}
+    volumes:
+      - api-data:/data
+    profiles:
+      - api
+      - ui
+
   assistant-redis:
     image: redis:7-alpine
     restart: unless-stopped

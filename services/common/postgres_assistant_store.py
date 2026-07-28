@@ -144,6 +144,31 @@ class PostgresAssistantStore:
                 row = cur.fetchone()
         return dict(row["payload"]) if row else None
 
+    def reap_stale_turns(self, *, max_age_seconds: int = 300) -> int:
+        """Atomically fail abandoned running turns across replicas."""
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE ravan_assistant_records
+                    SET status='failed',
+                        payload=jsonb_set(
+                            jsonb_set(
+                                jsonb_set(payload, '{status}', '"failed"'::jsonb),
+                                '{retryable}', 'true'::jsonb
+                            ),
+                            '{error}', %s::jsonb
+                        ),
+                        updated_at=NOW()
+                    WHERE record_type='turn' AND status='running'
+                      AND updated_at < NOW() - (%s * INTERVAL '1 second')
+                    """,
+                    (Json({"code": "ASSISTANT_TURN_REAPED", "message": "The assistant turn expired before completion."}), max(30, max_age_seconds)),
+                )
+                changed = cur.rowcount
+            conn.commit()
+        return int(changed)
+
     def record_tool_call(self, payload: dict[str, Any]) -> dict[str, Any]:
         record = {**payload, "tool_call_id": payload.get("tool_call_id") or f"tool-{uuid.uuid4().hex[:16]}", "created_at": payload.get("created_at") or _now(), "status": payload.get("status", "running")}
         return self._upsert(record_id=record["tool_call_id"], record_type="tool_call", actor_id=record.get("actor_id"), thread_id=record.get("thread_id"), status=record.get("status"), payload=record)
