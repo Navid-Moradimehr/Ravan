@@ -24,6 +24,7 @@ SERVICE_IMAGE_ROLES = {
     "dataset-worker": "processor",
     "raw-lakehouse-archive": "processor",
     "api-service": "api",
+    "assistant-worker": "api",
 }
 
 
