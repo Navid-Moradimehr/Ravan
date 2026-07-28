@@ -223,13 +223,22 @@ function AssistantDrawerInner() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let streamId = "";
+      let lastEventId = "-";
+      let streamFailure: Error | null = null;
       let completed: { user_message: AssistantMessage; assistant_message: AssistantMessage; action_preview?: ActionPreview | null; memory_candidate?: MemoryCandidate | null; questionnaire?: Questionnaire | null; thread_title?: string | null } | null = null;
       const applyEvent = (raw: string) => {
         const lines = raw.split("\n");
+        const eventId = lines.find((line) => line.startsWith("id:"))?.slice(3).trim();
+        if (eventId) lastEventId = eventId;
         const eventName = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
         const data = lines.find((line) => line.startsWith("data:"))?.slice(5).trim();
         if (!data) return;
         const payload = JSON.parse(data) as Record<string, unknown>;
+        if (typeof payload.stream_id === "string") {
+          streamId = payload.stream_id;
+          window.sessionStorage.setItem(`ravan.assistant.stream.${thread.thread_id}`, streamId);
+        }
         if (eventName === "token" && typeof payload.text === "string") {
           setThread((current) => current ? { ...current, messages: current.messages.map((message) => message.message_id === temporaryAssistant.message_id ? { ...message, content: message.content + payload.text } : message) } : current);
         } else if (eventName === "step" && typeof payload.tool === "string") {
@@ -237,7 +246,7 @@ function AssistantDrawerInner() {
         } else if (eventName === "complete") {
           completed = payload as typeof completed;
         } else if (eventName === "error") {
-          throw new Error(String(payload.message || "Assistant stream failed"));
+          streamFailure = new Error(String(payload.message || "Assistant stream failed"));
         }
       };
       while (true) {
@@ -249,7 +258,23 @@ function AssistantDrawerInner() {
         if (done) break;
       }
       if (buffer.trim()) applyEvent(buffer);
-      if (!completed) throw new Error("Assistant stream ended before saving the response");
+      if (!completed && streamId) {
+        const recovery = await fetch(`/api/assistant/threads/${thread.thread_id}/events?stream_id=${encodeURIComponent(streamId)}&after_id=${encodeURIComponent(lastEventId)}`, { cache: "no-store" });
+        if (recovery.ok && recovery.body) {
+          const recoveryReader = recovery.body.getReader();
+          let recoveryBuffer = "";
+          while (true) {
+            const { value, done } = await recoveryReader.read();
+            recoveryBuffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+            const recoveryRecords = recoveryBuffer.split("\n\n");
+            recoveryBuffer = recoveryRecords.pop() || "";
+            recoveryRecords.forEach(applyEvent);
+            if (done) break;
+          }
+          if (recoveryBuffer.trim()) applyEvent(recoveryBuffer);
+        }
+      }
+      if (!completed) throw streamFailure || new Error("Assistant stream ended before saving the response");
       const finalResponse = completed as { user_message: AssistantMessage; assistant_message: AssistantMessage; action_preview?: ActionPreview | null; memory_candidate?: MemoryCandidate | null; questionnaire?: Questionnaire | null; thread_title?: string | null };
       setThread((current) => current ? { ...current, messages: [...current.messages.filter((message) => message.message_id !== temporaryUser.message_id && message.message_id !== temporaryAssistant.message_id), finalResponse.user_message, finalResponse.assistant_message], updated_at: finalResponse.assistant_message.created_at } : current);
       setThreads((current) => current.map((item) => item.thread_id === thread.thread_id ? { ...item, title: finalResponse.thread_title || item.title, updated_at: finalResponse.assistant_message.created_at } : item));
