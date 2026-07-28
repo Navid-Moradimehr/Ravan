@@ -134,6 +134,12 @@ def _safe_audit(event: dict[str, Any]) -> None:
         return
 
 
+def _looks_like_secret(content: str) -> bool:
+    lowered = content.lower()
+    secret_terms = ("password", "passwd", "api key", "apikey", "token", "private key", "secret", "credential")
+    return any(term in lowered for term in secret_terms) and any(marker in content for marker in ("=", ":", " is "))
+
+
 def _actor(request_actor: str) -> str:
     # Auth remains deployment-owned. This stable local identity is replaced by
     # the authenticated actor adapter when a deployment enables auth.
@@ -202,6 +208,13 @@ def _requested_read_tools(content: str) -> list[tuple[str, dict[str, Any]]]:
         plan.append(("historian.recent_events", {"table": "industrial_events", "limit": 25}))
     if "lineage" in lowered:
         plan.append(("semantic.lineage", {"limit": 25}))
+    if any(term in lowered for term in ("relationship", "semantic graph", "graph search", "related entity")):
+        plan.append(("semantic.graph_search", {"query": content[:200], "limit": 25}))
+    if "report template" in lowered or "report templates" in lowered:
+        plan.append(("reports.templates", {}))
+    trend_match = re.search(r"(?:trend|history)\s+(?:for\s+)?(?:asset\s+)?([\w.-]+).*?tag\s+([\w.:-]+)", lowered)
+    if trend_match:
+        plan.append(("historian.trend", {"asset_id": trend_match.group(1), "tag": trend_match.group(2), "hours": 6}))
     if "scenario" in lowered or "replay" in lowered:
         plan.append(("scenarios.list", {}))
     # Preserve declaration order, then enforce the platform safety budget.
@@ -218,6 +231,45 @@ def _requested_read_tool(content: str) -> tuple[str, dict[str, Any]] | None:
     """Legacy single-tool view retained for downstream imports and tests."""
     tools = _requested_read_tools(content)
     return tools[0] if tools else None
+
+
+async def _model_read_plan(content: str, context: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """Ask the gateway for a strictly bounded read plan when enabled."""
+    if os.getenv("RAVAN_ASSISTANT_MODEL_PLANNER", "false").strip().lower() in {"0", "false", "no", "off"}:
+        return []
+    base = os.getenv("DATASTREAM_AI_BASE", "http://localhost:8080").rstrip("/")
+    catalog = [item for item in tool_registry.list_tools() if item.get("read_only")]
+    schema = {
+        "type": "object",
+        "properties": {"tools": {"type": "array", "maxItems": 4, "items": {"type": "object", "properties": {"name": {"type": "string"}, "arguments": {"type": "object"}}, "required": ["name", "arguments"], "additionalProperties": False}}},
+        "required": ["tools"],
+        "additionalProperties": False,
+    }
+    prompt = (
+        "Select at most four independent read-only tools for the operator request. "
+        "Return no tool when the request does not require inspection. Never select mutation-capable tools. "
+        f"Tool catalog: {json.dumps(catalog, ensure_ascii=True)}\nContext: {json.dumps(context, ensure_ascii=True, default=str)[:2000]}\nRequest: {content[:12000]}"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            response = await client.post(f"{base}/assistant/chat/structured", json={"prompt": prompt, "schema": schema, "model": context.get("model_id")})
+            if response.status_code != 200:
+                return []
+            payload = response.json()
+        raw = json.loads(str(payload.get("content") or "{}"))
+        result: list[tuple[str, dict[str, Any]]] = []
+        seen: set[str] = set()
+        for item in raw.get("tools", []) if isinstance(raw, dict) else []:
+            name = str(item.get("name") or "")
+            args = item.get("arguments")
+            spec = tool_registry.get(name)
+            if spec is None or not spec.read_only or name in seen or not isinstance(args, dict):
+                continue
+            seen.add(name)
+            result.append((name, args))
+        return result[:4]
+    except (httpx.HTTPError, ValueError, TypeError, json.JSONDecodeError):
+        return []
 
 
 def _source_action_request(content: str) -> tuple[str, Any] | None:
@@ -346,6 +398,9 @@ def _conversation_history(messages: list[dict[str, Any]], limit: int = 12, max_c
     """Build a bounded, role-preserving history like CRM's model message list."""
     selected: list[dict[str, str]] = []
     remaining = max_chars
+    # Keep whole recent turns whenever possible. The character budget is a
+    # provider-neutral approximation (~4 characters per token) and avoids
+    # adding another tokenizer dependency to local-first deployments.
     for message in reversed(messages[-limit:]):
         role = message.get("role")
         content = str(message.get("content") or "").strip()
@@ -618,7 +673,9 @@ async def _send_message_impl(thread_id: str, request: MessageRequest, _on_token:
             action_clarification = f"I could not prepare the report preview: {exc}"
     tool_result = None
     model_error = None
-    read_plan = _requested_read_tools(request.content)
+    read_plan = await _model_read_plan(request.content, request.context)
+    if not read_plan:
+        read_plan = _requested_read_tools(request.content)
     read_results: list[dict[str, Any]] = []
     if read_plan:
         tool_result, read_results = await _dispatch_read_plan(
@@ -640,7 +697,7 @@ async def _send_message_impl(thread_id: str, request: MessageRequest, _on_token:
     elif action_clarification:
         answer = action_clarification
     else:
-        approved_memory = [item["content"] for item in store.list_memory_candidates(actor_id=actor_id) if item.get("status") == "approved"]
+        approved_memory = [item["content"] for item in store.search_approved_memories(actor_id=actor_id, query=request.content, limit=8)]
         model_context = {**request.context, "approved_memory": approved_memory[-20:], "tool_result": tool_result, "conversation_history": _conversation_history(existing_thread.get("messages", []))}
         answer, model_error = await _model_answer(request.content, model_context, allow_fallback=not force_gateway, on_token=_on_token)
         if not answer:
@@ -674,7 +731,7 @@ async def _send_message_impl(thread_id: str, request: MessageRequest, _on_token:
     if questionnaire:
         questionnaire = {**questionnaire, "message_id": assistant_message["message_id"]}
         assistant_message = store.update_message_metadata(thread_id, assistant_message["message_id"], actor_id=actor_id, metadata={"questionnaire": questionnaire}) or assistant_message
-    if request.content.lower().startswith(("remember that", "i prefer", "always ")):
+    if request.content.lower().startswith(("remember that", "i prefer", "always ")) and not _looks_like_secret(request.content):
         candidate = store.add_memory_candidate(actor_id=actor_id, content=request.content, source_thread_id=thread_id)
     else:
         candidate = None
@@ -697,13 +754,13 @@ async def send_message(thread_id: str, request: MessageRequest) -> dict[str, Any
 @router.post("/threads/{thread_id}/messages/stream")
 async def stream_message(thread_id: str, request: MessageRequest) -> StreamingResponse:
     """Stream a normal chat turn while persisting the same durable result."""
-    queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
+    queue: asyncio.Queue[tuple[str, str, Any]] = asyncio.Queue()
     stream_id = f"stream-{secrets.token_urlsafe(18)}"
 
     async def publish(event_name: str, payload: dict[str, Any]) -> None:
         event_payload = {**payload, "stream_id": stream_id}
-        await stream_bus.publish(stream_id, event_name, event_payload)
-        await queue.put((event_name, event_payload))
+        event_id = await stream_bus.publish(stream_id, event_name, event_payload)
+        await queue.put((event_id, event_name, event_payload))
 
     async def on_token(text: str) -> None:
         if await stream_bus.is_cancelled(stream_id):
@@ -721,17 +778,17 @@ async def stream_message(thread_id: str, request: MessageRequest) -> StreamingRe
         except Exception as exc:
             await publish("error", {"message": str(exc), "retryable": True})
         finally:
-            await queue.put(("end", None))
+            await queue.put(("", "end", None))
 
     asyncio.create_task(run_turn())
 
     async def events():
         await publish("status", {"status": "working"})
         while True:
-            event_name, payload = await queue.get()
+            event_id, event_name, payload = await queue.get()
             if event_name == "end":
                 break
-            yield f"event: {event_name}\ndata: {json.dumps(payload, ensure_ascii=True)}\n\n"
+            yield f"id: {event_id}\nevent: {event_name}\ndata: {json.dumps(payload, ensure_ascii=True)}\n\n"
 
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 

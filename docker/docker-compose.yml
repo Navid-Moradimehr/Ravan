@@ -734,6 +734,7 @@ services:
       DATASTREAM_CORS_ALLOW_ORIGINS: ${DATASTREAM_CORS_ALLOW_ORIGINS:-http://localhost:3006,http://127.0.0.1:3006}
       DATASTREAM_AI_BASE: http://ai-gateway:8080
       RAVAN_ASSISTANT_REDIS_URL: redis://assistant-redis:6379/0
+      RAVAN_ASSISTANT_MODEL_PLANNER: ${RAVAN_ASSISTANT_MODEL_PLANNER:-true}
       DATASTREAM_CONNECTION_REGISTRY_PATH: /data/connection-registry.json
       DATASTREAM_WEBHOOK_REGISTRY_PATH: /data/webhooks.json
       DATASTREAM_NOTIFICATION_REGISTRY_PATH: /data/notifications.json

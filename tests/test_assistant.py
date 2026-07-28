@@ -86,6 +86,14 @@ def test_assistant_store_tracks_turns_and_retryable_failures(tmp_path):
     assert retryable and retryable["turn_id"] == turn["turn_id"]
 
 
+def test_secret_like_memory_requests_are_not_persisted(monkeypatch, tmp_path):
+    monkeypatch.setenv("RAVAN_ASSISTANT_STORE_PATH", str(tmp_path / "assistant.json"))
+    from services.api_service.routers.assistant import _looks_like_secret
+
+    assert _looks_like_secret("Remember that password = do-not-store") is True
+    assert _looks_like_secret("Remember that I prefer Celsius") is False
+
+
 def test_natural_language_source_action_requires_unique_registry_match(monkeypatch):
     source = SimpleNamespace(connection_id="conn-pump-1", name="Pump 1", site_id="site-a", state="disabled")
     monkeypatch.setattr("services.api_service.routers.assistant.connection_registry.list", lambda **kwargs: [source])

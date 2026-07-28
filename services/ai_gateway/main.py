@@ -11,7 +11,7 @@ from typing import Any
 
 import httpx
 from confluent_kafka import Consumer, Producer, TopicPartition
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.responses import Response
 from fastapi.responses import StreamingResponse
@@ -191,7 +191,28 @@ async def assistant_chat(request: dict[str, Any]) -> dict[str, Any]:
         return {"content": content, "provider": settings.llm_provider, "model": model_id}
     except Exception as exc:
         service_state.mark_degraded("assistant request failed", str(exc))
-        return {"content": "", "provider": settings.llm_provider, "model": model_id, "error": str(exc)}
+        raise HTTPException(status_code=503, detail={"code": "LLM_PROVIDER_UNAVAILABLE", "message": str(exc)}) from exc
+
+
+@app.post("/assistant/chat/structured")
+async def assistant_chat_structured(request: dict[str, Any]) -> dict[str, Any]:
+    """Provider-neutral structured response bridge for bounded agent planning."""
+    prompt = str(request.get("prompt", "")).strip()
+    schema = request.get("schema")
+    if not prompt or not isinstance(schema, dict):
+        return {"content": "", "provider": settings.llm_provider, "model": settings.llm_model_id, "error": "prompt and schema are required"}
+    model_id = str(request.get("model") or settings.llm_model_id).strip()[:200]
+    try:
+        content, metadata = await llm_client.summarize_structured(
+            prompt,
+            output_schema=schema,
+            timeout_seconds=min(settings.llm_timeout_seconds, 30),
+            model_id=model_id,
+        )
+        return {"content": content, "provider": settings.llm_provider, "model": model_id, "metadata": metadata}
+    except Exception as exc:
+        service_state.mark_degraded("structured assistant request failed", str(exc))
+        raise HTTPException(status_code=503, detail={"code": "LLM_PROVIDER_UNAVAILABLE", "message": str(exc)}) from exc
 
 
 def _sse(event: str, payload: dict[str, Any]) -> str:
