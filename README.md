@@ -66,7 +66,7 @@ that controller layer.
 Teams preparing world-model or latent-space systems can use Ravan to collect
 replayable telemetry together with asset relationships, topology, temporal
 context, alarms, actions, and lineage. These datasets can be exported or
-archived for user-owned JEPA-, Dreamer-, MuZero-, digital-twin, and simulation
+archived for user-owned JEPA, Dreamer, MuZero, digital-twin, and simulation
 training workflows without making a specific model architecture part of the
 platform.
 
@@ -102,7 +102,7 @@ the remaining application surface without changing the public API.
 - CDC: PostgreSQL plus Debezium Kafka Connect
 - AI: provider-neutral FastAPI gateway with native Anthropic and Gemini adapters, OpenAI-compatible endpoints for OpenAI, DeepSeek, Qwen, Kimi, GLM, vLLM, LM Studio, and other compatible servers, plus Ollama and open-weight model support
 - AI contracts: model registry, prompt registry, structured output validation, and read-only tool/context packages for future diagnostic agents
-- AI data foundation: canonical replayable events, semantic asset relationships, temporal and operational context, lineage, versioned dataset manifests, and optional Iceberg/MinIO or S3-compatible archival for JEPA-, Dreamer-, and MuZero-style preparation
+- AI data foundation: canonical replayable events, semantic asset relationships, temporal and operational context, lineage, versioned dataset manifests, and optional Iceberg/MinIO or S3-compatible archival for JEPA, Dreamer, and MuZero-style preparation
 - Tabular ML integration: feature/label-ready dataset contracts and model-registry hooks for user-owned gradient-boosting models such as XGBoost; training and model serving remain selectable user integrations rather than hidden platform dependencies
 - Observability: Prometheus and Grafana
 - UI: Next.js, TypeScript, Tailwind CSS, shadcn/ui
