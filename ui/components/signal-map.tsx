@@ -35,8 +35,8 @@ export function SignalMap({ nodes }: { nodes: PipelineNode[] }) {
             </div>
             <div className="mt-auto h-1 overflow-hidden rounded-full bg-surface-3">
               <div
-                className="h-full rounded-full bg-accent transition-all duration-300"
-                style={{ width: node.status === "active" ? "100%" : node.status === "starting" ? "45%" : "12%" }}
+                className="h-full origin-left rounded-full bg-accent transition-transform duration-200"
+                style={{ transform: `scaleX(${node.status === "active" ? 1 : node.status === "starting" ? 0.45 : 0.12})` }}
               />
             </div>
           </li>

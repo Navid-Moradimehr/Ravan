@@ -420,7 +420,7 @@ export function HistorianDashboard() {
                  <span className="font-mono text-text-primary">{replayQuery.data.progress_percent ?? 0}%</span>
            </div>
                <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${replayQuery.data.progress_percent ?? 0}%` }} />
+                <div className="h-full origin-left rounded-full bg-accent transition-transform duration-200" style={{ transform: `scaleX(${Math.max(0, Math.min(100, replayQuery.data.progress_percent ?? 0)) / 100})` }} />
           </div>
               <div className="text-xs text-text-secondary">{replayQuery.data.events_emitted ?? 0} events emitted</div>
         </div>
