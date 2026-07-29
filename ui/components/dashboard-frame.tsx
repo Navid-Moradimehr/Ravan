@@ -54,7 +54,7 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
 
           <Separator className="my-4 bg-border-subtle" />
 
-          <nav aria-label="Primary" className="space-y-1">
+          <nav aria-label="Desktop primary navigation" className="space-y-1">
             <p className="label-overline mb-2 px-2">Navigate</p>
             {navItems.map((item) => {
               const active = pathname === item.href;
@@ -83,7 +83,7 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
         </aside>
 
         <div className="workspace-column min-w-0 space-y-6">
-          <nav aria-label="Primary" className="mobile-nav-strip relative flex gap-2 overflow-x-auto pb-2 lg:hidden">
+          <nav aria-label="Mobile primary navigation" className="mobile-nav-strip relative flex gap-2 overflow-x-auto pb-2 lg:hidden">
             {navItems.map((item) => {
               const active = pathname === item.href;
               return (

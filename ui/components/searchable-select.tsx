@@ -68,6 +68,7 @@ export function SearchableSelect({
         className="app-select flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:opacity-60"
         aria-haspopup="listbox"
         role="combobox"
+        aria-label={placeholder}
         aria-expanded={open}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}

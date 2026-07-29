@@ -228,9 +228,10 @@ export function SqlQueryPanel() {
             </div>
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem]">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-text-secondary">SQL timeout</label>
+                <label htmlFor="sql-timeout-ms" className="text-xs font-medium text-text-secondary">SQL timeout</label>
                 <Input
                   type="number"
+                  id="sql-timeout-ms"
                   min={1000}
                   max={600000}
                   step={1000}
