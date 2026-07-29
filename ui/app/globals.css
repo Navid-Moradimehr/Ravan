@@ -173,6 +173,31 @@ body {
     border: 1px solid var(--color-border);
   }
 
+  .workspace-column > .app-card,
+  .workspace-column > header.app-card {
+    box-shadow: none;
+    border-color: var(--color-border-subtle);
+  }
+  .workspace-column > .app-card + .app-card,
+  .workspace-column > header.app-card + .app-card {
+    margin-top: -0.5rem;
+  }
+  .context-rail > .app-card {
+    box-shadow: none;
+    background: color-mix(in srgb, var(--color-surface-1) 68%, transparent);
+  }
+  .mobile-nav-strip::before,
+  .mobile-nav-strip::after {
+    content: "";
+    pointer-events: none;
+    position: sticky;
+    z-index: 2;
+    flex: 0 0 1rem;
+    height: 2.5rem;
+  }
+  .mobile-nav-strip::before { left: 0; background: linear-gradient(90deg, var(--color-surface-0), transparent); }
+  .mobile-nav-strip::after { right: 0; margin-left: -1rem; background: linear-gradient(270deg, var(--color-surface-0), transparent); }
+
   .action-primary {
     border: 1px solid color-mix(in srgb, var(--color-accent) 60%, #000000);
     background: var(--color-accent);

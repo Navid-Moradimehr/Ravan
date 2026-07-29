@@ -40,8 +40,8 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
     <div className="industrial-shell flex min-h-dvh flex-col bg-surface-0 text-text-primary">
       <TopBar systemStatus={systemStatus} />
 
-      <main className="mx-auto grid max-w-[1560px] gap-5 px-4 py-5 grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)_320px]">
-        <aside className="panel-rail hidden flex-col rounded-xl p-4 lg:sticky lg:top-[4.5rem] lg:flex lg:h-[calc(100dvh-5.5rem)]">
+      <main className="dashboard-layout mx-auto grid max-w-[1680px] gap-6 px-4 py-5 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_280px] lg:px-6">
+        <aside className="panel-rail hidden flex-col border-y-0 border-l-0 rounded-none bg-transparent p-3 lg:sticky lg:top-[4.5rem] lg:flex lg:h-[calc(100dvh-5.5rem)]">
           <div className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-lg border border-accent/40 bg-accent-subtle text-accent">
               <LayoutDashboard aria-hidden="true" className="size-5" />
@@ -82,8 +82,8 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
 
         </aside>
 
-        <div className="min-w-0 space-y-6">
-          <nav aria-label="Primary" className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
+        <div className="workspace-column min-w-0 space-y-6">
+          <nav aria-label="Primary" className="mobile-nav-strip relative flex gap-2 overflow-x-auto pb-2 lg:hidden">
             {navItems.map((item) => {
               const active = pathname === item.href;
               return (
@@ -108,7 +108,7 @@ export function DashboardFrame({ children, rightRail, systemStatus = "online" }:
           {children}
         </div>
 
-        <aside className="space-y-4">{rightRail}</aside>
+        <aside className="context-rail space-y-4">{rightRail}</aside>
       </main>
       <PlatformFooter />
       <AssistantDrawer />
