@@ -51,15 +51,27 @@ export function SearchableSelect({
     setOpen(false);
   };
 
+  const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    if (["Enter", " ", "ArrowDown"].includes(event.key)) {
+      event.preventDefault();
+      setOpen(true);
+    } else if (event.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
   return (
     <div ref={rootRef} className={`relative ${className}`}>
       <button
         type="button"
         className="app-select flex w-full items-center justify-between text-left disabled:cursor-not-allowed disabled:opacity-60"
         aria-haspopup="listbox"
+        role="combobox"
         aria-expanded={open}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
+        onKeyDown={handleTriggerKeyDown}
       >
         <span className={selected ? "truncate text-text-primary" : "truncate text-text-secondary"}>{selected?.label ?? placeholder}</span>
         <ChevronDown className={`ml-2 size-4 shrink-0 text-text-secondary transition-transform ${open ? "rotate-180" : ""}`} />
@@ -75,6 +87,7 @@ export function SearchableSelect({
               placeholder={searchPlaceholder}
               aria-label={searchPlaceholder}
               className="h-8 pl-8 text-xs"
+              onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setOpen(false); } }}
             />
           </div>
           <div className="max-h-56 overflow-y-auto" role="listbox" aria-label={placeholder}>
