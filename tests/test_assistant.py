@@ -87,6 +87,24 @@ def test_assistant_store_tracks_turns_and_retryable_failures(tmp_path):
     assert retryable and retryable["turn_id"] == turn["turn_id"]
 
 
+def test_start_turn_with_user_message_is_atomic_and_increments_retry_attempt(tmp_path):
+    store = AssistantStore(tmp_path / "assistant.json")
+    thread = store.create_thread(actor_id="operator-1")
+    turn, message = store.start_turn_with_user_message(
+        thread["thread_id"], actor_id="operator-1", content="Inspect the pipeline", context={"route": "/pipeline"}
+    )
+    assert message["metadata"]["turn_id"] == turn["turn_id"]
+    persisted = store.get_thread(thread["thread_id"], actor_id="operator-1")
+    assert persisted and persisted["messages"][-1]["message_id"] == message["message_id"]
+
+    retry, retry_message = store.start_turn_with_user_message(
+        thread["thread_id"], actor_id="operator-1", content="Inspect the pipeline again", retry_of=turn["turn_id"]
+    )
+    assert retry["attempt"] == 2
+    assert retry["retry_of"] == turn["turn_id"]
+    assert retry_message["metadata"]["turn_id"] == retry["turn_id"]
+
+
 def test_secret_like_memory_requests_are_not_persisted(monkeypatch, tmp_path):
     monkeypatch.setenv("RAVAN_ASSISTANT_STORE_PATH", str(tmp_path / "assistant.json"))
     from services.api_service.routers.assistant import _looks_like_secret

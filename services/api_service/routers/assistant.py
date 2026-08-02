@@ -636,10 +636,9 @@ async def _send_message_impl(thread_id: str, request: MessageRequest, _on_token:
     pending_questionnaire = _pending_source_questionnaire(existing_thread)
     retry_of = str(request.context.get("retry_turn_id", "")) or None
     force_gateway = bool(request.context.get("force_gateway", False))
-    turn = store.start_turn(thread_id, actor_id=actor_id, content=request.content, context=request.context, retry_of=retry_of)
+    turn, user_message = store.start_turn_with_user_message(thread_id, actor_id=actor_id, content=request.content, context=request.context, retry_of=retry_of)
     if request.context.get("worker_job"):
         turn = store.claim_turn(turn["turn_id"], actor_id=actor_id) or turn
-    user_message = store.append_message(thread_id, actor_id=actor_id, role="user", content=request.content, metadata={"context": request.context, "turn_id": turn["turn_id"]})
     action_preview = None
     questionnaire = _source_questionnaire() if _source_question_request(request.content) and not _source_action_request(request.content) else None
     if _resume_questionnaire_request(request.content, pending_questionnaire):

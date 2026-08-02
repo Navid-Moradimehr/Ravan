@@ -134,6 +134,31 @@ class PostgresAssistantStore:
             conn.commit()
         return message
 
+    def start_turn_with_user_message(self, thread_id: str, *, actor_id: str, content: str, context: dict[str, Any] | None = None, retry_of: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Commit the turn and its first message together for replica safety."""
+        now = _now()
+        turn_id = f"turn-{uuid.uuid4().hex[:16]}"
+        message_id = f"msg-{uuid.uuid4().hex[:16]}"
+        with get_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT payload FROM ravan_assistant_records WHERE record_type='thread' AND record_id=%s AND actor_id=%s AND COALESCE((payload->>'archived')::boolean, false)=false FOR UPDATE", (thread_id, actor_id))
+                row = cur.fetchone()
+                if not row:
+                    raise KeyError(thread_id)
+                cur.execute("SELECT COALESCE(attempt, 1) AS attempt FROM ravan_assistant_turns WHERE turn_id=%s AND actor_id=%s", (retry_of, actor_id)) if retry_of else None
+                previous = cur.fetchone() if retry_of else None
+                attempt = int(previous["attempt"] if previous else 0) + 1
+                turn = {"turn_id": turn_id, "thread_id": thread_id, "actor_id": actor_id, "content": content, "context": context or {}, "retry_of": retry_of, "attempt": attempt, "status": "running", "created_at": now, "updated_at": now}
+                message = {"message_id": message_id, "role": "user", "content": content, "created_at": now, "metadata": {"context": context or {}, "turn_id": turn_id}}
+                record = dict(row["payload"])
+                record.setdefault("messages", []).append(message)
+                record["updated_at"] = now
+                cur.execute("INSERT INTO ravan_assistant_turns(turn_id, thread_id, actor_id, content, context, retry_of, attempt, status, created_at, updated_at, heartbeat_at) VALUES (%s,%s,%s,%s,%s,%s,%s,'running',%s,%s,%s)", (turn_id, thread_id, actor_id, content, Json(context or {}), retry_of, attempt, now, now, now))
+                cur.execute("INSERT INTO ravan_assistant_records(record_id, record_type, actor_id, thread_id, status, payload) VALUES (%s,'turn',%s,%s,'running',%s)", (turn_id, actor_id, thread_id, Json(turn)))
+                cur.execute("UPDATE ravan_assistant_records SET payload=%s, updated_at=NOW() WHERE record_type='thread' AND record_id=%s AND actor_id=%s", (Json(record), thread_id, actor_id))
+            conn.commit()
+        return turn, message
+
     def start_turn(self, thread_id: str, *, actor_id: str, content: str, context: dict[str, Any] | None = None, retry_of: str | None = None) -> dict[str, Any]:
         if self.get_thread(thread_id, actor_id=actor_id) is None:
             raise KeyError(thread_id)

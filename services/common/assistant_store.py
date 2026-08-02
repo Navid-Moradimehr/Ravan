@@ -97,6 +97,33 @@ class AssistantStore:
         self._persist()
         return message
 
+    def start_turn_with_user_message(self, thread_id: str, *, actor_id: str, content: str, context: dict[str, Any] | None = None, retry_of: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Atomically persist a turn and its user message in the local store.
+
+        The single replace keeps a local-first install from exposing a turn
+        without its message if the process stops between writes.
+        """
+        record = self.get_thread(thread_id, actor_id=actor_id)
+        if record is None:
+            raise KeyError(thread_id)
+        now = _now()
+        attempt = 1
+        if retry_of:
+            previous = self.get_turn(retry_of, actor_id=actor_id)
+            attempt = int((previous or {}).get("attempt", 1)) + 1
+        turn = {
+            "turn_id": f"turn-{uuid.uuid4().hex[:16]}", "thread_id": thread_id,
+            "actor_id": actor_id, "content": content, "context": context or {},
+            "retry_of": retry_of, "attempt": attempt, "status": "running",
+            "created_at": now, "updated_at": now,
+        }
+        message = {"message_id": f"msg-{uuid.uuid4().hex[:16]}", "role": "user", "content": content, "created_at": now, "metadata": {"context": context or {}, "turn_id": turn["turn_id"]}}
+        self._state.setdefault("turns", {})[turn["turn_id"]] = turn
+        self._state["threads"][thread_id]["messages"].append(message)
+        self._state["threads"][thread_id]["updated_at"] = now
+        self._persist()
+        return dict(turn), dict(message)
+
     def start_turn(self, thread_id: str, *, actor_id: str, content: str, context: dict[str, Any] | None = None, retry_of: str | None = None) -> dict[str, Any]:
         if self.get_thread(thread_id, actor_id=actor_id) is None:
             raise KeyError(thread_id)
