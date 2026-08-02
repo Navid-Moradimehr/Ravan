@@ -7,6 +7,11 @@ Ravan is a self-hosted real-time industrial data platform for edge ingestion, lo
 ```text
 OPC UA, MQTT, Modbus, REST, and CDC sources --> Edge Ingest --> Kafka --> Flink --> Historian and AI
 
+Ravan also provides an `amd_versal_v1` gateway profile for Versal telemetry
+and an MCP server for user-owned external agents. See
+[`docs/versal-fpga-integration.md`](docs/versal-fpga-integration.md) and
+[`docs/external-agent-mcp.md`](docs/external-agent-mcp.md).
+
 Prometheus scrapes edge and AI metrics; Grafana and the web dashboard expose operational views.
 ```
 

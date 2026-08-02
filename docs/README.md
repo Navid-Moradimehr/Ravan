@@ -23,6 +23,11 @@ logs, and the maintainer Obsidian vault.
 - [Multi-site rollout](multi-site-rollout.md)
 - [World-model data foundation](world-model-data-foundation.md)
 
+## Integration Guides
+
+- [AMD Versal and FPGA Integration](versal-fpga-integration.md)
+- [External Agent Integration through MCP](external-agent-mcp.md)
+
 ## Operator References
 
 - [Secrets boundary](self-hosted-secrets.md)
