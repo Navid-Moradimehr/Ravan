@@ -146,9 +146,27 @@ PROTOCOL_PROFILES: dict[str, ProtocolProfile] = {
     ),
 }
 
+# Device profiles describe the producer behind an existing industrial
+# protocol.  They do not create a parallel connector taxonomy.
+DEVICE_PROFILES: dict[str, dict[str, Any]] = {
+    "amd_versal_v1": {
+        "name": "AMD Versal gateway",
+        "protocols": ("sparkplug_b", "opcua"),
+        "telemetry": ("health", "dma", "kernel_latency", "inference", "condition_monitoring"),
+        "artifact_modalities": ("waveform", "image", "video", "tensor"),
+        "control_plane": "gateway-owned; Ravan telemetry and artifact ingestion is read-only",
+    },
+}
+
 
 def supported_protocols() -> tuple[str, ...]:
     return tuple(PROTOCOL_PROFILES)
+
+
+def device_profile(profile: str) -> dict[str, Any] | None:
+    """Return metadata for a producer profile carried over a supported protocol."""
+
+    return DEVICE_PROFILES.get(str(profile).strip().lower())
 
 
 def protocol_profile(protocol: str) -> ProtocolProfile | None:
