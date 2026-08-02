@@ -10,6 +10,14 @@ pilot use, while final OS installers and real-site certification remain later
 release gates. It does not change the self-hosted or operator-owned deployment
 model.
 
+This release includes the AMD Versal/FPGA integration boundary: the
+`amd_versal_v1` gateway profile, Sparkplug B and OPC UA normalization contracts,
+artifact-reference handling for waveforms and profiles, and a deterministic
+VCK190-compatible simulator for local and CI validation. The simulator and
+contracts validate the platform data path; physical Versal hardware
+qualification and vendor Vitis hardware-emulation runs remain deployment-level
+acceptance activities.
+
 GitHub Actions validates Python tests, the production Compose profile, the Helm
 chart, and the UI build on every change. A `v*` tag publishes a checksummed
 source bundle and `release-manifest.json`. Installer and signed container-image

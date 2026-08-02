@@ -15,6 +15,7 @@ logs, and the maintainer Obsidian vault.
 - [Historian and dashboards](historian-guide.md)
 - [Observability](observability-walkthrough.md)
 - [Latest benchmark results](latest-benchmark-results.md)
+- [Release identity and capabilities](release-identity.md)
 
 ## Optional Capabilities
 
