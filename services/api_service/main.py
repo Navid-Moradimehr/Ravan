@@ -189,6 +189,11 @@ class HealthResponse(BaseModel):
     services: dict[str, Any] = Field(default_factory=dict)
 
 
+# Initialized after the FastAPI object is constructed so the MCP session
+# manager can share the API lifespan.
+mcp_server = None
+
+
 # Use orjson for faster JSON responses if available
 def _json_response(data):
     try:
@@ -241,7 +246,11 @@ async def lifespan(_app: FastAPI):
         )
     except Exception:
         policy_stop = None
-    yield
+    if mcp_server is not None:
+        async with mcp_server.session_manager.run():
+            yield
+    else:
+        yield
     if policy_stop is not None:
         policy_stop.set()
     for t in tasks:
@@ -317,7 +326,8 @@ app.include_router(realtime_router)
 # explicitly opt into write tools with RAVAN_MCP_ALLOW_WRITE=true.
 from services.mcp_server import build_mcp_server
 
-app.mount("/mcp", build_mcp_server().streamable_http_app())
+mcp_server = build_mcp_server()
+app.mount("/mcp", mcp_server.streamable_http_app())
 from services.api_service.ops_runtime import _render_topic
 
 
