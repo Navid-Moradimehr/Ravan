@@ -26,6 +26,7 @@ ravanctl = "services.cli.datastreamctl:main"
 ravand = "services.cli.datastreamd:main"
 ravan-import = "services.cli.datastream_import:main"
 ravan-mcp = "services.mcp_server:main"
+ravan-versal-sim = "services.cli.versal_sim:main"
 
 [tool.setuptools]
 include-package-data = true

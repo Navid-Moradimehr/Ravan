@@ -32,3 +32,13 @@ def test_simulator_sequence_is_deterministic():
     first = list(iter_metrics(source_id="v", site_id="s", start=start, count=2))
     second = list(iter_metrics(source_id="v", site_id="s", start=start, count=2))
     assert [item.model_dump() for item in first] == [item.model_dump() for item in second]
+
+
+def test_soak_profile_keeps_mcp_and_versal_acceptance_budgets_explicit():
+    import yaml
+
+    with open("config/benchmarks/versal-mcp-soak.yaml", encoding="utf-8") as handle:
+        profile = yaml.safe_load(handle)
+    assert profile["duration_seconds"] == 900
+    assert profile["acceptance"]["max_mcp_errors"] == 0
+    assert profile["versal"]["gateway_protocols"] == ["sparkplug_b", "opcua"]
