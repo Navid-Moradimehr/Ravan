@@ -311,6 +311,13 @@ app.include_router(updates_router)
 app.include_router(assistant_router)
 app.include_router(federation_router)
 app.include_router(realtime_router)
+
+# External agents use MCP as a protocol adapter over the existing Ravan
+# contracts.  The mounted server is loopback/read-only by default; deployments
+# explicitly opt into write tools with RAVAN_MCP_ALLOW_WRITE=true.
+from services.mcp_server import build_mcp_server
+
+app.mount("/mcp", build_mcp_server().streamable_http_app())
 from services.api_service.ops_runtime import _render_topic
 
 
